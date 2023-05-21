@@ -18,10 +18,9 @@ source "${working_dir}/_sourced/messages.sh"
 #export AWS_SECRET_ACCESS_KEY="${DJANGO_AWS_SECRET_ACCESS_KEY}"
 export AWS_STORAGE_BUCKET_NAME="${DJANGO_AWS_STORAGE_BUCKET_NAME}"
 
-
 message_info "Upload the backups directory to S3 bucket {$AWS_STORAGE_BUCKET_NAME}"
 
-aws s3 cp ${BACKUP_DIR_PATH} s3://${AWS_STORAGE_BUCKET_NAME}${BACKUP_DIR_PATH} --recursive
+docker run --rm -it -v ~/.aws:/root/.aws amazon/aws-cli s3 cp ${BACKUP_DIR_PATH} s3://${AWS_STORAGE_BUCKET_NAME}${BACKUP_DIR_PATH} --recursive
 
 message_info "Cleaning the directory ${BACKUP_DIR_PATH}"
 
