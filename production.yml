@@ -71,4 +71,3 @@ services:
       - ./.envs/.production/.django
     volumes:
       - production_postgres_data_backups:/backups:z
-      - /home/ec2-user/.aws:/root/.aws
