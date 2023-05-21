@@ -283,4 +283,5 @@ webpack-stats.json
 .envs/*
 !.envs/.local/
 
-.sh
+.keys
+*.pem

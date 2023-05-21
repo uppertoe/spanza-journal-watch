@@ -1,0 +1,5 @@
+[Unit]
+Description=this service runs /home/ec2-user/backup.sh daily
+
+[Service]
+ExecStart=/home/ec2-user/backup.sh

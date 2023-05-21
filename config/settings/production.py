@@ -106,7 +106,7 @@ EMAIL_SUBJECT_PREFIX = env(
     "DJANGO_EMAIL_SUBJECT_PREFIX",
     default="[SPANZA Journal Watch]",
 )
-
+AWS_DEFAULT_REGION = env("DJANGO_AWS_DEFAULT_REGION", default=None)
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL regex.
