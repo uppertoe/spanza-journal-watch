@@ -8,7 +8,7 @@ from spanza_journal_watch.users.managers import UserManager
 
 class User(AbstractUser):
     """
-    Default custom user model for Journal Watch.
+    Default custom user model for SPANZA Journal Watch.
     If adding fields that need to be filled at user signup,
     check forms.SignupForm and forms.SocialSignupForms accordingly.
     """

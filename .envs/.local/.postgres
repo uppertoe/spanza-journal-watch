@@ -1,0 +1,7 @@
+# PostgreSQL
+# ------------------------------------------------------------------------------
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=spanza_journal_watch
+POSTGRES_USER=JDgmTeAwqHyeEciLqzlJFKkgyuaiJwjK
+POSTGRES_PASSWORD=NHykPyed3auHZv843jpMcqMvd99tLXRvd4woghX65Gq787poUYKllVNN30Tkfa6C

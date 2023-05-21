@@ -27,7 +27,7 @@ django.setup()
 
 # -- Project information -----------------------------------------------------
 
-project = "Journal Watch"
+project = "SPANZA Journal Watch"
 copyright = """2023, Eamonn Upperton"""
 author = "Eamonn Upperton"
 

@@ -1,6 +1,6 @@
-# Journal Watch
+# SPANZA Journal Watch
 
-A web application for the SPANZA Journal Watch project
+A web application for the Society of Paediatric Anaesthesia in New Zealand and Australia - Journal Watch
 
 [![Built with Cookiecutter Django](https://img.shields.io/badge/built%20with-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
 [![Black code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
@@ -80,6 +80,13 @@ Container mailhog will start automatically when you will run all docker containe
 Please check [cookiecutter-django Docker documentation](http://cookiecutter-django.readthedocs.io/en/latest/deployment-with-docker.html) for more details how to start all containers.
 
 With MailHog running, to view messages that are sent by your application, open your browser and go to `http://127.0.0.1:8025`
+
+### Sentry
+
+Sentry is an error logging aggregator service. You can sign up for a free account at <https://sentry.io/signup/?code=cookiecutter> or download and host it yourself.
+The system is set up with reasonable defaults, including 404 logging and integration with the WSGI application.
+
+You must set the DSN url in production.
 
 ## Deployment
 
