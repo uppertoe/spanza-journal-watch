@@ -4,8 +4,14 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from spanza_journal_watch.users.forms import UserAdminChangeForm, UserAdminCreationForm
+from spanza_journal_watch.users.models import HealthService
 
 User = get_user_model()
+
+
+@admin.register(HealthService)
+class HealthServiceAdmin(admin.ModelAdmin):
+    list_display = ("name",)
 
 
 @admin.register(User)
