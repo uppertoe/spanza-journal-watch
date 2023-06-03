@@ -1,6 +1,8 @@
 import datetime
 
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
@@ -126,7 +128,6 @@ class Review(TimeStampedModel):
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     body = models.TextField()
-    pageviews = models.IntegerField(default=0)
     active = models.BooleanField(default=False)
 
     def increment_pageview(self):
@@ -151,7 +152,6 @@ class Issue(TimeStampedModel):
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     body = models.TextField()
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
-    pageviews = models.IntegerField(default=0, blank=True, null=True)
     active = models.BooleanField(default=False)
 
     def increment_pageview(self):
@@ -174,3 +174,26 @@ class Comment(TimeStampedModel):
     body = models.TextField()
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
+
+
+class Hit(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    count = models.PositiveIntegerField(default=0)
+    last_accessed = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def update_page_count(cls, content_object):
+        cls.objects.update_or_create(
+            content_type=ContentType.objects.get_for_model(content_object),
+            object_id=content_object.id,
+            defaults={"count": models.F("count") + 1, "last_accessed": datetime.timezone.now()},
+        )
+
+    @classmethod
+    def get_count(cls, content_object):
+        page_count, _ = cls.objects.get_or_create(
+            content_type=ContentType.objects.get_for_model(content_object), object_id=content_object.id
+        )
+        return page_count.count

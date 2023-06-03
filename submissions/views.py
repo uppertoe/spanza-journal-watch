@@ -15,8 +15,7 @@ class PageviewMixin:
         # Create an empty list if none exists
         viewed_objects = self.request.session.get("viewed_objects", [])
         if obj not in viewed_objects:
-            obj.increment_pageview()
-            obj.save()
+            models.Hit.update_page_count(obj)
         self.request.session["viewed_objects"] = viewed_objects + obj
         return obj
 
