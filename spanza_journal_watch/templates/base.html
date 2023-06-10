@@ -9,7 +9,7 @@
     <meta name="description" content="A web application for the Society of Paediatric Anaesthesia in New Zealand and Australia - Journal Watch">
     <meta name="author" content="Eamonn Upperton">
 
-    <link rel="icon" href="{% static 'images/favicons/favicon.ico' %}">
+    <link rel="icon" href="{% static 'images/favicons/favicon.svg' %}" type="image/svg" size='any'>
     <meta name="theme-color" content="#712cf9">
 
     {% block css %}
@@ -126,19 +126,14 @@
     </div>
 
     <main class="container">
-      <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-        <div class="col-lg-6 px-0">{% block main-feature %}{% endblock main-feature %}</div>
-      </div>
-
+      {% block main-feature %}{% endblock main-feature %}
       <div class="row mb-2">
-            {% block card-feature %}{% endblock card-feature %}
+      {% block card-feature %}{% endblock card-feature %}
       </div>
-
       <div class="row g-5">
         <div class="col-md-8">
-          <h3 class="pb-4 mb-4 fst-italic border-bottom">
-            This issue:
-          </h3>
+          {% block content %}{% endblock content %}
+          {% block article-title %}{% endblock article-title %}
           {% block article-block %}
           {% block articles %}{% endblock articles %}
           {% block pagination %}{% endblock pagination %}
@@ -148,8 +143,7 @@
         <div class="col-md-4">
           <div class="position-sticky" style="top: 2rem;">
             <div class="p-4 mb-3 bg-body-tertiary rounded">
-              <h4 class="fst-italic">About</h4>
-              <p class="mb-0">Customize this section to tell your visitors a little bit about your publication, writers, content, or something else entirely. Totally up to you.</p>
+              {% include "fragments/about.html" %}
             </div>
 
             <div>

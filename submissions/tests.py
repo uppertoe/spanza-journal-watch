@@ -42,6 +42,7 @@ class TagModelTest(TestCase):
 
         # Create a tag with an article
         article = Article.objects.create(name="Article", journal=Journal.objects.create(name="Journal"))
+        tag = Tag.objects.create(text="Used Tag")
         article.tags.add(tag)
         tag.delete_if_orphaned()
         self.assertTrue(Tag.objects.filter(pk=tag.pk).exists())
@@ -67,36 +68,55 @@ class ArticleModelTest(TestCase):
         self.assertEqual(str(self.article), "Test Article")
 
     def test_save_method_creates_tags(self):
-        self.article.tags_string = "Tag1 #Tag2"
+        self.article.tags_string = "Tag1 #Tag2 #Tag3 Tag4"
         self.article.save()
         self.assertEqual(self.article.tags.count(), 2)
 
     def test_save_method_updates_existing_tags(self):
         # Create a tag
-        tag = Tag.objects.create(text="Tag1")
+        tag = Tag.objects.create(text="Tag1 #Tag1")
         self.article.tags.add(tag)
 
+        # Check that the tag has been added
+        self.assertEqual(self.article.tags.count(), 1)
+
         # Update the tags_string
-        self.article.tags_string = "Tag2 #Tag3"
+        self.article.tags_string = "Tag2 #Tag3 #Tag4 #Tag5"
         self.article.save()
 
-        # Check that the tag count remains the same and new tags are created
+        # Check that the tag count reflects the new tags_string and the old tag was pruned
         self.assertEqual(self.article.tags.count(), 3)
 
     def test_shortened_name(self):
-        self.article.name = "Very long article name" * 10
-        shortened_name = "Very long article name" * 5 + "..."
-        self.assertEqual(self.article.shortened_name(), shortened_name)
+        # Create an Article instance with a long name
+        long_name = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed auctor eu sem id bibendum."
+        article = Article(name=long_name)
+
+        # Assert that the shortened name is truncated correctly
+        shortened_name = article.shortened_name()
+        expected_shortened_name = (
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed auctor eu sem id bibendum."
+        )
+        self.assertEqual(shortened_name, expected_shortened_name)
+
+        # Update the name to exceed 200 characters
+        long_name = "A" * 201
+        article.name = long_name
+
+        # Assert that the new shortened name is truncated correctly
+        shortened_name = article.shortened_name()
+        expected_shortened_name = "A" * 200 + "..."
+        self.assertEqual(shortened_name, expected_shortened_name)
 
     def test_tags_list(self):
-        self.article.tags_string = "Tag1 #Tag2"
-        tags_list = ["tag1", "tag2"]
-        self.assertEqual(self.article.tags_list(), tags_list)
+        self.article.tags_string = "Tag1 #Tag2 #Tag3 Tag4"
+        expected_tags = {"tag2", "tag3"}
+        self.assertSetEqual(set(self.article.tags_list()), expected_tags)
 
 
 class ReviewModelTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="testpassword")
+        self.user = User.objects.create_user(email="testuser@mail.com", password="testpassword")
         self.journal = Journal.objects.create(name="Test Journal")
         self.article = Article.objects.create(name="Test Article", journal=self.journal)
         self.review = Review.objects.create(article=self.article, author=self.user, body="Test Body")
@@ -136,7 +156,7 @@ class IssueModelTest(TestCase):
 
     def test_get_main_feature(self):
         # Create a main feature article for the issue
-        feature_article = FeatureArticle.objects.create(name="Main Feature Article")
+        feature_article = FeatureArticle.objects.create(title="Main Feature Article")
         self.issue.main_feature = feature_article
 
         # Check that the correct main feature article is returned
@@ -145,13 +165,13 @@ class IssueModelTest(TestCase):
 
 class CommentModelTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="testpassword")
+        self.user = User.objects.create_user(email="testuser@mail.com", password="testpassword")
         self.journal = Journal.objects.create(name="Test Journal")
         self.article = Article.objects.create(name="Test Article", journal=self.journal)
         self.comment = Comment.objects.create(body="Test Body", article=self.article, author=self.user)
 
     def test_str_representation(self):
-        self.assertEqual(str(self.comment), "Comment")
+        self.assertEqual(str(self.comment), "Test Body")
 
     def test_comment_author(self):
         self.assertEqual(self.comment.author, self.user)
@@ -160,15 +180,15 @@ class CommentModelTest(TestCase):
         self.assertEqual(self.comment.article, self.article)
 
 
-class HitModelTest(TestCase):
+class HitTestCase(TestCase):
     def setUp(self):
-        self.journal = Journal.objects.create(name="Test Journal")
-        self.article = Article.objects.create(name="Test Article", journal=self.journal)
+        self.article = Article.objects.create(name="Test Article")
         self.hit = Hit.objects.create(content_object=self.article)
 
     def test_update_page_count(self):
         initial_count = self.hit.count
         Hit.update_page_count(self.article)
+        self.hit.refresh_from_db()  # Refresh the object from the database
         self.assertEqual(self.hit.count, initial_count + 1)
 
     def test_get_count(self):

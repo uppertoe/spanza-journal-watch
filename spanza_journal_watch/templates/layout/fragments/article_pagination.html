@@ -1,4 +1,4 @@
-<nav aria-label="...">
+<nav aria-label="Article navigation">
     <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
@@ -13,18 +13,18 @@
         {% for page in page_obj.paginator.page_range %}
         {% if page == page_obj.number %}
         <li class="page-item active" aria-current="page">
-            <a class="page-link" href="#articles">{{ page }}</a>
+            <a class="page-link">{{ page }}</a>
         </li>
         {% else %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page }}#articles" hx-get="{{ request.path }}?page={{ page }}" hx-target="#article-block">{{ page }}</a>
+            <a class="page-link" href="?page={{ page }}" hx-get="{{ request.path }}?page={{ page }}" hx-target="#article-block">{{ page }}</a>
         </li>
         {% endif %}
         {% endfor %}
 
         {% if page_obj.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block">Next</a>
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block">Next</a>
         </li>
         {% else %}
         <li class="page-item disabled">

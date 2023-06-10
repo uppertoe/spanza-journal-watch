@@ -4,8 +4,9 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import IntegrityError, models
+from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 
 from spanza_journal_watch.utils.functions import unique_slugify
@@ -62,7 +63,7 @@ class Journal(TimeStampedModel):
 class Article(TimeStampedModel):
     name = models.TextField()
     tags_string = models.TextField(blank=True, null=False, verbose_name="Add #hashtags that describe this article")
-    journal = models.ForeignKey(Journal, on_delete=models.CASCADE)
+    journal = models.ForeignKey(Journal, on_delete=models.CASCADE, null=True, blank=True)
     year = models.IntegerField(
         validators=[MinValueValidator(1900), MaxValueValidator(datetime.date.today().year + 1)],
         default=datetime.date.today().year,
@@ -95,8 +96,8 @@ class Article(TimeStampedModel):
         Returns a list of unique 'hashtag' strings
         """
         hashtag_list = []
-        for word in self.tags_string.split(" #"):
-            if slugify(word):  # Ensure non-empty string after slugify
+        for word in self.tags_string.split(" "):
+            if slugify(word) and word[0] == "#":  # Ensure non-empty string after slugify
                 hashtag_list.append(slugify(word[:255]))
         return list(set(hashtag_list))
 
@@ -107,26 +108,19 @@ class Article(TimeStampedModel):
         Returns a list of Tags matching the tags_string
         """
         current_tags = []
-        tag_objects = []
 
         for text in self.tags_list():
             try:
                 tag = Tag.objects.get(text=text)
             except Tag.DoesNotExist:
                 tag = Tag(text=text)
-                tag_objects.append(tag)
+                tag.save()
             except Tag.MultipleObjectsReturned:
                 print(f"Warning: multiple matching tags for {tag}")
                 continue
             current_tags.append(tag)
-
-        try:
-            Tag.objects.bulk_create(tag_objects)
-        except IntegrityError as e:
-            print(f"IntegrityError occurred during bulk creation: {e}")
-
-        for tag in tag_objects:
             tag.articles.add(self)  # Will not duplicate relation, but triggers signals
+
         return current_tags
 
     def prune_tag_objects(self, current_tags):
@@ -159,7 +153,7 @@ class Review(TimeStampedModel):
 
 class Issue(TimeStampedModel):
     name = models.CharField(max_length=255, null=False, blank=False)
-    date = models.DateField()
+    date = models.DateField(null=True, blank=True)
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     body = models.TextField()
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
@@ -200,6 +194,9 @@ class Comment(TimeStampedModel):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
 
+    def __str__(self):
+        return self.body
+
 
 class Hit(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -213,7 +210,7 @@ class Hit(models.Model):
         cls.objects.update_or_create(
             content_type=ContentType.objects.get_for_model(content_object),
             object_id=content_object.id,
-            defaults={"count": models.F("count") + 1, "last_accessed": datetime.timezone.now()},
+            defaults={"count": models.F("count") + 1, "last_accessed": timezone.now()},
         )
 
     @classmethod

@@ -1,25 +1,26 @@
 {% extends "base.html" %}
 
 {% block main-feature %}
-<h1 class="display-4 fst-italic">{{ main_feature.title }}</h1>
-<p class="lead my-3">{{ main_feature.body }}</p>
-<p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
+{% include "layout/fragments/main_feature.html" %}
 {% endblock main-feature %}
 
 {% block card-feature %}
 {% for feature in card_features %}
-{% include "fragments/card_feature.html" %}
+{% include "layout/fragments/card_feature.html" %}
 {% endfor %}
 {% endblock card-feature %}
 
+{% block article-title %}
+<h3 class="pb-4 mb-4 fst-italic border-bottom">This issue:</h3>
+{% endblock article-title %}
 {% block article-block %}
 <div id="article-block">
 {% block articles %}
-{% include "fragments/articles.html" %}
+{% include "layout/fragments/articles.html" %}
 {% endblock articles %}
 
 {% block pagination %}
-{% include "fragments/article_pagination.html" %}
+{% include "layout/fragments/article_pagination.html" %}
 {% endblock pagination %}
 </div>
 {% endblock article-block %}

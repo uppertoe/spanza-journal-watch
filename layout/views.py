@@ -6,15 +6,15 @@ from .models import FeatureArticle, Homepage
 
 
 class HomepageView(ListView):
-    template_name = "pages/home.html"
-    paginate_by = 2
+    template_name = "layout/home.html"
+    paginate_by = 1
     context_object_name = "body_articles"
     number_of_card_features = 2
 
     def render_htmx_response(self):
         context = self.get_context_data()
-        articles_html = render_to_string("fragments/articles.html", context, request=self.request)
-        pagination_html = render_to_string("fragments/article_pagination.html", context, request=self.request)
+        articles_html = render_to_string("layout/fragments/articles.html", context, request=self.request)
+        pagination_html = render_to_string("layout/fragments/article_pagination.html", context, request=self.request)
         response = articles_html + pagination_html
         return HttpResponse(response)
 
