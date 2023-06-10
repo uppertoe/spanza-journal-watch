@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models
 from django.urls import reverse
 from django.utils.text import slugify
 
@@ -14,7 +14,7 @@ from spanza_journal_watch.utils.models import TimeStampedModel
 
 class Tag(models.Model):
     text = models.CharField(max_length=255, unique=True, blank=False, null=False)
-    slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
+    slug = models.SlugField(max_length=255, blank=True, unique=True)
     active = models.BooleanField(default=True)
     articles = models.ManyToManyField("Article", related_name="tags")
 
@@ -24,15 +24,14 @@ class Tag(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.text))
-        return super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse("tag-detail", kwargs={"slug": self.slug})
 
     def all_tags_list():
         tags = (
-            Tag.objects.all()
-            .exclude(active=False)
+            Tag.objects.exclude(active=False)
             .annotate(article_count=models.Count("articles"))
             .order_by("-article_count")
             .values_list("text", flat=True)
@@ -108,17 +107,26 @@ class Article(TimeStampedModel):
         Returns a list of Tags matching the tags_string
         """
         current_tags = []
+        tag_objects = []
+
         for text in self.tags_list():
             try:
                 tag = Tag.objects.get(text=text)
             except Tag.DoesNotExist:
                 tag = Tag(text=text)
-                tag.save()
+                tag_objects.append(tag)
             except Tag.MultipleObjectsReturned:
                 print(f"Warning: multiple matching tags for {tag}")
                 continue
-            tag.articles.add(self)  # Will not duplicate relation, but triggers signals
             current_tags.append(tag)
+
+        try:
+            Tag.objects.bulk_create(tag_objects)
+        except IntegrityError as e:
+            print(f"IntegrityError occurred during bulk creation: {e}")
+
+        for tag in tag_objects:
+            tag.articles.add(self)  # Will not duplicate relation, but triggers signals
         return current_tags
 
     def prune_tag_objects(self, current_tags):
