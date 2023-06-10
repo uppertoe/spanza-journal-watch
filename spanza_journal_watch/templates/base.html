@@ -136,12 +136,50 @@
 
       <div class="row g-5">
         <div class="col-md-8">
-          <h3 class="pb-4 mb-4 fst-italic border-bottom">
+          <h3 class="pb-4 mb-4 fst-italic border-bottom" id="articles">
             This issue:
           </h3>
           {% block articles %}{% endblock articles %}
 
-          {% block pagination %}{% endblock pagination %}
+          {% block pagination %}
+          {% if page_obj %}
+          <nav aria-label="...">
+            <ul class="pagination">
+              {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}#articles">Previous</a>
+              </li>
+              {% else %}
+              <li class="page-item disabled">
+                <a class="page-link">Previous</a>
+              </li>
+              {% endif %}
+
+              {% for page in page_obj.paginator.page_range %}
+              {% if page == page_obj.number %}
+              <li class="page-item active" aria-current="page">
+                <a class="page-link" href="#articles">{{ page }}</a>
+              </li>
+              {% else %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page }}#articles">{{ page }}</a>
+              </li>
+              {% endif %}
+              {% endfor %}
+
+              {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}#articles">Next</a>
+              </li>
+              {% else %}
+              <li class="page-item disabled">
+                <a class="page-link">Next</a>
+              </li>
+              {% endif %}
+            </ul>
+          </nav>
+          {% endif %}
+          {% endblock pagination %}
         </div>
         {% block sidebar %}
         <div class="col-md-4">

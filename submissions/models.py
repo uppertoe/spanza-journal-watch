@@ -85,6 +85,12 @@ class Article(TimeStampedModel):
             current_tags = self.create_tag_objects()  # Creates new tags where necessary
             self.prune_tag_objects(current_tags)
 
+    def shortened_name(self):
+        length = 200
+        if len(self.name) > length:
+            return f"{self.name[:length]}..."
+        return self.name
+
     def tags_list(self):
         """
         Returns a list of unique 'hashtag' strings
@@ -129,10 +135,7 @@ class Review(TimeStampedModel):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     body = models.TextField()
     active = models.BooleanField(default=False)
-
-    def increment_pageview(self):
-        self.pageviews += 1
-        return self.pageviews
+    is_featured = models.BooleanField(default=False)
 
     def get_absolute_url(self):
         reverse("review-detail", kwargs={"slug": self.slug})
@@ -153,10 +156,24 @@ class Issue(TimeStampedModel):
     body = models.TextField()
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
     active = models.BooleanField(default=False)
+    main_feature = models.ForeignKey(
+        to="layout.FeatureArticle",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="main_features",
+        related_query_name="main_feature",
+    )
 
-    def increment_pageview(self):
-        self.pageviews += 1
-        return self.pageviews
+    def get_card_features(self):
+        features = []
+        for review in self.reviews.all():
+            if review.is_featured:
+                features.append(review)
+        return features
+
+    def get_main_feature(self):
+        return self.main_feature
 
     def get_absolute_url(self):
         reverse("issue-detail", kwargs={"slug": self.slug})
