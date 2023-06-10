@@ -1,5 +1,9 @@
-<article class="article-post">
+<div id="articles">
+{% for article in body_articles %}
+    <article class="article-post">
     <h2 class="display-5 link-body-emphasis mb-1">{{ article }}</h2>
     <p class="article-post-meta">{{ article.created|date:"F j, Y" }} <a href="#">{{ article.author }}</a></p>
     {{ article.body|linebreaks }}
-</article>
+    </article>
+{% endfor %}
+</div>

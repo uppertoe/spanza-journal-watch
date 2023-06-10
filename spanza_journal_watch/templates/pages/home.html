@@ -12,8 +12,14 @@
 {% endfor %}
 {% endblock card-feature %}
 
+{% block article-block %}
+<div id="article-block">
 {% block articles %}
-{% for article in body_articles %}
-{% include "fragments/article_post.html" %}
-{% endfor %}
+{% include "fragments/articles.html" %}
 {% endblock articles %}
+
+{% block pagination %}
+{% include "fragments/article_pagination.html" %}
+{% endblock pagination %}
+</div>
+{% endblock article-block %}
