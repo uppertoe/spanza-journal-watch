@@ -9,5 +9,8 @@ class LayoutConfig(AppConfig):
     def ready(self):
         from .models import Homepage
 
-        latest_homepage = Homepage.objects.filter(publication_ready=True).latest("created")
-        Homepage.publish_homepage(latest_homepage)
+        try:
+            latest_homepage = Homepage.objects.filter(publication_ready=True).latest("created")
+            Homepage.publish_homepage(latest_homepage)
+        except:  # noqa
+            print("Skipped Homepage import")
