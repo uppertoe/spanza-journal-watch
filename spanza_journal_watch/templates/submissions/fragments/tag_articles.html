@@ -3,9 +3,7 @@
     <article class="article-post">
     <h2 class="display-5 link-body-emphasis mb-1">{{ article }}</h2>
     <p class="article-post-meta">{{ article.created|date:"F j, Y" }} <a href="#">{{ article.author }}</a></p>
-    {% for review in article.reviews.all %}
-    <div>{{ review.body|linebreaks }}</div>
-    {% endfor %}
+    <div>{{ article.get_related_review|linebreaks }}</div>
     </article>
 {% endfor %}
 </div>

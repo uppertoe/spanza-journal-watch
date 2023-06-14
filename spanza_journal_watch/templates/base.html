@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>{% block title %}SPANZA Journal Watch{% endblock title %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="A web application for the Society of Paediatric Anaesthesia in New Zealand and Australia - Journal Watch">
     <meta name="author" content="Eamonn Upperton">
 
@@ -19,7 +19,7 @@
 
     <!-- This file stores project-specific CSS -->
     {% render_bundle 'project' 'css' %}
-    <link rel="stylesheet" href={% static 'css/theme.css'%}>
+    <link rel="stylesheet" href="{% static 'css/theme.css'%}">
     {% endblock %}
     <!-- Le javascript
     ================================================== -->
@@ -119,7 +119,7 @@
       <div class="nav-scroller py-1 mb-3 border-bottom">
         <nav class="nav nav-underline justify-content-between">
           <a class="nav-item nav-link link-body-emphasis active" href="#">This issue</a>
-          <a class="nav-item nav-link link-body-emphasis" href="#">Previous issues</a>
+          <a class="nav-item nav-link link-body-emphasis" href="{% url "issue-list" %}">Previous issues</a>
           <a class="nav-item nav-link link-body-emphasis" href="#">Search</a>
           <a class="nav-item nav-link link-body-emphasis" href="#">Dashboard</a>
         </nav>
@@ -128,9 +128,7 @@
 
     <main class="container">
       {% block main-feature %}{% endblock main-feature %}
-      <div class="row mb-2">
       {% block card-feature %}{% endblock card-feature %}
-      </div>
       <div class="row g-5">
         <div class="col-md-8">
           {% block content %}{% endblock content %}
@@ -147,22 +145,22 @@
               {% include "fragments/about.html" %}
             </div>
 
-            {% if issues %}
+            {% if sidebar_issues %}
             <div>
               <h4 class="fst-italic">Issues</h4>
               <ul class="list-unstyled">
-                {% for issue in issues %}
+                {% for issue in sidebar_issues %}
                 {% include 'fragments/sidebar_issue.html' %}
                 {% endfor %}
               </ul>
             </div>
             {% endif %}
 
-            {% if tags %}
+            {% if sidebar_tags %}
             <div class="p-4">
               <h4 class="fst-italic">Topics</h4>
               <ol class="list-unstyled mb-0">
-                {% for tag in tags %}
+                {% for tag in sidebar_tags %}
                 <li><a href="{{ tag.get_absolute_url }}">{{ tag }}</a></li>
                 {% endfor %}
               </ol>
@@ -182,20 +180,25 @@
 
     </main>
 
-    <div class="container">
-
       {% if messages %}
+      <div class="container">
         {% for message in messages %}
           <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}">
             {{ message }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
         {% endfor %}
+      </div> <!-- /container -->
       {% endif %}
 
-    </div> <!-- /container -->
-
     {% block modal %}{% endblock modal %}
+
+    <footer class="py-5 text-center text-body-secondary bg-body-tertiary">
+      <p>Blog template built for <a href="https://getbootstrap.com/">Bootstrap</a> by <a href="https://twitter.com/mdo">@mdo</a>.</p>
+      <p class="mb-0">
+        <a href="#">Back to top</a>
+      </p>
+    </footer>
 
     {% block inline_javascript %}
     {% comment %}
@@ -206,5 +209,6 @@
     </script>
     {% endcomment %}
     {% endblock inline_javascript %}
+
   </body>
 </html>

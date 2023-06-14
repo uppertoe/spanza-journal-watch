@@ -12,6 +12,11 @@ class SaveAuthorMixin:
         super().save_model(request, obj, form, change)
 
 
+@admin.register(models.Hit)
+class HitAdmin(admin.ModelAdmin):
+    list_display = ("content_object", "count")
+
+
 class JournalAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name", "abbreviation")

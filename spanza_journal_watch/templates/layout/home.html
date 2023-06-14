@@ -5,9 +5,13 @@
 {% endblock main-feature %}
 
 {% block card-feature %}
+{% if card_features %}
+<div class="row mb-2">
 {% for feature in card_features %}
 {% include "layout/fragments/card_feature.html" %}
 {% endfor %}
+</div>
+{% endif %}
 {% endblock card-feature %}
 
 {% block article-title %}

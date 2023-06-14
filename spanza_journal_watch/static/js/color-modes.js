@@ -75,19 +75,6 @@
       }
     });
 
-  const switchSVG = (theme) => {
-    const objectElement = document.getElementById('logo');
-    const svgDoc = objectElement.contentDocument;
-    const svgElement = svgDoc.querySelector('svg');
-    if (theme === 'dark') {
-      svgElement.style.fill = '#FFF';
-      svgElement.style.background = 'transparent';
-    } else {
-      svgElement.style.fill = '#000';
-      svgElement.style.background = 'transparent';
-    }
-  };
-
   window.addEventListener('DOMContentLoaded', () => {
     showActiveTheme(getPreferredTheme());
 
@@ -97,7 +84,6 @@
         setStoredTheme(theme);
         setTheme(theme);
         showActiveTheme(theme, true);
-        switchSVG(theme);
       });
     });
   });

@@ -87,6 +87,9 @@ class Article(TimeStampedModel):
             current_tags = self.create_tag_objects()  # Creates new tags where necessary
             self.prune_tag_objects(current_tags)
 
+    def get_related_review(self):
+        return self.reviews.exclude(active=False).order_by("-created")[0]
+
     def shortened_name(self):
         return shorten_text(self.name, self.TRUNCATED_NAME_LENGTH)
 
@@ -144,7 +147,7 @@ class Review(TimeStampedModel):
         return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
 
     def get_absolute_url(self):
-        reverse("review-detail", kwargs={"slug": self.slug})
+        return reverse("review-detail", kwargs={"slug": self.slug})
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -182,7 +185,7 @@ class Issue(TimeStampedModel):
         return self.main_feature
 
     def get_absolute_url(self):
-        reverse("issue-detail", kwargs={"slug": self.slug})
+        return reverse("issue-detail", kwargs={"slug": self.slug})
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -209,13 +212,26 @@ class Hit(models.Model):
     count = models.PositiveIntegerField(default=0)
     last_accessed = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = ("content_type", "object_id")
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
+
     @classmethod
     def update_page_count(cls, content_object):
-        cls.objects.update_or_create(
-            content_type=ContentType.objects.get_for_model(content_object),
-            object_id=content_object.id,
-            defaults={"count": models.F("count") + 1, "last_accessed": timezone.now()},
-        )
+        content_type = ContentType.objects.get_for_model(content_object)
+        id = content_object.id
+
+        try:
+            hit = cls.objects.get(content_type=content_type, object_id=id)
+        except cls.DoesNotExist:
+            hit = cls(content_type=content_type, object_id=id)
+            hit.save()
+
+        hit.count = models.F("count") + 1
+        hit.last_accessed = timezone.now()
+        hit.save(update_fields=["count", "last_accessed"])
 
     @classmethod
     def get_count(cls, content_object):

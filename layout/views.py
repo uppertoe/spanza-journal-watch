@@ -19,8 +19,10 @@ class SidebarMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["issues"] = Issue.objects.exclude(active=False).order_by("-created")[: self.number_of_sidebar_issues]
-        context["tags"] = (
+        context["sidebar_issues"] = Issue.objects.exclude(active=False).order_by("-created")[
+            : self.number_of_sidebar_issues
+        ]
+        context["sidebar_tags"] = (
             Tag.objects.exclude(active=False)
             .annotate(article_count=Count("articles"))
             .order_by("-article_count")[: self.number_of_tags]

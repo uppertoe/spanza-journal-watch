@@ -1,0 +1,21 @@
+<div id="articles">
+    <div class="row row-cols-{{ article_cols }} g-3 p-3">
+        {% for review in articles %}
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                {{ review.article.journal }}
+                </div>
+                <div class="card-body">
+                <h5 class="card-title">{{ review.article }}</h5>
+                <p class="card-text">{{ review.get_truncated_body }}</p>
+                <div class="btn-group" role="group" aria-label="Explore reviewed article">
+                    <a href="{{ review.get_absolute_url }}" type="button" class="btn btn-outline-primary">Review</a>
+                    {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-outline-primary">View full text article</a>{% endif %}
+                  </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
