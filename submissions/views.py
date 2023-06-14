@@ -28,7 +28,7 @@ class PageviewMixin:
         return obj
 
 
-class ReviewDetailView(PageviewMixin, DetailView):
+class ReviewDetailView(PageviewMixin, SidebarMixin, DetailView):
     model = Review
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
@@ -41,7 +41,7 @@ class ReviewListView(ListView):
     queryset = Review.objects.exclude(active=False).order_by("-created")
 
 
-class IssueDetailView(PageviewMixin, SingleObjectMixin, ListView):
+class IssueDetailView(PageviewMixin, SidebarMixin, SingleObjectMixin, ListView):
     template_name = "submissions/issue_detail.html"
     context_object_name = "articles"
 
