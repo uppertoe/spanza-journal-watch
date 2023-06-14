@@ -94,18 +94,16 @@ class ArticleModelTest(TestCase):
 
         # Assert that the shortened name is truncated correctly
         shortened_name = article.shortened_name()
-        expected_shortened_name = (
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed auctor eu sem id bibendum."
-        )
+        expected_shortened_name = "Lorem ipsum dolor sit amet, consectetur..."
         self.assertEqual(shortened_name, expected_shortened_name)
 
         # Update the name to exceed 200 characters
-        long_name = "A" * 201
+        long_name = "A" * (article.TRUNCATED_NAME_LENGTH + 1)
         article.name = long_name
 
         # Assert that the new shortened name is truncated correctly
         shortened_name = article.shortened_name()
-        expected_shortened_name = "A" * 200 + "..."
+        expected_shortened_name = "A" * article.TRUNCATED_NAME_LENGTH + "..."
         self.assertEqual(shortened_name, expected_shortened_name)
 
     def test_tags_list(self):

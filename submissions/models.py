@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
-from spanza_journal_watch.utils.functions import unique_slugify
+from spanza_journal_watch.utils.functions import shorten_text, unique_slugify
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 
@@ -20,7 +20,7 @@ class Tag(models.Model):
     articles = models.ManyToManyField("Article", related_name="tags")
 
     def __str__(self):
-        return self.text
+        return f"#{self.text}"
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -61,6 +61,8 @@ class Journal(TimeStampedModel):
 
 
 class Article(TimeStampedModel):
+    TRUNCATED_NAME_LENGTH = 50
+
     name = models.TextField()
     tags_string = models.TextField(blank=True, null=False, verbose_name="Add #hashtags that describe this article")
     journal = models.ForeignKey(Journal, on_delete=models.CASCADE, null=True, blank=True)
@@ -86,10 +88,7 @@ class Article(TimeStampedModel):
             self.prune_tag_objects(current_tags)
 
     def shortened_name(self):
-        length = 200
-        if len(self.name) > length:
-            return f"{self.name[:length]}..."
-        return self.name
+        return shorten_text(self.name, self.TRUNCATED_NAME_LENGTH)
 
     def tags_list(self):
         """
@@ -132,12 +131,17 @@ class Article(TimeStampedModel):
 
 
 class Review(TimeStampedModel):
+    TRUNCATED_BODY_LENGTH = 200
+
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     body = models.TextField()
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
+
+    def get_truncated_body(self):
+        return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
 
     def get_absolute_url(self):
         reverse("review-detail", kwargs={"slug": self.slug})

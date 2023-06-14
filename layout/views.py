@@ -1,14 +1,39 @@
+from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.views.generic import DetailView, ListView
 
+from submissions.models import Issue, Tag
+
 from .models import FeatureArticle, Homepage
 
 
-class HomepageView(ListView):
+class SidebarMixin:
+    """
+    Adds sidebar features to the context
+    """
+
+    # Layout variables
+    number_of_sidebar_issues = 3
+    number_of_tags = 8
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["issues"] = Issue.objects.exclude(active=False).order_by("-created")[: self.number_of_sidebar_issues]
+        context["tags"] = (
+            Tag.objects.exclude(active=False)
+            .annotate(article_count=Count("articles"))
+            .order_by("-article_count")[: self.number_of_tags]
+        )
+        return context
+
+
+class HomepageView(SidebarMixin, ListView):
     template_name = "layout/home.html"
-    paginate_by = 1
+    paginate_by = 2
     context_object_name = "body_articles"
+
+    # Layout variables
     number_of_card_features = 2
 
     def render_htmx_response(self):
@@ -25,16 +50,14 @@ class HomepageView(ListView):
 
     def get_queryset(self):
         homepage = Homepage.get_current_homepage()
-        articles = homepage.get_articles()
-        queryset = articles.get("body_articles")
+        queryset = homepage.issue.reviews.exclude(active=False).order_by("-created")
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         homepage = Homepage.get_current_homepage()
-        articles = homepage.get_articles()
         context["main_feature"] = homepage.get_main_feature()
-        context["card_features"] = articles.get("features")[: self.number_of_card_features]
+        context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]
         return context
 
 

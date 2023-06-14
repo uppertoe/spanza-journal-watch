@@ -17,6 +17,7 @@ urlpatterns = [
     path("users/", include("spanza_journal_watch.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
+    path("", include("submissions.urls")),
     path("feature/", include("layout.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

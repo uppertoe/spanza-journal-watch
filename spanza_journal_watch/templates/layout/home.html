@@ -20,7 +20,9 @@
 {% endblock articles %}
 
 {% block pagination %}
+{% if page_obj %}
 {% include "layout/fragments/article_pagination.html" %}
+{% endif %}
 {% endblock pagination %}
 </div>
 {% endblock article-block %}

@@ -1,6 +1,8 @@
 from django.views.generic import DetailView, ListView
 
-from . import models
+from layout.views import SidebarMixin
+
+from .models import Hit, Issue, Review, Tag
 
 
 class PageviewMixin:
@@ -15,45 +17,45 @@ class PageviewMixin:
         # Create an empty list if none exists
         viewed_objects = self.request.session.get("viewed_objects", [])
         if obj not in viewed_objects:
-            models.Hit.update_page_count(obj)
+            Hit.update_page_count(obj)
         self.request.session["viewed_objects"] = viewed_objects + obj
         return obj
 
 
 class ReviewDetailView(PageviewMixin, DetailView):
-    model = models.Review
+    model = Review
     context_object_name = "review"
     template_name = "reviews/review_detail.html"
 
 
 class ReviewListView(ListView):
-    model = models.Review
+    model = Review
     context_object_name = "review_list"
     template_name = "reviews/review_list.html"
-    queryset = models.Review.objects.all().exclude(active=False).order_by("-created")
+    queryset = Review.objects.exclude(active=False).order_by("-created")
 
 
 class IssueDetailView(PageviewMixin, DetailView):
-    model = models.Issue
+    model = Issue
     context_object_name = "issue"
     template_name = "issues/issue_detail.html"
 
 
 class IssueListView(ListView):
-    model = models.Issue
+    model = Issue
     context_object_name = "issue_list"
     template_name = "issues/issue_list.html"
-    queryset = models.Issue.objects.all().exclude(active=False).order_by("-created")
+    queryset = Issue.objects.exclude(active=False).order_by("-created")
 
 
 class TagListView(ListView):
-    model = models.Tag
+    model = Tag
     context_object_name = "tag_list"
     template_name = "tags/tag_list.html"
-    queryset = models.Tag.objects.all().exclude(active=False).order_by("text")
+    queryset = Tag.objects.exclude(active=False).order_by("text")
 
 
-class TagDetailView(DetailView):
-    model = models.Tag
+class TagDetailView(SidebarMixin, DetailView):
+    model = Tag
     context_object_name = "tag"
-    template_name = "tags/tag_detail.html"
+    template_name = "submissions/tag_detail.html"

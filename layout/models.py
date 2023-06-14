@@ -2,18 +2,25 @@ from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
 
-from spanza_journal_watch.utils.functions import unique_slugify
+from spanza_journal_watch.utils.functions import HTMLShortener, unique_slugify
 from spanza_journal_watch.utils.models import TimeStampedModel
 from submissions.models import Issue
 
 
 class FeatureArticle(TimeStampedModel):
+    # Constants
+    TRUNCATED_BODY_LENGTH = 200
+
     # Fields
     title = models.CharField(max_length=255)
     body = models.TextField(null=True, blank=True)
     slug = models.SlugField(unique=True, blank=True)
 
     # Instance methods
+    def get_truncated_body(self):
+        # return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
+        return HTMLShortener(self.TRUNCATED_BODY_LENGTH).truncate_html(self.body)
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.title))
@@ -55,12 +62,9 @@ class Homepage(TimeStampedModel):
             return self.main_feature
         return self.issue.get_main_feature()
 
-    def get_articles(self):
-        all_articles = self.issue.reviews.exclude(active=False).order_by("created")
-        features = all_articles.filter(is_featured=True)
-        body_articles = all_articles
-
-        return {"features": features, "body_articles": body_articles}
+    def get_card_features(self):
+        card_features = self.issue.reviews.exclude(active=False).order_by("created").filter(is_featured=True)
+        return card_features
 
     # Special methods
     def __str__(self):
