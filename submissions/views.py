@@ -10,21 +10,21 @@ from .models import Hit, Issue, Review, Tag
 
 class PageviewMixin:
     """
-    Uses a list of viewed objects in the session
-    Calls obj.increment_pageview() and obj.save() if
-    an object has not already been viewed
+    Takes the obj and stores it in the session
+    in the form of {obj.model_name: obj.id}
+    If an obj.id is not present, call Hit.update_page_count
     """
 
     def get_object(self, **kwargs):
         obj = super().get_object(**kwargs)
-        model_str = f"model_{str(obj.__class__.__name__).lower()}_hits"
-        print(model_str)
+        model_class = str(obj.__class__.__name__).lower()
+        model_str = f"model_{model_class}_viewed"
         viewed_objects = self.request.session.get(model_str, [])
-        print(viewed_objects)
         if obj.id not in viewed_objects:
             Hit.update_page_count(obj)
             viewed_objects.append(obj.id)
         self.request.session[model_str] = viewed_objects
+        print(f"{model_str}: {viewed_objects}")
         return obj
 
 
@@ -41,7 +41,7 @@ class ReviewListView(ListView):
     queryset = Review.objects.exclude(active=False).order_by("-created")
 
 
-class IssueDetailView(SingleObjectMixin, ListView):
+class IssueDetailView(PageviewMixin, SingleObjectMixin, ListView):
     template_name = "submissions/issue_detail.html"
     context_object_name = "articles"
 

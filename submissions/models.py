@@ -220,18 +220,17 @@ class Hit(models.Model):
 
     @classmethod
     def update_page_count(cls, content_object):
+        # Implement 'get_or_create' to allow for F() operations
         content_type = ContentType.objects.get_for_model(content_object)
         id = content_object.id
-
         try:
             hit = cls.objects.get(content_type=content_type, object_id=id)
         except cls.DoesNotExist:
             hit = cls(content_type=content_type, object_id=id)
             hit.save()
-
-        hit.count = models.F("count") + 1
+        hit.count = models.F("count") + 1  # database-side operation
         hit.last_accessed = timezone.now()
-        hit.save(update_fields=["count", "last_accessed"])
+        hit.save(update_fields=["count", "last_accessed"])  # avoid race condition
 
     @classmethod
     def get_count(cls, content_object):
@@ -239,3 +238,6 @@ class Hit(models.Model):
             content_type=ContentType.objects.get_for_model(content_object), object_id=content_object.id
         )
         return page_count.count
+
+    def __str__(self):
+        return f"Hitcount: {str(self.content_object)}"
