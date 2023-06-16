@@ -12,7 +12,9 @@
                                 <a href="{{ review.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">Article review</a>
                                 {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>{% endif %}
                             </div>
-                            <small class="text-body-secondary">9 mins</small>
+                            {% with time=review.get_reading_time %}
+                            <small class="text-body-secondary">{{ time }} min{{ time|pluralize }}</small>
+                            {% endwith %}
                         </div>
                 </div>
             </div>

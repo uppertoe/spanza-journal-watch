@@ -1,5 +1,7 @@
 from html.parser import HTMLParser
 
+from django.utils.html import strip_tags
+
 
 def unique_slugify(instance, slug):
     model = instance.__class__
@@ -34,6 +36,19 @@ def shorten_text(text, char_limit):
     else:
         # If no space is found, cut the text at the character limit
         return text[:char_limit] + "..."
+
+
+def estimate_reading_time(html_text, words_per_minute=200):
+    # Strip HTML tags and extract plain text
+    plain_text = strip_tags(html_text)
+    words = plain_text.split()
+    word_count = len(words)
+
+    minutes = word_count / words_per_minute
+    minutes = max(1, minutes)  # Ensure a minimum reading time of 1 minute
+    minutes = round(minutes)
+
+    return minutes
 
 
 class HTMLShortener(HTMLParser):

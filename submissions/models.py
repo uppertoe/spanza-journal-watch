@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
-from spanza_journal_watch.utils.functions import shorten_text, unique_slugify
+from spanza_journal_watch.utils.functions import estimate_reading_time, shorten_text, unique_slugify
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 
@@ -149,6 +149,9 @@ class Review(TimeStampedModel):
     def get_absolute_url(self):
         return reverse("review-detail", kwargs={"slug": self.slug})
 
+    def get_reading_time(self):
+        return estimate_reading_time(self.body)
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
@@ -186,6 +189,9 @@ class Issue(TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse("issue-detail", kwargs={"slug": self.slug})
+
+    def get_reading_time(self):
+        return estimate_reading_time(self.body)
 
     def save(self, *args, **kwargs):
         if not self.slug:

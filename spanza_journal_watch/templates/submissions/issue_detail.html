@@ -20,7 +20,7 @@
     {% endblock articles %}
 
     {% block pagination %}
-    {% if page_obj.paginator.count > 1 %}
+    {% if page_obj.paginator.num_pages > 1 %}
     {% include "submissions/fragments/article_pagination.html" %}
     {% endif %}
     {% endblock pagination %}

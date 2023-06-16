@@ -12,7 +12,9 @@
                                     <a href="{{ issue.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">View issue</a>
                                     <button type="button" class="btn btn-sm btn-outline-secondary">Edit</button>
                                 </div>
-                                <small class="text-body-secondary">9 mins</small>
+                                {% with time=issue.get_reading_time %}
+                                <small class="text-body-secondary">{{ time }} min{{ time|pluralize }}</small>
+                                {% endwith %}
                             </div>
                     </div>
                 </div>

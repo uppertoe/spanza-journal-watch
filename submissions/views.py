@@ -78,9 +78,7 @@ class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin,
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["issue"] = self.object
-        context["articles"] = self.object_list
         context["article_cols"] = self.article_cols
-        print(context)
         return context
 
     def get_queryset(self):
