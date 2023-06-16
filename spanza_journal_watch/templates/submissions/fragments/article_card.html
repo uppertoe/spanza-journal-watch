@@ -9,7 +9,7 @@
                     <p class="card-text">{{ review.get_truncated_body }}</p>
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="btn-group">
-                                <a href="{{ review.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">View issue</a>
+                                <a href="{{ review.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">Article review</a>
                                 {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>{% endif %}
                             </div>
                             <small class="text-body-secondary">9 mins</small>
