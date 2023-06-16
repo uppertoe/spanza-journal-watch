@@ -1,6 +1,7 @@
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.template.loader import render_to_string
 from django.views.generic import DetailView, ListView
+from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 
 from layout.views import SidebarMixin
@@ -28,6 +29,23 @@ class PageviewMixin:
         return obj
 
 
+class HtmxMixin:
+    article_template = ""
+    pagination_template = ""
+
+    def render_htmx_response(self):
+        context = self.get_context_data()
+        articles_html = render_to_string(self.article_template, context, request=self.request)
+        pagination_html = render_to_string(self.pagination_template, context, request=self.request)
+        response = articles_html + pagination_html
+        return HttpResponse(response)
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("HX-Request") == "true":
+            return self.render_htmx_response()
+        return super().render_to_response(context, **response_kwargs)
+
+
 class ReviewDetailView(PageviewMixin, SidebarMixin, DetailView):
     model = Review
     context_object_name = "review"
@@ -41,12 +59,16 @@ class ReviewListView(ListView):
     queryset = Review.objects.exclude(active=False).order_by("-created")
 
 
-class IssueDetailView(PageviewMixin, SidebarMixin, SingleObjectMixin, ListView):
+class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, ListView):
     template_name = "submissions/issue_detail.html"
-    context_object_name = "articles"
+    context_object_name = "context_object"
+
+    # HTMX
+    article_template = "submissions/fragments/article_card.html"
+    pagination_template = "submissions/fragments/article_pagination.html"
 
     # Frontend options
-    paginate_by = 1
+    paginate_by = 4
     article_cols = 1
 
     def get(self, request, *args, **kwargs):
@@ -58,35 +80,26 @@ class IssueDetailView(PageviewMixin, SidebarMixin, SingleObjectMixin, ListView):
         context["issue"] = self.object
         context["articles"] = self.object_list
         context["article_cols"] = self.article_cols
+        print(context)
         return context
 
     def get_queryset(self):
         return self.object.reviews.exclude(active=False).order_by("-created")
 
 
-class IssueListView(SidebarMixin, ListView):
+class IssueListView(SidebarMixin, HtmxMixin, ListView):
     model = Issue
     context_object_name = "issues"
     template_name = "submissions/issue_list.html"
     queryset = Issue.objects.exclude(active=False).order_by("-created")
 
+    # HTMX
+    article_template = "submissions/fragments/issues.html"
+    pagination_template = "submissions/fragments/article_pagination.html"
+
     # Frontend options
     paginate_by = 2
     issue_cols = 1
-
-    def render_htmx_response(self):
-        context = self.get_context_data()
-        articles_html = render_to_string("submissions/fragments/issues.html", context, request=self.request)
-        pagination_html = render_to_string(
-            "submissions/fragments/article_pagination.html", context, request=self.request
-        )
-        response = articles_html + pagination_html
-        return HttpResponse(response)
-
-    def render_to_response(self, context, **response_kwargs):
-        if self.request.headers.get("HX-Request") == "true":
-            return self.render_htmx_response()
-        return super().render_to_response(context, **response_kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -105,3 +118,15 @@ class TagDetailView(SidebarMixin, DetailView):
     model = Tag
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
+
+
+class LatestIssueView(RedirectView):
+    permanent = False
+    query_string = True
+
+    def get_redirect_url(self, *args, **kwargs):
+        issue = Issue.objects.exclude(active=False).first()
+        print(f"here's an {issue}")
+        if not issue:
+            raise Http404
+        return issue.get_absolute_url()

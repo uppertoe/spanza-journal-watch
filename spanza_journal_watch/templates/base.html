@@ -11,7 +11,7 @@
 
     <link rel="icon" href="{% static 'images/logo/square-brackets.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: light)">
     <link rel="icon" href="{% static 'images/logo/square-brackets-white.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: dark)">
-    <meta name="theme-color" content="#712cf9">
+    <meta name="theme-color" content="#152b3b">
 
     {% block css %}
     <!-- Your stuff: Third-party CSS libraries go here -->
@@ -118,7 +118,7 @@
 
       <div class="nav-scroller py-1 mb-3 border-bottom">
         <nav class="nav nav-underline justify-content-between">
-          <a class="nav-item nav-link link-body-emphasis active" href="#">This issue</a>
+          <a class="nav-item nav-link link-body-emphasis active" href="{% url "issue-latest" %}">This issue</a>
           <a class="nav-item nav-link link-body-emphasis" href="{% url "issue-list" %}">Previous issues</a>
           <a class="nav-item nav-link link-body-emphasis" href="#">Search</a>
           <a class="nav-item nav-link link-body-emphasis" href="#">Dashboard</a>
@@ -157,7 +157,7 @@
             {% endif %}
 
             {% if sidebar_tags %}
-            <div class="p-4">
+            <div class="py-4">
               <h4 class="fst-italic">Topics</h4>
               <ol class="list-unstyled mb-0">
                 {% for tag in sidebar_tags %}
@@ -167,7 +167,7 @@
             </div>
             {% endif %}
 
-            <div class="p-4">
+            <div class="py-4">
               <h4 class="fst-italic">Links</h4>
               <ol class="list-unstyled">
                 {% include 'fragments/sidebar_links.html' %}

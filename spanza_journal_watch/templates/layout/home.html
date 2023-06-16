@@ -24,7 +24,7 @@
 {% endblock articles %}
 
 {% block pagination %}
-{% if page_obj %}
+{% if page_obj.paginator.count > 1 %}
 {% include "layout/fragments/article_pagination.html" %}
 {% endif %}
 {% endblock pagination %}
