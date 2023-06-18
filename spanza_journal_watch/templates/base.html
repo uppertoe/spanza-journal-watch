@@ -1,4 +1,4 @@
-{% load static i18n %}{% load render_bundle from webpack_loader %}<!DOCTYPE html>
+{% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}<!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
   <head><script src="{% static 'js/color-modes.js'%}"></script>
@@ -118,10 +118,11 @@
 
       <div class="nav-scroller py-1 mb-3 border-bottom">
         <nav class="nav nav-underline justify-content-between">
-          <a class="nav-item nav-link link-body-emphasis active" href="{% url "issue-latest" %}">This issue</a>
-          <a class="nav-item nav-link link-body-emphasis" href="{% url "issue-list" %}">Previous issues</a>
-          <a class="nav-item nav-link link-body-emphasis" href="#">Search</a>
-          <a class="nav-item nav-link link-body-emphasis" href="#">Dashboard</a>
+          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'home' %} active{% endif %}" href="{% url "home" %}">Home</a>
+          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_detail' %} active{% endif %}" href="{% url "submissions:issue_latest" %}">This issue</a>
+          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_list' %} active{% endif %}" href="{% url "submissions:issue_list" %}">Previous issues</a>
+          <a class="nav-item nav-link link-body-emphasis{# if request.resolver_match.url_name in 'submissions:issue_list' %} {% endif #}" href="#">Search</a>
+          <a class="nav-item nav-link link-body-emphasis{# if request.resolver_match.url_name in 'submissions:issue_list' %} {% endif #}" href="#">Dashboard</a>
         </nav>
       </div>
     </div>
@@ -132,6 +133,9 @@
       <div class="row g-5">
         <div class="col-md-8">
           {% block content %}{% endblock content %}
+          {% block breadcrumbs %}
+          {% render_breadcrumbs %}
+          {% endblock %}
           {% block article-title %}{% endblock article-title %}
           {% block article-block %}
           {% block articles %}{% endblock articles %}

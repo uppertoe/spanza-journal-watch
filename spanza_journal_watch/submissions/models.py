@@ -28,7 +28,7 @@ class Tag(models.Model):
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):
-        return reverse("tag-detail", kwargs={"slug": self.slug})
+        return reverse("submissions:tag_detail", kwargs={"slug": self.slug})
 
     def all_tags_list():
         tags = (
@@ -147,7 +147,7 @@ class Review(TimeStampedModel):
         return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
 
     def get_absolute_url(self):
-        return reverse("review-detail", kwargs={"slug": self.slug})
+        return reverse("submissions:review_detail", kwargs={"slug": self.slug})
 
     def get_reading_time(self):
         return estimate_reading_time(self.body)
@@ -188,7 +188,7 @@ class Issue(TimeStampedModel):
         return self.main_feature
 
     def get_absolute_url(self):
-        return reverse("issue-detail", kwargs={"slug": self.slug})
+        return reverse("submissions:issue_detail", kwargs={"slug": self.slug})
 
     def get_reading_time(self):
         return estimate_reading_time(self.body)

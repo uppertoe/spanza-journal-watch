@@ -1,10 +1,10 @@
 from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
+from submissions.models import Issue
 
 from spanza_journal_watch.utils.functions import HTMLShortener, unique_slugify
 from spanza_journal_watch.utils.models import TimeStampedModel
-from submissions.models import Issue
 
 
 class FeatureArticle(TimeStampedModel):

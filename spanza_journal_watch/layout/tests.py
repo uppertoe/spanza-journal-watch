@@ -1,6 +1,5 @@
 from django.test import TestCase
 from django.urls import reverse
-
 from submissions.models import Article, Issue, Review
 
 from .models import FeatureArticle, Homepage

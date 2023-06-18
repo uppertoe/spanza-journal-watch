@@ -2,16 +2,20 @@ from django.http import Http404
 from django.views.generic import DetailView, ListView
 from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
+from view_breadcrumbs import DetailBreadcrumbMixin, ListBreadcrumbMixin
 
 from spanza_journal_watch.utils.mixins import HtmxMixin, PageviewMixin, SidebarMixin
 
 from .models import Issue, Review, Tag
 
 
-class ReviewDetailView(PageviewMixin, SidebarMixin, DetailView):
+class ReviewDetailView(PageviewMixin, SidebarMixin, DetailBreadcrumbMixin, DetailView):
     model = Review
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
+
+    # Breadcrumb
+    breadcrumb_use_pk = False
 
 
 class ReviewListView(ListView):
@@ -21,9 +25,12 @@ class ReviewListView(ListView):
     queryset = Review.objects.exclude(active=False).order_by("-created")
 
 
-class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, ListView):
+class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):
     template_name = "submissions/issue_detail.html"
-    context_object_name = "context_object"
+    model = Issue
+
+    # Breadcrumb
+    breadcrumb_use_pk = False
 
     # HTMX
     htmx_templates = ["submissions/fragments/article_card.html", "submissions/fragments/article_pagination.html"]
@@ -51,7 +58,7 @@ class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin,
         return self.object.reviews.exclude(active=False).order_by("-created")
 
 
-class IssueListView(SidebarMixin, HtmxMixin, ListView):
+class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     model = Issue
     context_object_name = "issues"
     template_name = "submissions/issue_list.html"
@@ -70,17 +77,23 @@ class IssueListView(SidebarMixin, HtmxMixin, ListView):
         return context
 
 
-class TagListView(ListView):
+class TagListView(ListBreadcrumbMixin, ListView):
     model = Tag
     context_object_name = "tag_list"
     template_name = "tags/tag_list.html"
     queryset = Tag.objects.exclude(active=False).order_by("text")
 
+    # Breadcrumb
+    breadcrumb_use_pk = False
 
-class TagDetailView(SidebarMixin, DetailView):
+
+class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
     model = Tag
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
+
+    # Breadcrumb
+    breadcrumb_use_pk = False
 
 
 class LatestIssueView(RedirectView):

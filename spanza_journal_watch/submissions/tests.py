@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-
 from layout.models import FeatureArticle
 
 from .models import Article, Comment, Hit, Issue, Journal, Review, Tag
