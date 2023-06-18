@@ -1,9 +1,15 @@
 import os
+import sys
+from pathlib import Path
 
 from celery import Celery
 
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+
+# correctly import the root app folder
+ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent
+sys.path.append(str(ROOT_DIR / "spanza_journal_watch"))
 
 app = Celery("spanza_journal_watch")
 
