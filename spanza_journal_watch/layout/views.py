@@ -1,4 +1,5 @@
 from django.views.generic import DetailView, ListView
+from submissions.models import Review
 
 from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
 
@@ -18,7 +19,12 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
     def get_queryset(self):
         homepage = Homepage.get_current_homepage()
-        queryset = homepage.issue.reviews.exclude(active=False).order_by("-created")
+        # queryset = homepage.issue.reviews.exclude(active=False).order_by("-created")
+        queryset = (
+            Review.objects.filter(issues__homepage=homepage, active=True)
+            .prefetch_related("issues")
+            .order_by("-created")
+        )
         return queryset
 
     def get_context_data(self, **kwargs):

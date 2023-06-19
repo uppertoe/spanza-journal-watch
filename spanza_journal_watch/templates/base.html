@@ -131,7 +131,7 @@
       {% block main-feature %}{% endblock main-feature %}
       {% block card-feature %}{% endblock card-feature %}
       <div class="row py-2">
-        <div class="col-md-8">
+        <div class="col-md-8 pb-4">
           {% block content %}{% endblock content %}
           {% block breadcrumbs %}
           {% render_breadcrumbs %}
@@ -161,7 +161,7 @@
             {% endif %}
 
             {% if sidebar_tags %}
-            <div class="py-4">
+            <div class="p-3 p-md-0 py-md-4">
               <h4 class="fst-italic">Topics</h4>
               <ol class="list-unstyled mb-0">
                 {% for tag in sidebar_tags %}
@@ -171,7 +171,7 @@
             </div>
             {% endif %}
 
-            <div class="py-4">
+            <div class="p-3 p-md-0 py-md-4">
               <h4 class="fst-italic">Links</h4>
               <ol class="list-unstyled">
                 {% include 'fragments/sidebar_links.html' %}

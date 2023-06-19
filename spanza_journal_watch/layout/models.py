@@ -1,7 +1,7 @@
 from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
-from submissions.models import Issue
+from submissions.models import Issue, Review
 
 from spanza_journal_watch.utils.functions import HTMLShortener, unique_slugify
 from spanza_journal_watch.utils.models import TimeStampedModel
@@ -63,7 +63,7 @@ class Homepage(TimeStampedModel):
         return self.issue.get_main_feature()
 
     def get_card_features(self):
-        card_features = self.issue.reviews.exclude(active=False).order_by("created").filter(is_featured=True)
+        card_features = Review.objects.filter(issues__homepage=self, is_featured=True, active=True).order_by("created")
         return card_features
 
     # Special methods

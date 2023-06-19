@@ -29,7 +29,7 @@ class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin,
     htmx_templates = ["submissions/fragments/article_card.html", "submissions/fragments/article_pagination.html"]
 
     # Frontend options
-    paginate_by = 3
+    paginate_by = 5
     article_cols = 1
 
     def get(self, request, *args, **kwargs):
@@ -48,7 +48,11 @@ class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin,
         return context
 
     def get_queryset(self):
-        return self.object.reviews.exclude(active=False).order_by("-created")
+        return (
+            Review.objects.filter(issues=self.object, active=True)
+            .order_by("-created")
+            .select_related("article__journal")
+        )
 
 
 class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
@@ -61,7 +65,7 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     htmx_templates = ["submissions/fragments/issues.html", "submissions/fragments/article_pagination.html"]
 
     # Frontend options
-    paginate_by = 3
+    paginate_by = 5
     issue_cols = 1
 
     def get_context_data(self, **kwargs):
@@ -100,5 +104,5 @@ class LatestIssueView(RedirectView):
         return issue.get_absolute_url()
 
 
-class SearchView(TemplateView):
+class SearchView(SidebarMixin, TemplateView):
     template_name = "submissions/search.html"
