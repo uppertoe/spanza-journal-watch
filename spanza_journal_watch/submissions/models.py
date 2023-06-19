@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from spanza_journal_watch.utils.functions import estimate_reading_time, shorten_text, unique_slugify
-from spanza_journal_watch.utils.models import TimeStampedModel
+from spanza_journal_watch.utils.models import ModelSearchMixin, TimeStampedModel
 
 
 class Tag(models.Model):
@@ -45,7 +45,9 @@ class Tag(models.Model):
             self.delete()
 
 
-class Journal(TimeStampedModel):
+class Journal(ModelSearchMixin, TimeStampedModel):
+    search_fields = [("name", "B")]
+
     name = models.CharField(max_length=255, null=False, blank=False)
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     abbreviation = models.CharField(max_length=255, blank=True)
@@ -60,8 +62,10 @@ class Journal(TimeStampedModel):
         return self.name
 
 
-class Article(TimeStampedModel):
+class Article(ModelSearchMixin, TimeStampedModel):
     TRUNCATED_NAME_LENGTH = 50
+
+    search_fields = [("name", "A")]
 
     name = models.TextField()
     tags_string = models.TextField(blank=True, null=False, verbose_name="Add #hashtags that describe this article")
@@ -133,8 +137,10 @@ class Article(TimeStampedModel):
                 tag.delete_if_orphaned()
 
 
-class Review(TimeStampedModel):
+class Review(ModelSearchMixin, TimeStampedModel):
     TRUNCATED_BODY_LENGTH = 200
+
+    search_fields = [("body", "B")]
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)

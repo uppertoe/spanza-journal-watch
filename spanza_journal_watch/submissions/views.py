@@ -1,3 +1,5 @@
+from django.contrib.postgres.search import SearchQuery
+from django.db.models import Q
 from django.http import Http404
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import RedirectView
@@ -6,7 +8,7 @@ from view_breadcrumbs import DetailBreadcrumbMixin, ListBreadcrumbMixin
 
 from spanza_journal_watch.utils.mixins import HtmxMixin, PageviewMixin, SidebarMixin
 
-from .models import Issue, Review, Tag
+from .models import Article, Issue, Journal, Review, Tag
 
 
 class ReviewDetailView(PageviewMixin, SidebarMixin, DetailBreadcrumbMixin, DetailView):
@@ -106,3 +108,23 @@ class LatestIssueView(RedirectView):
 
 class SearchView(SidebarMixin, TemplateView):
     template_name = "submissions/search.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = self.request.GET.get("q")
+        search_results = self.search(query)
+        context["search_results"] = search_results
+        context["tags"] = Tag.objects.filter(Q(text__icontains=query))
+        return context
+
+    def search(self, query):
+        search_query = SearchQuery(query)
+        rank = 0.1
+
+        articles = Article.search(search_query, rank=rank)
+        reviews = Review.search(search_query, rank=rank)
+        journals = Journal.search(search_query, rank=rank)
+        search_results = list(articles) + list(reviews) + list(journals)
+        search_results.sort(key=lambda x: x.rank, reverse=True)
+
+        return search_results
