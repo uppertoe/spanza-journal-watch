@@ -16,6 +16,13 @@ class TimeStampedModel(models.Model):
 
 
 class ModelSearchMixin:
+    """
+    A mixin for models.Model instances that adds a search method
+    Requires a models.BooleanField named 'active'
+    Optionally sorted
+    Returns a queryset of objects annotated by search rank
+    """
+
     search_fields = []
 
     @classmethod
@@ -29,9 +36,13 @@ class ModelSearchMixin:
         return search_vector
 
     @classmethod
-    def search(cls, search_query, sort=False, rank=0.3):
+    def search(cls, search_query, sort=True, rank=0.3):
         search_vector = cls.get_search_vector()
-        search_results = cls.objects.annotate(rank=SearchRank(search_vector, search_query)).filter(rank__gte=rank)
+        search_results = (
+            cls.objects.exclude(active=False)
+            .annotate(rank=SearchRank(search_vector, search_query))
+            .filter(rank__gte=rank)
+        )
         if sort:
-            search_results = search_results.order_by("-rank")
+            search_results = search_results.order_by(models.F("rank").desc())
         return search_results

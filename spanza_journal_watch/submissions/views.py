@@ -106,25 +106,40 @@ class LatestIssueView(RedirectView):
         return issue.get_absolute_url()
 
 
-class SearchView(SidebarMixin, TemplateView):
+class SearchView(SidebarMixin, HtmxMixin, TemplateView):
     template_name = "submissions/search.html"
+
+    # HTMX
+    htmx_templates = ["submissions/fragments/search_results.html"]
+
+    # Search settings
+    rank_threshold = 0.1
+    no_result_message = "No results found"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         query = self.request.GET.get("q")
-        search_results = self.search(query)
-        context["search_results"] = search_results
-        context["tags"] = Tag.objects.filter(Q(text__icontains=query))
+        if query:
+            context.update(self.search(query))
+            context["tags"] = Tag.objects.filter(Q(text__icontains=query))
         return context
 
     def search(self, query):
         search_query = SearchQuery(query)
-        rank = 0.1
+        rank = self.rank_threshold
 
         articles = Article.search(search_query, rank=rank)
         reviews = Review.search(search_query, rank=rank)
         journals = Journal.search(search_query, rank=rank)
-        search_results = list(articles) + list(reviews) + list(journals)
-        search_results.sort(key=lambda x: x.rank, reverse=True)
 
-        return search_results
+        results = {
+            "result_articles": articles,
+            "result_reviews": reviews,
+            "result_journals": journals,
+        }
+
+        # Add a message if all querysets are empty
+        if not any(queryset for queryset in [articles, reviews, journals] if queryset.exists()):
+            results["no_result_message"] = self.no_result_message
+
+        return results

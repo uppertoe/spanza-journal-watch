@@ -52,6 +52,7 @@ class Journal(ModelSearchMixin, TimeStampedModel):
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     abbreviation = models.CharField(max_length=255, blank=True)
     url = models.URLField(max_length=255, null=True, blank=True)
+    active = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -64,8 +65,9 @@ class Journal(ModelSearchMixin, TimeStampedModel):
 
 class Article(ModelSearchMixin, TimeStampedModel):
     TRUNCATED_NAME_LENGTH = 50
-
     search_fields = [("name", "A")]
+
+    _original_tags_string = None  # Used to detect when tags_string has been changed on save()
 
     name = models.TextField()
     tags_string = models.TextField(blank=True, null=False, verbose_name="Add #hashtags that describe this article")
@@ -75,8 +77,7 @@ class Article(ModelSearchMixin, TimeStampedModel):
         default=datetime.date.today().year,
     )
     url = models.URLField(max_length=255, null=True, blank=True)
-
-    _original_tags_string = None  # Used to detect when tags_string has been changed on save()
+    active = models.BooleanField(default=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -140,7 +141,7 @@ class Article(ModelSearchMixin, TimeStampedModel):
 class Review(ModelSearchMixin, TimeStampedModel):
     TRUNCATED_BODY_LENGTH = 200
 
-    search_fields = [("body", "B")]
+    search_fields = [("body", "A")]
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)

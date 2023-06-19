@@ -1,5 +1,36 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block content %}
-{% for result in search_results %}{{ result }}{% endfor %}
-{% endblock content %}
+{% block main-feature %}
+<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
+    <div class="col-lg-8 px-0">
+        <h1 class="display-4 fst-italic">Search</h1>
+        <div class="lead my-3">Find reviews, articles and journals here.</div>
+        <p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
+    </div>
+</div>
+{% endblock main-feature %}
+
+{% block article-block %}
+<form action="{% url "submissions:search" %}" method="get">
+<div class="input-group p-3">
+    <input autofocus type="search"
+    class="form-control"
+    placeholder="{% if request.GET.q %}{{ request.GET.q|capfirst }}{% else %}Start typing here...{% endif %}"
+    aria-label="Search"
+    aria-describedby="button-addon"
+    name="q"
+    hx-get="/search"
+    hx-trigger="keyup changed delay:500ms, search"
+    hx-target="#search-results"
+    hx-indicator=".htmx-indicator">
+    <button class="btn btn-outline-primary" type="submit" id="button-addon">Search</button>
+  </div>
+</form>
+<span class="d-flex justify-content-center htmx-indicator ">
+    <img src="{% static "images/spinners/3-dots-move.svg" %}"/>
+</span>
+<div id="search-results">
+{% include "submissions/fragments/search_results.html" %}
+</div>
+{% endblock article-block %}
