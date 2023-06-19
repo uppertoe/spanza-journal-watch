@@ -1,5 +1,5 @@
 from django.http import Http404
-from django.views.generic import DetailView, ListView
+from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import DetailBreadcrumbMixin, ListBreadcrumbMixin
@@ -16,13 +16,6 @@ class ReviewDetailView(PageviewMixin, SidebarMixin, DetailBreadcrumbMixin, Detai
 
     # Breadcrumb
     breadcrumb_use_pk = False
-
-
-class ReviewListView(ListView):
-    model = Review
-    context_object_name = "review_list"
-    template_name = "reviews/review_list.html"
-    queryset = Review.objects.exclude(active=False).order_by("-created")
 
 
 class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):
@@ -98,10 +91,14 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
 
 class LatestIssueView(RedirectView):
     permanent = False
-    query_string = True
+    query_string = False
 
     def get_redirect_url(self, *args, **kwargs):
         issue = Issue.objects.exclude(active=False).first()
         if not issue:
             raise Http404
         return issue.get_absolute_url()
+
+
+class SearchView(TemplateView):
+    template_name = "submissions/search.html"

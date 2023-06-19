@@ -108,9 +108,6 @@
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
           </div>
           <div class="col d-flex justify-content-end align-items-center">
-            <a class="link-secondary" href="#" aria-label="Search">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="mx-3" role="img" viewBox="0 0 24 24"><title>Search</title><circle cx="10.5" cy="10.5" r="7.5"/><path d="M21 21l-5.2-5.2"/></svg>
-            </a>
             <a class="btn btn-sm btn-outline-secondary" href="#">Sign up</a>
           </div>
         </div>
@@ -121,7 +118,10 @@
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'home' %} active{% endif %}" href="{% url "home" %}">Home</a>
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_detail' %} active{% endif %}" href="{% url "submissions:issue_latest" %}">This issue</a>
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_list' %} active{% endif %}" href="{% url "submissions:issue_list" %}">Previous issues</a>
-          <a class="nav-item nav-link link-body-emphasis{# if request.resolver_match.url_name in 'submissions:issue_list' %} {% endif #}" href="#">Search</a>
+          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:review_detail' %} active{% endif %}" href="{% url "submissions:search" %}" href="#" aria-label="Search">
+            <svg class="d-inline-flex"xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="mx-3" role="img" viewBox="0 0 24 24"><title>Search</title><circle cx="10.5" cy="10.5" r="7.5"/><path d="M21 21l-5.2-5.2"/></svg>
+            Reviews
+          </a>
           <a class="nav-item nav-link link-body-emphasis{# if request.resolver_match.url_name in 'submissions:issue_list' %} {% endif #}" href="#">Dashboard</a>
         </nav>
       </div>
@@ -130,7 +130,7 @@
     <main class="container">
       {% block main-feature %}{% endblock main-feature %}
       {% block card-feature %}{% endblock card-feature %}
-      <div class="row g-5">
+      <div class="row py-2">
         <div class="col-md-8">
           {% block content %}{% endblock content %}
           {% block breadcrumbs %}
