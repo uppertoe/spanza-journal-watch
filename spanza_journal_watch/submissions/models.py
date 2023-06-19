@@ -46,7 +46,7 @@ class Tag(models.Model):
 
 
 class Journal(ModelSearchMixin, TimeStampedModel):
-    search_fields = [("name", "B")]
+    search_field = "name"
 
     name = models.CharField(max_length=255, null=False, blank=False)
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
@@ -65,7 +65,7 @@ class Journal(ModelSearchMixin, TimeStampedModel):
 
 class Article(ModelSearchMixin, TimeStampedModel):
     TRUNCATED_NAME_LENGTH = 50
-    search_fields = [("name", "A")]
+    search_field = "name"
 
     _original_tags_string = None  # Used to detect when tags_string has been changed on save()
 
@@ -141,7 +141,7 @@ class Article(ModelSearchMixin, TimeStampedModel):
 class Review(ModelSearchMixin, TimeStampedModel):
     TRUNCATED_BODY_LENGTH = 200
 
-    search_fields = [("body", "A")]
+    search_field = "body"
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)

@@ -1,4 +1,3 @@
-from django.contrib.postgres.search import SearchQuery
 from django.db.models import Q
 from django.http import Http404
 from django.views.generic import DetailView, ListView, TemplateView
@@ -113,7 +112,7 @@ class SearchView(SidebarMixin, HtmxMixin, TemplateView):
     htmx_templates = ["submissions/fragments/search_results.html"]
 
     # Search settings
-    rank_threshold = 0.1
+    sim_thres = 0.1
     no_result_message = "No results found"
 
     def get_context_data(self, **kwargs):
@@ -125,12 +124,9 @@ class SearchView(SidebarMixin, HtmxMixin, TemplateView):
         return context
 
     def search(self, query):
-        search_query = SearchQuery(query)
-        rank = self.rank_threshold
-
-        articles = Article.search(search_query, rank=rank)
-        reviews = Review.search(search_query, rank=rank)
-        journals = Journal.search(search_query, rank=rank)
+        articles = Article.search(query)
+        reviews = Review.search(query)
+        journals = Journal.search(query)
 
         results = {
             "result_articles": articles,

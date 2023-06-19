@@ -1,4 +1,4 @@
-from django.contrib.postgres.search import SearchRank, SearchVector, TrigramSimilarity
+from django.contrib.postgres.search import TrigramSimilarity
 from django.db import models
 
 
@@ -23,27 +23,20 @@ class ModelSearchMixin:
     Returns a queryset of objects annotated by search rank
     """
 
-    search_fields = []
+    search_field = ""
 
     @classmethod
-    def get_search_vector(cls):
-        search_vector = None
-        for field, weight in cls.search_fields:
-            if search_vector is None:
-                search_vector = SearchVector(field, weight=weight)
-            else:
-                search_vector += SearchVector(field, weight=weight)
-        return search_vector
+    def get_search_field(cls):
+        return cls.search_field
 
     @classmethod
-    def search(cls, search_query, sort=True, rank=0.3, similarity=0.3):
-        search_vector = cls.get_search_vector()
+    def search(cls, search_query, sim_thres=0.3):
         search_results = (
             cls.objects.exclude(active=False)
-            .annotate(similarity=TrigramSimilarity(*cls.search_fields, search_query))
-            .annotate(rank=SearchRank(search_vector, search_query))
-            .filter(rank__gte=rank, similarity__gte=similarity)
+            .annotate(
+                similarity=TrigramSimilarity(cls.get_search_field(), search_query),
+            )
+            .filter(similarity__gt=sim_thres)
+            .order_by("-similarity")
         )
-        if sort:
-            search_results = search_results.order_by(models.F("rank").desc())
         return search_results
