@@ -1,9 +1,11 @@
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, JsonResponse
+from django.urls import reverse
+from django.utils.functional import cached_property
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
-from view_breadcrumbs import DetailBreadcrumbMixin, ListBreadcrumbMixin
+from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
 from spanza_journal_watch.utils.mixins import HtmxMixin, PageviewMixin, SidebarMixin
 
@@ -105,7 +107,7 @@ class LatestIssueView(RedirectView):
         return issue.get_absolute_url()
 
 
-class SearchView(SidebarMixin, HtmxMixin, TemplateView):
+class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
     template_name = "submissions/search.html"
 
     # HTMX
@@ -114,6 +116,11 @@ class SearchView(SidebarMixin, HtmxMixin, TemplateView):
     # Search settings
     sim_thres = 0.1
     no_result_message = "No results found"
+
+    # Breadcrumb
+    @cached_property
+    def crumbs(self):
+        return [("Search", reverse("submissions:search"))]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -139,3 +146,10 @@ class SearchView(SidebarMixin, HtmxMixin, TemplateView):
             results["no_result_message"] = self.no_result_message
 
         return results
+
+
+def ajax_get_tags(request):
+    tags_queryset = Tag.get_all_tags()
+    tags_list = [str(tag) for tag in tags_queryset]
+    data = {"tags": tags_list}
+    return JsonResponse(data)

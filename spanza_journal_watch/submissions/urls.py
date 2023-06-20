@@ -14,4 +14,5 @@ urlpatterns = [
     path("tags/", views.TagListView.as_view(), name="tag_list"),
     path("tags/<slug:slug>", views.TagDetailView.as_view(), name="tag_detail"),
     path("search/", views.SearchView.as_view(), name="search"),
+    path("ajax/tags", views.ajax_get_tags, name="ajax_get_tags"),
 ]

@@ -19,6 +19,16 @@ class Tag(models.Model):
     active = models.BooleanField(default=True)
     articles = models.ManyToManyField("Article", related_name="tags")
 
+    @classmethod
+    def get_all_tags(cls):
+        tags = (
+            cls.objects.exclude(active=False)
+            .annotate(article_count=models.Count("articles"))
+            .order_by("-article_count")
+            .values_list("text", flat=True)
+        )
+        return tags
+
     def __str__(self):
         return f"#{self.text}"
 
@@ -29,15 +39,6 @@ class Tag(models.Model):
 
     def get_absolute_url(self):
         return reverse("submissions:tag_detail", kwargs={"slug": self.slug})
-
-    def all_tags_list():
-        tags = (
-            Tag.objects.exclude(active=False)
-            .annotate(article_count=models.Count("articles"))
-            .order_by("-article_count")
-            .values_list("text", flat=True)
-        )
-        return [str(tag) for tag in tags]
 
     def delete_if_orphaned(self):
         if not self.articles.all().count():

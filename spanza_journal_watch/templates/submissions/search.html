@@ -12,21 +12,26 @@
 {% endblock main-feature %}
 
 {% block article-block %}
-<form action="{% url "submissions:search" %}" method="get">
-<div class="input-group p-3">
-    <input autofocus type="search"
-    class="form-control"
-    placeholder="{% if request.GET.q %}{{ request.GET.q|capfirst }}{% else %}Start typing here...{% endif %}"
-    aria-label="Search"
-    aria-describedby="button-addon"
-    name="q"
-    hx-get="/search"
-    hx-trigger="keyup changed delay:500ms, search"
-    hx-target="#search-results"
-    hx-indicator=".htmx-indicator">
-    <button class="btn btn-outline-primary" type="submit" id="button-addon">Search</button>
-  </div>
-</form>
+<div>
+    <form action="{% url "submissions:search" %}" method="get" class="d-flex" id="search-form">
+        <div class="input-group m-3 col">
+            <input autofocus type="search"
+            id='autocompleteInput'
+            class="form-control"
+            placeholder="{% if request.GET.q %}{{ request.GET.q|capfirst }}{% else %}Start typing here...{% endif %}"
+            aria-label="Search"
+            aria-describedby="button-addon"
+            name="q"
+            hx-get="/search"
+            hx-trigger="keyup changed delay:500ms, search"
+            hx-target="#search-results"
+            hx-indicator=".htmx-indicator">
+            <div class="input-group-append">
+            <button class="btn btn-outline-primary rounded-0" type="submit" id="button-addon">Search</button>
+            </div>
+        </div>
+    </form>
+</div>
 <span class="d-flex justify-content-center htmx-indicator ">
     <img src="{% static "images/spinners/3-dots-move.svg" %}"/>
 </span>
