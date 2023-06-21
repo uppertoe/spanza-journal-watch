@@ -73,6 +73,7 @@ THIRD_PARTY_APPS = [
     "django_celery_beat",
     "webpack_loader",
     "view_breadcrumbs",
+    "tinymce",
 ]
 
 LOCAL_APPS = [
@@ -316,3 +317,22 @@ WEBPACK_LOADER = {
 }
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+# tiny-MCE
+# ------------------------------------------------------------------------------
+TINYMCE_DEFAULT_CONFIG = {
+    "theme": "silver",
+    "height": 500,
+    "menubar": False,
+    "plugins": "advlist,autolink,lists,link,image,charmap,print,preview,anchor,"
+    "searchreplace,visualblocks,code,fullscreen,insertdatetime,media,table,paste,"
+    "code,help,wordcount",
+    "toolbar": "undo redo | formatselect | "
+    "bold italic backcolor | alignleft aligncenter "
+    "alignright alignjustify | bullist numlist outdent indent | "
+    "removeformat | help",
+    "skin": "(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'oxide-dark' : 'oxide')",
+    "content_css": "(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default')",
+}
+TINYMCE_SPELLCHECKER = False
+TINYMCE_COMPRESSOR = True

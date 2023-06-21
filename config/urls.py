@@ -18,6 +18,8 @@ urlpatterns = [
     # Your stuff: custom urls includes go here
     path("", include("submissions.urls")),
     path("feature/", include("layout.urls")),
+    # Third party urls
+    path("tinymce/", include("tinymce.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
