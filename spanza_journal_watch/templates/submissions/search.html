@@ -25,7 +25,8 @@
             hx-get="/search"
             hx-trigger="keyup changed delay:500ms, search"
             hx-target="#search-results"
-            hx-indicator=".htmx-indicator">
+            hx-indicator=".htmx-indicator"
+            hx-push-url="true">
             <div class="input-group-append">
             <button class="btn btn-outline-primary rounded-0" type="submit" id="button-addon">Search</button>
             </div>

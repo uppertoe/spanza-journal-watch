@@ -3,7 +3,14 @@ import datetime
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector, SearchVectorField, TrigramSimilarity
+from django.contrib.postgres.search import (
+    SearchHeadline,
+    SearchQuery,
+    SearchRank,
+    SearchVector,
+    SearchVectorField,
+    TrigramSimilarity,
+)
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
@@ -85,6 +92,7 @@ class Article(TimeStampedModel):
         validators=[MinValueValidator(1900), MaxValueValidator(datetime.date.today().year + 1)],
         default=datetime.date.today().year,
     )
+    citation = models.TextField(null=True, blank=True)
     url = models.URLField(max_length=255, null=True, blank=True)
     active = models.BooleanField(default=False)
 
@@ -185,8 +193,9 @@ class Review(TimeStampedModel):
             .filter(
                 Q(title_similarity__gt=cls.title_similarity)
                 | Q(rank__gte=cls.body_rank)
-                | Q(search_vector=SearchQuery(query))
+                | Q(search_vector=SearchQuery(query))  # Exact matches
             )
+            .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter="...<br>..."))
             .order_by("-title_similarity", "-rank")
         )
         return results

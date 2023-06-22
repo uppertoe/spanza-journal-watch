@@ -4,7 +4,7 @@
 {% for review in result_reviews %}
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h3>{{ review.article }}</h3></a>
     <p>{{ review.author }}</p>
-    <p>{{ review.get_truncated_body|linebreaks }}</p>
+    <blockquote class="blockquote">"{{ review.headline|safe }}"</blockquote>
 {% endfor %}
 {% endif %}
 {{ no_result_message }}
