@@ -93,7 +93,7 @@ class Article(TimeStampedModel):
         self._original_tags_string = self.tags_string
 
     def __str__(self):
-        return self.name
+        return self.get_truncated_name()
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -104,7 +104,7 @@ class Article(TimeStampedModel):
     def get_related_review(self):
         return self.reviews.exclude(active=False).order_by("-created")[0]
 
-    def shortened_name(self):
+    def get_truncated_name(self):
         return shorten_text(self.name, self.TRUNCATED_NAME_LENGTH)
 
     def tags_list(self):
@@ -192,7 +192,7 @@ class Review(TimeStampedModel):
         return results
 
     def __str__(self):
-        return "Review: " + self.article.name
+        return self.article.get_truncated_name()
 
 
 class Issue(TimeStampedModel):

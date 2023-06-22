@@ -2,24 +2,9 @@
 <h1>Reviews</h1>
 <hr>
 {% for review in result_reviews %}
-    <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h3>Review by: {{ review.author }}</h3></a>
-    <p>Body: {{ review.body }}</p>
-{% endfor %}
-{% endif %}
-{% if result_articles %}
-<h1>Articles</h1>
-<hr>
-{% for article in result_articles %}
-    <a href="{{ article.get_absolute_url }}" class="text-decoration-none"><h3>Article: {{ article.name }}</h3></a>
-    <p>Year: {{ article.year }}</p>
-{% endfor %}
-{% endif %}
-{% if result_journals %}
-<h1>Journals</h1>
-<hr>
-{% for journal in result_journals %}
-    <a href="{{ journal.get_absolute_url }}" class="text-decoration-none"><h3>Journal: {{ journal.name }}</h3></a>
-    <p>URL: {{ journal.url }}</p>
+    <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h3>{{ review.article }}</h3></a>
+    <p>{{ review.author }}</p>
+    <p>{{ review.get_truncated_body|linebreaks }}</p>
 {% endfor %}
 {% endif %}
 {{ no_result_message }}
