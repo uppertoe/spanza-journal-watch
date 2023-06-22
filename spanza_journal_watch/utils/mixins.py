@@ -1,7 +1,6 @@
 from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-
 from submissions.models import Hit, Issue, Tag
 
 
@@ -26,7 +25,7 @@ class HtmxMixin:
         return super().render_to_response(context, **response_kwargs)
 
 
-class PageviewMixin:
+class HitMixin:
     """
     Takes the obj and stores it in the session
     in the form of {obj.model_name: obj.id}

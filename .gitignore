@@ -287,4 +287,4 @@ webpack-stats.json
 *.pem
 
 # Manage.py dump
-dump.json
+.fixtures

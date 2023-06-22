@@ -7,12 +7,12 @@ from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
-from spanza_journal_watch.utils.mixins import HtmxMixin, PageviewMixin, SidebarMixin
+from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
 from .models import Issue, Review, Tag
 
 
-class ReviewDetailView(PageviewMixin, SidebarMixin, DetailBreadcrumbMixin, DetailView):
+class ReviewDetailView(HitMixin, SidebarMixin, DetailBreadcrumbMixin, DetailView):
     model = Review
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
@@ -21,7 +21,7 @@ class ReviewDetailView(PageviewMixin, SidebarMixin, DetailBreadcrumbMixin, Detai
     breadcrumb_use_pk = False
 
 
-class IssueDetailView(PageviewMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):
+class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):
     template_name = "submissions/issue_detail.html"
     model = Issue
 

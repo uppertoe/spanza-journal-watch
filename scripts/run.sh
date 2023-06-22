@@ -10,3 +10,5 @@ docker-compose -f spanza-journal-watch/production.yml build
 docker-compose -f spanza-journal-watch/production.yml run --rm django python manage.py migrate
 echo "Start docker-compose"
 docker-compose -f spanza-journal-watch/production.yml up -d
+echo "Check filesystem space"
+df -h
