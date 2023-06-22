@@ -3,14 +3,25 @@ import datetime
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector, SearchVectorField, TrigramSimilarity
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
 from spanza_journal_watch.utils.functions import estimate_reading_time, shorten_text, unique_slugify
-from spanza_journal_watch.utils.models import ModelSearchMixin, TimeStampedModel
+from spanza_journal_watch.utils.models import TimeStampedModel
+
+
+class Author(TimeStampedModel):
+    name = models.CharField(max_length=255, blank=False, null=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
+    anonymous = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
 
 
 class Tag(models.Model):
@@ -46,9 +57,7 @@ class Tag(models.Model):
             self.delete()
 
 
-class Journal(ModelSearchMixin, TimeStampedModel):
-    search_field = "name"
-
+class Journal(TimeStampedModel):
     name = models.CharField(max_length=255, null=False, blank=False)
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     abbreviation = models.CharField(max_length=255, blank=True)
@@ -64,9 +73,8 @@ class Journal(ModelSearchMixin, TimeStampedModel):
         return self.name
 
 
-class Article(ModelSearchMixin, TimeStampedModel):
+class Article(TimeStampedModel):
     TRUNCATED_NAME_LENGTH = 50
-    search_field = "name"
 
     _original_tags_string = None  # Used to detect when tags_string has been changed on save()
 
@@ -139,14 +147,16 @@ class Article(ModelSearchMixin, TimeStampedModel):
                 tag.delete_if_orphaned()
 
 
-class Review(ModelSearchMixin, TimeStampedModel):
+class Review(TimeStampedModel):
     TRUNCATED_BODY_LENGTH = 200
 
-    search_field = "body"
+    search_vector = SearchVectorField(null=True, blank=True)
+    title_similarity = 0.1
+    body_rank = 0.3
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
-    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True)
     body = models.TextField()
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
@@ -163,7 +173,23 @@ class Review(ModelSearchMixin, TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
+        self.search_vector = SearchVector("body")
         return super().save(*args, **kwargs)
+
+    @classmethod
+    def search(cls, query):
+        results = (
+            cls.objects.exclude(active=False)
+            .annotate(title_similarity=TrigramSimilarity("article__name", query))
+            .annotate(rank=SearchRank(SearchVector("body"), SearchQuery(query)))
+            .filter(
+                Q(title_similarity__gt=cls.title_similarity)
+                | Q(rank__gte=cls.body_rank)
+                | Q(search_vector=SearchQuery(query))
+            )
+            .order_by("-title_similarity", "-rank")
+        )
+        return results
 
     def __str__(self):
         return "Review: " + self.article.name

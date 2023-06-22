@@ -9,7 +9,7 @@ from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBre
 
 from spanza_journal_watch.utils.mixins import HtmxMixin, PageviewMixin, SidebarMixin
 
-from .models import Article, Issue, Journal, Review, Tag
+from .models import Issue, Review, Tag
 
 
 class ReviewDetailView(PageviewMixin, SidebarMixin, DetailBreadcrumbMixin, DetailView):
@@ -131,18 +131,11 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         return context
 
     def search(self, query):
-        articles = Article.search(query)
         reviews = Review.search(query)
-        journals = Journal.search(query)
+        results = {"result_reviews": reviews}
 
-        results = {
-            "result_articles": articles,
-            "result_reviews": reviews,
-            "result_journals": journals,
-        }
-
-        # Add a message if all querysets are empty
-        if not any(queryset for queryset in [articles, reviews, journals] if queryset.exists()):
+        if not reviews.exists():
+            # Add a message if no results
             results["no_result_message"] = self.no_result_message
 
         return results

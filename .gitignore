@@ -285,3 +285,6 @@ webpack-stats.json
 
 .keys
 *.pem
+
+# Manage.py dump
+dump.json
