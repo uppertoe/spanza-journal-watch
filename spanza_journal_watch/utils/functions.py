@@ -7,15 +7,22 @@ def unique_slugify(instance, slug):
     model = instance.__class__
     max_length = model._meta.get_field("slug").max_length
 
-    truncated_slug = slug[: max_length - 2]  # Leave space for counter
-    unique_slug = truncated_slug
+    if len(slug) > max_length:
+        # Find the last space before the maximum length
+        last_space_index = slug.rfind("-", 0, max_length)
+        if last_space_index != -1:
+            slug = slug[:last_space_index]
+
+    unique_slug = slug
     counter = 1
 
     while model.objects.filter(slug=unique_slug).exists():
+        # Leave space for counter
+        truncated_slug = unique_slug[: max_length - 2]
         unique_slug = f"{truncated_slug}-{counter}"
         counter += 1
 
-        # If the generated slug exceeds the max_length, truncate it further
+        # Further reduce the slug length if the counter impinges on max_length
         if len(unique_slug) > max_length:
             truncated_slug = slug[: max_length - len(str(counter)) - 1]
             unique_slug = f"{truncated_slug}-{counter}"

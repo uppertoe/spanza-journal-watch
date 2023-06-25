@@ -37,7 +37,7 @@ class ReviewAdmin(SaveAuthorMixin, admin.ModelAdmin):
     list_display = ("article", "author")
     list_filter = ("author",)
     search_fields = ("article",)
-    readonly_fields = ("slug", "author")
+    readonly_fields = ("author",)
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = list(self.readonly_fields)

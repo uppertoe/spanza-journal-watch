@@ -12,13 +12,17 @@ from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 from .models import Issue, Review, Tag
 
 
-class ReviewDetailView(HitMixin, SidebarMixin, DetailBreadcrumbMixin, DetailView):
+class ReviewDetailView(HitMixin, SidebarMixin, BaseBreadcrumbMixin, DetailView):
     model = Review
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
 
     # Breadcrumb
-    breadcrumb_use_pk = False
+    @cached_property
+    def crumbs(self):
+        issue = Issue.objects.filter(reviews=self.object).latest("created")
+
+        return [("Issues", reverse("submissions:issue_list")), (issue, issue.get_absolute_url()), (self.object, "")]
 
 
 class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):

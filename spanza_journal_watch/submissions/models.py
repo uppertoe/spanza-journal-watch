@@ -180,7 +180,7 @@ class Review(TimeStampedModel):
     body_rank = 0.3
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
-    slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
+    slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True)
     body = models.TextField()
     active = models.BooleanField(default=False)
