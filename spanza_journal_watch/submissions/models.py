@@ -115,6 +115,22 @@ class Article(TimeStampedModel):
     def get_truncated_name(self):
         return shorten_text(self.name, self.TRUNCATED_NAME_LENGTH)
 
+    def get_title(self):
+        separators = [":", " - "]
+        for sep in separators:
+            if sep in self.name:
+                print(sep)
+                print(self.name)
+                return self.name.split(sep, 1)[0].strip()
+        return self.name
+
+    def get_subtitle(self):
+        separators = [":", "-"]
+        for sep in separators:
+            if sep in self.name:
+                return self.name.split(sep, 1)[1].strip()
+        return ""
+
     def tags_list(self):
         """
         Returns a list of unique 'hashtag' strings
@@ -157,6 +173,7 @@ class Article(TimeStampedModel):
 
 class Review(TimeStampedModel):
     TRUNCATED_BODY_LENGTH = 200
+    MAX_LINE_CHARS = 50
 
     search_vector = SearchVectorField(null=True, blank=True)
     title_similarity = 0.1
@@ -179,24 +196,32 @@ class Review(TimeStampedModel):
         return estimate_reading_time(self.body)
 
     def save(self, *args, **kwargs):
+        # Create the slug if it doesn't exist
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
-        self.search_vector = SearchVector("body")
-        return super().save(*args, **kwargs)
+
+        # Perform an initial save
+        super().save(*args, **kwargs)
+        # Create a SearchVector from the body test
+        # Update this field separately
+        Review.objects.filter(pk=self.pk).update(search_vector=SearchVector("body"))
 
     @classmethod
     def search(cls, query):
         results = (
             cls.objects.exclude(active=False)
-            .annotate(title_similarity=TrigramSimilarity("article__name", query))
-            .annotate(rank=SearchRank(SearchVector("body"), SearchQuery(query)))
+            .annotate(
+                title_similarity=TrigramSimilarity("article__name", query),
+                rank=SearchRank(SearchVector("body"), SearchQuery(query)),
+            )
             .filter(
                 Q(title_similarity__gt=cls.title_similarity)
                 | Q(rank__gte=cls.body_rank)
                 | Q(search_vector=SearchQuery(query))  # Exact matches
             )
             .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter="...<br>..."))
-            .order_by("-title_similarity", "-rank")
+            .order_by("-title_similarity", "-rank", "-created")
+            .select_related("article", "author")
         )
         return results
 

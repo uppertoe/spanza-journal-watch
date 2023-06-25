@@ -8,7 +8,7 @@ from .models import FeatureArticle, Homepage
 
 class HomepageView(SidebarMixin, HtmxMixin, ListView):
     template_name = "layout/home.html"
-    paginate_by = 2
+    paginate_by = 5
     context_object_name = "body_articles"
 
     # HTMX
@@ -19,9 +19,12 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
     def get_queryset(self):
         homepage = Homepage.get_current_homepage()
-        # queryset = homepage.issue.reviews.exclude(active=False).order_by("-created")
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True)
+            .select_related(
+                "article",
+                "author",
+            )
             .prefetch_related("issues")
             .order_by("-created")
         )

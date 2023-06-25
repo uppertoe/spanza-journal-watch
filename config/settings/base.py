@@ -181,6 +181,9 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "spanza_journal_watch.users.context_processors.allauth_settings",
             ],
+            "builtins": [
+                "submissions.templatetags.wrapchars",  # Add your app's templatetags module here
+            ],
         },
     }
 ]

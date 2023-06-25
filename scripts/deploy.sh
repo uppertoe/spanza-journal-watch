@@ -3,6 +3,7 @@ chmod +x backup.sh
 chmod +x run.sh
 mv backup.sh /home/ec2-user/backup.sh
 mv run.sh /home/ec2-user/run.sh
+mv maintain.sh /home/ec2-user/maintain.sh
 
 sh /home/ec2-user/run.sh
 
