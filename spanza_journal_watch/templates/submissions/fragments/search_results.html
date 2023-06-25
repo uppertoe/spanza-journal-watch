@@ -1,10 +1,16 @@
 {% if result_reviews %}
-<h1>Reviews</h1>
+<h3>Results</h3>
 <hr>
 {% for review in result_reviews %}
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h3>{{ review.article }}</h3></a>
     <p>{{ review.author }}</p>
     <blockquote class="blockquote">"{{ review.headline|safe }}"</blockquote>
 {% endfor %}
+{% else %}
+    {% if no_result_message %}
+        <p>{{ no_result_message }}</p>
+    {% else %}
+        <h3 class="text-decoration-none">Results will appear here</h3>
+        <p>Use multiple keywords to refine your search</p>
+    {% endif %}
 {% endif %}
-{{ no_result_message }}

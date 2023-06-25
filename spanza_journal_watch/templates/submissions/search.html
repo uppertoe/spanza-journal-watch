@@ -6,14 +6,13 @@
     <div class="col-lg-8 px-0">
         <h1 class="display-4 fst-italic">Search</h1>
         <div class="lead my-3">Find reviews, articles and journals here.</div>
-        <p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
     </div>
 </div>
 {% endblock main-feature %}
 
 {% block article-block %}
 <div class="d-flex">
-        <div class="input-group m-3 col">
+        <div class="input-group m-3">
             <input autofocus type="search"
             id='autocompleteInput'
             class="form-control"
@@ -30,7 +29,7 @@
 <span class="d-flex justify-content-center htmx-indicator ">
     <img src="{% static "images/spinners/3-dots-move.svg" %}"/>
 </span>
-<div id="search-results">
+<div id="search-results" class="mx-3">
 {% include "submissions/fragments/search_results.html" %}
 </div>
 {% endblock article-block %}

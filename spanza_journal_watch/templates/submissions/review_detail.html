@@ -11,8 +11,9 @@
 
 {% block article-block %}
 <article class="article-post">
-    <h2 class="display-5 link-body-emphasis mb-1">{{ review.article.name }}</h2>
+    <h2 class="link-body-emphasis mb-1">{{ review.article.get_title|capfirst }}</h2>
+    <h5 class="link-body-emphasis mb-1">{{ review.article.get_subtitle|capfirst }}</h5>
     <p class="article-post-meta">{{ review.created|date:"F j, Y" }} <a href="#">{{ review.author }}</a></p>
-    {{ review.body|linebreaks }}
+    <p class="text-break">{{ review.body|wrapchars|safe|linebreaks }}</p>
 </article>
 {% endblock article-block %}

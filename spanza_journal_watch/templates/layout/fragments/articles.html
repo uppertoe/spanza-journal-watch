@@ -2,7 +2,7 @@
 {% for article in body_articles %}
     <article class="article-post">
     <h2 class="link-body-emphasis mb-1">{{ article.article.get_title|capfirst }}</h2>
-    <h5 class="link-body-emphasis mb-1">{{ article.article.get_subtitle|capfirst }}</h2>
+    <h5 class="link-body-emphasis mb-1">{{ article.article.get_subtitle|capfirst }}</h5>
     <p class="article-post-meta">{{ article.created|date:"F Y" }} - <a href="#">{{ article.author }}</a></p>
     <p class="text-break">{{ article.body|wrapchars|safe|linebreaks }}</p>
     </article>
