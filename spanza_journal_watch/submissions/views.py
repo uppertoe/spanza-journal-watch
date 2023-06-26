@@ -37,7 +37,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
 
     # Frontend options
     paginate_by = 6
-    article_cols = 2
+    article_cols = 1
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object(queryset=Issue.objects.exclude(active=False))

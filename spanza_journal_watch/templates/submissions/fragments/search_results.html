@@ -2,8 +2,11 @@
 <h3>Results</h3>
 <hr>
 {% for review in result_reviews %}
-    <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h3>{{ review.article }}</h3></a>
-    <p>{{ review.author }}</p>
+    <a href="{{ review.get_absolute_url }}" class="text-decoration-none mb-0"><h3 class="mb-0">{{ review.article.get_title|capfirst }}</h3>
+    <h5 class="text-muted">{{ review.article.get_subtitle|capfirst }}</h5></a>
+    <div class="mb-3"></div>
+    <p class="mb-0 fst-italic">{{ review.article.journal }}</p>
+    <p class="mb-3">{{ review.created|date:"F Y" }} by <a href="#">{{ review.author }}</a></p>
     <blockquote class="blockquote">"{{ review.headline|safe }}"</blockquote>
 {% endfor %}
 {% else %}

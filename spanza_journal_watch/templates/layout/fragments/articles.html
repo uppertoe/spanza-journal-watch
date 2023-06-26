@@ -1,16 +1,26 @@
 <div id="articles">
-{% for article in body_articles %}
-    <article class="article-post">
-    <h2 class="link-body-emphasis mb-2">{{ article.article.get_title|capfirst }}</h2>
-    <h5 class="mb-2">{{ article.article.get_subtitle|capfirst }}</h5>
-    <p class="article-post-meta mb-3">{{ article.created|date:"F Y" }} by <a href="#">{{ article.author }}</a></p>
-    <div class="d-flex mt-auto justify-content-between align-items-center">
-        <div class="btn-group">
-            <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ article.article.journal }}" data-bs-content="{{ article.article.citation }}">Citation</a>
-            <a href="{{ article.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>
+    <div class="row row-cols-{{ article_cols }} g-3 py-2">
+        {% for review in reviews %}
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                {% if review.image %}<svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/><text x="50%" y="50%" fill="#eceeef" dy=".3em">Thumbnail</text></svg>{% endif %}
+                <div class="d-flex card-body flex-column">
+                    <h5 class="card-title">{{ review.article.get_title|capfirst }}</h5>
+                    {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
+                    <div class="mb-2"></div>
+                    <p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal }}</a>
+                    <p class="card-subtitle text-muted mb-1">Reviewed {{ review.created|date:"F Y" }} by <a href="#">{{ review.author }}</a></p>
+                    <div class="mb-2"></div>
+                    <p class="card-text">{{ review.get_truncated_body }}</p>
+                        <div class="d-flex mt-auto justify-content-between align-items-center">
+                                <div class="btn-group">
+                                    <a href="{{ review.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">Article review</a>
+                                    {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>{% endif %}
+                                </div>
+                        </div>
+                </div>
+            </div>
         </div>
+        {% endfor %}
     </div>
-    <p class="text-break">{{ article.body|wrapchars|safe|linebreaks }}</p>
-    </article>
-{% endfor %}
 </div>

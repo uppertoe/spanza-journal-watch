@@ -14,6 +14,12 @@
     <h2 class="link-body-emphasis mb-1">{{ review.article.get_title|capfirst }}</h2>
     <h5 class="link-body-emphasis mb-1">{{ review.article.get_subtitle|capfirst }}</h5>
     <p class="article-post-meta">{{ review.created|date:"F j, Y" }} <a href="#">{{ review.author }}</a></p>
+    <div class="d-flex mt-auto justify-content-between align-items-center">
+        <div class="btn-group">
+            <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</a>
+            <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>
+        </div>
+    </div>
     <p class="text-break">{{ review.body|wrapchars|safe|linebreaks }}</p>
 </article>
 {% endblock article-block %}
