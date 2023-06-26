@@ -4,7 +4,8 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
-from layout.views import HomepageView
+
+from spanza_journal_watch.layout.views import HomepageView
 
 urlpatterns = [
     # path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
@@ -16,8 +17,8 @@ urlpatterns = [
     path("users/", include("spanza_journal_watch.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
-    path("", include("submissions.urls")),
-    path("feature/", include("layout.urls")),
+    path("", include("spanza_journal_watch.submissions.urls")),
+    path("feature/", include("spanza_journal_watch.layout.urls")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

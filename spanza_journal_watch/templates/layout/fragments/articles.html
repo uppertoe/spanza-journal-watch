@@ -1,9 +1,15 @@
 <div id="articles">
 {% for article in body_articles %}
     <article class="article-post">
-    <h2 class="link-body-emphasis mb-1">{{ article.article.get_title|capfirst }}</h2>
-    <h5 class="link-body-emphasis mb-1">{{ article.article.get_subtitle|capfirst }}</h5>
-    <p class="article-post-meta">{{ article.created|date:"F Y" }} - <a href="#">{{ article.author }}</a></p>
+    <h2 class="link-body-emphasis mb-2">{{ article.article.get_title|capfirst }}</h2>
+    <h5 class="mb-2">{{ article.article.get_subtitle|capfirst }}</h5>
+    <p class="article-post-meta mb-3">{{ article.created|date:"F Y" }} by <a href="#">{{ article.author }}</a></p>
+    <div class="d-flex mt-auto justify-content-between align-items-center">
+        <div class="btn-group">
+            <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ article.article.journal }}" data-bs-content="{{ article.article.citation }}">Citation</a>
+            <a href="{{ article.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>
+        </div>
+    </div>
     <p class="text-break">{{ article.body|wrapchars|safe|linebreaks }}</p>
     </article>
 {% endfor %}

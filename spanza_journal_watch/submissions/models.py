@@ -119,8 +119,6 @@ class Article(TimeStampedModel):
         separators = [":", " - "]
         for sep in separators:
             if sep in self.name:
-                print(sep)
-                print(self.name)
                 return self.name.split(sep, 1)[0].strip()
         return self.name
 

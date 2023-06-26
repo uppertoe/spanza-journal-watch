@@ -1,7 +1,8 @@
 from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-from submissions.models import Hit, Issue, Tag
+
+from spanza_journal_watch.submissions.models import Hit, Issue, Tag
 
 
 class HtmxMixin:

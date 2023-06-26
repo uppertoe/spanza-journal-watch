@@ -1,6 +1,6 @@
 from django.views.generic import DetailView, ListView
-from submissions.models import Review
 
+from spanza_journal_watch.submissions.models import Review
 from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
 
 from .models import FeatureArticle, Homepage
