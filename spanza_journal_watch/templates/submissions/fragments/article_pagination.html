@@ -1,5 +1,5 @@
 <nav class="fixed-bottom ps-3" aria-label="Article navigation">
-    <ul class="pagination pt-3">
+    <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
             <a class="page-link" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block">Previous</a>
