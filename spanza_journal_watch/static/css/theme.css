@@ -119,7 +119,13 @@
     Georgia,
     'Times New Roman',
     serif /*rtl:Amiri, Georgia, "Times New Roman", serif*/;
-  font-size: 4rem;
+  font-size: 2rem;
+}
+
+@media (min-width: 768px) {
+  .blog-header-logo {
+    font-size: 4rem;
+  }
 }
 
 .blog-header-logo:hover {
