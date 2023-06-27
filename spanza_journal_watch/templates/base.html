@@ -131,7 +131,7 @@
     <main class="container">
       {% block main-feature %}{% endblock main-feature %}
       {% block card-feature %}{% endblock card-feature %}
-      <div class="row py-2" id="top-divider">
+      <div class="row py-2" id="top">
         <div class="col-md-8 pb-4">
           {% block content %}{% endblock content %}
           {% block breadcrumbs %}
@@ -147,39 +147,16 @@
         <div class="col-md-4 {% if arrange_sidebar_top %}order-first order-md-0{% endif %}">
           <div class="position-sticky" style="top: 2rem;">
             {% block additional_sidebar_content %}{% endblock additional_sidebar_content %}
-            <div class="p-4 mb-3 bg-body-tertiary rounded">
-              {% include "fragments/about.html" %}
-            </div>
-            {% if sidebar_issues %}
-            <div>
-              <h4 class="fst-italic">Issues</h4>
-              <ul class="list-unstyled">
-                {% for issue in sidebar_issues %}
-                {% include 'fragments/sidebar_issue.html' %}
-                {% endfor %}
-              </ul>
-            </div>
-            {% endif %}
-
-            {% if sidebar_tags %}
-            <div class="p-3 p-md-0 py-md-4">
-              <h4 class="fst-italic">Topics</h4>
-              <ol class="list-unstyled mb-0">
-                {% for tag in sidebar_tags %}
-                <li><a href="{{ tag.get_absolute_url }}">{{ tag }}</a></li>
-                {% endfor %}
-              </ol>
-            </div>
-            {% endif %}
-
-            <div class="p-3 p-md-0 py-md-4">
-              <h4 class="fst-italic">Links</h4>
-              <ol class="list-unstyled">
-                {% include 'fragments/sidebar_links.html' %}
-              </ol>
-            </div>
+            {% include 'fragments/sidebar_content.html' %}
           </div>
         </div>
+        {% if arrange_sidebar_top %}
+        <div class="col d-block d-md-none">
+          {% with arrange_sidebar_top=False %}
+          {% include 'fragments/sidebar_content.html' %}
+          {% endwith %}
+        </div>
+        {% endif %}
       </div>
       {% endblock sidebar %}
 

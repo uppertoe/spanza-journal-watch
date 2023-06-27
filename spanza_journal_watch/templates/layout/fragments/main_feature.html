@@ -2,6 +2,6 @@
     <div class="col-lg-8 px-0">
         <h1 class="display-4 fst-italic">{{ main_feature.title }}</h1>
         <div class="lead my-3">{{ main_feature.get_truncated_body|safe }}</div>
-        <p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
+        {% if truncated %}<p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>{% endif %}
     </div>
 </div>

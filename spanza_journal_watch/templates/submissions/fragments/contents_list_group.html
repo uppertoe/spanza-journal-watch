@@ -1,5 +1,6 @@
 {% load render_bundle from webpack_loader %}
-<div id="contents-list-group" hx-swap-oob="true" class="mb-3">
+{% render_bundle 'project' 'js' attrs='defer' %}
+<div id="contents-list-group" hx-swap-oob="true" class="mb-3 pb-3">
     <div class="row d-flex align-items-center">
         <div class="col"><h4 class="fst-italic mb-3">Contents</h4></div>
         <div class="col">
@@ -60,8 +61,3 @@
         {% endfor %}
       </div>
 </div>
-
-{% render_bundle 'project' 'js' %}
-<script>
-
-</script>
