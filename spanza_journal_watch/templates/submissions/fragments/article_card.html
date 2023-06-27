@@ -1,9 +1,9 @@
 <div id="articles">
     {% for review in articles %}
     <article class="article-post">
-    <h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>
-    <h5 class="mb-2">{{ review.article.get_subtitle|capfirst }}</h5>
-    <p class="article-post-meta mb-1 fst-italic">{{ review.article.journal }}</a>
+    <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>
+    <h5 class="mb-2">{{ review.article.get_subtitle|capfirst }}</h5></a>
+    <p class="article-post-meta mb-1 fst-italic">{{ review.article.journal }}</p>
     <p class="mb-3">{{ review.created|date:"F Y" }} by <a href="#">{{ review.author }}</a></p>
     <div class="d-flex mt-auto justify-content-between align-items-center">
         <div class="btn-group">

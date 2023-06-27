@@ -4,22 +4,32 @@
     <div class="col-lg-8 px-0">
         <h1 class="display-4 fst-italic">Journal Watch Review</h1>
         <p class="lead my-3">{{ review.article.journal }}</p>
-        {% with review.issues.all.last as issue %} <p class="lead mb-0"><a href="{{ issue.get_absolute_url }}" class="text-body-emphasis fw-bold">&lt Back to {{ issue|lower }}...</a></p>{% endwith%}
     </div>
 </div>
 {% endblock main-feature %}
 
 {% block article-block %}
 <article class="article-post">
-    <h2 class="link-body-emphasis mb-1">{{ review.article.get_title|capfirst }}</h2>
-    <h5 class="link-body-emphasis mb-1">{{ review.article.get_subtitle|capfirst }}</h5>
-    <p class="article-post-meta">{{ review.created|date:"F j, Y" }} <a href="#">{{ review.author }}</a></p>
-    <div class="d-flex mt-auto justify-content-between align-items-center">
-        <div class="btn-group">
-            <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</a>
-            <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>
-        </div>
+<h2 class="card-title">{{ review.article.get_title|capfirst }}</h2>
+{% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
+<p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal }}</a>
+<p class="card-subtitle text-muted mb-3">Reviewed {{ review.created|date:"F Y" }} by <a href="#">{{ review.author }}</a></p>
+<div class="d-flex mt-auto justify-content-between align-items-center">
+    <div class="btn-group">
+        <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</a>
+        <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>
     </div>
-    <p class="text-break">{{ review.body|wrapchars|safe|linebreaks }}</p>
+</div>
+<p class="text-break">{{ review.body|wrapchars|safe|linebreaks }}</p>
 </article>
+{% if review.article.tags.all %}
+<div>
+    <h5>Tags for this article:</h5>
+    <div class="row">
+    {% for tag in review.article.tags.all %}
+    <div class="col-2"><a href="{{ tag.get_absolute_url }}" class="text-decoration-none">{{ tag }}</a></div>
+    {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endblock article-block %}

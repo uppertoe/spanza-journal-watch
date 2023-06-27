@@ -12,6 +12,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="review",
             name="slug",
-            field=models.SlugField(blank=True, max_length=30, unique=True),
+            field=models.SlugField(blank=True, max_length=50, unique=True),
         ),
     ]

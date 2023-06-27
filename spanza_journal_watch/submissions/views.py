@@ -12,7 +12,7 @@ from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 from .models import Issue, Review, Tag
 
 
-class ReviewDetailView(HitMixin, SidebarMixin, BaseBreadcrumbMixin, DetailView):
+class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
     model = Review
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
@@ -23,6 +23,9 @@ class ReviewDetailView(HitMixin, SidebarMixin, BaseBreadcrumbMixin, DetailView):
         issue = Issue.objects.filter(reviews=self.object).latest("created")
 
         return [("Issues", reverse("submissions:issue_list")), (issue, issue.get_absolute_url()), (self.object, "")]
+
+    # HTMX
+    htmx_templates = ["layout/fragments/card_modal.html"]
 
 
 class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):

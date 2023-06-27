@@ -1,18 +1,45 @@
+{% load static %}
 <div class="col-md-6">
     <div class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">
         <div class="col p-4 d-flex flex-column position-static">
             <strong class="d-inline-block mb-2 {{ feature_text_styles|random }}">Featured Article</strong>
             <h5 class="mb-1">{{ feature.article.get_title }}</h5>
             <div class="mb-1 text-body-secondary">By {{ feature.author }}</div>
-            <a href="{{ feature.get_absolute_url }}" class="icon-link gap-1 icon-link-hover stretched-link">
-            Continue reading
+            <a
+            role="button"
+            class="icon-link gap-1 icon-link-hover stretched-link"
+            data-bs-toggle="modal"
+            data-bs-target="#{{ feature.slug }}Modal"
+            hx-get="{{ feature.get_absolute_url }}"
+            hx-indicator="#{{ feature.slug }}Indicator"
+            hx-target="#{{ feature.slug }}Container"
+            >Continue reading
             <svg class="bi"><use xlink:href="#chevron-right"/></svg>
             </a>
         </div>
-
         <div class="col-auto d-none d-lg-block">
             <svg class="bd-placeholder-img" width="150" height="300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/><text x="50%" y="50%" fill="#eceeef" dy=".3em">Thumbnail</text></svg>
         </div>
+    </div>
+</div>
 
+<!-- Modal -->
+<div class="modal fade" id="{{ feature.slug }}Modal" tabindex="-1" aria-labelledby="{{ feature.slug }}ModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+        <div class="modal-header">
+        <h1 class="modal-title fs-5" id="{{ feature.slug }}ModalLabel">SPANZA Journal Watch - Review</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="d-flex justify-content-center">
+                <img src="{% static "images/spinners/3-dots-move.svg" %}" id="{{ feature.slug }}Indicator" class="htmx-indicator">
+                </div>
+            <div class="container px-5 py-2" id="{{ feature.slug }}Container"></div>
+        </div>
+        <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+    </div>
     </div>
 </div>

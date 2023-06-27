@@ -1,3 +1,4 @@
+{% load static %}
 <div id="articles">
     <div class="row row-cols-{{ article_cols }} g-3 py-2">
         {% for review in reviews %}
@@ -14,11 +15,40 @@
                     <p class="card-text">{{ review.get_truncated_body }}</p>
                         <div class="d-flex mt-auto justify-content-between align-items-center">
                                 <div class="btn-group">
-                                    <a href="{{ review.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">Article review</a>
+                                    <a
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#{{ review.slug }}Modal"
+                                    hx-get="{{ review.get_absolute_url }}"
+                                    hx-indicator="#{{ review.slug }}Indicator"
+                                    hx-target="#{{ review.slug }}Container"
+                                    >Review</a>
                                     {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>{% endif %}
                                 </div>
                         </div>
                 </div>
+            </div>
+        </div>
+        <!-- Modal -->
+        <div class="modal fade" id="{{ review.slug }}Modal" tabindex="-1" aria-labelledby="{{ review.slug }}ModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h1 class="modal-title fs-5" id="{{ review.slug }}ModalLabel">SPANZA Journal Watch - Review</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-center">
+                        <img src="{% static "images/spinners/3-dots-move.svg" %}" id="{{ review.slug }}Indicator" class="htmx-indicator">
+                      </div>
+                    <div class="container px-5 py-2" id="{{ review.slug }}Container"></div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                <a rel="bookmark" href="{{ review.get_absolute_url }}" class=" my-2 icon-link gap-1 icon-link-hover text-decoration-none">Permalink<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
             </div>
         </div>
         {% endfor %}
