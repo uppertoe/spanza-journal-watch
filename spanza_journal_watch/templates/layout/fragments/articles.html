@@ -42,7 +42,7 @@
                     <div class="d-flex justify-content-center">
                         <img src="{% static "images/spinners/3-dots-move.svg" %}" id="{{ review.slug }}Indicator" class="htmx-indicator">
                       </div>
-                    <div class="container px-5 py-2" id="{{ review.slug }}Container"></div>
+                    <div class="container p-2 px-md-5" id="{{ review.slug }}Container"></div>
                 </div>
                 <div class="modal-footer d-flex justify-content-between">
                 <a rel="bookmark" href="{{ review.get_absolute_url }}" class=" my-2 icon-link gap-1 icon-link-hover text-decoration-none">Permalink<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
