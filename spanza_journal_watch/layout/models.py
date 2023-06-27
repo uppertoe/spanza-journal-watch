@@ -15,6 +15,15 @@ class FeatureArticle(TimeStampedModel):
     title = models.CharField(max_length=255)
     body = models.TextField(null=True, blank=True)
     slug = models.SlugField(unique=True, blank=True)
+    image = models.ImageField(
+        upload_to="uploads/featurearticle/",
+        blank=True,
+        null=True,
+        height_field="image_height",
+        width_field="image_width",
+    )
+    image_height = models.IntegerField(null=True, blank=True)
+    image_width = models.IntegerField(null=True, blank=True)
 
     # Instance methods
     def get_truncated_body(self):

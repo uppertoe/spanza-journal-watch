@@ -183,6 +183,15 @@ class Review(TimeStampedModel):
     body = models.TextField()
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
+    feature_image = models.ImageField(
+        upload_to="uploads/review/",
+        blank=True,
+        null=True,
+        height_field="feature_image_height",
+        width_field="feature_image_width",
+    )
+    feature_image_height = models.IntegerField(null=True, blank=True)
+    feature_image_width = models.IntegerField(null=True, blank=True)
 
     def get_truncated_body(self):
         return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
