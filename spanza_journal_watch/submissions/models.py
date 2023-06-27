@@ -200,7 +200,7 @@ class Review(TimeStampedModel):
 
         # Perform an initial save
         super().save(*args, **kwargs)
-        # Create a SearchVector from the body test
+        # Create a SearchVector from the body text
         # Update this field separately
         Review.objects.filter(pk=self.pk).update(search_vector=SearchVector("body"))
 

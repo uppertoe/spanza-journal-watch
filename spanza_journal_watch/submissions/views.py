@@ -36,11 +36,16 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
     breadcrumb_use_pk = False
 
     # HTMX
-    htmx_templates = ["submissions/fragments/article_card.html", "submissions/fragments/article_pagination.html"]
+    htmx_templates = [
+        "submissions/fragments/article_full.html",
+        "submissions/fragments/article_pagination.html",
+        "submissions/fragments/contents_list_group.html",
+    ]
 
     # Frontend options
-    paginate_by = 6
+    paginate_by = 8
     article_cols = 1
+    arrange_sidebar_top = True
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object(queryset=Issue.objects.exclude(active=False))
@@ -50,6 +55,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         context = super().get_context_data(**kwargs)
         context["issue"] = self.object
         context["article_cols"] = self.article_cols
+        context["arrange_sidebar_top"] = self.arrange_sidebar_top
 
         # Supply only paginated objects to the template
         paginator = context["paginator"]

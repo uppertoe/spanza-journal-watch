@@ -15,7 +15,7 @@
 {% block article-block %}
 <div id="article-block">
     {% block articles %}
-    {% include "submissions/fragments/article_card.html" %}
+    {% include "submissions/fragments/article_full.html" %}
     {% endblock articles %}
 
     {% block pagination %}
@@ -26,3 +26,7 @@
 </div>
 
 {% endblock article-block %}
+
+{% block additional_sidebar_content %}
+{% include 'submissions/fragments/contents_list_group.html' %}
+{% endblock additional_sidebar_content %}

@@ -131,7 +131,7 @@
     <main class="container">
       {% block main-feature %}{% endblock main-feature %}
       {% block card-feature %}{% endblock card-feature %}
-      <div class="row py-2">
+      <div class="row py-2" id="top-divider">
         <div class="col-md-8 pb-4">
           {% block content %}{% endblock content %}
           {% block breadcrumbs %}
@@ -144,12 +144,12 @@
           {% endblock article-block %}
         </div>
         {% block sidebar %}
-        <div class="col-md-4">
+        <div class="col-md-4 {% if arrange_sidebar_top %}order-first order-md-0{% endif %}">
           <div class="position-sticky" style="top: 2rem;">
+            {% block additional_sidebar_content %}{% endblock additional_sidebar_content %}
             <div class="p-4 mb-3 bg-body-tertiary rounded">
               {% include "fragments/about.html" %}
             </div>
-
             {% if sidebar_issues %}
             <div>
               <h4 class="fst-italic">Issues</h4>

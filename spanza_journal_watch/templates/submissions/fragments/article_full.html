@@ -1,6 +1,6 @@
-<div id="articles">
+<div id="articles" data-bs-spy="scroll" data-bs-target="#list-reviews"  tabindex="0">
     {% for review in articles %}
-    <article class="article-post">
+    <article class="article-post" id="list-item-{{ review.slug }}">
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>
     <h5 class="mb-2">{{ review.article.get_subtitle|capfirst }}</h5></a>
     <p class="article-post-meta mb-1 fst-italic">{{ review.article.journal }}</p>
@@ -12,6 +12,8 @@
         </div>
     </div>
     <p class="text-break">{{ review.body|wrapchars|safe|linebreaks }}</p>
+    <p class="mb-3"><a href="#top-divider">Back to top</a></p>
     </article>
+
 {% endfor %}
 </div>
