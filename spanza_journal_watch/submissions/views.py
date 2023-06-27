@@ -98,9 +98,20 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
     model = Tag
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
+    queryset = Tag.objects.exclude(active=False).prefetch_related(
+        "articles", "articles__reviews", "articles__journal", "articles__reviews__author", "articles__reviews__issues"
+    )
 
     # Breadcrumb
     breadcrumb_use_pk = False
+
+    # Frontend options
+    article_cols = 1
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["article_cols"] = self.article_cols
+        return context
 
 
 class LatestIssueView(RedirectView):

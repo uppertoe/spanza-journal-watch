@@ -1,9 +1,58 @@
+{% load static %}
 <div id="articles">
-{% for article in tag.articles.all %}
-    <article class="article-post">
-    <h2 class="display-5 link-body-emphasis mb-1">{{ article }}</h2>
-    <p class="article-post-meta">{{ article.created|date:"F j, Y" }} <a href="#">{{ article.author }}</a></p>
-    <div>{{ article.get_related_review|linebreaks }}</div>
-    </article>
-{% endfor %}
+    <div class="row row-cols-{{ article_cols }} g-3 py-2">
+        {% for article in tag.articles.all %}
+        {% with article.reviews.last as review %}
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                {% if review.image %}<svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/><text x="50%" y="50%" fill="#eceeef" dy=".3em">Thumbnail</text></svg>{% endif %}
+                <div class="d-flex card-body flex-column">
+                    <h5 class="card-title">{{ article.get_title|capfirst }}</h5>
+                    {% if article.get_subtitle %}<p class="card-subtitle mb-1">{{ article.get_subtitle|capfirst }}</p>{% endif %}
+                    <div class="mb-2"></div>
+                    <p class="card-subtitle text-muted mb-1 fst-italic">{{ article.journal }}</a>
+                    <p class="card-subtitle text-muted mb-1">Reviewed {{ review.created|date:"F Y" }} by <a href="#">{{ review.author }}</a></p>
+                    <div class="mb-2"></div>
+                    <p class="card-text">{{ review.get_truncated_body }}</p>
+                        <div class="d-flex mt-auto justify-content-between align-items-center">
+                                <div class="btn-group">
+                                    <a
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#{{ review.slug }}Modal"
+                                    hx-get="{{ review.get_absolute_url }}"
+                                    hx-indicator="#{{ review.slug }}Indicator"
+                                    hx-target="#{{ review.slug }}Container"
+                                    >Review</a>
+                                    {% if article.url %}<a href="{{ article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>{% endif %}
+                                </div>
+                        </div>
+                </div>
+            </div>
+        </div>
+        <!-- Modal -->
+        <div class="modal fade" id="{{ review.slug }}Modal" tabindex="-1" aria-labelledby="{{ review.slug }}ModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h1 class="modal-title fs-5" id="{{ review.slug }}ModalLabel">Journal Watch - Review</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-center">
+                        <img src="{% static "images/spinners/3-dots-move.svg" %}" id="{{ review.slug }}Indicator" class="htmx-indicator">
+                      </div>
+                    <div class="container p-2 px-md-5" id="{{ review.slug }}Container"></div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                <a rel="bookmark" href="{{ review.get_absolute_url }}" class=" my-2 icon-link gap-1 icon-link-hover text-decoration-none">Permalink<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
 </div>

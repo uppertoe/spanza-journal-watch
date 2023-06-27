@@ -25,6 +25,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)
             .select_related(
                 "article",
+                "article__journal",
                 "author",
             )
             .prefetch_related("issues")
