@@ -1,6 +1,13 @@
 from html.parser import HTMLParser
 
+from django.apps import apps as django_apps
 from django.utils.html import strip_tags
+
+
+def process_model_instance(app_label, model_name, instance_pk):
+    model = django_apps.get_model(app_label=app_label, model_name=model_name)
+    instance = model.objects.get(pk=instance_pk)
+    return instance
 
 
 def unique_slugify(instance, slug):
