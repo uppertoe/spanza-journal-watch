@@ -55,21 +55,21 @@ def resize_image(app_label, model_name, pk, size=600):
     print(f"Celery: {image.path}")
 
     image_file = default_storage.open(image.path)
-    with Image.open(image_file) as img:  # Ensure file is closed
-        width, height = img.size
+    img = Image.open(image_file)
+    width, height = img.size
 
-        if max(width, height) > size:
-            # Resize the image
-            new_width, new_height = resize_to_max_dimension(width, height, size)
-            resized_img = img.resize((new_width, new_height))
+    if max(width, height) > size:
+        # Resize the image
+        new_width, new_height = resize_to_max_dimension(width, height, size)
+        resized_img = img.resize((new_width, new_height))
 
-            # Operate in memory
-            output = BytesIO()
-            resized_img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
-            output.seek(0)
-            resized_image = ContentFile(output.getvalue())
+        # Operate in memory
+        output = BytesIO()
+        resized_img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
+        output.seek(0)
+        resized_image = ContentFile(output.getvalue())
 
-            # Save the resized image to the specific field
-            setattr(instance, image_field_name, resized_image)
-            instance.save()
+        # Save the resized image to the specific field
+        setattr(instance, image_field_name, resized_image)
+        instance.save()
     image_file.close()
