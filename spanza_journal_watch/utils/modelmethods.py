@@ -2,6 +2,7 @@ import datetime
 from io import BytesIO
 
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.db.models import ImageField
 from django.utils.text import slugify
 from PIL import Image
@@ -48,9 +49,13 @@ def resize_image(app_label, model_name, pk, size=600):
     if not image_field_name:
         return print(f"Warning: no compatible ImageField for {instance}")
 
-    image = getattr(instance, image_field_name)
+    print(f"Celery 1 {instance.feature_image.path}")
 
-    with Image.open(image) as img:  # Ensure file is closed
+    image = getattr(instance, image_field_name)
+    print(f"Celery: {image.path}")
+
+    image_file = default_storage.open(image.path)
+    with Image.open(image_file) as img:  # Ensure file is closed
         width, height = img.size
 
         if max(width, height) > size:
@@ -67,3 +72,4 @@ def resize_image(app_label, model_name, pk, size=600):
             # Save the resized image to the specific field
             setattr(instance, image_field_name, resized_image)
             instance.save()
+    image_file.close()
