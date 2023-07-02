@@ -50,8 +50,8 @@ def resize_image(app_label, model_name, pk, size=600):
 
     image = getattr(instance, image_field_name)
 
-    image_file = image.open()
-    img = Image.open(image_file)
+    image.open()
+    img = Image.open(image)
     width, height = img.size
 
     if max(width, height) > size:
@@ -68,5 +68,4 @@ def resize_image(app_label, model_name, pk, size=600):
         # Save the resized image to the specific field
         setattr(instance, image_field_name, resized_image)
         instance.save()
-        # image_file.write(resized_image)
-    image_file.close()
+    image.close()
