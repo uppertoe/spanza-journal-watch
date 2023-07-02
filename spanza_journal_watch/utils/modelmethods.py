@@ -39,6 +39,7 @@ import datetime
 from io import BytesIO
 
 # from django.apps import apps as django_apps
+from django.core.files import File
 from django.core.files.base import ContentFile
 
 # from django.core.files.storage import default_storage
@@ -92,5 +93,5 @@ def resize_image(image, size=600):
         output = BytesIO()
         resized_img.save(output, format="JPEG", quality=95, resampling=Image.Resampling.LANCZOS)
         output.seek(0)
-        return ContentFile(output.getvalue())
+        return File(ContentFile(output.getvalue()), name=image.name)
     return image
