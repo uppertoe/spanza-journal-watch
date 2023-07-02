@@ -204,16 +204,14 @@ class Review(TimeStampedModel):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
 
-        # Set the image filename
-        self.feature_image.name = name_image(self)
+        if self.feature_image:
+            # Resize the image
+            self.feature_image = resize_image(self.feature_image)
+            # Set the image filename
+            self.feature_image.name = name_image(self)
 
         # Perform an initial save
         super().save(*args, **kwargs)
-
-        # TODO: move this to ModelForm clean_feature_image
-        # Resize the uploaded image
-        resize_image.delay("submissions", "Review", self.pk)
-        # resize_image("submissions", "Review", self.pk)
 
         # Create a SearchVector from the body text
         # Update this field separately

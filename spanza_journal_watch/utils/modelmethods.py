@@ -1,15 +1,53 @@
+"""
+@celery_app.task
+def resize_image(app_label, model_name, pk, size=600):
+    # Get instance via Model and pk to avoid stale references
+    instance = process_model_instance(app_label, model_name, pk)
+    image_field_name = get_instance_image_field(instance)
+    if not image_field_name:
+        return print(f"Warning: no compatible ImageField for {instance}")
+
+    image = getattr(instance, image_field_name)
+
+    with default_storage.open(image.name, mode="rb+") as file:
+        img = Image.open(file)
+        width, height = img.size
+
+        if max(width, height) > size:
+            # Resize the image
+            new_width, new_height = resize_to_max_dimension(width, height, size)
+            resized_img = img.resize((new_width, new_height))
+
+            # Operate in memory
+            output = BytesIO()
+            resized_img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
+            output.seek(0)
+            resized_image = ContentFile(output.getvalue())
+
+            # Save the resized image to the specific field
+            #path = default_storage.save(image.name, resized_image)
+
+            # Save the resized image to the specific field
+            image.delete(save=False)  # Delete the previous image file
+            image.save(image.name, resized_image, save=False)  # Save the resized image to S3
+
+            #model = django_apps.get_model(app_label, model_name)
+            #fields = {f'{image_field_name}.name': image.name}
+            #model.objects.filter(pk=pk).update(**fields) """
+
 import datetime
 from io import BytesIO
 
-from django.apps import apps as django_apps
+# from django.apps import apps as django_apps
 from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
+
+# from django.core.files.storage import default_storage
 from django.db.models import ImageField
 from django.utils.text import slugify
 from PIL import Image
 
-from config.celery_app import app as celery_app
-from spanza_journal_watch.utils.functions import process_model_instance
+# from config.celery_app import app as celery_app
+# from spanza_journal_watch.utils.functions import process_model_instance
 
 
 def resize_to_max_dimension(width, height, target):
@@ -42,33 +80,17 @@ def get_instance_image_field(instance):
     return None
 
 
-@celery_app.task
-def resize_image(app_label, model_name, pk, size=600):
-    # Get instance via Model and pk to avoid stale references
-    instance = process_model_instance(app_label, model_name, pk)
-    image_field_name = get_instance_image_field(instance)
-    if not image_field_name:
-        return print(f"Warning: no compatible ImageField for {instance}")
-
-    image = getattr(instance, image_field_name)
-
-    file = default_storage.open(image.name, mode="rb+")
-    img = Image.open(file)
+def resize_image(image, size=600):
+    img = Image.open(image)
     width, height = img.size
 
     if max(width, height) > size:
-        # Resize the image
         new_width, new_height = resize_to_max_dimension(width, height, size)
         resized_img = img.resize((new_width, new_height))
 
         # Operate in memory
         output = BytesIO()
-        resized_img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
+        resized_img.save(output, format="JPEG", quality=95, resampling=Image.Resampling.LANCZOS)
         output.seek(0)
-        resized_image = ContentFile(output.getvalue())
-
-        # Save the resized image to the specific field
-        path = default_storage.save(image.name, resized_image)
-        model = django_apps.get_model(app_label, model_name)
-        fields = {image_field_name: path}
-        model.objects.filter(pk=pk).update(**fields)
+        return ContentFile(output.getvalue())
+    return image
