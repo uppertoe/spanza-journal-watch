@@ -213,6 +213,7 @@ class Review(TimeStampedModel):
         # TODO: move this to ModelForm clean_feature_image
         # Resize the uploaded image
         resize_image.delay("submissions", "Review", self.pk)
+        # resize_image("submissions", "Review", self.pk)
 
         # Create a SearchVector from the body text
         # Update this field separately
