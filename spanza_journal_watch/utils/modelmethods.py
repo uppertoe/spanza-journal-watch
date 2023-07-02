@@ -68,7 +68,7 @@ def resize_image(app_label, model_name, pk, size=600):
         resized_image = ContentFile(output.getvalue())
 
         # Save the resized image to the specific field
-        path = default_storage.save(image.path, resized_image)
+        path = default_storage.save(image.name, resized_image)
         model = django_apps.get_model(app_label, model_name)
         fields = {image_field_name: path}
         model.objects.filter(pk=pk).update(**fields)
