@@ -204,12 +204,11 @@ class Review(TimeStampedModel):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
 
-        self.feature_image.name = name_image(self)
-
         if self.feature_image:
+            # Set the image filename
+            self.feature_image.name = name_image(self)
             # Resize the image
             self.feature_image = resize_image(self.feature_image)
-            # Set the image filename
 
         # Perform an initial save
         super().save(*args, **kwargs)
