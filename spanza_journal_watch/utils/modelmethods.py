@@ -2,7 +2,6 @@ import datetime
 from io import BytesIO
 
 from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
 from django.db.models import ImageField
 from django.utils.text import slugify
 from PIL import Image
@@ -51,7 +50,7 @@ def resize_image(app_label, model_name, pk, size=600):
 
     image = getattr(instance, image_field_name)
 
-    image_file = default_storage.open(image.path)
+    image_file = image.open()
     img = Image.open(image_file)
     width, height = img.size
 
@@ -69,4 +68,5 @@ def resize_image(app_label, model_name, pk, size=600):
         # Save the resized image to the specific field
         setattr(instance, image_field_name, resized_image)
         instance.save()
+        # image_file.write(resized_image)
     image_file.close()
