@@ -206,14 +206,12 @@ class Review(TimeStampedModel):
 
         # Set the image filename
         self.feature_image.name = name_image(self)
-        print(f"Django 1: {self.feature_image.path}")
 
         # Perform an initial save
         super().save(*args, **kwargs)
 
         # TODO: move this to ModelForm clean_feature_image
         # Resize the uploaded image
-        print(f"Django 2: {self.feature_image.path}")
         resize_image.delay("submissions", "Review", self.pk)
 
         # Create a SearchVector from the body text

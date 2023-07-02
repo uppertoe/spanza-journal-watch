@@ -49,10 +49,7 @@ def resize_image(app_label, model_name, pk, size=600):
     if not image_field_name:
         return print(f"Warning: no compatible ImageField for {instance}")
 
-    print(f"Celery 1 {instance.feature_image.path}")
-
     image = getattr(instance, image_field_name)
-    print(f"Celery: {image.path}")
 
     image_file = default_storage.open(image.path)
     img = Image.open(image_file)
