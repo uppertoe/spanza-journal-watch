@@ -212,7 +212,6 @@ class Review(TimeStampedModel):
         celery_resize_image.delay(self.feature_image.name)
 
         # Create a SearchVector from the body text
-        # Update this field separately
         Review.objects.filter(pk=self.pk).update(search_vector=SearchVector("body"))
 
     @classmethod
