@@ -1,7 +1,7 @@
 from io import BytesIO
 from sys import getsizeof
 
-# from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image
@@ -28,7 +28,7 @@ def celery_resize_image(path, size=600):
             output = BytesIO()
             resized_img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
             output.seek(0)
-            # output = ContentFile(output.getvalue())
+            output = ContentFile(output.getvalue())
             imagefile = InMemoryUploadedFile(output, None, path, "image/jpeg", getsizeof(output), None)
 
             # Replace the S3 file
