@@ -2,7 +2,7 @@ import os
 from io import BytesIO
 
 from django.core.files.storage import default_storage
-from django.core.files.uploadedfile import TemporaryUploadedFile
+from django.core.files.uploadedfile import InMemoryUploadedFile  # TemporaryUploadedFile
 from django.db.models import ImageField
 from django.utils.text import slugify
 from PIL import Image
@@ -27,8 +27,11 @@ def name_image(instance, filename):
     ext = filename.split(".")[-1]
     name = f"{slugify(str(instance))}-image"
     filename = ".".join([name, ext])
+
+    # Prevents celery working on the old file
     if default_storage.exists(filename):
         default_storage.delete(filename)
+
     return os.path.join(upload_to, filename)
 
 
@@ -54,9 +57,12 @@ def resize_image(image, size=600):
         output.seek(0)
 
         # Create a TemporaryUploadedFile object
-        temp_file = TemporaryUploadedFile(name=image.name)
-        temp_file.write(output.getvalue())
-        temp_file.seek(0)
+        # temp_file = TemporaryUploadedFile(name=image.name)
+        # temp_file.write(output.getvalue())
+        # temp_file.seek(0)
+
+        # Create an InMemoryUploadedFile object
+        temp_file = InMemoryUploadedFile(output, None, image.name, "image/jpeg", len(output), None)
 
         return temp_file
     return image

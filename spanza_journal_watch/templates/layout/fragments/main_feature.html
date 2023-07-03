@@ -1,7 +1,10 @@
-<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
+<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary image-container">
+    <div class="overlay"></div>
     <div class="col-lg-8 px-0">
-        <h1 class="display-4 fst-italic">{{ main_feature.title }}</h1>
-        <div class="lead my-3">{{ main_feature.get_truncated_body|safe }}</div>
-        {% if truncated %}<p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>{% endif %}
+      <h1 class="display-4 fst-italic">{{ main_feature.title }}</h1>
+      <div class="lead my-3">{{ main_feature.get_truncated_body|safe }}</div>
+      {% if truncated %}
+      <p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
+      {% endif %}
     </div>
-</div>
+  </div>

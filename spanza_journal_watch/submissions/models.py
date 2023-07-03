@@ -20,7 +20,7 @@ from django.utils.text import slugify
 
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import estimate_reading_time, shorten_text, unique_slugify
-from spanza_journal_watch.utils.modelmethods import name_image  # , resize_image
+from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 
@@ -205,18 +205,12 @@ class Review(TimeStampedModel):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
 
-        # if self.feature_image:
-        # Set the image filename
-        # self.feature_image.name = name_image(self)
-        # Resize the image
-        # self.feature_image = resize_image(self.feature_image)
-
         # Perform an initial save
-        print(self.feature_image.name)
         super().save(*args, **kwargs)
-        print(self.feature_image.name)
+
+        # Delegate resizing to Celery
         celery_resize_image.delay(self.feature_image.name)
-        # celery_resize_image('submissions', 'Review', self.pk)
+
         # Create a SearchVector from the body text
         # Update this field separately
         Review.objects.filter(pk=self.pk).update(search_vector=SearchVector("body"))
