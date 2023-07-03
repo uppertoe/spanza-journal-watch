@@ -13,7 +13,7 @@ from .modelmethods import get_instance_image_field, resize_to_max_dimension
 
 
 @celery_app.task
-def celery_resize_image(app_label, model_name, pk, size=600):
+def celery_resize_image(app_label, model_name, pk, path, size=600):
     # Get instance via Model and pk to avoid stale references
     instance = process_model_instance(app_label, model_name, pk)
     image_field_name = get_instance_image_field(instance)
@@ -21,7 +21,7 @@ def celery_resize_image(app_label, model_name, pk, size=600):
         return print(f"Warning: no compatible ImageField for {instance}")
     image = getattr(instance, image_field_name)
 
-    with default_storage.open(image.name, mode="rb") as file:
+    with default_storage.open(path, mode="rb") as file:
         # Create memory object
         buffer = BytesIO()
         for chunk in file.chunks():
@@ -45,7 +45,7 @@ def celery_resize_image(app_label, model_name, pk, size=600):
             imagefile = InMemoryUploadedFile(output, None, image.name, "image/jpeg", None, None)
 
             # file.delete(save=False)
-            path = default_storage.save(image.name, imagefile)
+            path = default_storage.save(path, imagefile)
 
             model = django_apps.get_model(app_label, model_name)
             fields = {f"{image_field_name}": path}

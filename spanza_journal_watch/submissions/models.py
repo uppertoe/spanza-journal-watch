@@ -213,9 +213,10 @@ class Review(TimeStampedModel):
         # self.feature_image = resize_image(self.feature_image)
 
         # Perform an initial save
+        print(self.feature_image.name)
         super().save(*args, **kwargs)
-
-        celery_resize_image.delay("submissions", "Review", self.pk)
+        print(self.feature_image.name)
+        celery_resize_image.delay("submissions", "Review", self.pk, self.feature_image.name)
         # celery_resize_image('submissions', 'Review', self.pk)
         # Create a SearchVector from the body text
         # Update this field separately
