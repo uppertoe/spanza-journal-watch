@@ -1,18 +1,11 @@
 import os
 from io import BytesIO
 
-# from django.apps import apps as django_apps
-# from django.core.files import File
-# from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import TemporaryUploadedFile
-
-# from django.core.files.storage import default_storage
 from django.db.models import ImageField
 from django.utils.text import slugify
 from PIL import Image
-
-# from config.celery_app import app as celery_app
-# from spanza_journal_watch.utils.functions import process_model_instance
 
 
 def resize_to_max_dimension(width, height, target):
@@ -34,6 +27,8 @@ def name_image(instance, filename):
     ext = filename.split(".")[-1]
     name = f"{slugify(str(instance))}-image"
     filename = ".".join([name, ext])
+    if default_storage.exists(filename):
+        default_storage.delete(filename)
     return os.path.join(upload_to, filename)
 
 
