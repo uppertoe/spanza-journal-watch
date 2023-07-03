@@ -1,4 +1,4 @@
-import datetime
+import os
 from io import BytesIO
 
 # from django.apps import apps as django_apps
@@ -29,12 +29,12 @@ def resize_to_max_dimension(width, height, target):
     return new_width, new_height
 
 
-def name_image(instance, timestamp=False):
+def name_image(instance, filename):
+    upload_to = "uploads/review"
+    ext = filename.split(".")[-1]
     name = f"{slugify(str(instance))}-image"
-    if timestamp:
-        current_datetime = datetime.datetime.now().strftime("%d%m%Y%H%M%S")
-        name = name + current_datetime
-    return name + ".jpg"
+    filename = ".".join([name, ext])
+    return os.path.join(upload_to, filename)
 
 
 def get_instance_image_field(instance):

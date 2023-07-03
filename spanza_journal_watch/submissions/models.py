@@ -186,7 +186,7 @@ class Review(TimeStampedModel):
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     feature_image = models.ImageField(
-        upload_to="uploads/review/",
+        upload_to=name_image,
         blank=True,
         null=True,
     )
@@ -205,7 +205,6 @@ class Review(TimeStampedModel):
         if not self.slug:
             self.slug = unique_slugify(self, slugify(self.article.name))
 
-        self.feature_image.name = name_image(self)
         # if self.feature_image:
         # Set the image filename
         # self.feature_image.name = name_image(self)
@@ -216,7 +215,7 @@ class Review(TimeStampedModel):
         print(self.feature_image.name)
         super().save(*args, **kwargs)
         print(self.feature_image.name)
-        celery_resize_image.delay("submissions", "Review", self.pk, self.feature_image.name)
+        celery_resize_image.delay(self.feature_image.name)
         # celery_resize_image('submissions', 'Review', self.pk)
         # Create a SearchVector from the body text
         # Update this field separately
