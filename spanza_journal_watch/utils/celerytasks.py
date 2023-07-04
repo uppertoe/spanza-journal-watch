@@ -8,11 +8,12 @@ from PIL import Image
 
 from config.celery_app import app as celery_app
 
-from .modelmethods import resize_to_max_dimension
+from .functions import resize_to_max_dimension
 
 
 @celery_app.task
 def celery_resize_image(path, size=600):
+    # File may be local or remote (S3)
     with default_storage.open(path, mode="rb") as file:
         file.seek(0)
         img = Image.open(file)

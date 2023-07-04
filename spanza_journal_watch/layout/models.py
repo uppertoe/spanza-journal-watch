@@ -3,7 +3,9 @@ from django.urls import reverse
 from django.utils.text import slugify
 
 from spanza_journal_watch.submissions.models import Issue, Review
-from spanza_journal_watch.utils.functions import HTMLShortener, unique_slugify
+from spanza_journal_watch.utils.celerytasks import celery_resize_image
+from spanza_journal_watch.utils.functions import HTMLShortener, get_unique_slug
+from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 
@@ -16,24 +18,22 @@ class FeatureArticle(TimeStampedModel):
     body = models.TextField(null=True, blank=True)
     slug = models.SlugField(unique=True, blank=True)
     image = models.ImageField(
-        upload_to="uploads/featurearticle/",
+        upload_to=name_image,
         blank=True,
         null=True,
-        height_field="image_height",
-        width_field="image_width",
     )
-    image_height = models.IntegerField(null=True, blank=True)
-    image_width = models.IntegerField(null=True, blank=True)
 
     # Instance methods
     def get_truncated_body(self):
-        # return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
         return HTMLShortener(self.TRUNCATED_BODY_LENGTH).truncate_html(self.body)
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = unique_slugify(self, slugify(self.title))
+            self.slug = get_unique_slug(self, slugify(self.title))
         super().save(*args, **kwargs)
+
+        # Delegate resizing to Celery
+        celery_resize_image.delay(self.image.name)
 
     def get_absolute_url(self):
         return reverse("feature_article_detail", kwargs={"slug": self.slug})

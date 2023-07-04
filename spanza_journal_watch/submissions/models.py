@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
-from spanza_journal_watch.utils.functions import estimate_reading_time, shorten_text, unique_slugify
+from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text
 from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
 
@@ -54,7 +54,7 @@ class Tag(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = unique_slugify(self, slugify(self.text))
+            self.slug = get_unique_slug(self, slugify(self.text))
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):
@@ -75,7 +75,7 @@ class Journal(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = unique_slugify(self, slugify(self.name))
+            self.slug = get_unique_slug(self, slugify(self.name))
         return super().save(*args, **kwargs)
 
     def __str__(self):
@@ -186,7 +186,7 @@ class Review(TimeStampedModel):
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     feature_image = models.ImageField(
-        upload_to=name_image,
+        upload_to=name_image,  # Handle path/name and delete old file
         blank=True,
         null=True,
     )
@@ -203,7 +203,7 @@ class Review(TimeStampedModel):
     def save(self, *args, **kwargs):
         # Create the slug if it doesn't exist
         if not self.slug:
-            self.slug = unique_slugify(self, slugify(self.article.name))
+            self.slug = get_unique_slug(self, slugify(self.article.name))
 
         # Perform an initial save
         super().save(*args, **kwargs)
@@ -271,7 +271,7 @@ class Issue(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = unique_slugify(self, slugify(self.name))
+            self.slug = get_unique_slug(self, slugify(self.name))
         return super().save(*args, **kwargs)
 
     def __str__(self):

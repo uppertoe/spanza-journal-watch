@@ -4,13 +4,27 @@ from django.apps import apps as django_apps
 from django.utils.html import strip_tags
 
 
+def resize_to_max_dimension(width, height, target):
+    # Determine the larger dimension
+    max_dimension = max(width, height)
+
+    # Calculate the ratio between the dimensions
+    ratio = max_dimension / target
+
+    # Calculate the new width and height while maintaining the aspect ratio
+    new_width = int(width / ratio)
+    new_height = int(height / ratio)
+
+    return new_width, new_height
+
+
 def process_model_instance(app_label, model_name, instance_pk):
     model = django_apps.get_model(app_label=app_label, model_name=model_name)
     instance = model.objects.get(pk=instance_pk)
     return instance
 
 
-def unique_slugify(instance, slug):
+def get_unique_slug(instance, slug):
     model = instance.__class__
     max_length = model._meta.get_field("slug").max_length
 
