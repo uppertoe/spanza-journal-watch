@@ -1,9 +1,17 @@
 {% extends 'base.html' %}
 {% block main-feature %}
-
-    {% with review as object_title %}{% with review.feature_image as image %}{% with page_header as content %}
+    {% if page_header %}
+    {% with page_header as content %}
     {% include "submissions/fragments/main_feature.html" %}
-    {% endwith %}{% endwith %}{% endwith %}
+    {% endwith %}
+    {% else %}
+    <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
+        <div class="col-lg-8 px-0">
+            <h1 class="display-4 fst-italic">Review</h1>
+            <div class="lead my-3">A review of a journal article created by a Journal Watch contributor</div>
+        </div>
+    </div>
+    {% endif %}
 
 {% endblock main-feature %}
 

@@ -35,9 +35,10 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         context = super().get_context_data(**kwargs)
 
         # Override header
-        header_object = {"title": self.object.get_full_name()}
-        context["header_object"] = header_object
-        context["page_header"] = self.page_header
+        override = {"title": self.object.get_full_name()}
+        header = ReviewPage.get_latest_instance()
+        context["page_header"] = header.collate_fields(**override) if header else override
+
         return context
 
 
@@ -97,13 +98,15 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     paginate_by = 5
     issue_cols = 1
 
-    # Include page header
-    page_header = IssuePage.get_latest_instance()
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["issue_cols"] = self.issue_cols
-        context["page_header"] = self.page_header
+
+        # Override header
+        header = IssuePage.get_latest_instance()
+        override = {}
+        context["page_header"] = header.collate_fields(**override) if header else override
+
         return context
 
 
@@ -116,12 +119,14 @@ class TagListView(ListBreadcrumbMixin, ListView):
     # Breadcrumb
     breadcrumb_use_pk = False
 
-    # Include page header
-    page_header = TagPage.get_latest_instance()
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["page_header"] = self.page_header
+
+        # Override header
+        header = TagPage.get_latest_instance()
+        override = {}
+        context["page_header"] = header.collate_fields(**override) if header else override
+
         return context
 
 
@@ -139,18 +144,16 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
     # Frontend options
     article_cols = 1
 
-    # Include page header
-    page_header = TagPage.get_latest_instance()
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
         # Override header
-        header_object = {"title": str(self.object)}
-        context["header_object"] = header_object
+        header = TagPage.get_latest_instance()
+        override = {"title": str(self.object)}
+        context["page_header"] = header.collate_fields(**override) if header else override
 
         context["article_cols"] = self.article_cols
-        context["page_header"] = self.page_header
+
         return context
 
 
@@ -180,17 +183,18 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
     def crumbs(self):
         return [("Search", reverse("submissions:search"))]
 
-    # Include page header
-    page_header = SearchPage.get_latest_instance()
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         query = self.request.GET.get("q")
         if query:
             context.update(self.search(query))
             context["tags"] = Tag.objects.filter(Q(text__icontains=query))
-        context["page_header"] = self.page_header
-        print(context)
+
+        # Override header
+        header = SearchPage.get_latest_instance()
+        override = {}
+        context["page_header"] = header.collate_fields(**override) if header else override
+
         return context
 
     def search(self, query):

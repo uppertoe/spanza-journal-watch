@@ -1,3 +1,20 @@
+{% if content.overlay_light or content.overlay_dark or content.additional_css%}
+<style>
+    {% if content.overlay_light %}
+    .transparent-overlay{
+        {{ content.overlay_light }}
+    }
+    {% endif %}
+    {% if content.overlay_dark %}
+    [data-bs-theme='dark'] .transparent-overlay{
+        {{ content.overlay_dark }}
+    }
+    {% endif %}
+    {% if content.additional_css %}
+    {{ content.additional_css }}
+    {% endif %}
+</style>
+{% endif %}
 <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary main-feature">
     {% if content.image %}
     <div class="transparent-overlay"></div>

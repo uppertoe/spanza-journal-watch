@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 
 {% block main-feature %}
-    {% with issue as object_title %}{% with issue.main_feature as content %}
+
+    {% with issue.main_feature as content %}{% with issue.name as content.title %}
     {% include "submissions/fragments/main_feature.html" %}
     {% endwith %}{% endwith %}
+
 {% endblock main-feature %}
 
 {% block article-title %}

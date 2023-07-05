@@ -1,4 +1,5 @@
 from django.db import models
+from django.forms import model_to_dict
 
 
 class TimeStampedModel(models.Model):
@@ -34,6 +35,33 @@ class PageModel(models.Model):
     @classmethod
     def get_latest_instance(cls):
         return cls.objects.exclude(active=False).order_by("-modified").first()
+
+    def collate_fields(self, **kwargs):
+        """
+        Outputs a dictionary with fields from a PageModel and
+        its ForeignKey relations in a single level
+
+        Updates with kwargs from the view if fields need to be replaced
+
+        Suitable for including as context in a View
+        """
+
+        fields_dict = model_to_dict(self)
+
+        # Include immediate fields of the foreign key model
+        foreign_key_fields = [field.name for field in self._meta.fields if isinstance(field, models.ForeignKey)]
+        for field_name in foreign_key_fields:
+            field_value = getattr(self, field_name)
+            if field_value:
+                foreign_key_fields_dict = model_to_dict(field_value)
+                # Updates (overwrites) dict with values from the ForeignKey model
+                fields_dict.update({key: value for key, value in foreign_key_fields_dict.items()})
+
+        # Add replacement fields from the View
+        for field, value in kwargs.items():
+            fields_dict.update({field: value})
+
+        return fields_dict
 
     def __str__(self):
         return str(self.feature_article)

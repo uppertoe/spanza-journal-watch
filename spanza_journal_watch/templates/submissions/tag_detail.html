@@ -2,23 +2,7 @@
 
 {% block main-feature %}
 {% if page_header %}
-<style>
-    {% if page_header.overlay_light %}
-    .transparent-overlay{
-        {{ page_header.overlay_light }}
-    }
-    {% endif %}
-    {% if page_header.overlay_dark %}
-    [data-bs-theme='dark'] .transparent-overlay{
-        {{ page_header.overlay_dark }}
-    }
-    {% endif %}
-    {% if page_header.additional_css %}
-    {{ page_header.additional_css }}
-    {% endif %}
-</style>
-
-{% with page_header.feature_article as content %}
+{% with page_header as content %}
     {% include "submissions/fragments/main_feature.html" %}
     {% endwith %}
     {% else %}
