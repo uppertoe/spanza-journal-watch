@@ -7,6 +7,7 @@ from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
+from spanza_journal_watch.layout.models import IssuePage, ReviewPage, SearchPage, TagPage
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
 from .models import Issue, Review, Tag
@@ -26,6 +27,18 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
 
     # HTMX
     htmx_templates = ["layout/fragments/card_modal.html"]
+
+    # Include page header
+    page_header = ReviewPage.get_latest_instance()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Override header
+        header_object = {"title": self.object.get_full_name()}
+        context["header_object"] = header_object
+        context["page_header"] = self.page_header
+        return context
 
 
 class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):
@@ -84,9 +97,13 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     paginate_by = 5
     issue_cols = 1
 
+    # Include page header
+    page_header = IssuePage.get_latest_instance()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["issue_cols"] = self.issue_cols
+        context["page_header"] = self.page_header
         return context
 
 
@@ -98,6 +115,14 @@ class TagListView(ListBreadcrumbMixin, ListView):
 
     # Breadcrumb
     breadcrumb_use_pk = False
+
+    # Include page header
+    page_header = TagPage.get_latest_instance()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_header"] = self.page_header
+        return context
 
 
 class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
@@ -114,9 +139,18 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
     # Frontend options
     article_cols = 1
 
+    # Include page header
+    page_header = TagPage.get_latest_instance()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        # Override header
+        header_object = {"title": str(self.object)}
+        context["header_object"] = header_object
+
         context["article_cols"] = self.article_cols
+        context["page_header"] = self.page_header
         return context
 
 
@@ -146,12 +180,17 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
     def crumbs(self):
         return [("Search", reverse("submissions:search"))]
 
+    # Include page header
+    page_header = SearchPage.get_latest_instance()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         query = self.request.GET.get("q")
         if query:
             context.update(self.search(query))
             context["tags"] = Tag.objects.filter(Q(text__icontains=query))
+        context["page_header"] = self.page_header
+        print(context)
         return context
 
     def search(self, query):

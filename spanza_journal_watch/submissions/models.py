@@ -200,6 +200,9 @@ class Review(TimeStampedModel):
     def get_reading_time(self):
         return estimate_reading_time(self.body)
 
+    def get_full_name(self):
+        return self.article.name
+
     def save(self, *args, **kwargs):
         # Create the slug if it doesn't exist
         if not self.slug:

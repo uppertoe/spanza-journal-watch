@@ -6,7 +6,7 @@ from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import HTMLShortener, get_unique_slug
 from spanza_journal_watch.utils.modelmethods import name_image
-from spanza_journal_watch.utils.models import TimeStampedModel
+from spanza_journal_watch.utils.models import PageModel, TimeStampedModel
 
 
 class FeatureArticle(TimeStampedModel):
@@ -81,3 +81,19 @@ class Homepage(TimeStampedModel):
 
     # Relationships
     main_feature = models.ForeignKey(FeatureArticle, on_delete=models.CASCADE, blank=True, null=True)
+
+
+class SearchPage(PageModel):
+    pass
+
+
+class IssuePage(PageModel):
+    pass
+
+
+class ReviewPage(PageModel):
+    pass
+
+
+class TagPage(PageModel):
+    pass

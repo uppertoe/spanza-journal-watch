@@ -2,14 +2,14 @@
     <a class="d-flex flex-column flex-lg-row gap-3 align-items-start align-items-lg-center p-3 p-md-0 py-md-3 link-body-emphasis text-decoration-none border-top" href="{{ issue.get_absolute_url }}">
       <div class="col-4 d-none d-lg-block">
       {% if issue.main_feature.image %}
-      <img src="{{ issue.main_feature.image.url }}" height="150" class="w-100 center-thumbnail object-fit-cover shadow-sm">
+      <img src="{{ issue.main_feature.image.url }}" height="150" class="w-100 center-thumbnail object-fit-cover rounded">
       {% else %}
-      <svg class="shadow-sm" height="150" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#777"/></svg>
+      <svg class="rounded" height="150" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#777"/></svg>
       {% endif %}
       </div>
       <div class="col-lg-8">
         <h6 class="mb-0">{{ issue.name }}</h6>
-        <small class="text-body-secondary">{{ issue.date|date:"F Y" }}</small>
+        <small class="text-body-secondary">Added {{ issue.date|date:"F Y" }}</small>
       </div>
     </a>
   </li>

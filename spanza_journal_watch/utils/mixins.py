@@ -65,3 +65,14 @@ class SidebarMixin:
             .order_by("-article_count")[: self.number_of_tags]
         )
         return context
+
+
+class GetLatestInstanceMixin:
+    """
+    Gets the last modified active instance for a model
+    Requires an 'active' and 'created' field
+    """
+
+    @classmethod
+    def get_latest_instance(cls):
+        return cls.objects.exclude(active=False).order_by("-modified").first()

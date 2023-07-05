@@ -1,6 +1,6 @@
 <h3 class="mb-4 fst-italic mt-5">Use the page navigation below to view more articles</h3>
-<nav class="fixed-bottom ms-3" aria-label="Article navigation">
-    <ul class="pagination ">
+<nav class="fixed-bottom pb-3 ps-3 ps-lg-5" aria-label="Article navigation">
+    <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
             <a class="page-link" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block">Previous</a>

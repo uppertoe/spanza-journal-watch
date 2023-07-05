@@ -2,19 +2,20 @@
         <div class="row row-cols-{{ issue_cols }} g-3 py-2">
             {% for issue in issues %}
             <div class="col">
-                <div class="card shadow-sm">
-                    <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/><text x="50%" y="50%" fill="#eceeef" dy=".3em">Thumbnail</text></svg>
+                <div class="card ">
+                    {% if issue.main_feature.image %}
+                    <img src="{{ issue.main_feature.image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
+                    {% else %}
+                    <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/></svg>
+                    {% endif %}
                     <div class="card-body">
-                        <h5 class="card-title">{{ issue }}</h5>
-                        <p class="card-text">This is a wider card with supporting text below as a natural lead-in to additional content. This content is a little bit longer.</p>
+                        <h5 class="card-title">{{ issue.main_feature.title }}</h5>
+                        <p class="card-text">{{ issue.main_feature.body }}</p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="btn-group">
                                     <a href="{{ issue.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">View issue</a>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary">Edit</button>
                                 </div>
-                                {% with time=issue.get_reading_time %}
-                                <small class="text-body-secondary">{{ time }} min{{ time|pluralize }}</small>
-                                {% endwith %}
+                                <small class="text-body-secondary">{{ issue.reviews.all|length }} articles{{ time|pluralize }}</small>
                             </div>
                     </div>
                 </div>
