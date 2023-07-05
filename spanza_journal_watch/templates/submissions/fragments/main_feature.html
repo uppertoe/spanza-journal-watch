@@ -22,8 +22,8 @@
     {% endif %}
     <div class="row">
     <div class="col-lg-8 feature-content">
-        <h1 class="display-4 fst-italic">{% firstof header_object.title content.title %}</h1>
-        <div class="lead my-3">{% firstof header_object.get_truncated_body content.get_truncated_body %}</div>
+        <h1 class="display-4 fst-italic">{{ content.title|capfirst }}</h1>
+        <div class="lead my-3">{{ content.body|capfirst }}</div>
         {% if truncated %}
         <p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
         {% endif %}
