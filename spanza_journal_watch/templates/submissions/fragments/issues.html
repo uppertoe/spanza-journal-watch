@@ -4,7 +4,7 @@
             <div class="col">
                 <div class="card ">
                     {% with issue.issue_detail_page.feature_article as feature %}
-                    {% if image %}
+                    {% if feature.image %}
                     <img src="{{ feature.image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
                     {% else %}
                     <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/></svg>
