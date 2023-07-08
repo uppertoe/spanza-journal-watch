@@ -103,4 +103,12 @@ class TagPage(PageModel):
 
 
 class HomepagePage(PageModel):
-    pass
+    def save(self, *args, **kwargs):
+        # Refresh the homepage
+        try:
+            latest_homepage = Homepage.objects.filter(publication_ready=True).latest("created")
+            Homepage.publish_homepage(latest_homepage)
+        except:  # noqa
+            print("Skipped Homepage import")
+
+        return super().save(*args, **kwargs)

@@ -19,6 +19,10 @@ def celery_resize_image(self, path, size=600):
             file.seek(0)
             img = Image.open(file)
 
+            # Remove transparency channel if present
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
             width, height = img.size
 
             if max(width, height) > size:

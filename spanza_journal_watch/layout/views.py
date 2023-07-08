@@ -44,6 +44,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         # Override header
         override = {}
         header = homepage.homepage_page
+        print(header)
         context["page_header"] = header.collate_fields(**override) if header else override
 
         return context
