@@ -50,6 +50,8 @@ class Homepage(TimeStampedModel):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     override_main = models.BooleanField(default=False)
     publication_ready = models.BooleanField(default=False)
+    # Relationships
+    homepage_page = models.ForeignKey("HomepagePage", on_delete=models.CASCADE, blank=True, null=True)
 
     # Class methods
     @classmethod
@@ -79,9 +81,6 @@ class Homepage(TimeStampedModel):
     def __str__(self):
         return f"{self.issue} homepage - {self.created}"
 
-    # Relationships
-    main_feature = models.ForeignKey(FeatureArticle, on_delete=models.CASCADE, blank=True, null=True)
-
 
 class SearchPage(PageModel):
     pass
@@ -91,9 +90,17 @@ class IssuePage(PageModel):
     pass
 
 
+class IssueDetailPage(PageModel):
+    pass
+
+
 class ReviewPage(PageModel):
     pass
 
 
 class TagPage(PageModel):
+    pass
+
+
+class HomepagePage(PageModel):
     pass

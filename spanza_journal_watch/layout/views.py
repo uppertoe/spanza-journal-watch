@@ -36,10 +36,16 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         homepage = Homepage.get_current_homepage()
-        context["main_feature"] = homepage.get_main_feature()
+
         context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]
         context["article_cols"] = self.article_cols
         context["feature_text_styles"] = self.feature_text_styles
+
+        # Override header
+        override = {}
+        header = homepage.homepage_page
+        context["page_header"] = header.collate_fields(**override) if header else override
+
         return context
 
 

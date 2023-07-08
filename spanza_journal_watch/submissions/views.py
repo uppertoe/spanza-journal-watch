@@ -69,7 +69,14 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         context = super().get_context_data(**kwargs)
         context["issue"] = self.object
         context["article_cols"] = self.article_cols
+
+        # Rearrange the sidebar to ensure on top in mobile
         context["arrange_sidebar_top"] = self.arrange_sidebar_top
+
+        # Override header
+        override = {"title": self.object.name}
+        header = self.object.issue_detail_page
+        context["page_header"] = header.collate_fields(**override) if header else override
 
         # Supply only paginated objects to the template
         paginator = context["paginator"]

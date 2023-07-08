@@ -247,13 +247,12 @@ class Issue(TimeStampedModel):
     body = models.TextField()
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
     active = models.BooleanField(default=False)
-    main_feature = models.ForeignKey(
-        to="layout.FeatureArticle",
+    issue_detail_page = models.ForeignKey(
+        to="layout.IssueDetailPage",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name="main_features",
-        related_query_name="main_feature",
+        related_name="issue_detail_page",
     )
 
     def get_card_features(self):
@@ -262,9 +261,6 @@ class Issue(TimeStampedModel):
             if review.is_featured:
                 features.append(review)
         return features
-
-    def get_main_feature(self):
-        return self.main_feature
 
     def get_absolute_url(self):
         return reverse("submissions:issue_detail", kwargs={"slug": self.slug})

@@ -2,9 +2,9 @@
 
 {% block main-feature %}
 
-    {% with issue.main_feature as content %}{% with issue.name as content.title %}
-    {% include "submissions/fragments/main_feature.html" %}
-    {% endwith %}{% endwith %}
+    {% with page_header as content %}
+    {% include "fragments/main_feature.html" %}
+    {% endwith %}
 
 {% endblock main-feature %}
 
