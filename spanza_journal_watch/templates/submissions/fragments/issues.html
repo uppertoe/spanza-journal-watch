@@ -3,14 +3,16 @@
             {% for issue in issues %}
             <div class="col">
                 <div class="card ">
-                    {% if issue.main_feature.image %}
-                    <img src="{{ issue.main_feature.image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
+                    {% with issue.issue_detail_page.feature_article as feature %}
+                    {% if image %}
+                    <img src="{{ feature.image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
                     {% else %}
                     <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/></svg>
                     {% endif %}
+
                     <div class="card-body">
-                        <h5 class="card-title">{{ issue.main_feature.title }}</h5>
-                        <p class="card-text">{{ issue.main_feature.body }}</p>
+                        <h5 class="card-title">{{ issue.name }}</h5>
+                        <p class="card-text">{{ feature.body }}</p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="btn-group">
                                     <a href="{{ issue.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">View issue</a>
@@ -20,6 +22,7 @@
                     </div>
                 </div>
             </div>
+            {% endwith %}
             {% endfor %}
         </div>
 </div>
