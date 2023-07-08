@@ -23,7 +23,7 @@
 
     {% block pagination %}
     {% if page_obj.paginator.num_pages > 1 %}
-    {% include "submissions/fragments/article_pagination.html" %}
+    {% include "fragments/pagination.html" %}
     {% endif %}
     {% endblock pagination %}
 </div>

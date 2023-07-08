@@ -52,7 +52,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
     # HTMX
     htmx_templates = [
         "submissions/fragments/article_full.html",
-        "submissions/fragments/article_pagination.html",
+        "fragments/pagination.html",
         "submissions/fragments/contents_list_group.html",
     ]
 
@@ -99,7 +99,7 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     queryset = Issue.objects.exclude(active=False).order_by("-created")
 
     # HTMX
-    htmx_templates = ["submissions/fragments/issues.html", "submissions/fragments/article_pagination.html"]
+    htmx_templates = ["submissions/fragments/issues.html", "fragments/pagination.html"]
 
     # Frontend options
     paginate_by = 5

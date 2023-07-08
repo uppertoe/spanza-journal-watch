@@ -12,7 +12,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     context_object_name = "reviews"
 
     # HTMX
-    htmx_templates = ["layout/fragments/articles.html", "layout/fragments/article_pagination.html"]
+    htmx_templates = ["layout/fragments/articles.html", "fragments/pagination.html"]
 
     # Layout variables
     number_of_card_features = 2
