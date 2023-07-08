@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block main-feature %}
+{% if page_header %}
+{% with page_header as content %}
+    {% include "fragments/main_feature.html" %}
+    {% endwith %}
+    {% else %}
+    <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
+        <div class="col-lg-8 px-0">
+            <h1 class="display-4 fst-italic">#Tags</h1>
+            <p class="lead my-3">Find articles group by common #tags here</p>
+        </div>
+    </div>
+{% endif %}
+{% endblock main-feature %}
+
+{% block article-title %}
+{% endblock article-title %}
+
+{% block article-block %}
+<div id="article-block">
+    {% block articles %}
+    {% include "submissions/fragments/tags.html" %}
+    {% endblock articles %}
+
+    {% block pagination %}
+    {% if page_obj.paginator.num_pages > 1 %}
+    {% include "fragments/pagination.html" %}
+    {% endif %}
+    {% endblock pagination %}
+</div>
+{% endblock article-block %}

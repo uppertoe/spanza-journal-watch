@@ -17,7 +17,7 @@
                                 <div class="btn-group">
                                     <a href="{{ issue.get_absolute_url }}" type="button" class="btn btn-sm btn-outline-secondary">View issue</a>
                                 </div>
-                                <small class="text-body-secondary">{{ issue.reviews.all|length }} articles{{ time|pluralize }}</small>
+                                <small class="text-body-secondary">{{ issue.reviews.all|length }} article{{ issue.reviews.all|pluralize }}</small>
                             </div>
                     </div>
                 </div>

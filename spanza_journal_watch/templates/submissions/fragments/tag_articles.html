@@ -4,7 +4,9 @@
         {% with article.reviews.last as review %}
         <div class="col">
             <div class="card shadow-sm h-100">
-                {% if review.image %}<svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/><text x="50%" y="50%" fill="#eceeef" dy=".3em">Thumbnail</text></svg>{% endif %}
+                {% if review.feature_image %}
+                <img src="{{ review.feature_image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
+                {% endif %}
                 <div class="d-flex card-body flex-column">
                     <h5 class="card-title">{{ article.get_title|capfirst }}</h5>
                     {% if article.get_subtitle %}<p class="card-subtitle mb-1">{{ article.get_subtitle|capfirst }}</p>{% endif %}

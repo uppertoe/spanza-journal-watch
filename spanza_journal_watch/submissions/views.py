@@ -117,17 +117,25 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         return context
 
 
-class TagListView(ListBreadcrumbMixin, ListView):
+class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     model = Tag
-    context_object_name = "tag_list"
+    context_object_name = "tags"
     template_name = "tags/tag_list.html"
     queryset = Tag.objects.exclude(active=False).order_by("text")
 
     # Breadcrumb
     breadcrumb_use_pk = False
 
+    # HTMX
+    htmx_templates = ["submissions/fragments/tags.html", "fragments/pagination.html"]
+
+    # Frontend options
+    paginate_by = 18
+    issue_cols = 4
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["issue_cols"] = self.issue_cols
 
         # Override header
         header = TagPage.get_latest_instance()
