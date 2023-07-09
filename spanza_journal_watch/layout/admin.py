@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-from .models import FeatureArticle, Homepage, HomepagePage, IssueDetailPage, IssuePage, ReviewPage, SearchPage, TagPage
+from .models import (
+    FeatureArticle,
+    Gradient,
+    Homepage,
+    HomepagePage,
+    IssueDetailPage,
+    IssuePage,
+    ReviewPage,
+    SearchPage,
+    TagPage,
+)
 
 
 # Inlines
@@ -56,3 +66,8 @@ class IssueDetailPageAdmin(admin.ModelAdmin):
 class HomepagePageAdmin(admin.ModelAdmin):
     list_display = ("feature_article", "active")
     inlines = [HomepageInline]
+
+
+@admin.register(Gradient)
+class GradientAdmin(admin.ModelAdmin):
+    list_display = ("name",)

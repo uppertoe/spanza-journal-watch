@@ -82,27 +82,60 @@ class Homepage(TimeStampedModel):
         return f"{self.issue} homepage - {self.created}"
 
 
+# Individual related_names to avoid clashes
 class SearchPage(PageModel):
-    pass
+    light_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="search_page_light"
+    )
+    dark_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="search_page_dark"
+    )
 
 
 class IssuePage(PageModel):
-    pass
+    light_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_page_light"
+    )
+    dark_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_page_dark"
+    )
 
 
 class IssueDetailPage(PageModel):
-    pass
+    light_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_detail_page_light"
+    )
+    dark_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_detail_page_dark"
+    )
 
 
 class ReviewPage(PageModel):
-    pass
+    light_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="review_page_light"
+    )
+    dark_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="review_page_dark"
+    )
 
 
 class TagPage(PageModel):
-    pass
+    light_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="tag_page_light"
+    )
+    dark_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="tag_page_dark"
+    )
 
 
 class HomepagePage(PageModel):
+    light_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="homepage_page_light"
+    )
+    dark_gradient = models.ForeignKey(
+        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="homepage_page_dark"
+    )
+
     def save(self, *args, **kwargs):
         # Refresh the homepage
         try:
@@ -112,3 +145,11 @@ class HomepagePage(PageModel):
             print("Skipped Homepage import")
 
         return super().save(*args, **kwargs)
+
+
+class Gradient(models.Model):
+    name = models.CharField(max_length=255)
+    css = models.TextField()
+
+    def __str__(self):
+        return self.name

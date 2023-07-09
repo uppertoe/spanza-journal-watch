@@ -1,17 +1,14 @@
-{% if content.overlay_light or content.overlay_dark or content.additional_css%}
+{% if content.light_gradient_css or content.dark_gradient_css %}
 <style>
-    {% if content.overlay_light %}
+    {% if content.light_gradient_css %}
     .transparent-overlay{
-        {{ content.overlay_light }}
+        {{ content.light_gradient_css }}
     }
     {% endif %}
-    {% if content.overlay_dark %}
+    {% if content.dark_gradient_css %}
     [data-bs-theme='dark'] .transparent-overlay{
-        {{ content.overlay_dark }}
+        {{ content.dark_gradient_css }}
     }
-    {% endif %}
-    {% if content.additional_css %}
-    {{ content.additional_css }}
     {% endif %}
 </style>
 {% endif %}

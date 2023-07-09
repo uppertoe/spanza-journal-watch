@@ -50,12 +50,15 @@ class PageModel(models.Model):
 
         # Include immediate fields of the foreign key model
         foreign_key_fields = [field.name for field in self._meta.fields if isinstance(field, models.ForeignKey)]
+        retained_names = ["light_gradient", "dark_gradient"]
+
         for field_name in foreign_key_fields:
             field_value = getattr(self, field_name)
+            modifier = f"{field_name}_" if field_name in retained_names else ""
             if field_value:
                 foreign_key_fields_dict = model_to_dict(field_value)
                 # Updates (overwrites) dict with values from the ForeignKey model
-                fields_dict.update({key: value for key, value in foreign_key_fields_dict.items()})
+                fields_dict.update({f"{modifier}{key}": value for key, value in foreign_key_fields_dict.items()})
 
         # Add replacement fields from the View
         for field, value in kwargs.items():
