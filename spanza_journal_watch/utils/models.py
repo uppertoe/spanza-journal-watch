@@ -22,9 +22,6 @@ class PageModel(models.Model):
     """
 
     feature_article = models.ForeignKey("FeatureArticle", on_delete=models.CASCADE)
-    overlay_light = models.TextField(blank=True, null=True)
-    overlay_dark = models.TextField(blank=True, null=True)
-    additional_css = models.TextField(blank=True, null=True)
     active = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
