@@ -12,7 +12,7 @@ from .functions import resize_to_max_dimension
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=20)
-def celery_resize_image(self, path, size=600):
+def celery_resize_image(self, path, size=800):
     try:
         # File may be local or remote (S3)
         with default_storage.open(path, mode="rb") as file:

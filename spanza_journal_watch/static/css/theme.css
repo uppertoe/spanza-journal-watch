@@ -11,21 +11,17 @@
   width: 100%;
   height: 100%;
   z-index: 1;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255) 40%,
-    rgb(83, 83, 83)
-  ); /* Light mode gradient */
+  background: linear-gradient(60deg, #e9ecef 0%, #e9ecef 100%);
+  /* Light mode gradient */
   opacity: 0.8;
 }
 
 [data-bs-theme='dark'] .transparent-overlay {
   background: linear-gradient(
-    50deg,
-    rgba(0, 0, 0) 40%,
-    rgb(144, 144, 144)
+    to top,
+    #09203f 0%,
+    rgba(33, 37, 41, 0.75) 100%
   ); /* Dark mode gradient */
-  /* Dark mode gradient */
   opacity: 0.8;
 }
 
@@ -36,6 +32,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: blur(0.2rem);
 }
 
 .feature-content {

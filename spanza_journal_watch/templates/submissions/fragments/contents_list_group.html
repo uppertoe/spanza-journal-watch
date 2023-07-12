@@ -3,6 +3,7 @@
 <div id="contents-list-group" hx-swap-oob="true" class="mb-3 pb-3">
     <div class="row d-flex align-items-center">
         <div class="col"><h4 class="fst-italic mb-3">Contents</h4></div>
+        {% if page_obj.paginator.num_pages > 1 %}
         <div class="col">
             <ul class="pagination pagination-sm">
 
@@ -54,6 +55,7 @@
                 {% endif %}
             </ul>
         </div>
+        {% endif %}
     </div>
     <div id="list-reviews" class="list-group">
         {% for review in articles %}
