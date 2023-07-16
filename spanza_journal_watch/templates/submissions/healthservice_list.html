@@ -9,12 +9,13 @@
 {% endblock main-feature %}
 {% block article-block %}
 <div class="container pt-3">
-    <div class="row g-4 pb-5 d-flex align-items-center justify-content-start ">
-        {% for service in health_services %}
+    {% for service in health_services %}
+    <div class="row g-4 pb-5 d-flex align-items-start justify-content-start ">
+
             <div class="col-12 col-lg-3">
                 {% if service.is_logo_authorised %}
                 <div class="fs-2 mb-3">
-                    <img src="{{ service.logo.url }}" height="100" class="object-fit-cover rounded">
+                    <img src="{{ service.logo.url }}" height="100" class="w-100 object-fit-cover rounded">
                 </div>
                 {% else %}
                 <div class="fs-2 mb-3">
@@ -25,10 +26,14 @@
             <div class="col-12 col-lg-6">
                 <h3 class="fs-2 text-body-emphasis">{{ service }}</h3>
                 {% for author in service.authors.all %}
-                <p><a href="{{ author.get_absolute_url}}" class="text-decoration-none">{{ author }}</a></p>
+                <p><a href="{{ author.get_absolute_url}}" class="text-decoration-none">{{ author }}</a>
+                    <br><small>{{ author.get_review_count }} review{{ author.get_review_count|pluralize }}</small>
+                </p>
+
                 {% endfor %}
             </div>
-    {% endfor %}
+
     </div>
+    {% endfor %}
 </div>
 {% endblock article-block %}
