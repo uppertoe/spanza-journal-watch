@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block main-feature %}
+<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
+    <div class="col-lg-8 px-0">
+        <h1 class="display-4 fst-italic">Journal Watch Contributor</h1>
+        <div class="lead my-3">Reviews submitted by {{ author }} are listed below</div>
+    </div>
+</div>
+{% endblock main-feature %}
+
+{% block card-feature %}
+<h2 class="link-body-emphasis mb-2">{{ author|capfirst }}</h2>
+{% for service in author.health_services.all %}
+<h5 class="mb-2">{{ service|capfirst }}</h5></a>
+{% endfor %}
+{% endblock card-feature %}
+
+{% if reviews %}
+{% block article-block %}
+<div id="article-block">
+    {% block articles %}
+    {% include "layout/fragments/articles.html" %}
+    {% endblock articles %}
+
+    {% block pagination %}
+    {% if page_obj.paginator.num_pages > 1 %}
+    {% include "fragments/pagination.html" %}
+    {% endif %}
+    {% endblock pagination %}
+    </div>
+{% endblock article-block %}
+{% endif %}

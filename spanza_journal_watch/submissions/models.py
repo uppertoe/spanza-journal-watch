@@ -24,13 +24,58 @@ from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 
-class Author(TimeStampedModel):
+class HealthService(models.Model):
     name = models.CharField(max_length=255, blank=False, null=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
-    anonymous = models.BooleanField(default=False)
+    url = models.URLField(max_length=255, blank=True, null=True)
+    logo = models.ImageField(
+        upload_to=name_image,  # Handle path/name and delete old file
+        blank=True,
+        null=True,
+    )
+    logo_authorised = models.BooleanField(default=False)
+
+    def is_logo_authorised(self):
+        return self.logo and self.logo_authorised
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        celery_resize_image.delay(self.logo.name, size=400)
 
     def __str__(self):
         return self.name
+
+
+class Author(TimeStampedModel):
+    title = models.CharField(max_length=255, default="Dr")
+    name = models.CharField(max_length=255, blank=False, null=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
+    anonymous = models.BooleanField(default=False)
+    health_services = models.ManyToManyField(HealthService, blank=True, related_name="authors")
+    slug = models.SlugField(max_length=255, blank=True)
+    profile_image = models.ImageField(
+        upload_to=name_image,  # Handle path/name and delete old file
+        blank=True,
+        null=True,
+    )
+    show_profile_image = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = get_unique_slug(self, slugify(self.name))
+        super().save(*args, **kwargs)
+        celery_resize_image.delay(self.profile_image.name, size=400)
+
+    def is_profile_image(self):
+        return self.profile_image and self.show_profile_image
+
+    def get_review_count(self):
+        return Review.objects.filter(active=True, author=self).count()
+
+    def get_absolute_url(self):
+        return reverse("submissions:author_detail", kwargs={"slug": self.slug})
+
+    def __str__(self):
+        return " ".join([self.title, self.name]) if self.title else self.name
 
 
 class Tag(models.Model):
@@ -181,7 +226,7 @@ class Review(TimeStampedModel):
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True, related_name="reviews")
     body = models.TextField()
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)

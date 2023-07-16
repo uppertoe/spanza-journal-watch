@@ -10,7 +10,7 @@ from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBre
 from spanza_journal_watch.layout.models import IssuePage, ReviewPage, SearchPage, TagPage
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
-from .models import Issue, Review, Tag
+from .models import Author, HealthService, Issue, Review, Tag
 
 
 class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
@@ -228,3 +228,55 @@ def ajax_get_tags(request):
     tags_list = [str(tag) for tag in tags_queryset]
     data = {"tags": tags_list}
     return JsonResponse(data)
+
+
+class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, ListView):
+    model = Author
+    template_name = "submissions/author_detail.html"
+
+    # HTMX
+    htmx_templates = ["layout/fragments/articles.html", "fragments/pagination.html"]
+
+    # Frontend options
+    paginate_by = 8
+    article_cols = 1
+
+    # Breadcrumb
+    @cached_property
+    def crumbs(self):
+        return [("About", reverse("submissions:about")), (self.object, "")]
+
+    def get(self, request, *args, **kwargs):
+        # Gets the Author object from the url kwargs
+        self.object = self.get_object(queryset=Author.objects.exclude(anonymous=True))
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["article_cols"] = self.article_cols
+
+        # Supply only paginated objects to the template
+        paginator = context["paginator"]
+        page = context["page_obj"]
+        context["reviews"] = paginator.get_page(page.number)
+
+        return context
+
+    def get_queryset(self):
+        return (
+            Review.objects.filter(author=self.object, active=True)
+            .order_by("-created")
+            .select_related("article__journal")
+        )
+
+
+class HealthServiceListView(BaseBreadcrumbMixin, SidebarMixin, ListView):
+    model = HealthService
+    template_name = "submissions/healthservice_list.html"
+    context_object_name = "health_services"
+    queryset = HealthService.objects.all()
+
+    # Breadcrumb
+    @cached_property
+    def crumbs(self):
+        return [("About", "")]

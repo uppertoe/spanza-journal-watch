@@ -12,6 +12,11 @@ class SaveAuthorMixin:
         super().save_model(request, obj, form, change)
 
 
+@admin.register(models.HealthService)
+class HealthServieAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+
+
 @admin.register(models.Author)
 class AuthorAdmin(admin.ModelAdmin):
     list_display = ("name",)

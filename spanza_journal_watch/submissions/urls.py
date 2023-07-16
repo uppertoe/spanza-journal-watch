@@ -14,4 +14,6 @@ urlpatterns = [
     path("tags/<slug:slug>", views.TagDetailView.as_view(), name="tag_detail"),
     path("search", views.SearchView.as_view(), name="search"),
     path("ajax/tags", views.ajax_get_tags, name="ajax_get_tags"),  # Hardcoded in base.html
+    path("about", views.HealthServiceListView.as_view(), name="about"),
+    path("about/<slug:slug>", views.AuthorDetailView.as_view(), name="author_detail"),
 ]

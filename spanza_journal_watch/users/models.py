@@ -1,18 +1,9 @@
 from django.contrib.auth.models import AbstractUser
-from django.db import models
 from django.db.models import CharField, EmailField
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from spanza_journal_watch.users.managers import UserManager
-
-
-class HealthService(models.Model):
-    name = models.CharField(max_length=255, blank=False, null=False)
-    url = models.URLField(max_length=255, blank=True, null=True)
-
-    def __str__(self):
-        return self.name
 
 
 class User(AbstractUser):
@@ -28,10 +19,6 @@ class User(AbstractUser):
     last_name = None  # type: ignore
     email = EmailField(_("email address"), unique=True)
     username = None  # type: ignore
-
-    # Additional fields
-    anonymous_author = models.BooleanField(default=False)
-    health_services = models.ManyToManyField(HealthService, related_name="health_services")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
