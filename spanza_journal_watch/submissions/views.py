@@ -96,7 +96,7 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     model = Issue
     context_object_name = "issues"
     template_name = "submissions/issue_list.html"
-    queryset = Issue.objects.exclude(active=False).order_by("-created")
+    queryset = Issue.objects.exclude(active=False).order_by("-date")
 
     # HTMX
     htmx_templates = ["submissions/fragments/issues.html", "fragments/pagination.html"]
