@@ -5,7 +5,8 @@ WORKDIR ${APP_HOME}
 
 COPY ./package.json ${APP_HOME}
 #RUN npm install && npm cache clean --force
-RUN yarn install && yarn cache clean --force
+# --force to fix HTMX bug 17/7/23
+RUN yarn install --force && yarn cache clean --force
 COPY . ${APP_HOME}
 #RUN npm run build
 RUN yarn run build
