@@ -3,15 +3,6 @@ from django.contrib import admin
 from . import models
 
 
-class SaveAuthorMixin:
-    """Overrides save_model to set author field to request.user"""
-
-    def save_model(self, request, obj, form, change):
-        if obj.author is None:
-            obj.author = request.user
-        super().save_model(request, obj, form, change)
-
-
 @admin.register(models.HealthService)
 class HealthServieAdmin(admin.ModelAdmin):
     list_display = ("name",)
@@ -38,7 +29,7 @@ class ArticleAdmin(admin.ModelAdmin):
     search_fields = ("name", "journal")
 
 
-class ReviewAdmin(SaveAuthorMixin, admin.ModelAdmin):
+class ReviewAdmin(admin.ModelAdmin):
     list_display = ("article", "author")
     list_filter = ("author",)
     search_fields = ("article",)

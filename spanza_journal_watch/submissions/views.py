@@ -177,7 +177,7 @@ class LatestIssueView(RedirectView):
     query_string = False
 
     def get_redirect_url(self, *args, **kwargs):
-        issue = Issue.objects.exclude(active=False).order_by("-created").first()
+        issue = Issue.objects.exclude(active=False).order_by("-date").first()
         if not issue:
             raise Http404
         return issue.get_absolute_url()

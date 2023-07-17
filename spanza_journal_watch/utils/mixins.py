@@ -56,7 +56,7 @@ class SidebarMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["sidebar_issues"] = Issue.objects.exclude(active=False).order_by("-created")[
+        context["sidebar_issues"] = Issue.objects.exclude(active=False).order_by("-date")[
             : self.number_of_sidebar_issues
         ]
         context["sidebar_tags"] = (
