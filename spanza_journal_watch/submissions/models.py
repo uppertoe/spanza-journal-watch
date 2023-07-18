@@ -39,7 +39,9 @@ class HealthService(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        celery_resize_image.delay(self.logo.name, size=400)
+
+        if self.logo:
+            celery_resize_image.delay(self.logo.name, size=400)
 
     def __str__(self):
         return self.name
@@ -63,7 +65,9 @@ class Author(TimeStampedModel):
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.name))
         super().save(*args, **kwargs)
-        celery_resize_image.delay(self.profile_image.name, size=400)
+
+        if self.profile_image:
+            celery_resize_image.delay(self.profile_image.name, size=400)
 
     def is_profile_image(self):
         return self.profile_image and self.show_profile_image
@@ -257,7 +261,8 @@ class Review(TimeStampedModel):
         super().save(*args, **kwargs)
 
         # Delegate resizing to Celery
-        celery_resize_image.delay(self.feature_image.name)
+        if self.feature_image:
+            celery_resize_image.delay(self.feature_image.name)
 
         # Create a SearchVector from the body text
         Review.objects.filter(pk=self.pk).update(search_vector=SearchVector("body"))
