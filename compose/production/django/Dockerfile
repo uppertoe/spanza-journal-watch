@@ -96,6 +96,7 @@ COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
 RUN chown django:django ${APP_HOME}
 
 # Create a logging directory
+RUN mkdir /logs
 COPY --chown=django:django ./logs ${APP_HOME}/logs
 RUN chmod 755 ${APP_HOME}/logs \
   && touch ${APP_HOME}/logs/access_logs.log \
