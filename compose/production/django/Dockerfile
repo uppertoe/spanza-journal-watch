@@ -45,10 +45,9 @@ ENV BUILD_ENV ${BUILD_ENVIRONMENT}
 WORKDIR ${APP_HOME}
 
 RUN addgroup --system django \
-    && adduser --system --ingroup django django
-
-# Create a logging directory
-RUN mkdir -p /app/logs \
+    && adduser --system --ingroup django django \
+    # Create a logging directory
+    && mkdir -p /app/logs \
     && chown -R django:django /app/logs \
     && chmod -R 755 /app/logs
 
