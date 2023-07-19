@@ -45,14 +45,7 @@ ENV BUILD_ENV ${BUILD_ENVIRONMENT}
 WORKDIR ${APP_HOME}
 
 RUN addgroup --system django \
-  && adduser --system --ingroup django django \
-  # Create a logging directory
-  && mkdir -p /app/logs \
-  && chown -R django:django /app/logs \
-  && chmod -R 755 /app/logs \
-  && touch /app/logs/access_logs.log \
-  && chown django:django /app/logs/access_logs.log \
-  && chmod 644 /app/logs/access_logs.log
+  && adduser --system --ingroup django django
 
 # Install required system dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -99,6 +92,13 @@ RUN chmod +x /start-flower
 # copy application code to WORKDIR
 COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
 
+# Create a logging directory
+RUN mkdir -p /app/logs \
+  && chown -R django:django /app/logs \
+  && chmod -R 755 /app/logs \
+  && touch /app/logs/access_logs.log \
+  && chown django:django /app/logs/access_logs.log \
+  && chmod 644 /app/logs/access_logs.log
 
 # make django owner of the WORKDIR directory as well.
 RUN chown django:django ${APP_HOME}
