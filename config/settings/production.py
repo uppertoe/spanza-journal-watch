@@ -7,7 +7,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from .base import *  # noqa
-from .base import env
+from .base import LOG_FILE, env
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -148,7 +148,7 @@ LOGGING = {
         "access_logs": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": "/app/logs/access_logs.log",  # Replace with the desired path and filename
+            "filename": LOG_FILE,  # Replace with the desired path and filename
             "maxBytes": 10485760,  # 10MB
             "backupCount": 10,
             "formatter": "verbose",

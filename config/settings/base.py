@@ -8,6 +8,8 @@ import environ
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 # spanza_journal_watch/
 APPS_DIR = BASE_DIR / "spanza_journal_watch"
+LOGS_DIR = BASE_DIR / "logs"
+LOG_FILE = LOGS_DIR / "access_logs.log"
 env = environ.Env()
 
 READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=False)
