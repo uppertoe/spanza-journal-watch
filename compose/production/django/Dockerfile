@@ -88,14 +88,6 @@ COPY ./compose/production/django/celery/flower/start /start-flower
 RUN sed -i 's/\r$//g' /start-flower
 RUN chmod +x /start-flower
 
-# Create a logging directory
-RUN mkdir /logs
-COPY --chown=django:django ./logs ${APP_HOME}/logs
-RUN chmod 755 ${APP_HOME}/logs \
-  && touch ${APP_HOME}/logs/access_logs.log \
-  && chown django:django ${APP_HOME}/logs/access_logs.log \
-  && chmod 644 ${APP_HOME}/logs/access_logs.log
-
 # copy application code to WORKDIR
 COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
 
