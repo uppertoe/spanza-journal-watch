@@ -4,6 +4,7 @@ volumes:
   production_postgres_data: {}
   production_postgres_data_backups: {}
   production_traefik: {}
+  access_logs: {} # Add a new volume definition for the logs
 
 services:
   django: &django
@@ -16,7 +17,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./access_logs:/app/access_logs # Map the logs directory on the host to /app/logs inside the container
+      - access_logs:/app/access_logs # Map the logs directory on the host to /app/logs inside the container
     env_file:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
