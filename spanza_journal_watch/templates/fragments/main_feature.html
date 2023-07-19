@@ -1,13 +1,13 @@
-{% if content.light_gradient_css or content.dark_gradient_css %}
+{% if content.light_gradient or content.dark_gradient %}
 <style>
-    {% if content.light_gradient_css %}
+    {% if content.light_gradient %}
     .transparent-overlay{
-        {{ content.light_gradient_css }}
+        {{ content.light_gradient }}
     }
     {% endif %}
-    {% if content.dark_gradient_css %}
+    {% if content.dark_gradient %}
     [data-bs-theme='dark'] .transparent-overlay{
-        {{ content.dark_gradient_css }}
+        {{ content.dark_gradient }}
     }
     {% endif %}
 </style>
@@ -21,9 +21,6 @@
     <div class="col-lg-8 feature-content">
         <h1 class="display-4 fst-italic">{{ content.title|capfirst }}</h1>
         <div class="lead my-3">{{ content.body|capfirst }}</div>
-        {% if truncated %}
-        <p class="lead mb-0"><a href="#" class="text-body-emphasis fw-bold">Continue reading...</a></p>
-        {% endif %}
       </div>
     </div>
 </div>
