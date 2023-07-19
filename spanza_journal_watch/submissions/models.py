@@ -53,7 +53,7 @@ class Author(TimeStampedModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     anonymous = models.BooleanField(default=False)
     health_services = models.ManyToManyField(HealthService, blank=True, related_name="authors")
-    slug = models.SlugField(max_length=255, blank=True, unique=True)
+    slug = models.SlugField(max_length=255, blank=True)
     profile_image = models.ImageField(
         upload_to=name_image,  # Handle path/name and delete old file
         blank=True,
