@@ -92,16 +92,16 @@ RUN chmod +x /start-flower
 # copy application code to WORKDIR
 COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
 
-# Create a logging directory
-RUN mkdir -p /app/logs \
-  && chown -R django:django /app/logs \
-  && chmod -R 755 /app/logs \
-  && touch /app/logs/access_logs.log \
-  && chown django:django /app/logs/access_logs.log \
-  && chmod 644 /app/logs/access_logs.log
-
 # make django owner of the WORKDIR directory as well.
 RUN chown django:django ${APP_HOME}
+
+# Create a logging directory
+RUN mkdir -p ${APP_HOME}/logs \
+  && chown -R django:django ${APP_HOME}/logs \
+  && chmod -R 755 ${APP_HOME}/logs \
+  && touch ${APP_HOME}/logs/access_logs.log \
+  && chown django:django ${APP_HOME}/logs/access_logs.log \
+  && chmod 644 ${APP_HOME}/logs/access_logs.log
 
 USER django
 
