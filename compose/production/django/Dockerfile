@@ -47,6 +47,10 @@ WORKDIR ${APP_HOME}
 RUN addgroup --system django \
     && adduser --system --ingroup django django
 
+# Create a logging directory
+RUN mkdir -p /app/logs \
+    && chown -R django:django /app/logs \
+    && chmod -R 755 /app/logs
 
 # Install required system dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
