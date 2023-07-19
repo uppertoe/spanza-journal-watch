@@ -16,7 +16,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./logs:/app/logs # Map the logs directory on the host to /app/logs inside the container
+      - ./access_logs:/app/access_logs # Map the logs directory on the host to /app/logs inside the container
     env_file:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
