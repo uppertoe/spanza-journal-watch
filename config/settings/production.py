@@ -144,13 +144,21 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
-        }
+        },
+        "access_logs": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": "/app/logs/access_logs.log",  # Replace with the desired path and filename
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
     },
     "root": {"level": "INFO", "handlers": ["console"]},
     "loggers": {
         "django.server": {
-            "level": "DEBUG",
-            "handlers": ["console"],
+            "level": "INFO",
+            "handlers": ["console", "access_logs"],
             "propagate": False,
         },
         "django.db.backends": {
