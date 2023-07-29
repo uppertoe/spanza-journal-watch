@@ -12,8 +12,8 @@ urlpatterns = [
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
     # User management
-    path("users/", include("spanza_journal_watch.users.urls", namespace="users")),
-    path("accounts/", include("allauth.urls")),
+    # path("users/", include("spanza_journal_watch.users.urls", namespace="users")),
+    # path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
     path("", include("spanza_journal_watch.submissions.urls")),
     path("feature/", include("spanza_journal_watch.layout.urls")),

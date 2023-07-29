@@ -3,6 +3,7 @@ import datetime
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import (
     SearchHeadline,
     SearchQuery,
@@ -147,6 +148,9 @@ class Article(TimeStampedModel):
     url = models.URLField(max_length=255, null=True, blank=True)
     active = models.BooleanField(default=False)
 
+    class Meta:
+        indexes = [GinIndex(name="gin_trgm_idx", fields=("name",), opclasses=("gin_trgm_ops",))]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._original_tags_string = self.tags_string
@@ -240,6 +244,10 @@ class Review(TimeStampedModel):
         null=True,
     )
 
+    class Meta:
+        # Requires from django.contrib.postgres.operations import BtreeGinExtension in the migration
+        indexes = [GinIndex(fields=("search_vector",))]
+
     def get_truncated_body(self):
         return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
 
@@ -273,7 +281,7 @@ class Review(TimeStampedModel):
             cls.objects.exclude(active=False)
             .annotate(
                 title_similarity=TrigramSimilarity("article__name", query),
-                rank=SearchRank(SearchVector("body"), SearchQuery(query)),
+                rank=SearchRank("search_vector", SearchQuery(query)),
             )
             .filter(
                 Q(title_similarity__gt=cls.title_similarity)
