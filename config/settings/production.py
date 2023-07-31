@@ -157,17 +157,17 @@ LOGGING = {
     "root": {"level": "INFO", "handlers": ["console"]},
     "loggers": {
         "django.server": {
-            "level": "INFO",
+            "level": "DEBUG",
             "handlers": ["console"],
             "propagate": False,
         },
         "django.request": {
             "handlers": ["console", "access_logs"],
-            "level": "INFO",  # change debug level as appropiate
+            "level": "DEBUG",  # change debug level as appropiate
             "propagate": False,
         },
         "django.db.backends": {
-            "level": "ERROR",
+            "level": "DEBUG",
             "handlers": ["console"],
             "propagate": False,
         },
@@ -200,8 +200,8 @@ sentry_sdk.init(
     dsn=SENTRY_DSN,
     integrations=integrations,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
-    traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
-    profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.0),
+    traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
+    profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.1),
 )
 
 
