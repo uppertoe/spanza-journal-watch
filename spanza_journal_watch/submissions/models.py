@@ -360,7 +360,7 @@ class Hit(models.Model):
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
         ]
-        ordering = ("count",)
+        ordering = ("-count",)
 
     @classmethod
     def update_page_count(cls, content_object):
