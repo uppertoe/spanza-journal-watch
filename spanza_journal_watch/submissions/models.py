@@ -261,6 +261,10 @@ class Review(TimeStampedModel):
     def get_full_name(self):
         return self.article.name
 
+    def get_review_date(self):
+        # Fall back to issue date if publish date not set
+        return self.publish_date if self.publish_date else self.issues.all()[0].date
+
     def save(self, *args, **kwargs):
         # Create the slug if it doesn't exist
         if not self.slug:
