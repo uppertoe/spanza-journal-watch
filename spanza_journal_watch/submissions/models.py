@@ -236,6 +236,7 @@ class Review(TimeStampedModel):
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True, related_name="reviews")
     body = models.TextField()
+    publish_date = models.DateField(blank=True, null=True)
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     feature_image = models.ImageField(
@@ -267,6 +268,9 @@ class Review(TimeStampedModel):
 
         # Perform an initial save
         super().save(*args, **kwargs)
+
+        if not self.publish_date:
+            Review.objects.filter(pk=self.pk).update(publish_date=self.created)
 
         # Delegate resizing to Celery
         if self.feature_image:
@@ -356,6 +360,7 @@ class Hit(models.Model):
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
         ]
+        ordering = ("count",)
 
     @classmethod
     def update_page_count(cls, content_object):
