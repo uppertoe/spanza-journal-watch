@@ -6,7 +6,7 @@
     <h5 class="text-muted">{{ review.article.get_subtitle|capfirst }}</h5></a>
     <div class="mb-3"></div>
     <p class="mb-0 fst-italic">{{ review.article.journal }}</p>
-    <p class="mb-3">{{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+    <p class="mb-3">{{ review.get_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
     <blockquote class="blockquote">"{{ review.headline|safe }}"</blockquote>
 {% endfor %}
 {% else %}
