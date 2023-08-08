@@ -167,7 +167,7 @@ LOGGING = {
         },
         "django.request": {
             "handlers": ["console", "access_logs"],
-            "level": "DEBUG",  # change debug level as appropiate
+            "level": "INFO",  # change debug level as appropiate
             "propagate": False,
         },
         "django.db.backends": {
