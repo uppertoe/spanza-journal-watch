@@ -1,6 +1,6 @@
-<form class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-form">
+<form class="input-group input-group-sm" id="subscribe-form">
 {% csrf_token %}
-<button class="btn btn-outline-primary" type="submit" hx-post="{% url "newsletter:subscribe" %}" hx-target="#subscribe-form">Submit</button>
+<button class="btn btn-outline-primary" type="submit" hx-post="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container">Submit</button>
 {{ form.email }}
 </form>
 {% if form.errors %}

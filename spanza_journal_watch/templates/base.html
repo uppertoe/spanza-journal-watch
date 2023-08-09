@@ -105,20 +105,20 @@
 
     <div class="container">
       <header class="border-bottom lh-1 py-3">
-        <div class="row flex-nowrap justify-content-between align-items-center">
+        <div class="row align-items-center">
           {% if request.session.subscribed %}
-            <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
-                <a class="btn btn-outline-success" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribed!</a>
+            <div class="col-sm-4 d-flex order-2 order-sm-1 justify-content-center justify-content-sm-start align-items-center" id="subscribe-container">
+                <a class="btn btn-outline-success btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribed!</a>
             </div>
             {% else %}
-            <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
+            <div class="col-sm-4 order-2 order-sm-1 justify-content-sm-start align-items-center input-group input-group-sm" id="subscribe-container">
                 <a class="btn btn-outline-secondary" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
             </div>
           {% endif %}
-          <div class="col text-center">
+          <div class="col-sm-4 order-1 order-sm-2 pb-2 pb-sm-0 text-center">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
           </div>
-          <div class="col d-flex justify-content-end align-items-center">
+          <div class="col-sm-4 order-3 order-sm-3 justify-content-sm-end align-items-center">
             {% comment %}<a class="btn btn-sm btn-outline-secondary" href="#" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="beforeend">Sign up</a>{% endcomment %}
           </div>
         </div>
