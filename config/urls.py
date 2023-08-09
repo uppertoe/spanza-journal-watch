@@ -17,6 +17,7 @@ urlpatterns = [
     # Your stuff: custom urls includes go here
     path("", include("spanza_journal_watch.submissions.urls")),
     path("feature/", include("spanza_journal_watch.layout.urls")),
+    path("newsletter/", include("spanza_journal_watch.newsletter.urls")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

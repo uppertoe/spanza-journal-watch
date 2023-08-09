@@ -100,16 +100,17 @@
     </svg>
 
     <div class="container">
+      <div id="oob-message"></div>
       <header class="border-bottom lh-1 py-3">
         <div class="row flex-nowrap justify-content-between align-items-center">
-          <div class="col pt-1">
-            {% comment %}<a class="link-secondary" href="#">Subscribe</a>{% endcomment %}
+          <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
+            <a class="btn btn-outline-secondary" href="#" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
           </div>
           <div class="col text-center">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
           </div>
           <div class="col d-flex justify-content-end align-items-center">
-            {% comment %}<a class="btn btn-sm btn-outline-secondary" href="#">Sign up</a>{% endcomment %}
+            {% comment %}<a class="btn btn-sm btn-outline-secondary" href="#" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="beforeend">Sign up</a>{% endcomment %}
           </div>
         </div>
       </header>
