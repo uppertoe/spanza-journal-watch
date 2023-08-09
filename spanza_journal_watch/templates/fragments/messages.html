@@ -1,0 +1,8 @@
+<div class="container-fluid p-0 sticky-top" id="oob-message" hx-swap-oob="true">
+  {% for message in messages %}
+    <div class="alert alert-dismissible {{ message.tags }}">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+</div>

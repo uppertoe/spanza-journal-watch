@@ -99,13 +99,22 @@
       </symbol>
     </svg>
 
+    <!-- Container for HTMX messages -->
+    {% include "fragments/messages.html" %}
+    <!-- /container -->
+
     <div class="container">
-      <div id="oob-message"></div>
       <header class="border-bottom lh-1 py-3">
         <div class="row flex-nowrap justify-content-between align-items-center">
-          <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
-            <a class="btn btn-outline-secondary" href="#" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
-          </div>
+          {% if request.session.subscribed %}
+            <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
+                <a class="btn btn-outline-success" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribed!</a>
+            </div>
+            {% else %}
+            <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
+                <a class="btn btn-outline-secondary" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
+            </div>
+          {% endif %}
           <div class="col text-center">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
           </div>
@@ -163,17 +172,6 @@
       {% endblock sidebar %}
 
     </main>
-
-      {% if messages %}
-      <div class="container">
-        {% for message in messages %}
-          <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      </div> <!-- /container -->
-      {% endif %}
 
     {% block modal %}{% endblock modal %}
 

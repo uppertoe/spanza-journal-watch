@@ -17,13 +17,16 @@ def unsubscribe(request, unsubscribe_token):
             subscriber.subscribed = False
             subscriber.unsubscribe_token = ""
             subscriber.save()
-            messages.success(request, f"{subscriber.email.capitalize()} been unsubscribed successfully.")
+            messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
+
+            # Set the subscribed flag in session
+            request.session["subscribed"] = False
         else:
             messages.error(request, "Invalid unsubscribe link.")
     except Subscriber.DoesNotExist:
         messages.error(request, "Subscriber does not exist.")
 
-    return redirect("newsletter:success")
+    return redirect("home")
 
 
 def subscribe(request):
@@ -37,10 +40,14 @@ def subscribe(request):
             if existing_subscriber:
                 existing_subscriber.subscribed = True
                 existing_subscriber.save()
-                messages.success(request, f"'{email}' updated successfully.")
+                messages.success(request, f"'{email}' subscribed successfully.")
             else:
                 form.save()
                 messages.success(request, f"'{email}' subscribed successfully.")
+
+            # Set subscribed flag in session
+            request.session["subscribed"] = True
+
             return redirect("newsletter:success")
     else:
         form = SubscriberForm()

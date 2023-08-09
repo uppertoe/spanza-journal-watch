@@ -12,3 +12,4 @@ class SubscriberForm(forms.ModelForm):
         widgets = {
             "email": forms.TextInput(attrs={"class": "form-control", "autofocus": "", "placeholder": "Email address"})
         }
+        error_messages = {"email": {"invalid": "Please enter a valid email address."}}

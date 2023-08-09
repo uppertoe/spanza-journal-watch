@@ -8,6 +8,8 @@ from django.urls import reverse
 
 from spanza_journal_watch.submissions.models import Issue
 
+# from .tasks import send_newsletter
+
 
 class Subscriber(models.Model):
     email = models.EmailField(max_length=255)
@@ -35,14 +37,14 @@ class Subscriber(models.Model):
 class Newsletter(models.Model):
     subject = models.CharField(max_length=255)
     content = models.TextField()
-    send_date = models.DateTimeField()
+    send_date = models.DateTimeField(blank=True, null=True)
     ready_to_send = models.BooleanField(default=False)
     is_sent = models.BooleanField(default=False)
     is_test_sent = models.BooleanField(default=False)
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
 
     def generate_html_content(self, subscriber):
-        template_name = "newsletter/email_newsletter"
+        template_name = "newsletter/email_newsletter.html"
         context = {
             "newsletter": self,
             "issue": self.issue,
@@ -51,7 +53,7 @@ class Newsletter(models.Model):
         return render_to_string(template_name, context)
 
     def generate_emails(self):
-        subscribers = Subscriber.objects.exlude(subscribed=False)
+        subscribers = Subscriber.objects.exclude(subscribed=False)
         emails = []
         for subscriber in subscribers:
             email = mail.EmailMultiAlternatives(
@@ -62,3 +64,7 @@ class Newsletter(models.Model):
             email.attach_alternative(self.generate_html_content(subscriber), "text/html")
             emails.append(email)
         return emails
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # send_newsletter.delay(self.pk)

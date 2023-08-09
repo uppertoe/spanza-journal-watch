@@ -4,10 +4,12 @@
 {{ form.email }}
 </form>
 {% if form.errors %}
-<div class="container mt-3" id="oob-message" hx-swap-oob="true">
-<div class="alert alert-dismissible alert-primary">
-    {{ form.email.errors }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
+<div class="container-fluid p-0 sticky-top" id="oob-message" hx-swap-oob="true">
+    <div class="alert alert-dismissible alert-primary">
+        {% for error in form.email.errors %}
+        {{ error|escape }}
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 </div>
 {% endif %}

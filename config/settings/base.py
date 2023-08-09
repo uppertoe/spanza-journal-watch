@@ -4,6 +4,7 @@ Base settings to build other settings files upon.
 from pathlib import Path
 
 import environ
+from django.contrib.messages import constants as messages
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 # spanza_journal_watch/
@@ -36,6 +37,17 @@ USE_I18N = True
 USE_TZ = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#locale-paths
 LOCALE_PATHS = [str(BASE_DIR / "locale")]
+
+# MESSAGES
+# ------------------------------------------------------------------------------
+# Convert Django messages to Bootstrap alert styles
+MESSAGE_TAGS = {
+    messages.DEBUG: "alert-secondary",
+    messages.INFO: "alert-info",
+    messages.SUCCESS: "alert-success",
+    messages.WARNING: "alert-warning",
+    messages.ERROR: "alert-danger",
+}
 
 # DATABASES
 # ------------------------------------------------------------------------------

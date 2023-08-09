@@ -1,14 +1,11 @@
+{% if request.session.subscribed %}
+<div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
+    <a class="btn btn-outline-success" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribed!</a>
+</div>
+{% else %}
 <div class="col d-flex justify-content-start align-items-center input-group input-group-sm" id="subscribe-container">
     <a class="btn btn-outline-secondary" href="#" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
-  </div>
-
-{% if messages %}
-<div class="container mt-3" id="oob-message" hx-swap-oob="true">
-  {% for message in messages %}
-    <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
 </div>
 {% endif %}
+
+{% include "fragments/messages.html" %}
