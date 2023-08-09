@@ -111,7 +111,7 @@
                 <a class="btn btn-outline-success btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribed!</a>
             </div>
             {% else %}
-            <div class="col-sm-4 order-2 order-sm-1 justify-content-sm-start align-items-center input-group input-group-sm" id="subscribe-container">
+            <div class="col-sm-4 d-flex order-2 order-sm-1 justify-content-center justify-content-sm-start align-items-center" id="subscribe-container">
                 <a class="btn btn-outline-secondary" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
             </div>
           {% endif %}
