@@ -15,3 +15,15 @@ def send_newsletter(newsletter_pk):
     messages = newsletter.generate_emails()
     successful = connection.send_messages(messages)
     print(f"{successful} of {len(messages)} emails sent successfully")
+
+
+@celery_app.task()
+def send_confirmation_email(subscriber_pk):
+    """Sends a single EmailMessage object"""
+
+    from .models import Subscriber  # Avoid circular import
+
+    subscriber = Subscriber.objects.get(pk=subscriber_pk)
+    email = subscriber.generate_confirmation_email()
+    email.send()
+    print(f"Sign-up email sent to {subscriber.email}")
