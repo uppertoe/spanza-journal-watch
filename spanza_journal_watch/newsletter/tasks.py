@@ -21,7 +21,7 @@ def send_newsletter(newsletter_pk):
 def send_confirmation_email(subscriber_pk):
     """Sends a single EmailMessage object"""
 
-    from .models import Subscriber
+    from .models import Subscriber  # Avoid circular import
 
     subscriber = Subscriber.objects.get(pk=subscriber_pk)
     email = subscriber.generate_confirmation_email()

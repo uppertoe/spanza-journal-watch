@@ -35,20 +35,20 @@ def subscribe(request):
             email = form.cleaned_data["email"]
 
             # Check if email exists
-            existing_subscriber = Subscriber.objects.filter(email=email).first()
-            if existing_subscriber:
-                existing_subscriber.subscribed = True
-                existing_subscriber.save()
+            subscriber = Subscriber.objects.filter(email=email).first()
+            if subscriber:
+                subscriber.subscribed = True
+                subscriber.save()
                 messages.success(request, f"'{email}' subscribed successfully.")
             else:
-                form.save()
+                subscriber = form.save()
                 messages.success(request, f"'{email}' subscribed successfully.")
 
             # Set subscribed flag in session
             request.session["subscribed"] = True
 
             # Send confirmation email
-            send_confirmation_email.delay(existing_subscriber.pk)
+            send_confirmation_email.delay(subscriber.pk)
 
             return redirect("newsletter:success")
     else:

@@ -1,6 +1,8 @@
 import base64
 import uuid
 
+from django.conf import settings
+from django.contrib.sites.models import Site
 from django.core import mail
 from django.db import models
 from django.template.loader import render_to_string
@@ -24,7 +26,8 @@ class Subscriber(models.Model):
         return render_to_string(template_name, context)
 
     def generate_confirmation_email(self):
-        body = f"""Thank you for subscribing to SPANZA Journal Watch.
+        body = f"""
+        Thank you for subscribing to SPANZA Journal Watch.
 
         You will receive updates with each issue of Journal Watch,
         which is published every two months.
@@ -50,8 +53,15 @@ class Subscriber(models.Model):
         r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
         return r_uuid.replace("=", "")
 
-    def get_unsubscribe_link(self):
-        return reverse("unsubscribe", kwargs={"unsubscribe_token": self.unsubscribe_token})
+    def get_unsubscribe_link(self, absolute=True):
+        path = reverse("newsletter:unsubscribe", kwargs={"unsubscribe_token": self.unsubscribe_token})
+        if absolute:
+            if settings.DEBUG:
+                domain = "127.0.0.1:3000"
+            else:
+                domain = Site.objects.get_current().domain
+            return f"https://{domain}{path}"
+        return path
 
     def save(self, *args, **kwargs):
         if not self.unsubscribe_token:
