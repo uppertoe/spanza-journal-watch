@@ -18,6 +18,34 @@ class Subscriber(models.Model):
     modified = models.DateTimeField(auto_now=True)
     unsubscribe_token = models.CharField(max_length=64, blank=True, null=True)
 
+    def generate_confirmation_email_html(self):
+        template_name = "newsletter/email_confirmation.html"
+        context = {"subscriber": self}
+        return render_to_string(template_name, context)
+
+    def generate_confirmation_email(self):
+        body = f"""Thank you for subscribing to SPANZA Journal Watch.
+
+        You will receive updates with each issue of Journal Watch,
+        which is published every two months.
+
+        You are receiving this email because you subscribed at
+        journalwatch.org.au using the email {self.email}
+
+        You can unsubscribe at any time by visiting the following address:
+        {self.get_unsubscribe_link()}
+
+        Sincerely,
+        The SPANZA Journal Watch team
+        """
+        email = mail.EmailMultiAlternatives(
+            subject="Journal Watch Subscription",
+            body=body,
+            to=[self.email],
+        )
+        email.attach_alternative(self.generate_confirmation_email_html(), "text/html")
+        return email
+
     def generate_unsubscribe_token(self):
         r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
         return r_uuid.replace("=", "")

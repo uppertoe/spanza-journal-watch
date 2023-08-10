@@ -3,6 +3,7 @@ from django.shortcuts import redirect, render
 
 from .forms import SubscriberForm
 from .models import Subscriber
+from .tasks import send_confirmation_email
 
 
 def success(request):
@@ -13,18 +14,16 @@ def success(request):
 def unsubscribe(request, unsubscribe_token):
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
-        if subscriber:
-            subscriber.subscribed = False
-            subscriber.unsubscribe_token = ""
-            subscriber.save()
-            messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
+        subscriber.subscribed = False
+        subscriber.unsubscribe_token = ""
+        subscriber.save()
+        messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
 
-            # Set the subscribed flag in session
-            request.session["subscribed"] = False
-        else:
-            messages.error(request, "Invalid unsubscribe link.")
+        # Set the subscribed flag in session
+        request.session["subscribed"] = False
+
     except Subscriber.DoesNotExist:
-        messages.error(request, "Subscriber does not exist.")
+        messages.error(request, "Invalid unsubscribe link.")
 
     return redirect("home")
 
@@ -47,6 +46,9 @@ def subscribe(request):
 
             # Set subscribed flag in session
             request.session["subscribed"] = True
+
+            # Send confirmation email
+            send_confirmation_email.delay(existing_subscriber.pk)
 
             return redirect("newsletter:success")
     else:
