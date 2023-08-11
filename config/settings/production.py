@@ -126,6 +126,7 @@ INSTALLED_APPS += ["anymail"]  # noqa: F405
 EMAIL_BACKEND = "anymail.backends.amazon_ses.EmailBackend"
 ANYMAIL = {
     "AMAZON_SES_CLIENT_PARAMS": {"region_name": env("DJANGO_AWS_DEFAULT_REGION", default="ap-southeast-2")},
+    "WEBHOOK_SECRET": env("WEBHOOK_SECRET"),
 }
 
 

@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, render
 
 from .forms import SubscriberForm
@@ -29,6 +30,9 @@ def unsubscribe(request, unsubscribe_token):
 
 
 def subscribe(request):
+    if not request.headers.get("HX-Request") == "true":
+        return HttpResponseBadRequest("Bad Request")
+
     if request.method == "POST":
         form = SubscriberForm(request.POST)
         if form.is_valid():

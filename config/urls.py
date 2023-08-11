@@ -22,8 +22,11 @@ urlpatterns = [
     path("tinymce/", include("tinymce.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-
-if settings.DEBUG:
+if not settings.DEBUG:
+    urlpatterns += [
+        path("anymail/", include("anymail.urls")),
+    ]
+else:
     # This allows the error pages to be debugged during development, just visit
     # these url in browser to see how these error pages look like.
     urlpatterns += [
