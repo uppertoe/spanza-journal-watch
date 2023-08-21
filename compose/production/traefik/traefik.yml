@@ -41,6 +41,16 @@ http:
         # https://docs.traefik.io/master/routing/routers/#certresolver
         certResolver: letsencrypt
 
+    web-secure-router-www:
+      rule: 'Host(`www.journalwatch.org.au`)'
+      entryPoints:
+        - web-secure
+      middlewares:
+        - csrf
+      service: django
+      tls:
+        certResolver: letsencrypt
+
     flower-secure-router:
       rule: 'Host(`journalwatch.org.au`)'
       entryPoints:
