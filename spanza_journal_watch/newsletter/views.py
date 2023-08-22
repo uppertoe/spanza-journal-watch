@@ -42,7 +42,7 @@ def subscribe(request):
             email = form.cleaned_data["email"]
 
             # Check if email exists
-            subscriber = Subscriber.objects.filter(email=email).first()
+            subscriber = Subscriber.objects.filter(email__icontains=email).first()
             if subscriber:
                 subscriber.subscribed = True
                 subscriber.save()
