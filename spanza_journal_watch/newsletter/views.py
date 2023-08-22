@@ -4,7 +4,7 @@ from django.shortcuts import redirect, render
 
 from .forms import SubscriberForm
 from .models import Subscriber
-from .tasks import send_confirmation_email
+from .tasks import reset_unsubscribe_token, send_confirmation_email
 
 
 def success(request):
@@ -16,12 +16,14 @@ def unsubscribe(request, unsubscribe_token):
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
         subscriber.subscribed = False
-        subscriber.unsubscribe_token = ""
         subscriber.save()
         messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
 
         # Set the subscribed flag in session
         request.session["subscribed"] = False
+
+        # Reset the unsubscribe token in 3 minutes
+        reset_unsubscribe_token.apply_async((subscriber.pk,), countdown=3 * 60)
 
     except Subscriber.DoesNotExist:
         messages.error(request, "Invalid unsubscribe link.")

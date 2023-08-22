@@ -27,3 +27,12 @@ def send_confirmation_email(subscriber_pk):
     email = subscriber.generate_confirmation_email()
     email.send()
     print(f"Sign-up email sent to {subscriber.email}")
+
+
+@celery_app.task()
+def reset_unsubscribe_token(subscriber_pk):
+    from .models import Subscriber
+
+    subscriber = Subscriber.objects.get(pk=subscriber_pk)
+    subscriber.unsubscribe_token = ""
+    subscriber.save()
