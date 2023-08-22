@@ -23,6 +23,7 @@ def unsubscribe(request, unsubscribe_token):
         request.session["subscribed"] = False
 
         # Reset the unsubscribe token in 3 minutes
+        # Ensures that repeated unsubscribe attempts are seen to succeed
         reset_unsubscribe_token.apply_async((subscriber.pk,), countdown=3 * 60)
 
     except Subscriber.DoesNotExist:
