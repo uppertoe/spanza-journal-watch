@@ -81,6 +81,9 @@ class EmailImage(models.Model):
 class Subscriber(models.Model):
     email = models.EmailField(max_length=255)
     subscribed = models.BooleanField(default=True)
+    tester = models.BooleanField(default=False)
+    bounced = models.BooleanField(default=False)
+    complained = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     unsubscribe_token = models.CharField(max_length=64, blank=True, null=True)
@@ -120,6 +123,15 @@ class Subscriber(models.Model):
             return f"https://{domain}{path}"
         return path
 
+    @classmethod
+    def get_valid_subscribers(cls):
+        subscribers = Subscriber.objects.filter(
+            bounced=False,
+            complained=False,
+            subscribed=True,
+        )
+        return subscribers
+
     def save(self, *args, **kwargs):
         if not self.unsubscribe_token:
             self.unsubscribe_token = self.generate_unsubscribe_token()
@@ -158,8 +170,7 @@ class Newsletter(models.Model):
         template = "newsletter/email_newsletter.txt"
         return self.render_email(subscriber, template)
 
-    def generate_emails(self):
-        subscribers = Subscriber.objects.exclude(subscribed=False)
+    def generate_emails(self, subscribers):
         emails = []
         for subscriber in subscribers:
             email = mail.EmailMultiAlternatives(
