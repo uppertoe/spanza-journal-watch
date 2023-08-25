@@ -3,16 +3,38 @@ from django.core import mail
 from config.celery_app import app as celery_app
 
 
-@celery_app.task()
-def send_newsletter(newsletter_pk):
-    """Takes a list of EmailMessage objects and sends them"""
+class NewsletterNotReadyToSendError(Exception):
+    pass
 
-    from .models import Newsletter  # Avoid circular import
+
+@celery_app.task()
+def send_newsletter(newsletter_pk, test_email=True):
+    """
+    Send a newsletter to subscribers.
+
+    The newsletter must be ready_to_send == True and is_test_sent == True
+
+    Args:
+        newsletter_pk (int): The primary key of the newsletter to send.
+        test_email (bool, optional): Whether to send to test subscribers. Defaults to False.
+    """
+
+    from .models import Newsletter, Subscriber  # Avoid circular import
 
     newsletter = Newsletter.objects.get(pk=newsletter_pk)
 
+    if test_email:
+        subscribers = Subscriber.objects.filter(tester=True)
+        newsletter.update(is_test_sent=True)
+    else:
+        if not (newsletter.ready_to_send and newsletter.is_test_sent):
+            raise NewsletterNotReadyToSendError("newsletter object not ready to send")
+
+        subscribers = Subscriber.get_valid_subscribers()
+        newsletter.update(is_sent=True)
+
     connection = mail.get_connection()
-    messages = newsletter.generate_emails()
+    messages = newsletter.generate_emails(subscribers)
     successful = connection.send_messages(messages)
     print(f"{successful} of {len(messages)} emails sent successfully")
 
