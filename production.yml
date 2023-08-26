@@ -23,8 +23,6 @@ services:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
     command: /start
-    networks:
-      - internal_network
 
   postgres:
     build:
@@ -36,8 +34,6 @@ services:
       - production_postgres_data_backups:/backups
     env_file:
       - ./.envs/.production/.postgres
-    networks:
-      - internal_network
 
   traefik:
     build:
@@ -89,9 +85,4 @@ services:
     restart: always
     ports:
       - '28101:28101'
-    networks:
-      - internal_network
     command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
-
-networks:
-  internal_network:
