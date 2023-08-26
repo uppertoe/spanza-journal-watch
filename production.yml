@@ -16,12 +16,15 @@ services:
     depends_on:
       - postgres
       - redis
+      - mjml
     volumes:
       - access_logs:/app/access_logs # Map the logs directory on the host to /app/logs inside the container
     env_file:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
     command: /start
+    networks:
+      - internal_network
 
   postgres:
     build:
@@ -74,3 +77,19 @@ services:
       - ./.envs/.production/.django
     volumes:
       - production_postgres_data_backups:/backups:z
+
+  mjml:
+    build:
+      context: .
+      dockerfile: ./compose/production/mjml-tcp/Dockerfile
+    image: spanza_journal_watch_production_mjml
+    container_name: spanza_journal_watch_production_mjml
+    restart: always
+    ports:
+      - '28101:28101'
+    networks:
+      - internal_network
+    command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
+
+networks:
+  internal_network:
