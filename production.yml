@@ -85,4 +85,4 @@ services:
     restart: always
     ports:
       - '28101:28101'
-    command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
+    command: ['--mjml.validationLevel=strict']
