@@ -11,6 +11,8 @@ from django.urls import reverse
 from spanza_journal_watch.submissions.models import Issue
 from spanza_journal_watch.utils.modelmethods import name_font, name_image
 
+from .tasks import send_newsletter
+
 
 class EmailFont(models.Model):
     TITLE = "TI"
@@ -35,11 +37,11 @@ class EmailFont(models.Model):
 
     @classmethod
     def get_latest_title(cls):
-        return cls.filter(type=cls.TITLE).order_by("-modified").first()
+        return cls.objects.filter(type=cls.TITLE).order_by("-modified").first()
 
     @classmethod
     def get_latest_body(cls):
-        return cls.filter(type=cls.BODY).order_by("-modified").first()
+        return cls.objects.filter(type=cls.BODY).order_by("-modified").first()
 
     def __str__(self):
         return self.name
@@ -68,11 +70,11 @@ class EmailImage(models.Model):
 
     @classmethod
     def get_latest_header(cls):
-        return cls.filter(type=cls.HEADER).order_by("-modified").first()
+        return cls.objects.filter(type=cls.HEADER).order_by("-modified").first()
 
     @classmethod
     def get_latest_logo(cls):
-        return cls.filter(type=cls.LOGO).order_by("-modified").first()
+        return cls.objects.filter(type=cls.LOGO).order_by("-modified").first()
 
     def __str__(self):
         return self.name
@@ -151,8 +153,20 @@ class Newsletter(models.Model):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
 
     # Email media
-    title_font = models.ForeignKey(EmailFont, on_delete=models.CASCADE, default=EmailFont.get_latest_title)
-    header_image = models.ForeignKey(EmailImage, on_delete=models.CASCADE, default=EmailImage.get_latest_header)
+    title_font = models.ForeignKey(
+        EmailFont,
+        on_delete=models.CASCADE,
+        default=EmailFont.get_latest_title,
+        blank=True,
+        null=True,
+    )
+    header_image = models.ForeignKey(
+        EmailImage,
+        on_delete=models.CASCADE,
+        default=EmailImage.get_latest_header,
+        blank=True,
+        null=True,
+    )
 
     def render_email(self, subscriber, template):
         context = {
@@ -184,4 +198,5 @@ class Newsletter(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # send_newsletter.delay(self.pk)
+        if not (self.is_sent or self.is_test_sent):
+            send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=10)
