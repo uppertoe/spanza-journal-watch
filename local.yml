@@ -15,6 +15,7 @@ services:
       - postgres
       - redis
       - mailhog
+      - mjml
     volumes:
       - .:/app:z
     env_file:
@@ -70,6 +71,7 @@ services:
       - redis
       - postgres
       - mailhog
+      - mjml
     ports: []
     command: /start-celeryworker
 
@@ -81,6 +83,7 @@ services:
       - redis
       - postgres
       - mailhog
+      - mjml
     ports: []
     command: /start-celerybeat
 
@@ -107,3 +110,14 @@ services:
     command: npm run dev
     ports:
       - '3000:3000'
+
+  mjml:
+    build:
+      context: .
+      dockerfile: ./compose/local/mjml-tcp/Dockerfile
+    image: spanza_journal_watch_local_mjml
+    container_name: spanza_journal_watch_local_mjml
+    restart: always
+    ports:
+      - '28101:28101'
+    command: ['--mjml.minify=true', '--mjml.validationLevel=strict']

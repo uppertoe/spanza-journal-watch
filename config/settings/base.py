@@ -88,6 +88,7 @@ THIRD_PARTY_APPS = [
     "webpack_loader",
     "view_breadcrumbs",
     "tinymce",
+    "mjml",
 ]
 
 LOCAL_APPS = [
@@ -234,6 +235,13 @@ EMAIL_BACKEND = env(
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-timeout
 EMAIL_TIMEOUT = 5
+
+# MJML
+# ------------------------------------------------------------------------------
+MJML_BACKEND_MODE = "tcpserver"
+MJML_TCPSERVERS = [
+    ("mjml", 28101),  # the host and port of MJML TCP-Server
+]
 
 # ADMIN
 # ------------------------------------------------------------------------------
