@@ -114,8 +114,8 @@ services:
   mjml:
     build:
       context: .
-      dockerfile: ./compose/local/mjml-tcp/Dockerfile
-    image: spanza_journal_watch_local_mjml
+      dockerfile: ./compose/production/mjml-tcp/Dockerfile
+    image: spanza_journal_watch_production_mjml
     container_name: spanza_journal_watch_local_mjml
     restart: always
     ports:

@@ -14,7 +14,6 @@ RUN chmod +x $SCRIPTSDIR/*.sh
 
 
 RUN set -ex; \
-    npm cache clean --force; \
     npm init -y; \
     npm install mjml@${MJML_VERSION}
 
