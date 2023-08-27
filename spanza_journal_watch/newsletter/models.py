@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 
 from spanza_journal_watch.submissions.models import Issue
+from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
 from spanza_journal_watch.utils.modelmethods import name_font, name_image
 
 from .tasks import send_newsletter
@@ -75,6 +76,11 @@ class EmailImage(models.Model):
     @classmethod
     def get_latest_logo(cls):
         return cls.objects.filter(type=cls.LOGO).order_by("-modified").first()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.type == self.HEADER and self.image:
+            celery_resize_greyscale_contrast_image.delay(self.image.name)
 
     def __str__(self):
         return self.name

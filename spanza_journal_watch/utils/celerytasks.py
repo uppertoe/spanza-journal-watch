@@ -62,7 +62,7 @@ def celery_resize_greyscale_contrast_image(self, path, size=600):
             if max(width, height) > size:
                 # Resize the image
                 new_width, new_height = resize_to_max_dimension(width, height, size)
-                resized_img = img.resize((new_width, new_height))
+                img = img.resize((new_width, new_height))
 
             # Convert the file to greyscale
             img = img.convert("L")
@@ -72,7 +72,7 @@ def celery_resize_greyscale_contrast_image(self, path, size=600):
 
             # Create the new file
             output = BytesIO()
-            resized_img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
+            img.save(output, format="JPEG", quality=90, resampling=Image.Resampling.LANCZOS)
             output.seek(0)
             output = ContentFile(output.getvalue())
             imagefile = InMemoryUploadedFile(output, None, path, "image/jpeg", getsizeof(output), None)

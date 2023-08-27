@@ -243,6 +243,10 @@ MJML_TCPSERVERS = [
     ("mjml", 28101),  # the host and port of MJML TCP-Server
 ]
 
+# FILE UPLOAD
+# ------------------------------------------------------------------------------
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", default=10_000_000)
+
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL.
