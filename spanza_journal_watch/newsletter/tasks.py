@@ -21,24 +21,23 @@ def send_newsletter(newsletter_pk, test_email=True):
 
     from .models import Newsletter, Subscriber  # Avoid circular import
 
-    newsletter = Newsletter.objects.get(pk=newsletter_pk)
+    queryset = Newsletter.objects.filter(pk=newsletter_pk)  # Allow .update
+    newsletter = queryset.get()  # Return single instance
 
     if test_email:
         subscribers = Subscriber.objects.filter(tester=True)
-        newsletter.is_test_sent = True
+        queryset.update(is_test_sent=True)
     else:
         if not (newsletter.ready_to_send and newsletter.is_test_sent):
             raise NewsletterNotReadyToSendError("newsletter object not ready to send")
 
         subscribers = Subscriber.get_valid_subscribers()
-        newsletter.is_sent = True
+        queryset.update(is_sent=True)
 
     connection = mail.get_connection()
     messages = newsletter.generate_emails(subscribers)
     successful = connection.send_messages(messages)
 
-    # Ensure flags are updated
-    newsletter.save()
     print(f"{successful} of {len(messages)} emails sent successfully")
 
 

@@ -1,3 +1,137 @@
-Here's a great HTML email
-For {{ subscriber }}
-Issue: {{ issue }}
+{% load mjml %}
+{% mjml %}
+<mjml>
+  <mj-head>
+    <mj-font name="Fugaz One" href="https://fonts.googleapis.com/css?family=Fugaz%20One" />
+    <mj-style inline="inline">
+      .link-nostyle { color: inherit; text-decoration: none; }
+      .italics { font-style: italic; }
+      .link-inherit-color { color: inherit; }
+      .stroke { color: #fff; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000; }
+    </mj-style>
+        <mj-attributes>
+      <mj-accordion border="none" padding="1px" />
+      <mj-accordion-element icon-wrapped-url="https://i.imgur.com/Xvw0vjq.png" icon-unwrapped-url="https://i.imgur.com/KKHenWa.png" icon-height="24px" icon-width="24px" />
+      <mj-accordion-title font-family="Helvetica Neue, Arial, sans-serif" background-color="#fff" color="#626262" padding="25px" font-size="18px" />
+      <mj-accordion-text font-family="Helvetica Neue, Arial, sans-serif" background-color="#fff" padding="0px 40px" color="#525252" font-size="14px" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body>
+    <mj-section background-color="#152b3b" padding="0">
+      <mj-column>
+        <mj-button background-color="#ec7800" align="right" inner-padding="5px 20px" href="{{ subscriber.get_unsubscribe_link }}">Unsubscribe</mj-button>
+      </mj-column>
+    </mj-section>
+    <!-- Company Header -->
+    <mj-section background-color="#f0f0f0">
+      <mj-column>
+        <mj-text align="center" font-family="Fugaz One, Helvetica Neue" font-size="40px" color="#152b3b">
+          Journal Watch
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Image Header -->
+    <mj-section background-url="{{ domain }}{{ newsletter.header_image.url }}" background-size="cover" background-repeat="no-repeat">
+
+      <mj-column width="600px">
+        <mj-text align="center" color="#fff" font-size="40px" font-family="Helvetica Neue">
+          <div class="stroke">{{ newsletter.issue }}</div>
+        </mj-text>
+
+        <mj-button background-color="#ec7800" href="https://journalwatch.org.au">
+          journalwatch.org.au
+        </mj-button>
+
+      </mj-column>
+
+    </mj-section>
+
+    <!-- Introduction Text -->
+    <mj-section background-color="#fafafa">
+      <mj-column width="400px">
+
+        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262">{{ newsletter.content_heading }}</mj-text>
+
+        <mj-text color="#525252">{{ newsletter.content|linebreaks }}</mj-text>
+
+        <mj-button background-color="#152b3b" href="{{ newsletter.issue.get_absolute_url }}">Read this issue</mj-button>
+
+      </mj-column>
+    </mj-section>
+    <!-- Side image -->
+    {% for review in newsletter.get_featured_reviews %}
+    <mj-section background-color="white">
+
+      <!-- Left image -->
+      <mj-column width="30%">
+        <mj-image width="200px" src="{{ domain }}{{ review.feature_image.url }}" href="{{ review.get_absolute_url }}" alt="Article image" />
+      </mj-column>
+
+      <!-- right paragraph -->
+      <mj-column width="70%">
+        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262">
+          <a href="{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
+        </mj-text>
+        <mj-text color="#525252">
+          <small>Review by {{ review.author }}</small>
+          <p>{{ review.get_truncated_body }}</p>
+          <a class="italics link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    {% endfor %}
+
+    <mj-section padding="0px">
+      <mj-column>
+        <mj-divider border-width="1px" border-style="solid" border-color="lightgrey" />
+      </mj-column>
+    </mj-section>
+    <!-- 2 columns section -->
+    {% if non_featured_reviews %}
+    <mj-section background-color="white">
+    	<mj-column>
+        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262">Further articles in this edition include:</mj-text>
+        <mj-accordion>
+        {% for review in non_featured_reviews %}
+          <mj-accordion-element>
+            <mj-accordion-title>{{ review.article.get_title }}</mj-accordion-title>
+            <mj-accordion-text>
+              <span style="line-height:20px">
+                <p>Review by {{ review.author }}</p>
+                <p>{{ review.get_truncated_body }}</p>
+                <p><a class="italics link-inherit-color" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
+              </span>
+            </mj-accordion-text>
+          </mj-accordion-element>
+         {% endfor %}
+        </mj-accordion>
+      </mj-column>
+    </mj-section>
+		{% endif %}
+
+    <mj-section>
+    	<mj-column>
+        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262"><a href="{{ newsletter.issue.get_absolute_url }}" class="link-inherit-color">Visit the Journal Watch website</a> to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue</mj-text>
+      </mj-column>
+    </mj-section>
+    <!-- Icons -->
+    <mj-section background-color="#fbfbfb">
+      <mj-column>
+        <mj-image width="200px" src="{{ domain }}{{ newsletter.logo.image.url }}" alt="SPANZA logo" />
+      </mj-column>
+    </mj-section>
+
+    <!-- Footer -->
+    <mj-section background-color="#152b3b" padding="0">
+      <mj-column>
+        <mj-text color="#fff" font-size="10px">
+          <p>You are receiving this email after subscribing to <a href="https://journalwatch.org.au" class="link-inherit-color">journalwatch.org.au</a> using the email {{ subscriber.email }}</p>
+          <p><a href="{{ subscriber.get_unsubscribe_link }}" class="link-inherit-color">Unsubscribe in a single click by following this link</a></p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+  </mj-body>
+</mjml>
+{% endmjml %}

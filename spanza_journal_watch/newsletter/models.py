@@ -8,59 +8,16 @@ from django.db import models
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from spanza_journal_watch.submissions.models import Issue
+from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
-from spanza_journal_watch.utils.modelmethods import name_font, name_image
+from spanza_journal_watch.utils.modelmethods import name_image
 
 from .tasks import send_newsletter
 
 
-class EmailFont(models.Model):
-    TITLE = "TI"
-    BODY = "BO"
-    OTHER = "OT"
-    TYPE_CHOICES = [
-        (TITLE, "Title"),
-        (BODY, "BODY"),
-        (OTHER, "Other"),
-    ]
-
+class Logo(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=2, choices=TYPE_CHOICES, default=OTHER)
-    font = models.FileField(
-        upload_to=name_font,
-        blank=True,
-        null=True,
-    )
-    created = models.DateTimeField(auto_now_add=True)
-    modified = models.DateTimeField(auto_now=True)
-
-    @classmethod
-    def get_latest_title(cls):
-        return cls.objects.filter(type=cls.TITLE).order_by("-modified").first()
-
-    @classmethod
-    def get_latest_body(cls):
-        return cls.objects.filter(type=cls.BODY).order_by("-modified").first()
-
-    def __str__(self):
-        return self.name
-
-
-class EmailImage(models.Model):
-    HEADER = "HE"
-    LOGO = "LO"
-    OTHER = "OT"
-    TYPE_CHOICES = [
-        (HEADER, "Header"),
-        (LOGO, "Logo"),
-        (OTHER, "Other"),
-    ]
-
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=2, choices=TYPE_CHOICES, default=OTHER)
     image = models.ImageField(
         upload_to=name_image,
         blank=True,
@@ -70,17 +27,8 @@ class EmailImage(models.Model):
     modified = models.DateTimeField(auto_now=True)
 
     @classmethod
-    def get_latest_header(cls):
-        return cls.objects.filter(type=cls.HEADER).order_by("-modified").first()
-
-    @classmethod
     def get_latest_logo(cls):
-        return cls.objects.filter(type=cls.LOGO).order_by("-modified").first()
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.type == self.HEADER and self.image:
-            celery_resize_greyscale_contrast_image.delay(self.image.name)
+        return cls.objects.order_by("-modified").first()
 
     def __str__(self):
         return self.name
@@ -151,34 +99,46 @@ class Subscriber(models.Model):
 
 class Newsletter(models.Model):
     subject = models.CharField(max_length=255)
-    content = models.TextField()
+    content_heading = models.CharField(
+        max_length=255, verbose_name="Heading for the introductory content", blank=True, null=True
+    )
+    content = models.TextField(verbose_name="Introductory content paragraph")
     send_date = models.DateTimeField(blank=True, null=True)
     ready_to_send = models.BooleanField(default=False)
     is_sent = models.BooleanField(default=False)
     is_test_sent = models.BooleanField(default=False)
-    issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
-
-    # Email media
-    title_font = models.ForeignKey(
-        EmailFont,
-        on_delete=models.CASCADE,
-        default=EmailFont.get_latest_title,
+    issue = models.ForeignKey(Issue, on_delete=models.PROTECT)
+    header_image = models.ImageField(
+        upload_to=name_image,
         blank=True,
         null=True,
     )
-    header_image = models.ForeignKey(
-        EmailImage,
-        on_delete=models.CASCADE,
-        default=EmailImage.get_latest_header,
-        blank=True,
-        null=True,
-    )
+    header_image_processed = models.BooleanField(default=False, editable=False)
+    logo = models.ForeignKey(Logo, on_delete=models.SET_NULL, default=Logo.get_latest_logo, blank=True, null=True)
+    non_featured_review_count = models.PositiveIntegerField(default=5, blank=True, null=True)
 
+    # Get issue content
+    def get_featured_reviews(self, count=2):
+        return Review.objects.filter(issues=self.issue, is_featured=True, active=True).order_by("-created")[:count]
+
+    def get_non_featured_reviews(self, count=None):
+        return Review.objects.filter(issues=self.issue, is_featured=False, active=True).order_by("-created")[:count]
+
+    @staticmethod
+    def get_domain():
+        if settings.DEBUG:
+            domain = "127.0.0.1:3000"
+            return f"http://{domain}"
+        domain = Site.objects.get_current().domain
+        return f"https://{domain}"
+
+    # Assemble emails
     def render_email(self, subscriber, template):
         context = {
             "newsletter": self,
-            "issue": self.issue,
             "subscriber": subscriber,
+            "non_featured_reviews": self.get_non_featured_reviews(count=self.non_featured_review_count),
+            "domain": Newsletter.get_domain(),
         }
         return render_to_string(template, context)
 
@@ -202,7 +162,19 @@ class Newsletter(models.Model):
             emails.append(email)
         return emails
 
+    # Send emails
+    def send_test_email(self):
+        pass
+
+    def send_email(self):
+        pass
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+        if self.header_image and not self.header_image_processed:
+            celery_resize_greyscale_contrast_image.delay(self.header_image.name)
+            Newsletter.objects.filter(pk=self.pk).update(header_image_processed=True)
+
         if not (self.is_sent or self.is_test_sent):
             send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=10)
