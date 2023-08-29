@@ -15,6 +15,59 @@ from spanza_journal_watch.utils.modelmethods import name_image
 from .tasks import send_newsletter
 
 
+class ElementImage(models.Model):
+    UPCHEVRON = "UP"
+    DOWNCHEVRON = "DN"
+    LOGO = "LO"
+    OTHER = "OT"
+    CHOICES = [
+        (UPCHEVRON, "Up chevron"),
+        (DOWNCHEVRON, "Down chevron"),
+        (LOGO, "Logo"),
+        (OTHER, "Other"),
+    ]
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    type = models.CharField(max_length=2, choices=CHOICES, default=OTHER, unique=True)
+    image = models.ImageField(
+        upload_to=name_image,
+        blank=True,
+        null=True,
+    )
+
+    @classmethod
+    def _get_unique_image_url(cls, type):
+        try:
+            instance = cls.objects.get(type=type).image.url
+        except cls.DoesNotExist:  # Still raises MultipleObjectsReturned
+            instance = None
+        return instance
+
+    @classmethod
+    def get_up_chevron_url(cls):
+        return cls._get_unique_image_url(cls.UPCHEVRON)
+
+    @classmethod
+    def get_down_chevron_url(cls):
+        return cls._get_unique_image_url(cls.DOWNCHEVRON)
+
+    def save(self, *args, **kwargs):
+        # Ensure only a single instance of each type is created
+        if not self.pk:
+            try:
+                # Update existing instance
+                instance = ElementImage.objects.get(type=self.type)
+                self.pk = instance.pk
+            except ElementImage.DoesNotExist:
+                # Create new instance
+                pass
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class Logo(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -119,10 +172,10 @@ class Newsletter(models.Model):
 
     # Get issue content
     def get_featured_reviews(self, count=2):
-        return Review.objects.filter(issues=self.issue, is_featured=True, active=True).order_by("-created")[:count]
+        return Review.objects.filter(issues=self.issue, is_featured=True, active=True).order_by("?")[:count]
 
     def get_non_featured_reviews(self, count=None):
-        return Review.objects.filter(issues=self.issue, is_featured=False, active=True).order_by("-created")[:count]
+        return Review.objects.filter(issues=self.issue, is_featured=False, active=True).order_by("?")[:count]
 
     @staticmethod
     def get_domain():
@@ -139,6 +192,7 @@ class Newsletter(models.Model):
             "subscriber": subscriber,
             "non_featured_reviews": self.get_non_featured_reviews(count=self.non_featured_review_count),
             "domain": Newsletter.get_domain(),
+            "element": ElementImage,
         }
         return render_to_string(template, context)
 
@@ -177,4 +231,4 @@ class Newsletter(models.Model):
             Newsletter.objects.filter(pk=self.pk).update(header_image_processed=True)
 
         if not (self.is_sent or self.is_test_sent):
-            send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=10)
+            send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=1)

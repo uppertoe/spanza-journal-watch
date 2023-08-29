@@ -6,12 +6,13 @@
     <mj-style inline="inline">
       .link-nostyle { color: inherit; text-decoration: none; }
       .italics { font-style: italic; }
+      .bold { font-weight: bold; }
       .link-inherit-color { color: inherit; }
       .stroke { color: #fff; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000; }
     </mj-style>
         <mj-attributes>
       <mj-accordion border="none" padding="1px" />
-      <mj-accordion-element icon-wrapped-url="https://i.imgur.com/Xvw0vjq.png" icon-unwrapped-url="https://i.imgur.com/KKHenWa.png" icon-height="24px" icon-width="24px" />
+      <mj-accordion-element icon-wrapped-url="{{ domain }}{{ element.get_down_chevron_url }}" icon-unwrapped-url="{{ domain }}{{ element.get_up_chevron_url }}" icon-height="24px" icon-width="24px" />
       <mj-accordion-title font-family="Helvetica Neue, Arial, sans-serif" background-color="#fff" color="#626262" padding="25px" font-size="18px" />
       <mj-accordion-text font-family="Helvetica Neue, Arial, sans-serif" background-color="#fff" padding="0px 40px" color="#525252" font-size="14px" />
     </mj-attributes>
@@ -76,7 +77,8 @@
         <mj-text color="#525252">
           <small>Review by {{ review.author }}</small>
           <p>{{ review.get_truncated_body }}</p>
-          <a class="italics link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a>
+          <small><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></small>
+          <p><a class="italics bold link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
         </mj-text>
       </mj-column>
     </mj-section>
@@ -95,12 +97,13 @@
         <mj-accordion>
         {% for review in non_featured_reviews %}
           <mj-accordion-element>
-            <mj-accordion-title>{{ review.article.get_title }}</mj-accordion-title>
+            <mj-accordion-title><span class="bold">{{ review.article.get_title }}</span></mj-accordion-title>
             <mj-accordion-text>
               <span style="line-height:20px">
                 <p>Review by {{ review.author }}</p>
                 <p>{{ review.get_truncated_body }}</p>
-                <p><a class="italics link-inherit-color" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
+                <p><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></p>
+                <p><a class="italics bold link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
               </span>
             </mj-accordion-text>
           </mj-accordion-element>
@@ -118,7 +121,7 @@
     <!-- Icons -->
     <mj-section background-color="#fbfbfb">
       <mj-column>
-        <mj-image width="200px" src="{{ domain }}{{ newsletter.logo.image.url }}" alt="SPANZA logo" />
+        <mj-image width="200px" src="{{ domain }}{{ newsletter.logo.image.url }}" href="https://www.spanza.org.au/" alt="SPANZA logo" />
       </mj-column>
     </mj-section>
 

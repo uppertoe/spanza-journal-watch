@@ -16,3 +16,8 @@ class NewsletterAdmin(admin.ModelAdmin):
 @admin.register(models.Logo)
 class LogoAdmin(admin.ModelAdmin):
     list_display = ("name",)
+
+
+@admin.register(models.ElementImage)
+class ElementImageAdmin(admin.ModelAdmin):
+    list_display = ("name", "type")
