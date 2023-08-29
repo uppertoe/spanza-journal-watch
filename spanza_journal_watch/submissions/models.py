@@ -252,6 +252,9 @@ class Review(TimeStampedModel):
     def get_truncated_body(self):
         return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
 
+    def get_longer_truncated_body(self):
+        return shorten_text(self.body, 500)
+
     def get_absolute_url(self):
         return reverse("submissions:review_detail", kwargs={"slug": self.slug})
 

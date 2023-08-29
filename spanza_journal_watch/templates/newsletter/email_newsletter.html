@@ -61,7 +61,7 @@
       </mj-column>
     </mj-section>
     <!-- Side image -->
-    {% for review in newsletter.get_featured_reviews %}
+    {% for review in featured_reviews %}
     <mj-section background-color="white">
 
       <!-- Left image -->
@@ -75,8 +75,8 @@
           <a href="{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
         </mj-text>
         <mj-text color="#525252">
-          <small>Review by {{ review.author }}</small>
-          <p>{{ review.get_truncated_body }}</p>
+          <small>Reviewed by {{ review.author }}</small>
+          <p>{{ review.get_longer_truncated_body }}</p>
           <small><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></small>
           <p><a class="italics bold link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
         </mj-text>
@@ -100,7 +100,7 @@
             <mj-accordion-title><span class="bold">{{ review.article.get_title }}</span></mj-accordion-title>
             <mj-accordion-text>
               <span style="line-height:20px">
-                <p>Review by {{ review.author }}</p>
+                <p>Reviewed by {{ review.author }}</p>
                 <p>{{ review.get_truncated_body }}</p>
                 <p><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></p>
                 <p><a class="italics bold link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>

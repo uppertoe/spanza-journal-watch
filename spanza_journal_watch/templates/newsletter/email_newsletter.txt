@@ -1,0 +1,53 @@
+{% load newsletter_filters %}
+Unsubscribe: {{ subscriber.get_unsubscribe_link }}
+--------------------
+
+Dear {{ subscriber.email }},
+
+Thank you for subscribing to SPANZA Journal Watch.
+
+The {{ newsletter.issue }} issue is now available at {{ domain }}
+
+{{ newsletter.content_heading }}
+{{ newsletter.content|safe }}
+
+--------------------
+
+Featured articles:
+{% for review in featured_reviews %}
+{{ review.article.get_title|insert_linebreaks:80 }}
+Reviewed by {{ review.author }}
+Original article in "{{ review.article.journal }}" at:
+{{ review.article.url }}
+
+{{ review.get_longer_truncated_body|insert_linebreaks:80 }}
+
+Read more at:
+{{ domain }}{{ review.get_absolute_url }}
+
+---
+{% endfor %}
+Other reviews include:
+{% for review in non_featured_reviews %}
+{{ review.article.get_title|insert_linebreaks:80 }}
+Reviewed by {{ review.author }}
+Original article in "{{ review.article.journal }}" at:
+{{ review.article.url }}
+
+Read the review at:
+{{ domain }}{{ review.get_absolute_url }}
+{% if not forloop.last %}
+-
+{% endif %}{% endfor %}
+---
+
+Visit the https://journalwatch.org.au website to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue.
+
+--------------------
+
+You are receiving this email because you subscribed at {{ domain }}
+using the email {{ subscriber.email }}
+
+You can unsubscribe at any time by visiting the following address:
+
+{{ subscriber.get_unsubscribe_link }}

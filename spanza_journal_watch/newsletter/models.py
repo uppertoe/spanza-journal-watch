@@ -186,33 +186,35 @@ class Newsletter(models.Model):
         return f"https://{domain}"
 
     # Assemble emails
-    def render_email(self, subscriber, template):
+    def get_email_context(self):
         context = {
             "newsletter": self,
-            "subscriber": subscriber,
+            "featured_reviews": self.get_featured_reviews(),
             "non_featured_reviews": self.get_non_featured_reviews(count=self.non_featured_review_count),
             "domain": Newsletter.get_domain(),
             "element": ElementImage,
         }
+        return context
+
+    def generate_html_content(self, context):
+        template = "newsletter/email_newsletter.html"
         return render_to_string(template, context)
 
-    def generate_html_content(self, subscriber):
-        template = "newsletter/email_newsletter.html"
-        return self.render_email(subscriber, template)
-
-    def generate_txt_content(self, subscriber):
+    def generate_txt_content(self, context):
         template = "newsletter/email_newsletter.txt"
-        return self.render_email(subscriber, template)
+        return render_to_string(template, context)
 
     def generate_emails(self, subscribers):
         emails = []
+        context = self.get_email_context()
         for subscriber in subscribers:
+            context["subscriber"] = subscriber
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
-                body=self.generate_txt_content(subscriber),
+                body=self.generate_txt_content(context),
                 to=[subscriber.email],
             )
-            email.attach_alternative(self.generate_html_content(subscriber), "text/html")
+            email.attach_alternative(self.generate_html_content(context), "text/html")
             emails.append(email)
         return emails
 
