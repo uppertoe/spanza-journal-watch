@@ -127,8 +127,8 @@ class Subscriber(models.Model):
         if absolute:
             if settings.DEBUG:
                 domain = "127.0.0.1:3000"
-            else:
-                domain = Site.objects.get_current().domain
+                return f"http://{domain}{path}"
+            domain = Site.objects.get_current().domain
             return f"https://{domain}{path}"
         return path
 
@@ -232,5 +232,5 @@ class Newsletter(models.Model):
             celery_resize_greyscale_contrast_image.delay(self.header_image.name)
             Newsletter.objects.filter(pk=self.pk).update(header_image_processed=True)
 
-        if not (self.is_sent or self.is_test_sent):
+        if not self.is_test_sent:
             send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=1)

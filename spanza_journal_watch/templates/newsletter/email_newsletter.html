@@ -40,7 +40,7 @@
           <div class="stroke">{{ newsletter.issue }}</div>
         </mj-text>
 
-        <mj-button background-color="#ec7800" href="https://journalwatch.org.au">
+        <mj-button background-color="#ec7800" href="{{ domain }}">
           journalwatch.org.au
         </mj-button>
 
@@ -56,7 +56,7 @@
 
         <mj-text color="#525252">{{ newsletter.content|linebreaks }}</mj-text>
 
-        <mj-button background-color="#152b3b" href="{{ newsletter.issue.get_absolute_url }}">Read this issue</mj-button>
+        <mj-button background-color="#152b3b" href="{{ domain }}{{ newsletter.issue.get_absolute_url }}">Read this issue</mj-button>
 
       </mj-column>
     </mj-section>
@@ -66,19 +66,19 @@
 
       <!-- Left image -->
       <mj-column width="30%">
-        <mj-image width="200px" src="{{ domain }}{{ review.feature_image.url }}" href="{{ review.get_absolute_url }}" alt="Article image" />
+        <mj-image width="200px" src="{{ domain }}{{ review.feature_image.url }}" href="{{ domain }}{{ review.get_absolute_url }}" alt="Article image" />
       </mj-column>
 
       <!-- right paragraph -->
       <mj-column width="70%">
         <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262">
-          <a href="{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
+          <a href="{{ domain }}{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
         </mj-text>
         <mj-text color="#525252">
           <small>Reviewed by {{ review.author }}</small>
-          <p>{{ review.get_longer_truncated_body }}</p>
+          <p>{{ review.get_truncated_body }}</p>
           <small><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></small>
-          <p><a class="italics bold link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
+          <p><a class="italics bold link-nostyle" href="{{ domain }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
         </mj-text>
       </mj-column>
     </mj-section>
@@ -103,7 +103,7 @@
                 <p>Reviewed by {{ review.author }}</p>
                 <p>{{ review.get_truncated_body }}</p>
                 <p><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></p>
-                <p><a class="italics bold link-nostyle" href="{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
+                <p><a class="italics bold link-nostyle" href="{{ domain }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
               </span>
             </mj-accordion-text>
           </mj-accordion-element>
@@ -115,7 +115,7 @@
 
     <mj-section>
     	<mj-column>
-        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262"><a href="{{ newsletter.issue.get_absolute_url }}" class="link-inherit-color">Visit the Journal Watch website</a> to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue</mj-text>
+        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue" color="#626262"><a href="{{ domain }}{{ newsletter.issue.get_absolute_url }}" class="link-inherit-color">Visit the Journal Watch website</a> to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue</mj-text>
       </mj-column>
     </mj-section>
     <!-- Icons -->
@@ -129,7 +129,7 @@
     <mj-section background-color="#152b3b" padding="0">
       <mj-column>
         <mj-text color="#fff" font-size="10px">
-          <p>You are receiving this email after subscribing to <a href="https://journalwatch.org.au" class="link-inherit-color">journalwatch.org.au</a> using the email {{ subscriber.email }}</p>
+          <p>You are receiving this email after subscribing to <a href="{{ domain }}" class="link-inherit-color">journalwatch.org.au</a> using the email {{ subscriber.email }}</p>
           <p><a href="{{ subscriber.get_unsubscribe_link }}" class="link-inherit-color">Unsubscribe in a single click by following this link</a></p>
         </mj-text>
       </mj-column>
