@@ -187,11 +187,19 @@ class Newsletter(models.Model):
 
     # Assemble emails
     def get_email_context(self):
+        # Images are provided with full path in production
+        domain = Newsletter.get_domain()
+        if settings.DEBUG:
+            image_domain = domain
+        else:
+            image_domain = ""
+
         context = {
             "newsletter": self,
             "featured_reviews": self.get_featured_reviews(),
             "non_featured_reviews": self.get_non_featured_reviews(count=self.non_featured_review_count),
-            "domain": Newsletter.get_domain(),
+            "domain": domain,
+            "image_domain": image_domain,
             "element": ElementImage,
         }
         return context
