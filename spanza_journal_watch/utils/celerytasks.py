@@ -46,7 +46,7 @@ def celery_resize_image(self, path, size=800):
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=20)
-def celery_resize_greyscale_contrast_image(self, path, size=600):
+def celery_resize_greyscale_contrast_image(self, path, size=900, aspect_ratio=21 / 9):
     try:
         # File may be local or remote (S3)
         with default_storage.open(path, mode="rb") as file:
@@ -59,9 +59,22 @@ def celery_resize_greyscale_contrast_image(self, path, size=600):
 
             width, height = img.size
 
-            if max(width, height) > size:
+            # Calculate the dimensions of the center rectangle with the desired aspect ratio
+            target_width = int(min(width, height * aspect_ratio))
+            target_height = int(min(height, width / aspect_ratio))
+
+            # Calculate the position to start cropping
+            left = (width - target_width) / 2
+            top = (height - target_height) / 2
+            right = (width + target_width) / 2
+            bottom = (height + target_height) / 2
+
+            # Crop the image using the calculated dimensions
+            img = img.crop((left, top, right, bottom))
+
+            if max(target_width, target_height) > size:
                 # Resize the image
-                new_width, new_height = resize_to_max_dimension(width, height, size)
+                new_width, new_height = resize_to_max_dimension(target_width, target_height, size)
                 img = img.resize((new_width, new_height))
 
             # Convert the file to greyscale

@@ -166,7 +166,7 @@ class Newsletter(models.Model):
         blank=True,
         null=True,
     )
-    header_image_processed = models.BooleanField(default=False, editable=False)
+    header_image_processed = models.BooleanField(default=False)
     logo = models.ForeignKey(Logo, on_delete=models.SET_NULL, default=Logo.get_latest_logo, blank=True, null=True)
     non_featured_review_count = models.PositiveIntegerField(default=5, blank=True, null=True)
 
