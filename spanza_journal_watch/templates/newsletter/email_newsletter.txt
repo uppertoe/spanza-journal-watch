@@ -17,7 +17,7 @@ Featured articles:
 {% for review in featured_reviews %}
 {{ review.article.get_title|insert_linebreaks:80 }}
 Reviewed by {{ review.author }}
-Original article in "{{ review.article.journal }}" at:
+Original article in "{{ review.article.journal|safe }}" at:
 {{ review.article.url }}
 
 {{ review.get_longer_truncated_body|insert_linebreaks:80 }}
@@ -31,7 +31,7 @@ Other reviews include:
 {% for review in non_featured_reviews %}
 {{ review.article.get_title|insert_linebreaks:80 }}
 Reviewed by {{ review.author }}
-Original article in "{{ review.article.journal }}" at:
+Original article in "{{ review.article.journal|safe }}" at:
 {{ review.article.url }}
 
 Read the review at:
@@ -41,7 +41,7 @@ Read the review at:
 {% endif %}{% endfor %}
 ---
 
-Visit the https://journalwatch.org.au website to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue.
+Visit {{ domain }} to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue.
 
 --------------------
 
