@@ -17,10 +17,10 @@ if not settings.DEBUG:  # Anymail only available in production
 
         if event.event_type == "bounced":
             # Soft bounces are not removed from mailing list
-            bounce_type, bounce_subtype = event.description.split(":", 1)
-            if bounce_type.lower() == "transient":
+            bounce_type, bounce_subtype = event.description.strip().lower().split(":", 1)
+            if bounce_type == "transient":
                 return print(
-                    f"Transient bounce for email {event.recipient} subtype {bounce_subtype}; kept on mailing list"
+                    f"Transient bounce for email {event.recipient} (subtype {bounce_subtype}); kept on mailing list"
                 )
 
             subscriber = _get_subscriber(event.recipient)
