@@ -7,21 +7,22 @@ Dear {{ subscriber.email }},
 
 Thank you for subscribing to SPANZA Journal Watch.
 
-The {{ newsletter.issue }} issue is now available at {{ domain }}
+The {{ newsletter.issue }} issue is now available at:
+{{ domain }}{{ newsletter.issue.get_absolute_url }}
 
 {{ newsletter.content_heading }}
-{{ newsletter.content|safe }}
+{{ newsletter.content }}
 
 --------------------
 
 Featured articles:
 {% for review in featured_reviews %}
-{{ review.article.get_title|insert_linebreaks:80 }}
+{{ review.article.get_title|insert_linebreaks:76 }}
 Reviewed by {{ review.author }}
-Original article in "{{ review.article.journal|safe }}" at:
+Original article in "{{ review.article.journal }}" at:
 {{ review.article.url }}
 
-{{ review.get_longer_truncated_body|insert_linebreaks:80 }}
+{{ review.get_longer_truncated_body|insert_linebreaks:76 }}
 
 Read more at:
 {{ domain }}{{ review.get_absolute_url }}
@@ -30,9 +31,9 @@ Read more at:
 {% endfor %}
 Other reviews include:
 {% for review in non_featured_reviews %}
-{{ review.article.get_title|insert_linebreaks:80 }}
+{{ review.article.get_title|insert_linebreaks:76 }}
 Reviewed by {{ review.author }}
-Original article in "{{ review.article.journal|safe }}" at:
+Original article in "{{ review.article.journal }}" at:
 {{ review.article.url }}
 
 Read the review at:
@@ -46,10 +47,10 @@ Visit {{ domain }} to view all {{ newsletter.issue.reviews.all|length }} review{
 
 --------------------
 
-You are receiving this email because you subscribed at {{ domain }}
+You are receiving this email because you subscribed at:
+{{ domain }}
 using the email {{ subscriber.email }}
 
 You can unsubscribe at any time by visiting the following address:
-
 {{ subscriber.get_unsubscribe_link }}
 {% endautoescape %}
