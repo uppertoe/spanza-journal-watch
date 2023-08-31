@@ -8,10 +8,10 @@
             role="button"
             class="icon-link gap-1 icon-link-hover stretched-link"
             data-bs-toggle="modal"
-            data-bs-target="#{{ feature.slug }}Modal"
+            data-bs-target="#modal-{{ feature.slug }}"
             hx-get="{{ feature.get_absolute_url }}"
-            hx-indicator="#{{ feature.slug }}Indicator"
-            hx-target="#{{ feature.slug }}Container"
+            hx-indicator="#indicator-{{ feature.slug }}"
+            hx-target="#container-{{ feature.slug }}"
             >Continue reading
             <svg class="bi"><use xlink:href="#chevron-right"/></svg>
             </a>

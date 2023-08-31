@@ -17,10 +17,10 @@
                                     type="button"
                                     class="btn btn-sm btn-outline-secondary"
                                     data-bs-toggle="modal"
-                                    data-bs-target="#{{ review.slug }}Modal"
+                                    data-bs-target="#modal-{{ review.slug }}"
                                     hx-get="{{ review.get_absolute_url }}"
-                                    hx-indicator="#{{ review.slug }}Indicator"
-                                    hx-target="#{{ review.slug }}Container"
+                                    hx-indicator="#indicator-{{ review.slug }}"
+                                    hx-target="#container-{{ review.slug }}"
                                     >Review</a>
                                     {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">View full text article</a>{% endif %}
                                 </div>
