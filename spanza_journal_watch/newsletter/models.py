@@ -40,10 +40,10 @@ class ElementImage(models.Model):
     @classmethod
     def _get_unique_image_url(cls, type):
         try:
-            instance = cls.objects.get(type=type).image.url
+            url = cls.objects.get(type=type).image.url
         except cls.DoesNotExist:  # Still raises MultipleObjectsReturned
-            instance = None
-        return instance
+            url = None
+        return url
 
     @classmethod
     def get_up_chevron_url(cls):
