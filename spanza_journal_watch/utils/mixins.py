@@ -2,6 +2,7 @@ from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
+from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Hit, Issue, Tag
 
 
@@ -35,13 +36,21 @@ class HitMixin:
 
     def get_object(self, **kwargs):
         obj = super().get_object(**kwargs)
+
+        # All views recorded in PageView
+        PageView.record_view(obj)
+
+        # Only unique hits recorded
         model_class = str(obj.__class__.__name__).lower()
         model_str = f"model_{model_class}_viewed"
         viewed_objects = self.request.session.get(model_str, [])
+
         if obj.id not in viewed_objects:
             Hit.update_page_count(obj)
             viewed_objects.append(obj.id)
+
         self.request.session[model_str] = viewed_objects
+
         return obj
 
 

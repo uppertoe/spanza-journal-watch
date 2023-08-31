@@ -1,9 +1,11 @@
 from django.contrib.staticfiles import finders
+from django.core.exceptions import MultipleObjectsReturned
 from django.http import HttpResponse
 from django.shortcuts import redirect
 
-from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
+from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen, PageView
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
+from spanza_journal_watch.submissions.models import Review
 
 
 def _get_newsletter(token):
@@ -54,3 +56,14 @@ def track_email_link(request, newsletter_token):
         tracker.save()
 
     return redirect(next)
+
+
+def page_view(request, model=None, slug=None):
+    if model == "review":
+        try:
+            review = Review.objects.get(slug=slug)
+            PageView.record_view(review)
+        except (Review.DoesNotExist, MultipleObjectsReturned) as e:
+            print(e)
+
+    return HttpResponse("")

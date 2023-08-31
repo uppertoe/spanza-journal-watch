@@ -1,5 +1,6 @@
 from django.views.generic import DetailView, ListView
 
+from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Review
 from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
 
@@ -21,6 +22,8 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
     def get_queryset(self):
         homepage = Homepage.get_current_homepage()
+        PageView.record_view(homepage)
+
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)
             .select_related(

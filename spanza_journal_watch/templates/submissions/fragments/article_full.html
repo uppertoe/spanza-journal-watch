@@ -14,6 +14,8 @@
     <p class="text-break">{{ review.body|wrapchars|safe|linebreaks }}</p>
     <p class="mb-3"><a href="#top">Back to top</a></p>
     </article>
-
+    <div
+    hx-get="/analytics/page/review/{{ review.slug }}"
+    hx-trigger="revealed"></div>
 {% endfor %}
 </div>

@@ -69,6 +69,14 @@ class PageView(models.Model):
     def get_page_views(cls, content_type, object_id):
         return cls.objects.filter(content_type=content_type, object_id=object_id)
 
+    @classmethod
+    def record_view(cls, object):
+        content_type = ContentType.objects.get_for_model(object)
+        id = object.id
+
+        view = cls(content_type=content_type, object_id=id)
+        view.save()
+
     def __str__(self):
         datetime = self.timestamp.strftime("%d/%m/%Y, %H:%M:%S")
         return f"{str(self.content_object)}: {datetime}"
