@@ -25,7 +25,7 @@
     <!-- Company Header -->
     <mj-section background-color="#f0f0f0">
       <mj-column>
-        <mj-image width="300px" src="{{ image_domain }}{{ element.get_heading_url }}" href="{{ tracker|safe }}/" alt="Journal Watch" />
+        <mj-image width="300px" src="{{ image_domain }}{{ element.get_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
       </mj-column>
     </mj-section>
 
@@ -37,7 +37,7 @@
           <div class="stroke">{{ newsletter.issue }}</div>
         </mj-text>
 
-        <mj-button background-color="#ec7800" href="{{ tracker|safe }}/">
+        <mj-button background-color="#ec7800" href="{{ tracker }}/">
           journalwatch.org.au
         </mj-button>
 
@@ -53,7 +53,7 @@
 
         <mj-text color="#525252" font-size="16px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif">{{ newsletter.content|linebreaks }}</mj-text>
 
-        <mj-button background-color="#152b3b" href="{{ tracker|safe }}{{ newsletter.issue.get_absolute_url }}">Read this issue</mj-button>
+        <mj-button background-color="#152b3b" href="{{ tracker }}{{ newsletter.issue.get_absolute_url }}">Read this issue</mj-button>
 
       </mj-column>
     </mj-section>
@@ -63,19 +63,19 @@
 
       <!-- Left image -->
       <mj-column width="30%">
-        <mj-image width="200px" src="{{ image_domain }}{{ review.feature_image.url }}" href="{{ tracker|safe }}{{ review.get_absolute_url }}" alt="Article image" />
+        <mj-image width="200px" src="{{ image_domain }}{{ review.feature_image.url }}" href="{{ tracker }}{{ review.get_absolute_url }}" alt="Article image" />
       </mj-column>
 
       <!-- right paragraph -->
       <mj-column width="70%">
         <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif" color="#626262">
-          <a href="{{ tracker|safe }}{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
+          <a href="{{ tracker }}{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
         </mj-text>
         <mj-text color="#525252" font-size="16px">
           <small>Reviewed by {{ review.author }}</small>
           <p>{{ review.get_truncated_body|linebreaks }}</p>
-          <small><a class="link-inherit-color" href="{{ tracker|safe }}{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></small>
-          <p><a class="italics bold link-nostyle" href="{{ tracker|safe }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
+          <small><a class="link-inherit-color" href="{{ tracker }}{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></small>
+          <p><a class="italics bold link-nostyle" href="{{ tracker }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
         </mj-text>
       </mj-column>
     </mj-section>
@@ -99,8 +99,8 @@
               <span style="line-height:20px">
                 <p>Reviewed by {{ review.author }}</p>
                 <p>{{ review.get_truncated_body|linebreaks }}</p>
-                <p><a class="link-inherit-color" href="{{ tracker|safe }}{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></p>
-                <p><a class="italics bold link-nostyle" href="{{ tracker|safe }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
+                <p><a class="link-inherit-color" href="{{ tracker }}{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></p>
+                <p><a class="italics bold link-nostyle" href="{{ tracker }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
               </span>
             </mj-accordion-text>
           </mj-accordion-element>
@@ -112,13 +112,13 @@
 
     <mj-section>
     	<mj-column>
-        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif" color="#626262"><a href="{{ tracker|safe }}{{ newsletter.issue.get_absolute_url }}" class="link-inherit-color">Visit the Journal Watch website</a> to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue</mj-text>
+        <mj-text font-style="italic" font-size="20px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif" color="#626262"><a href="{{ tracker }}{{ newsletter.issue.get_absolute_url }}" class="link-inherit-color">Visit the Journal Watch website</a> to view all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue</mj-text>
       </mj-column>
     </mj-section>
     <!-- Icons -->
     <mj-section background-color="#fbfbfb">
       <mj-column>
-        <mj-image width="200px" src="{{ image_domain }}{{ element.get_logo_url }}" href="{{ tracker|safe }}https://www.spanza.org.au/" alt="SPANZA logo" />
+        <mj-image width="200px" src="{{ image_domain }}{{ element.get_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
       </mj-column>
     </mj-section>
 
@@ -126,7 +126,7 @@
     <mj-section background-color="#152b3b" padding="0">
       <mj-column>
         <mj-text color="#fff" font-size="10px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif">
-          <p>You are receiving this email after subscribing to <a href="{{ tracker|safe }}/" class="link-inherit-color">journalwatch.org.au</a> using the email <a href="mailto:{{ subscriber.email }}" class="link-inherit-color">{{ subscriber.email }}</a></p>
+          <p>You are receiving this email after subscribing to <a href="{{ tracker }}/" class="link-inherit-color">journalwatch.org.au</a> using the email <a href="mailto:{{ subscriber.email }}" class="link-inherit-color">{{ subscriber.email }}</a></p>
           <p><a href="{{ subscriber.get_unsubscribe_link }}" class="link-inherit-color">Unsubscribe in a single click by following this link</a></p>
         </mj-text>
       </mj-column>
