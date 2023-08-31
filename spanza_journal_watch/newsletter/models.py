@@ -19,11 +19,13 @@ class ElementImage(models.Model):
     UPCHEVRON = "UP"
     DOWNCHEVRON = "DN"
     LOGO = "LO"
+    HEADING = "HE"
     OTHER = "OT"
     CHOICES = [
         (UPCHEVRON, "Up chevron"),
         (DOWNCHEVRON, "Down chevron"),
         (LOGO, "Logo"),
+        (HEADING, "Heading"),
         (OTHER, "Other"),
     ]
     name = models.CharField(max_length=255)
@@ -51,6 +53,14 @@ class ElementImage(models.Model):
     def get_down_chevron_url(cls):
         return cls._get_unique_image_url(cls.DOWNCHEVRON)
 
+    @classmethod
+    def get_heading_url(cls):
+        return cls._get_unique_image_url(cls.HEADING)
+
+    @classmethod
+    def get_logo_url(cls):
+        return cls._get_unique_image_url(cls.LOGO)
+
     def save(self, *args, **kwargs):
         # Ensure only a single instance of each type is created
         if not self.pk:
@@ -63,25 +73,6 @@ class ElementImage(models.Model):
                 pass
 
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
-
-
-class Logo(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    image = models.ImageField(
-        upload_to=name_image,
-        blank=True,
-        null=True,
-    )
-    created = models.DateTimeField(auto_now_add=True)
-    modified = models.DateTimeField(auto_now=True)
-
-    @classmethod
-    def get_latest_logo(cls):
-        return cls.objects.order_by("-modified").first()
 
     def __str__(self):
         return self.name
@@ -167,7 +158,6 @@ class Newsletter(models.Model):
         null=True,
     )
     header_image_processed = models.BooleanField(default=False)
-    logo = models.ForeignKey(Logo, on_delete=models.SET_NULL, default=Logo.get_latest_logo, blank=True, null=True)
     non_featured_review_count = models.PositiveIntegerField(default=5, blank=True, null=True)
 
     # Get issue content
@@ -242,3 +232,6 @@ class Newsletter(models.Model):
 
         if not self.is_test_sent:
             send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=1)
+
+    def __str__(self):
+        return self.subject

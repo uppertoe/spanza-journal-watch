@@ -21,17 +21,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="newsletter",
-            name="logo",
-            field=models.ForeignKey(
-                blank=True,
-                default=spanza_journal_watch.newsletter.models.Logo.get_latest_logo,
-                null=True,
-                on_delete=django.db.models.deletion.SET_NULL,
-                to="newsletter.logo",
-            ),
-        ),
-        migrations.AddField(
-            model_name="newsletter",
             name="non_featured_review_count",
             field=models.PositiveIntegerField(blank=True, default=5, null=True),
         ),

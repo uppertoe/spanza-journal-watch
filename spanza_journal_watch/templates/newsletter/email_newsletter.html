@@ -2,13 +2,12 @@
 {% mjml %}
 <mjml>
   <mj-head>
-    <mj-font name="Fugaz One" href="https://fonts.googleapis.com/css?family=Fugaz%20One" />
     <mj-style inline="inline">
       .link-nostyle { color: inherit; text-decoration: none; }
       .italics { font-style: italic; }
       .bold { font-weight: bold; }
       .link-inherit-color { color: inherit; }
-      .stroke { color: #fff; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000; }
+      .stroke { text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000; }
     </mj-style>
         <mj-attributes>
       <mj-accordion border="none" padding="1px" />
@@ -26,9 +25,7 @@
     <!-- Company Header -->
     <mj-section background-color="#f0f0f0">
       <mj-column>
-        <mj-text align="center" font-family="Fugaz One, Helvetica Neue" font-size="40px" color="#152b3b">
-          Journal Watch
-        </mj-text>
+        <mj-image width="300px" src="{{ image_domain }}{{ element.get_heading_url }}" href="{{ domain }}" alt="Journal Watch" />
       </mj-column>
     </mj-section>
 
@@ -36,7 +33,7 @@
     <mj-section background-url="{{ image_domain }}{{ newsletter.header_image.url }}" background-size="cover" background-repeat="no-repeat">
 
       <mj-column width="600px">
-        <mj-text align="center" color="#fff" font-size="40px" font-family="Helvetica Neue">
+        <mj-text align="center" color="#ec7800" font-size="60px" font-family="Helvetica Neue" font-weight="bold">
           <div class="stroke">{{ newsletter.issue }}</div>
         </mj-text>
 
@@ -76,7 +73,7 @@
         </mj-text>
         <mj-text color="#525252">
           <small>Reviewed by {{ review.author }}</small>
-          <p>{{ review.get_truncated_body }}</p>
+          <p>{{ review.get_truncated_body|linebreaks }}</p>
           <small><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></small>
           <p><a class="italics bold link-nostyle" href="{{ domain }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
         </mj-text>
@@ -101,7 +98,7 @@
             <mj-accordion-text>
               <span style="line-height:20px">
                 <p>Reviewed by {{ review.author }}</p>
-                <p>{{ review.get_truncated_body }}</p>
+                <p>{{ review.get_truncated_body|linebreaks }}</p>
                 <p><a class="link-inherit-color" href="{{ review.article.url }}">Full text article</a> in <span class="italics">{{ review.article.journal }}</span></p>
                 <p><a class="italics bold link-nostyle" href="{{ domain }}{{ review.get_absolute_url }}">Continue reading &gt;</a></p>
               </span>
@@ -121,7 +118,7 @@
     <!-- Icons -->
     <mj-section background-color="#fbfbfb">
       <mj-column>
-        <mj-image width="200px" src="{{ image_domain }}{{ newsletter.logo.image.url }}" href="https://www.spanza.org.au/" alt="SPANZA logo" />
+        <mj-image width="200px" src="{{ image_domain }}{{ element.get_logo_url }}" href="https://www.spanza.org.au/" alt="SPANZA logo" />
       </mj-column>
     </mj-section>
 

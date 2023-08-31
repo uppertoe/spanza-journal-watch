@@ -10,22 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name="Logo",
-            fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("name", models.CharField(max_length=255)),
-                ("description", models.TextField(blank=True, null=True)),
-                (
-                    "image",
-                    models.ImageField(
-                        blank=True, null=True, upload_to=spanza_journal_watch.utils.modelmethods.name_image
-                    ),
-                ),
-                ("created", models.DateTimeField(auto_now_add=True)),
-                ("modified", models.DateTimeField(auto_now=True)),
-            ],
-        ),
         migrations.AddField(
             model_name="newsletter",
             name="header_image",

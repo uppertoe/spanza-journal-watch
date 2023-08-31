@@ -1,4 +1,5 @@
 {% load newsletter_filters %}
+{% autoescape off %}
 Unsubscribe: {{ subscriber.get_unsubscribe_link }}
 --------------------
 
@@ -51,3 +52,4 @@ using the email {{ subscriber.email }}
 You can unsubscribe at any time by visiting the following address:
 
 {{ subscriber.get_unsubscribe_link }}
+{% endautoescape %}

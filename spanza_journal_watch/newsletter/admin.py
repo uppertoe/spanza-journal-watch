@@ -13,11 +13,6 @@ class NewsletterAdmin(admin.ModelAdmin):
     list_display = ("subject", "ready_to_send", "is_sent")
 
 
-@admin.register(models.Logo)
-class LogoAdmin(admin.ModelAdmin):
-    list_display = ("name",)
-
-
 @admin.register(models.ElementImage)
 class ElementImageAdmin(admin.ModelAdmin):
     list_display = ("name", "type")

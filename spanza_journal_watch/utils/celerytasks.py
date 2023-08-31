@@ -46,7 +46,7 @@ def celery_resize_image(self, path, size=800):
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=20)
-def celery_resize_greyscale_contrast_image(self, path, size=900, aspect_ratio=21 / 9):
+def celery_resize_greyscale_contrast_image(self, path, size=600, aspect_ratio=21 / 9):
     try:
         # File may be local or remote (S3)
         with default_storage.open(path, mode="rb") as file:
