@@ -159,6 +159,11 @@ class Newsletter(models.Model):
     )
     header_image_processed = models.BooleanField(default=False)
     non_featured_review_count = models.PositiveIntegerField(default=5, blank=True, null=True)
+    email_token = models.CharField(max_length=64, default="", editable=False, unique=True)
+
+    def generate_email_token(self):
+        r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
+        return r_uuid.replace("=", "")
 
     # Get issue content
     def get_featured_reviews(self, count=2):
@@ -205,14 +210,23 @@ class Newsletter(models.Model):
     def generate_emails(self, subscribers):
         emails = []
         context = self.get_email_context()
+        token = self.email_token
+        from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
+
         for subscriber in subscribers:
             context["subscriber"] = subscriber
+            context["pixel"] = NewsletterOpen.render_tracking_pixel(subscriber.email, token)
+            context["tracker"] = NewsletterClick.generate_tracking_link(subscriber.email, token)
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
                 body=self.generate_txt_content(context),
                 to=[subscriber.email],
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
+
+            # Attach token
+            email.metadata = {"email_token": self.email_token, "type": "newsletter"}
+
             emails.append(email)
         return emails
 
@@ -224,6 +238,9 @@ class Newsletter(models.Model):
         pass
 
     def save(self, *args, **kwargs):
+        if not self.email_token:
+            self.email_token = self.generate_email_token()
+
         super().save(*args, **kwargs)
 
         if self.header_image and not self.header_image_processed:

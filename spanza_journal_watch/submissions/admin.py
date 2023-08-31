@@ -15,7 +15,7 @@ class AuthorAdmin(admin.ModelAdmin):
 
 @admin.register(models.Hit)
 class HitAdmin(admin.ModelAdmin):
-    list_display = ("content_object", "count")
+    list_display = ("content_object", "count", "last_accessed")
 
 
 class JournalAdmin(admin.ModelAdmin):

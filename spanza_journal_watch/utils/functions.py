@@ -1,7 +1,17 @@
 from html.parser import HTMLParser
 
 from django.apps import apps as django_apps
+from django.conf import settings
+from django.contrib.sites.models import Site
 from django.utils.html import strip_tags
+
+
+def get_domain_url():
+    if settings.DEBUG:
+        domain = "127.0.0.1:3000"
+        return f"http://{domain}"
+    domain = Site.objects.get_current().domain
+    return f"https://{domain}"
 
 
 def resize_to_max_dimension(width, height, target):
