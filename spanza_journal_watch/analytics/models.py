@@ -1,16 +1,17 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import MultipleObjectsReturned
 from django.db import models
 from django.template.loader import render_to_string
 
-from spanza_journal_watch.newsletter.models import Newsletter
+from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.utils.functions import get_domain_url
 
 
 class NewsletterOpen(models.Model):
-    email_address = models.EmailField(max_length=254)
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
 
     @staticmethod
     def render_tracking_pixel(email, token):
@@ -23,13 +24,13 @@ class NewsletterOpen(models.Model):
         return cls.objects.filter(newsletter=newsletter, timestamp__gte=start_timestamp, timestamp__lte=end_timestamp)
 
     def __str__(self):
-        return self.email_address
+        return str(self.subscriber)
 
 
 class NewsletterClick(models.Model):
-    email_address = models.EmailField(max_length=254)
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
 
     @staticmethod
     def generate_tracking_link(email, token):
@@ -43,7 +44,7 @@ class NewsletterClick(models.Model):
         return cls.objects.filter(newsletter=newsletter, timestamp__gte=start_timestamp, timestamp__lte=end_timestamp)
 
     def __str__(self):
-        return self.email_address
+        return str(self.subscriber)
 
 
 class PageView(models.Model):
@@ -51,6 +52,7 @@ class PageView(models.Model):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey("content_type", "object_id")
     timestamp = models.DateTimeField(auto_now_add=True)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
 
     class Meta:
         indexes = [
@@ -70,11 +72,18 @@ class PageView(models.Model):
         return cls.objects.filter(content_type=content_type, object_id=object_id)
 
     @classmethod
-    def record_view(cls, object):
+    def record_view(cls, object, subscriber_id=None):
         content_type = ContentType.objects.get_for_model(object)
         id = object.id
 
-        view = cls(content_type=content_type, object_id=id)
+        # Attempt to find a subscriber in the session
+        try:
+            subscriber = Subscriber.objects.get(id=subscriber_id)
+        except (Subscriber.DoesNotExist, MultipleObjectsReturned) as e:
+            subscriber = None
+            print(f"Unable to attach subscriber to pageview: {e} {subscriber_id}")
+
+        view = cls(content_type=content_type, object_id=id, subscriber=subscriber)
         view.save()
 
     def __str__(self):

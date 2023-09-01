@@ -53,6 +53,7 @@ def subscribe(request):
 
             # Set subscribed flag in session
             request.session["subscribed"] = True
+            request.session["subscriber_id"] = subscriber.pk
 
             # Send confirmation email
             send_confirmation_email.delay(subscriber.pk)

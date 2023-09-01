@@ -34,8 +34,11 @@ def track_email_open(request):
     subscriber = _get_subscriber(email)
 
     if newsletter and subscriber:
-        tracker = NewsletterOpen(email_address=subscriber.email, newsletter=newsletter)
+        tracker = NewsletterOpen(subscriber=subscriber, newsletter=newsletter)
         tracker.save()
+
+        # Identify the subscriber in the session
+        request.session["subscriber_id"] = subscriber.pk
 
     pixel_path = finders.find("images/tracking/pixel.png")
     with open(pixel_path, "rb") as f:
@@ -52,8 +55,11 @@ def track_email_link(request, newsletter_token):
     subscriber = _get_subscriber(email)
 
     if newsletter and subscriber:
-        tracker = NewsletterClick(email_address=subscriber.email, newsletter=newsletter)
+        tracker = NewsletterClick(subscriber=subscriber, newsletter=newsletter)
         tracker.save()
+
+        # Identify the subscriber in the session
+        request.session["subscriber_id"] = subscriber.pk
 
     return redirect(next)
 
@@ -62,7 +68,9 @@ def page_view(request, model=None, slug=None):
     if model == "review":
         try:
             review = Review.objects.get(slug=slug)
-            PageView.record_view(review)
+            subscriber_id = request.session.get("subscriber_id")
+            print(f"Here's the ID: {subscriber_id}")
+            PageView.record_view(review, subscriber_id)
         except (Review.DoesNotExist, MultipleObjectsReturned) as e:
             print(e)
 

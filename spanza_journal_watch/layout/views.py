@@ -22,7 +22,8 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
     def get_queryset(self):
         homepage = Homepage.get_current_homepage()
-        PageView.record_view(homepage)
+        subscriber_id = self.request.session.get("subscriber_id")
+        PageView.record_view(homepage, subscriber_id)
 
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)

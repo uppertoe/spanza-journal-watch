@@ -5,14 +5,14 @@ from . import models
 
 @admin.register(models.NewsletterOpen)
 class NewsletterOpenAdmin(admin.ModelAdmin):
-    list_display = ("email_address", "newsletter")
+    list_display = ("subscriber", "newsletter", "timestamp")
 
 
 @admin.register(models.NewsletterClick)
 class NewsletterClickAdmin(admin.ModelAdmin):
-    list_display = ("email_address", "newsletter")
+    list_display = ("subscriber", "newsletter", "timestamp")
 
 
 @admin.register(models.PageView)
 class PageViewAdmin(admin.ModelAdmin):
-    list_display = ("content_object", "timestamp")
+    list_display = ("subscriber", "content_object", "timestamp")

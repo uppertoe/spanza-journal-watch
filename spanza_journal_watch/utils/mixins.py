@@ -38,7 +38,8 @@ class HitMixin:
         obj = super().get_object(**kwargs)
 
         # All views recorded in PageView
-        PageView.record_view(obj)
+        subscriber_id = self.request.session.get("subscriber_id")
+        PageView.record_view(obj, subscriber_id)
 
         # Only unique hits recorded
         model_class = str(obj.__class__.__name__).lower()

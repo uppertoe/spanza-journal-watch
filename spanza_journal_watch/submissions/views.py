@@ -7,6 +7,7 @@ from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
+from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.layout.models import IssuePage, ReviewPage, SearchPage, TagPage
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
@@ -158,6 +159,13 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
 
     # Frontend options
     article_cols = 1
+
+    def get_object(self, queryset=None):
+        # Record page view
+        obj = super().get_object(queryset)
+        subscriber_id = self.request.session.get("subscriber_id")
+        PageView.record_view(obj, subscriber_id)
+        return obj
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
