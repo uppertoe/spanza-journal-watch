@@ -11,7 +11,7 @@ from spanza_journal_watch.utils.functions import get_domain_url
 class NewsletterOpen(models.Model):
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
-    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
 
     @staticmethod
     def render_tracking_pixel(email, token):
@@ -30,7 +30,7 @@ class NewsletterOpen(models.Model):
 class NewsletterClick(models.Model):
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
-    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
 
     @staticmethod
     def generate_tracking_link(email, token):
