@@ -2,24 +2,47 @@
 {% mjml %}
 <mjml>
   <mj-head>
-    <mj-font name="Fugaz One" href="https://fonts.googleapis.com/css?family=Fugaz%20One" />
+    <mj-style inline="inline">
+      .link-nostyle { color: inherit; text-decoration: none; }
+      .link-inherit-color { color: inherit; }
+    </mj-style>
   </mj-head>
   <mj-body>
+    <mj-section background-color="#152b3b" padding="0">
+      <mj-column>
+        <mj-button background-color="#ec7800" align="right" inner-padding="5px 20px" href="{{ subscriber.get_unsubscribe_link }}">Unsubscribe</mj-button>
+      </mj-column>
+    </mj-section>
     <mj-section>
       <mj-column>
-        <mj-text font-size="40px" font-family="Fugaz One" color="#152b3b" align="center">Journal Watch</mj-text>
-
+        <mj-image width="300px" src="{{ image_domain }}{{ element.get_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column>
         <mj-divider border-color="#152b3b"></mj-divider>
-
         <mj-text font-size="20px" color="#152b3b" font-family="helvetica">
           <p>Thank you for subscribing to SPANZA Journal Watch.</p>
           <p>You will receive updates with each issue of Journal Watch, which is published every two months.</p>
-          <p>You are receiving this email because you subscribed at <a href="https://journalwatch.org.au/">journalwatch.org.au</a> using the email {{ subscriber.email }}</p>
+          <p>You are receiving this email because you subscribed at <a href="{{ tracker }}/">journalwatch.org.au</a> using the email {{ subscriber.email }}</p>
           <p>You can unsubscribe at any time by visiting this link: <a href="{{ subscriber.get_unsubscribe_link}}">unsubscribe now</a></p>
           <p>Sincerely,</p>
           <p>The SPANZA Journal Watch team</p>
         </mj-text>
-
+      </mj-column>
+    </mj-section>
+    <!-- Icons -->
+    <mj-section background-color="#fbfbfb">
+      <mj-column>
+        <mj-image width="200px" src="{{ image_domain }}{{ element.get_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#152b3b" padding="0">
+      <mj-column>
+        <mj-text color="#fff" font-size="10px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif">
+          <p>You are receiving this email because you are a member of SPANZA, or after subscribing to <a href="{{ tracker }}/" class="link-inherit-color">journalwatch.org.au</a> using the email <a href="mailto:{{ subscriber.email }}" class="link-inherit-color">{{ subscriber.email }}</a></p>
+          <p><a href="{{ subscriber.get_unsubscribe_link }}" class="link-inherit-color">Unsubscribe in a single click by following this link</a></p>
+        </mj-text>
       </mj-column>
     </mj-section>
   </mj-body>

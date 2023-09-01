@@ -8,8 +8,10 @@ from django.db import models
 from django.template.loader import render_to_string
 from django.urls import reverse
 
+from spanza_journal_watch.analytics.utils import click_tracker
 from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
+from spanza_journal_watch.utils.functions import get_domain_url
 from spanza_journal_watch.utils.modelmethods import name_image
 
 from .tasks import send_newsletter
@@ -88,25 +90,41 @@ class Subscriber(models.Model):
     modified = models.DateTimeField(auto_now=True)
     unsubscribe_token = models.CharField(max_length=64, blank=True, null=True)
 
-    def generate_confirmation_email_html(self):
+    def get_email_context(self):
+        domain = get_domain_url()
+        image_domain = domain if settings.DEBUG else ""
+
+        context = {
+            "domain": domain,
+            "image_domain": image_domain,
+            "element": ElementImage,
+            "subscriber": self,
+            "tracker": click_tracker(self.email),
+        }
+
+        return context
+
+    @staticmethod
+    def generate_confirmation_email_html(context):
         template = "newsletter/email_confirmation.html"
-        context = {"subscriber": self}
         return render_to_string(template, context)
 
-    def generate_confirmation_email_txt(self):
+    @staticmethod
+    def generate_confirmation_email_txt(context):
         template = "newsletter/email_confirmation.txt"
-        context = {"subscriber": self}
         return render_to_string(template, context)
 
     def generate_confirmation_email(self):
-        body = self.generate_confirmation_email_txt()
+        context = self.get_email_context()
+        body = Subscriber.generate_confirmation_email_txt(context)
+        html = Subscriber.generate_confirmation_email_html(context)
 
         email = mail.EmailMultiAlternatives(
             subject="Journal Watch Subscription",
             body=body,
             to=[self.email],
         )
-        email.attach_alternative(self.generate_confirmation_email_html(), "text/html")
+        email.attach_alternative(html, "text/html")
         return email
 
     def generate_unsubscribe_token(self):

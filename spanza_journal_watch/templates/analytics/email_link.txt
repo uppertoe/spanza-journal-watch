@@ -1,1 +1,0 @@
-{{ domain }}{% url "analytics:track_email_link" token %}?email={{ email }}&next=

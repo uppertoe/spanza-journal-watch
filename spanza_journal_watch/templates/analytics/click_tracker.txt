@@ -1,0 +1,1 @@
+{{ domain }}{% url "analytics:track_email_click" %}?email={{ email }}&next=

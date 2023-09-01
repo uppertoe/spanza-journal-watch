@@ -36,7 +36,7 @@ class NewsletterClick(models.Model):
     def generate_tracking_link(email, token):
         """Redirects to the url immediately following this tag"""
         context = {"email": email, "token": token, "domain": get_domain_url()}
-        template = "analytics/email_link.txt"
+        template = "analytics/email_newsletter_link.txt"
         return render_to_string(template, context)
 
     @classmethod

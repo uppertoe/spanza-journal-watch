@@ -47,8 +47,8 @@ Visit {{ domain }} to view all {{ newsletter.issue.reviews.all|length }} review{
 
 --------------------
 
-You are receiving this email because you subscribed at:
-{{ domain }}
+You are receiving this email because you are a SPANZA member,
+or you subscribed at: {{ domain }}
 using the email {{ subscriber.email }}
 
 You can unsubscribe at any time by visiting the following address:

@@ -47,7 +47,7 @@ def track_email_open(request):
     return response
 
 
-def track_email_link(request, newsletter_token):
+def track_newsletter_link(request, newsletter_token):
     next = request.GET.get("next")
     email = request.GET.get("email")
 
@@ -75,3 +75,18 @@ def page_view(request, model=None, slug=None):
             print(e)
 
     return HttpResponse("")
+
+
+def track_email_click(request):
+    # Sets the session ID on following an email link
+    email = request.GET.get("email")
+    next = request.GET.get("next")
+
+    try:
+        subscriber = Subscriber.objects.get(email=email)
+        request.session["subscriber_id"] = subscriber.pk
+    except Subscriber.DoesNotExist:
+        subscriber = None
+        print(f"No subscriber by this email: {email}")
+
+    return redirect(next)
