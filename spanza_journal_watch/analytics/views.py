@@ -69,7 +69,6 @@ def page_view(request, model=None, slug=None):
         try:
             review = Review.objects.get(slug=slug)
             subscriber_id = request.session.get("subscriber_id")
-            print(f"Here's the ID: {subscriber_id}")
             PageView.record_view(review, subscriber_id)
         except (Review.DoesNotExist, MultipleObjectsReturned) as e:
             print(e)

@@ -16,3 +16,5 @@ class NewsletterClickAdmin(admin.ModelAdmin):
 @admin.register(models.PageView)
 class PageViewAdmin(admin.ModelAdmin):
     list_display = ("subscriber", "content_object", "timestamp")
+
+    empty_value_display = "-anonymous-"
