@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 
 from spanza_journal_watch.analytics.utils import click_tracker
+from spanza_journal_watch.backend.models import SubscriberCSV
 from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
 from spanza_journal_watch.utils.functions import get_domain_url
@@ -89,6 +90,9 @@ class Subscriber(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     unsubscribe_token = models.CharField(max_length=64, blank=True, null=True)
+    from_csv = models.ForeignKey(
+        SubscriberCSV, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Uploaded via CSV"
+    )
 
     def get_email_context(self):
         domain = get_domain_url()

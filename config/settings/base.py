@@ -97,6 +97,7 @@ LOCAL_APPS = [
     "spanza_journal_watch.layout.apps.LayoutConfig",
     "spanza_journal_watch.newsletter.apps.NewsletterConfig",
     "spanza_journal_watch.analytics.apps.AnalyticsConfig",
+    "spanza_journal_watch.backend.apps.BackendConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

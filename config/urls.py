@@ -19,6 +19,7 @@ urlpatterns = [
     path("feature/", include("spanza_journal_watch.layout.urls")),
     path("newsletter/", include("spanza_journal_watch.newsletter.urls")),
     path("analytics/", include("spanza_journal_watch.analytics.urls")),
+    path("backend/", include("spanza_journal_watch.backend.urls")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
