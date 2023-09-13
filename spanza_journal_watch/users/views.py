@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -8,10 +8,14 @@ from django.views.generic import DetailView, RedirectView, UpdateView
 User = get_user_model()
 
 
-class UserDetailView(LoginRequiredMixin, DetailView):
+class UserDetailView(UserPassesTestMixin, DetailView):
     model = User
     slug_field = "id"
     slug_url_kwarg = "id"
+    raise_exception = True
+
+    def test_func(self):
+        return self.request.user.id == self.get_object().id
 
 
 user_detail_view = UserDetailView.as_view()

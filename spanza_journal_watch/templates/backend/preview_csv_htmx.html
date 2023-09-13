@@ -1,0 +1,21 @@
+<div class="p-3">
+<table class="table">
+    <thead>
+        {% for header in preview.fieldnames %}
+        <th scope="col">{{ header }}</th>
+        {% endfor %}
+    </thead>
+    {% for row in preview %}
+    {% if forloop.counter < 6 %}
+    <tr>
+        {% for cell in row.values %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+    </tr>
+    {% endif %}
+    {% endfor %}
+</table>
+
+{% include "backend/edit_csv_header.html" %}
+
+</div>

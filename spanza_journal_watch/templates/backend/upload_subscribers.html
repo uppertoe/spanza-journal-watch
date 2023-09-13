@@ -1,0 +1,19 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+<form enctype="multipart/form-data" method="post" action="{% url "backend:upload_subscribers" %}">
+{% csrf_token %}
+{{ form|crispy }}
+{% if instance %}
+<p>File {{ instance.name }} successfully uploaded</p>
+<input type="submit" value="Re-upload">
+{% else %}
+<input type="submit" value="Submit">
+{% endif %}
+</form>
+
+{% block preview %}{% endblock preview %}
+
+{% endblock content %}

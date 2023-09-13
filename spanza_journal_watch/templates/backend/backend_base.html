@@ -1,0 +1,71 @@
+{% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}<!DOCTYPE html>
+{% get_current_language as LANGUAGE_CODE %}
+<html lang="{{ LANGUAGE_CODE }}">
+  <head><script src="{% static 'js/color-modes.js'%}"></script>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>{% block title %}Journal Watch{% endblock title %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Journal Watch - by the Society of Paediatric Anaesthesia in New Zealand and Australia">
+    <meta name="author" content="Eamonn Upperton">
+
+    <link rel="icon" href="{% static 'images/logo/square-brackets.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: light)">
+    <link rel="icon" href="{% static 'images/logo/square-brackets-white.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#152b3b">
+
+    {% block css %}
+    {% render_bundle 'project' 'css' %}
+    {% endblock %}
+    {% block javascript %}
+      <!-- Vendor dependencies bundled as one file -->
+      {% render_bundle 'vendors' 'js' attrs='defer' %}
+      <!-- place project specific Javascript in this file -->
+      {% render_bundle 'project' 'js' attrs='defer' %}
+    {% endblock javascript %}
+
+  </head>
+
+  <body>
+    <!-- Container for HTMX messages -->
+    {% include "fragments/messages.html" %}
+    <!-- /container -->
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg bg-body-tertiary">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="{% url "backend:dashboard" %}">Journal Watch Settings</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+            {% if request.user.is_authenticated %}
+            {% if request.user.is_staff %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'backend:dashboard' %} active{% endif %}" href="{% url "backend:dashboard" %}">Dashboard</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'backend:upload_subscribers' %} active{% endif %}" href="{% url "backend:upload_subscribers" %}">Upload Subscribers</a>
+              </li>
+              {% endif %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'account_logout' %} active{% endif %}" href="{% url "account_logout" %}">Log Out</a>
+              </li>
+              {% else %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'account_login' %} active{% endif %}" href="{% url "account_login" %}">Log In</a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+      </nav>
+
+    <!-- Main container -->
+    <main class="container p-3 col-md-6 offset-md-3">
+        {% block content %}{% endblock content %}
+    </main>
+
+  </body>
+
+</html>

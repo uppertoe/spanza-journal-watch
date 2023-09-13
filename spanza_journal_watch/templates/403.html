@@ -1,9 +1,18 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Forbidden (403){% endblock %}
 
 {% block content %}
-<h1>Forbidden (403)</h1>
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="p-3">
+            <img src="{% static "images/errors/exclamation-octagon.svg" %}" alt="Error 403" width="100px">
+        </div>
+        <h1>403 Forbidden</h1>
 
-<p>{% if exception %}{{ exception }}{% else %}You're not allowed to access this page.{% endif %}</p>
+        <p>Your login does not have permission to view this page</p>
+        <p>Contact your local Journal Watch coordinator if you need access to be arranged for you</p>
+    </div>
+</div>
 {% endblock content %}
