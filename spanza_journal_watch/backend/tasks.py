@@ -68,6 +68,9 @@ def get_celery_subscriber_form():
     return CelerySubscriberForm
 
 
+DELIMITERS = [",", ";", "\t", " "]
+
+
 @celery_app.task()
 def process_subscriber_csv(subscriber_csv_pk):
     # Prevent circular import
@@ -78,8 +81,18 @@ def process_subscriber_csv(subscriber_csv_pk):
 
     # Load the CSV
     with subscriber_csv.file.open() as file:
-        decoded_file = file.read().decode("UTF-8")
-        dialect = csv.Sniffer().sniff(decoded_file, [",", ";"])
+        decoded_file = file.read().decode("UTF-8-SIG")
+
+        try:
+            dialect = csv.Sniffer().sniff(decoded_file, DELIMITERS)
+        except csv.Error:
+            for delimiter in DELIMITERS:
+                if delimiter in decoded_file:
+                    raise ValidationError("Not a valid CSV file")
+            # No delimiter found; likely single-columm file
+            dialect = csv.excel
+
+        # Use user-supplied entry
         has_header = subscriber_csv.header
 
         io_string = io.StringIO(decoded_file)
@@ -92,8 +105,6 @@ def process_subscriber_csv(subscriber_csv_pk):
         records_added = 0
 
         for index, row in enumerate(document):
-            print(f"Index {index} - {row}")
-
             # Skip the header
             if index < start:
                 continue

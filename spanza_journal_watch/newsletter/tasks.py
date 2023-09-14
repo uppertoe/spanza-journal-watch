@@ -96,10 +96,10 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
     # Send emails for this batch of subscribers
     connection = mail.get_connection()
     messages = newsletter.generate_emails(subscribers)
-    connection.send_messages(messages)
+    successful = connection.send_messages(messages)
 
     if not test_email:
-        newsletter_queryset.update(emails_sent=F("emails_sent") + 1)
+        newsletter_queryset.update(emails_sent=F("emails_sent") + successful)
 
 
 @celery_app.task()

@@ -13,14 +13,27 @@ def csv_size(file):
         raise ValidationError({"file": "File too large. Size should not exceed 1 megabyte."})
 
 
+DELIMITERS = [",", ";", "\t", " "]
+
+
 def peek_csv(file, user_header=None):
     try:
-        decoded_file = file.read(1024).decode("UTF-8")
-        dialect = csv.Sniffer().sniff(decoded_file, [",", ";"])
-        has_header = csv.Sniffer().has_header(decoded_file)
-    except (csv.Error, UnicodeDecodeError) as error:
+        decoded_file = file.read(1024).decode("UTF-8-SIG")
+    except UnicodeDecodeError as error:
         print(f"Error handling uploaded CSV: {error}")
         raise ValidationError({"file": "Not a valid CSV file"})
+
+    try:
+        dialect = csv.Sniffer().sniff(decoded_file, DELIMITERS)
+    except csv.Error as error:
+        for delimiter in DELIMITERS:
+            if delimiter in decoded_file:
+                print(f"Error handling uploaded CSV: {error}")
+                raise ValidationError({"file": "Not a valid CSV file"})
+        # No delimiter found; likely single-column file
+        dialect = csv.excel
+
+    has_header = csv.Sniffer().has_header(decoded_file)
 
     # Determine column number and names
     delimiter = str(dialect.delimiter)
