@@ -7,7 +7,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render
 
-from .forms import HeaderForm, SubscriberCSVForm
+from .forms import HeaderForm, SubscriberCSVForm, peek_csv
 from .models import SubscriberCSV
 
 
@@ -48,7 +48,7 @@ def upload_subscriber_csv(request):
             context["preview"] = form.cleaned_data["preview"]
             context["header_form"] = HeaderForm(initial={"header": header})  # include a checkbox for header select
 
-            # Retain backward compatibility
+            # HTMX not yet implemented here
             if request.headers.get("HX-Request") == "true":
                 template = "backend/preview_csv_htmx.html"
             else:
@@ -73,24 +73,31 @@ def edit_csv_header(request, save_token):
     # Perform a lookup using the token
     try:
         subscriber_csv = SubscriberCSV.objects.get(save_token=save_token)
-    except (SubscriberCSV.DoesNotExist, MultipleObjectsReturned) as error:
+    except (SubscriberCSV.DoesNotExist, MultipleObjectsReturned):
         messages.error(request, "There was a problem updating this CSV. Please refresh the page and try again")
-        raise error
+        return render(request, "fragments/messages.html")
 
     if request.method == "POST":
         form = HeaderForm(request.POST)
 
         if form.is_valid():
             header = form.cleaned_data["header"]
+            print(f"here's the header: {header}")
             subscriber_csv.header = header
             subscriber_csv.save()
 
     else:
         form = HeaderForm(initial={"header": subscriber_csv.header})
 
-    context = {"header_form": form}
+    # Re-peek into the CSV
+    file = subscriber_csv.file.open()
+    peek = peek_csv(file, user_header=subscriber_csv.header)
+    file.close()
 
-    return render(request, "backend/edit_csv_header", context)
+    context = {"header_form": form, "instance": subscriber_csv}
+    context.update(peek)
+
+    return render(request, "backend/preview_csv_htmx.html", context)
 
 
 @login_required

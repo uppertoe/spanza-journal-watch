@@ -1,19 +1,27 @@
 {% extends "backend/backend_base.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block content %}
+<h1>Subscriber list</h1>
+<p>Add a CSV file containing a column with subscriber email addresses below</p>
+<p>Email addresses will be added to the subscriber database. Duplicates will not be added.</p>
 
 <form enctype="multipart/form-data" method="post" action="{% url "backend:upload_subscribers" %}">
 {% csrf_token %}
 {{ form|crispy }}
+<input type="submit" class="my-3 btn btn-outline-primary" value="Upload">
 {% if instance %}
-<p>File {{ instance.name }} successfully uploaded</p>
-<input type="submit" value="Re-upload">
-{% else %}
-<input type="submit" value="Submit">
+<p>File "{{ instance.name }}" successfully uploaded</p>
 {% endif %}
 </form>
 
+<div class="text-center">
+    <img id="csv-header-spinner" src="{% static "images/spinners/3-dots-move.svg" %}" alt="Loading" class="htmx-indicator" width="50px">
+</div>
+
+<div id="preview">
 {% block preview %}{% endblock preview %}
+</div>
 
 {% endblock content %}

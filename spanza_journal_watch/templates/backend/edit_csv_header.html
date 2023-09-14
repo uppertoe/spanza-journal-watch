@@ -1,2 +1,5 @@
 {% load crispy_forms_tags %}
+<form hx-post="{% url "backend:edit_csv_header" instance.save_token %}" hx-trigger="change" hx-target="#csv-table" hx-swap="outerHTML" hx-indicator="#csv-header-spinner">
+{% csrf_token %}
 {{ header_form|crispy }}
+</form>

@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from .models import SubscriberCSV
 
 
-def csv_size(file):  # add this to some file where you can import it from
+def csv_size(file):
     limit = 1 * 1024 * 1024
     if file.size > limit:
         raise ValidationError({"file": "File too large. Size should not exceed 1 megabyte."})
@@ -26,6 +26,7 @@ def peek_csv(file, user_header=None):
     delimiter = str(dialect.delimiter)
     fieldnames = decoded_file.split("\n")[0].split(delimiter)
 
+    # If user has selected header
     if user_header is not None:
         has_header = user_header
 
@@ -33,7 +34,7 @@ def peek_csv(file, user_header=None):
         column_count = len(fieldnames)
         fieldnames = []
         for i in range(column_count):
-            fieldnames.append(f"column {i+1}")
+            fieldnames.append(f"Column {i+1}")
     else:
         fieldnames = None  # Allow DictReader to use the first row as fieldnames
 
@@ -66,4 +67,4 @@ class SubscriberCSVForm(forms.ModelForm):
 
 
 class HeaderForm(forms.Form):
-    header = forms.BooleanField(label="The first row of this CSV is a column heading")
+    header = forms.BooleanField(label="The first row of this CSV is a column heading", required=False)

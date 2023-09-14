@@ -26,8 +26,7 @@ class SubscriberCSV(models.Model):
         return r_uuid.replace("=", "")
 
     def save(self, *args, **kwargs):
-        if not self.save_token:
-            self.save_token = self.generate_save_token()
+        self.save_token = self.generate_save_token()
         super().save(*args, **kwargs)
 
     def __str__(self):
