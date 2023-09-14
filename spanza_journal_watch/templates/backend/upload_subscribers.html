@@ -10,9 +10,9 @@
 <form enctype="multipart/form-data" method="post" action="{% url "backend:upload_subscribers" %}">
 {% csrf_token %}
 {{ form|crispy }}
-<input type="submit" class="my-3 btn btn-outline-primary" value="Upload">
+<input type="submit" class="my-2 btn btn-outline-primary" value="Upload">
 {% if instance %}
-<p>File "{{ instance.name }}" successfully uploaded</p>
+<p class="mt-2">File "{{ instance.name }}" successfully uploaded</p>
 {% endif %}
 </form>
 

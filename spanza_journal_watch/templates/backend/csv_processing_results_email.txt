@@ -1,0 +1,15 @@
+{% autoescape off %}
+Dear staff member,
+
+The results of the subscriber list added to the system are:
+
+Errors:{% for error in errors %}
+{{ error }}
+{% endfor %}
+
+Records added:
+{{ records_added }}
+
+Regards,
+Journal Watch admin
+{% endautoescape %}

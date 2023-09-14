@@ -16,4 +16,9 @@
         {% endif %}
         {% endfor %}
     </table>
+
+    <div id="process-csv" class="py-3">
+        <button class="btn btn-outline-primary" hx-get="{% url "backend:process_csv" instance.save_token %}" hx-target="#process-csv" hx-swap="outerHTML">Submit CSV for processing</button>
+    </div>
 </div>
+

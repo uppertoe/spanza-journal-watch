@@ -1,6 +1,3 @@
-import csv
-import io
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import MultipleObjectsReturned
@@ -9,24 +6,7 @@ from django.shortcuts import render
 
 from .forms import HeaderForm, SubscriberCSVForm, peek_csv
 from .models import SubscriberCSV
-
-
-def preview_csv(file, rows=5):
-    """
-    Takes a CSV file and parses it using csv Sniffer and reader
-    Returns a dictionary with a preview and row-count
-    """
-    with file.open() as file:
-        decoded_file = file.read(1024).decode("UTF-8")
-
-        # Get file properties
-        dialect = csv.Sniffer().sniff(decoded_file, [",", ";"])
-        has_header = csv.Sniffer().has_header(decoded_file)
-
-        io_string = io.StringIO(decoded_file)
-        preview = csv.reader(io_string, dialect=dialect)
-
-        return {"preview": preview, "has_header": has_header}
+from .tasks import process_subscriber_csv
 
 
 @login_required
@@ -102,11 +82,38 @@ def edit_csv_header(request, save_token):
 
 @login_required
 @permission_required("backend.manage_subscriber_csv", raise_exception=True)  # Prevents login loop
-def process_csv(request):
-    pass
+def process_csv(request, save_token):
+    """
+    Accessing this endpoint sets the subscriber_csv.confirmed to True
+    Saving the object then sends the task to Celery for processing
+
+    Requires a subscriber_csv.save_token
+    """
+    # Requires HTMX
+    if not request.headers.get("HX-Request") == "true":
+        return HttpResponseBadRequest("Bad Request - HTMX only")
+
+    # Perform a lookup using the token
+    try:
+        subscriber_csv = SubscriberCSV.objects.get(save_token=save_token)
+    except (SubscriberCSV.DoesNotExist, MultipleObjectsReturned):
+        messages.error(request, "There was a problem updating this CSV. Please refresh the page and try again")
+        return render(request, "fragments/messages.html")
+
+    subscriber_csv.confirmed = True
+    subscriber_csv.save()
+
+    # Send the task to Celery
+    if subscriber_csv.is_ready_to_process:
+        process_subscriber_csv.apply_async((subscriber_csv.pk,), countdown=1)
+
+    # Messages included in the template fragment
+    messages.success(request, "CSV successfully sent for processing")
+
+    return render(request, "backend/process_csv_success.html")
 
 
 @login_required
 @permission_required("backend.manage_subscriber_csv", raise_exception=True)  # Prevents login loop
 def dashboard(request):
-    pass
+    return render(request, "backend/dashboard.html")

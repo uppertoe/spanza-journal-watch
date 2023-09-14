@@ -1,0 +1,18 @@
+<div class="py-3">
+    <button class="btn btn-outline-primary disabled">Submit CSV for processing</button>
+</div>
+
+{% include "fragments/messages.html" %}
+
+<script defer>
+function disableForms() {
+    let forms = document.querySelectorAll("form");
+    forms.forEach(form => {
+        let elements = form.elements;
+        for (let i = 0; i < elements.length; i++) {
+            elements[i].disabled = true;
+        }
+    });
+}
+disableForms();
+</script>
