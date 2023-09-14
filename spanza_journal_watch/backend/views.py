@@ -4,6 +4,9 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render
 
+from spanza_journal_watch.newsletter.models import Newsletter
+from spanza_journal_watch.newsletter.tasks import send_newsletter
+
 from .forms import HeaderForm, SubscriberCSVForm, peek_csv
 from .models import SubscriberCSV
 from .tasks import process_subscriber_csv
@@ -117,3 +120,29 @@ def process_csv(request, save_token):
 @permission_required("backend.manage_subscriber_csv", raise_exception=True)  # Prevents login loop
 def dashboard(request):
     return render(request, "backend/dashboard.html")
+
+
+@login_required
+@permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
+def final_newsletter(request, send_token):
+    # Provides last check before sending
+    return render(request, "backend/final_newsletter.html", {"send_token": send_token})
+
+
+@login_required
+@permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
+def send_final_newsletter(request, send_token):
+    try:
+        newsletter = Newsletter.objects.get(send_token=send_token)
+        if newsletter.is_ready_to_send():
+            # Celery task also checks is_ready_to_send
+            send_newsletter.apply_async((newsletter.pk,), {"test_email": False}, countdown=1)
+            messages.success(request, f"Newsletter {newsletter} queued for sending")
+        else:
+            messages.error(request, f"Newsletter {newsletter} not sent: not ready")
+
+    except Newsletter.DoesNotExist:
+        messages.error(request, "This token is no longer valid. Please re-send a test newsletter")
+        newsletter = {}
+
+    return render(request, "backend/send_final_newsletter.html", {"newsletter": newsletter})

@@ -1,0 +1,14 @@
+Dear staff member,
+
+A SPANZA Journal Watch newsletter has been successfully sent out to subscribers.
+
+Details below:
+
+Newsletter: {{ newsletter }}
+Subscribers: {{ subscriber_count }}
+Successful emails sent: {{ newsletter.emails_sent }}
+Number of send batches: {{ batch_count }}
+
+Regards,
+
+Journal Watch admin

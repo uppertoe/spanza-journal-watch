@@ -1,0 +1,17 @@
+Dear staff member,
+
+This email contains a link used to send the newsletter to all Journal Watch subscribers.
+The newsletter to be sent out is:
+
+{{ newsletter }}
+
+You will have received a test copy of this newsletter along with this email.
+To send this newsletter to the wider group, use the following link:
+
+{{ domain }}{% url "backend:final_newsletter" send_token %}
+
+This link will expire if the newsletter is edited. To get a new link, send another test newsletter email.
+
+Regards,
+
+Journal Watch admin

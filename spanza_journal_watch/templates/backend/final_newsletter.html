@@ -1,0 +1,7 @@
+{% extends "backend/backend_base.html" %}
+{% block content %}
+<h1>Double check</h1>
+<p>Are you sure you're ready to send the newsletter?</p>
+<p>Use the following button to confirm</p>
+<a href="{% url "backend:send_final_newsletter" send_token %}" class="btn btn-outline-danger my-3">Send Newsletter</a>
+{% endblock content %}

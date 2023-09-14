@@ -1,0 +1,10 @@
+{% extends "backend/backend_base.html" %}
+{% block content %}
+<h1>Newsletter send</h1>
+<p>Visiting this page sends the associated newsletter to all subscribers</p>
+{% if newsletter %}
+<p>The currently selected newsletter is: {{ newsletter }}</p>
+{% else %}
+<p>There is no newsletter associated with this link</p>
+{% endif %}
+{% endblock content %}

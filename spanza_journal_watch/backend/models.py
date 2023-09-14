@@ -19,7 +19,10 @@ class SubscriberCSV(models.Model):
     header = models.BooleanField(default=False)
 
     class Meta:
-        permissions = [("manage_subscriber_csv", "Can create and edit CSV subscriber lists")]
+        permissions = [
+            ("manage_subscriber_csv", "Can create and edit CSV subscriber lists"),
+            ("send_newsletters", "Can send out newsletters to all subscribers"),
+        ]
 
     def generate_save_token(self):
         r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
