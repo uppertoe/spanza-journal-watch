@@ -188,6 +188,11 @@ class Newsletter(models.Model):
     send_token = models.CharField(max_length=64, default="", editable=False, unique=True)
     emails_sent = models.PositiveIntegerField(default=0, editable=False)
 
+    # Newsletter stats
+    def get_stats_absolute_url(self):
+        return reverse("backend:newsletter_stats_detail", kwargs={"pk": self.pk})
+
+    # Setup token
     def generate_email_token(self):
         r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
         return r_uuid.replace("=", "")

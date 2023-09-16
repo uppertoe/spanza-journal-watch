@@ -2,8 +2,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import MultipleObjectsReturned
 from django.http import HttpResponseBadRequest
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 
+from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter
 from spanza_journal_watch.newsletter.tasks import send_newsletter
 
@@ -146,3 +147,41 @@ def send_final_newsletter(request, send_token):
         newsletter = {}
 
     return render(request, "backend/send_final_newsletter.html", {"newsletter": newsletter})
+
+
+@login_required
+@permission_required("backend.view_newsletter_stats", raise_exception=True)  # Prevents login loop
+def newsletter_stats_list(request):
+    newsletters = Newsletter.objects.filter(is_sent=True)
+    context = {"newsletters": newsletters}
+    template = "backend/newsletter_stats_list.html"
+    return render(request, template, context)
+
+
+@login_required
+@permission_required("backend.view_newsletter_stats", raise_exception=True)  # Prevents login loop
+def newsletter_stats_detail(request, pk):
+    newsletter = get_object_or_404(Newsletter, pk=pk)
+
+    subscriber_opens = NewsletterOpen.objects.filter(newsletter=newsletter).values("subscriber")
+    total_opens = subscriber_opens.count()
+    opens = subscriber_opens.distinct().count()
+
+    subscriber_clicks = NewsletterClick.objects.filter(newsletter=newsletter).values("subscriber")
+    total_clicks = subscriber_clicks.count()
+    clicks = subscriber_clicks.distinct().count()
+
+    percentage = f"{str(round(clicks/opens*100))}%" if opens else "0"
+
+    context = {
+        "newsletter": newsletter,
+        "total_opens": total_opens,
+        "opens": opens,
+        "total_clicks": total_clicks,
+        "clicks": clicks,
+        "percentage": percentage,
+    }
+
+    template = "backend/newsletter_stats_detail.html"
+
+    return render(request, template, context)

@@ -1,0 +1,13 @@
+{% extends "backend/backend_base.html" %}
+{% block content %}
+<h1>Newsletter stats</h1>
+
+<h5>Newsletter:</h5>
+<p>{{ newsletter }}</p>
+<h5>Distinct opens (total):</h5>
+<p>{{ opens }} ({{ total_opens }})</p>
+<h5>Distinct clicks (total):</h5>
+<p>{{ clicks }} ({{ total_clicks }})</p>
+<h5>Percentage of opened emails with clicks:</h5>
+<p>{{ percentage }}</p>
+{% endblock content %}

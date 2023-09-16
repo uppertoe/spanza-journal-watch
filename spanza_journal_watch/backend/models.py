@@ -22,6 +22,7 @@ class SubscriberCSV(models.Model):
         permissions = [
             ("manage_subscriber_csv", "Can create and edit CSV subscriber lists"),
             ("send_newsletters", "Can send out newsletters to all subscribers"),
+            ("view_newesletter_stats", "Can view newsletter open and click statistics"),
         ]
 
     def generate_save_token(self):

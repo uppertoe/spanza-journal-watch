@@ -1,0 +1,8 @@
+{% extends "backend/backend_base.html" %}
+{% block content %}
+<h1>Newsletter statistics</h1>
+<h5>Sent newsletters:</h5>
+{% for newsletter in newsletters %}
+<p><a href="{{ newsletter.get_stats_absolute_url }}" class="text-decoration-none">{{ newsletter }}</a></p>
+{% endfor %}
+{% endblock content %}
