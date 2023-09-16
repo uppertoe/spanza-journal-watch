@@ -26,6 +26,7 @@ class SubscriberCSV(models.Model):
             ("send_newsletters", "Can send out newsletters to all subscribers"),
             ("view_newesletter_stats", "Can view newsletter open and click statistics"),
         ]
+        verbose_name = "Subscriber list CSV"
 
     def generate_save_token(self):
         r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
