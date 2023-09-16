@@ -1,7 +1,9 @@
 import base64
 import uuid
 
+from django.conf import settings
 from django.db import models
+from django.utils.html import escape, strip_tags
 
 from spanza_journal_watch.utils.modelmethods import name_csv
 
@@ -40,3 +42,34 @@ class SubscriberCSV(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class InboundEmail(models.Model):
+    sender = models.EmailField(null=True, blank=True)
+    recipient = models.EmailField(null=True, blank=True)
+    header_sender = models.CharField(max_length=255, null=True, blank=True)
+    header_recipients = models.TextField(null=True, blank=True)
+    subject = models.CharField(max_length=255, null=True, blank=True)
+    body = models.TextField(null=True, blank=True)
+    body_html = models.TextField(null=True, blank=True)
+    sent_timestamp = models.DateTimeField(null=True, blank=True)
+    attachments = models.BooleanField(default=False)
+    email_file = models.CharField(max_length=255, null=True, blank=True)
+
+    created = models.DateTimeField(auto_now_add=True)
+
+    def get_stripped_body_html(self):
+        return escape(strip_tags(self.body_html))
+
+    def get_raw_email(self):
+        if settings.DEBUG:
+            return self.email_file
+        else:
+            bucket = settings.AWS_STORAGE_BUCKET_NAME
+            region = settings.AWS_S3_REGION_NAME
+            prefix = settings.INBOUND_S3_OBJECT_PREFIX
+            return f"https://{bucket}.s3.{region}.amazonaws.com/{prefix}/{self.email_file}"
+
+    def __str__(self):
+        created = self.created.strftime("%m/%d/%Y, %H:%M:%S")
+        return f"Email from {self.sender} - received {created}"

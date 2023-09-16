@@ -126,6 +126,7 @@ class Subscriber(models.Model):
         email = mail.EmailMultiAlternatives(
             subject="Journal Watch Subscription",
             body=body,
+            from_email="SPANZA Journal Watch <subscribe@journalwatch.org.au>",
             to=[self.email],
         )
         email.attach_alternative(html, "text/html")
@@ -252,11 +253,12 @@ class Newsletter(models.Model):
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
                 body=self.generate_txt_content(context),
+                from_email="newsletter@journalwatch.org.au",
                 to=[subscriber.email],
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
 
-            # Attach token
+            # Attach token to identify instigating email for bounces/complaints
             email.metadata = {"email_token": self.email_token, "type": "newsletter"}
 
             emails.append(email)

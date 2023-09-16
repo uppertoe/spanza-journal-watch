@@ -88,7 +88,7 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
     from .models import Newsletter, Subscriber
 
     newsletter_queryset = Newsletter.objects.filter(pk=newsletter_pk)
-    newsletter = newsletter_queryset[0]
+    newsletter = newsletter_queryset.get()
 
     # Get subscribers queryset
     subscribers = Subscriber.objects.filter(pk__in=subscriber_pks)
@@ -107,23 +107,32 @@ def send_newsletter(newsletter_pk, test_email=True):
     # Get models
     from .models import Newsletter, Subscriber
 
+    # Get querysets
+    newsletter_queryset = Newsletter.objects.filter(pk=newsletter_pk)
+    newsletter = newsletter_queryset.get()  # Retain queryset to allow .update()
     subscribers = Subscriber.get_valid_subscribers(test_email=test_email)
 
-    newsletter_queryset = Newsletter.objects.filter(pk=newsletter_pk)
+    # Perform checks before sending
+    if test_email:
+        newsletter_queryset.update(is_test_sent=True)
+    elif newsletter.is_sent:
+        raise NewsletterNotReadyToSendError(
+            f"Newsletter {newsletter} already sent to {newsletter.emails_sent} recipients; sending aborted"
+        )
+    elif not newsletter.ready_to_send:
+        raise NewsletterNotReadyToSendError(f"Newsletter {newsletter} not marked ready to send")
+    else:
+        newsletter_queryset.update(is_sent=True)
 
     # Serialise queryset for Celery
     subscriber_pks = list(subscribers.values_list("pk", flat=True))
 
-    batch_count = 0
-
     # Send emails to each batch of subscribers
+    batch_count = 0
     for subscribers_batch in get_subscriber_batches(subscriber_pks, BATCH_SIZE):
         batch_pks = list(subscribers_batch.values_list("pk", flat=True))  # Ensure serialisable for Celery
         send_newsletter_batch.delay(newsletter_pk, batch_pks, test_email)
         batch_count += 1
-
-    # Mark as sent after all emails are processed
-    newsletter_queryset.update(is_test_sent=True) if test_email else newsletter_queryset.update(is_sent=True)
 
     if test_email:
         # Send the distribution link to the administrator

@@ -4,7 +4,7 @@ import io
 from django import forms
 from django.core.exceptions import ValidationError
 
-from .models import SubscriberCSV
+from .models import InboundEmail, SubscriberCSV
 
 
 def csv_size(file):
@@ -81,3 +81,26 @@ class SubscriberCSVForm(forms.ModelForm):
 
 class HeaderForm(forms.Form):
     header = forms.BooleanField(label="The first row of this CSV is a column heading", required=False)
+
+
+class InboundAnymailEmailForm(forms.ModelForm):
+    class Meta:
+        model = InboundEmail
+        fields = [
+            "sender",
+            "recipient",
+            "header_sender",
+            "header_recipients",
+            "subject",
+            "body",
+            "body_html",
+            "sent_timestamp",
+            "attachments",
+            "email_file",
+        ]
+
+    def clean_attachments(self):
+        return bool(self.cleaned_data["attachments"])
+
+    def clean_header_recipients(self):
+        return ", ".join(self.cleaned_data["header_recipients"])

@@ -97,7 +97,7 @@ MEDIA_URL = f"https://{aws_s3_domain}/media/"
 # https://docs.djangoproject.com/en/dev/ref/settings/#default-from-email
 DEFAULT_FROM_EMAIL = env(
     "DJANGO_DEFAULT_FROM_EMAIL",
-    default="SPANZA Journal Watch <noreply@journalwatch.org.au>",
+    default="SPANZA Journal Watch <admin@journalwatch.org.au>",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#server-email
 SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
@@ -126,6 +126,7 @@ ANYMAIL = {
     "AMAZON_SES_MESSAGE_TAG_NAME": "Email_ID",
     "AMAZON_SES_CONFIGURATION_SET_NAME": "TrackingConfigSet",
 }
+INBOUND_S3_OBJECT_PREFIX = env("DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX", default="")
 
 
 # LOGGING
