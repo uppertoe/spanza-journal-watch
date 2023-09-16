@@ -14,7 +14,7 @@ if not settings.DEBUG:  # Anymail only available in production
             "sender": message.envelope_sender,
             "recipient": message.envelope_recipient,
             "header_sender": message.from_email,
-            "header_recipients": message.to_email,
+            "header_recipients": message.to,
             "subject": message.subject,
             "body": message.text,
             "body_html": message.html,
