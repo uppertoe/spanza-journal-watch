@@ -101,6 +101,3 @@ class InboundAnymailEmailForm(forms.ModelForm):
 
     def clean_attachments(self):
         return bool(self.cleaned_data["attachments"])
-
-    def clean_header_recipients(self):
-        return ", ".join(self.cleaned_data["header_recipients"])

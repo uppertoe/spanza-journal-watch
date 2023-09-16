@@ -9,12 +9,13 @@ if not settings.DEBUG:  # Anymail only available in production
     @receiver(inbound)  # add weak=False if inside some other function/class
     def handle_inbound_email(sender, event, esp_name, **kwargs):
         message = event.message
+        recipients = ", ".join(message.to)
 
         email = {
             "sender": message.envelope_sender,
             "recipient": message.envelope_recipient,
             "header_sender": message.from_email,
-            "header_recipients": message.to,
+            "header_recipients": recipients,
             "subject": message.subject,
             "body": message.text,
             "body_html": message.html,
