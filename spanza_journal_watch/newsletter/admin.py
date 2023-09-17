@@ -6,6 +6,7 @@ from . import models
 @admin.register(models.Subscriber)
 class SubscriberAdmin(admin.ModelAdmin):
     list_display = ("email", "subscribed", "bounced", "complained")
+    list_filter = ("subscribed", "bounced", "complained")
 
 
 @admin.register(models.Newsletter)

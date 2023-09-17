@@ -6,11 +6,13 @@ from . import models
 @admin.register(models.NewsletterOpen)
 class NewsletterOpenAdmin(admin.ModelAdmin):
     list_display = ("subscriber", "newsletter", "timestamp")
+    list_filter = ("newsletter",)
 
 
 @admin.register(models.NewsletterClick)
 class NewsletterClickAdmin(admin.ModelAdmin):
     list_display = ("subscriber", "newsletter", "timestamp")
+    list_filter = ("newsletter",)
 
 
 @admin.register(models.PageView)
