@@ -171,15 +171,18 @@ def newsletter_stats_detail(request, pk):
     total_clicks = subscriber_clicks.count()
     clicks = subscriber_clicks.distinct().count()
 
-    percentage = f"{str(round(clicks/opens*100))}%" if opens else "0"
+    open_rate = f"{str(round(opens/newsletter.emails_sent*100))}%" if newsletter.emails_sent else "0"
+    click_through_rate = f"{str(round(clicks/opens*100))}%" if opens else "0"
 
     context = {
         "newsletter": newsletter,
+        "newsletters_sent": newsletter.emails_sent,
         "total_opens": total_opens,
         "opens": opens,
         "total_clicks": total_clicks,
         "clicks": clicks,
-        "percentage": percentage,
+        "open_rate": open_rate,
+        "click_through_rate": click_through_rate,
     }
 
     template = "backend/newsletter_stats_detail.html"

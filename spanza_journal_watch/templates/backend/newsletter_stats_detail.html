@@ -4,10 +4,14 @@
 
 <h5>Newsletter:</h5>
 <p>{{ newsletter }}</p>
-<h5>Distinct opens (total):</h5>
+<h5>Emails sent:</h5>
+<p>{{ newsletters_sent }}</p>
+<h5>Distinct (total) emails opened:</h5>
 <p>{{ opens }} ({{ total_opens }})</p>
-<h5>Distinct clicks (total):</h5>
+<h5>Email open rate:</h5>
+<p>{{ open_rate }}</p>
+<h5>Distinct (total) links clicked:</h5>
 <p>{{ clicks }} ({{ total_clicks }})</p>
-<h5>Percentage of opened emails with clicks:</h5>
-<p>{{ percentage }}</p>
+<h5>Click-through rate</h5>
+<p>{{ click_through_rate }}</p>
 {% endblock content %}
