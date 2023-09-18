@@ -122,12 +122,16 @@ class Subscriber(models.Model):
         context = self.get_email_context()
         body = Subscriber.generate_confirmation_email_txt(context)
         html = Subscriber.generate_confirmation_email_html(context)
+        unsubscribe_header = self.get_unsubscribe_link()
 
         email = mail.EmailMultiAlternatives(
             subject="Journal Watch Subscription",
             body=body,
             from_email="SPANZA Journal Watch <subscribe@journalwatch.org.au>",
             to=[self.email],
+            headers={
+                "List-Unsubscribe": unsubscribe_header,
+            },
         )
         email.attach_alternative(html, "text/html")
         return email
