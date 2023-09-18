@@ -16,16 +16,16 @@ def _get_subscriber(email):
 def handle_bounce(event):
     # Soft bounces are not removed from mailing list
     bounce_type, bounce_subtype = event.description.strip().lower().split(":", 1)
-    if bounce_type == "transient":
+    if not bounce_type == "permanent":  # May be transient or undetermined
         return print(f"Transient bounce for email {event.recipient} (subtype {bounce_subtype}); kept on mailing list")
 
     subscriber = _get_subscriber(event.recipient)
     if subscriber:
         subscriber.bounced = True
         subscriber.save()
-        print(f"Email to {subscriber} bounced; removed from mailing list")
+        print(f"Email to {subscriber} bounced due to {bounce_subtype}; removed from mailing list")
     else:
-        print(f"No subscriber found for bounced email: {subscriber}")
+        print(f"No subscriber found for bounced ({bounce_subtype}) email: {subscriber}")
 
 
 def handle_complaint(event):
