@@ -250,11 +250,15 @@ class Newsletter(models.Model):
             context["subscriber"] = subscriber
             context["pixel"] = NewsletterOpen.render_tracking_pixel(subscriber.email, token)
             context["tracker"] = NewsletterClick.generate_tracking_link(subscriber.email, token)
+            unsubscribe_header = subscriber.get_unsubscribe_link()
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
                 body=self.generate_txt_content(context),
                 from_email="newsletter@journalwatch.org.au",
                 to=[subscriber.email],
+                headers={
+                    "List-Unsubscribe": unsubscribe_header,
+                },
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
 

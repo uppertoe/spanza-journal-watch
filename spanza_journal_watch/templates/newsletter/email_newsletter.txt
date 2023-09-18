@@ -1,16 +1,15 @@
 {% load newsletter_filters %}
 {% autoescape off %}
 Unsubscribe: {{ subscriber.get_unsubscribe_link }}
+
 --------------------
-
-Dear {{ subscriber.email }},
-
-Thank you for subscribing to SPANZA Journal Watch.
 
 The {{ newsletter.issue }} issue is now available at:
 {{ domain }}{{ newsletter.issue.get_absolute_url }}
 
-{{ newsletter.content_heading }}
+--------------------
+
+-- {{ newsletter.content_heading }} --
 {{ newsletter.content }}
 
 --------------------
