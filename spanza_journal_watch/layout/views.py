@@ -1,3 +1,7 @@
+from django.conf import settings
+from django.http import FileResponse, HttpRequest, HttpResponse
+from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_GET
 from django.views.generic import DetailView, ListView
 
 from spanza_journal_watch.analytics.models import PageView
@@ -55,3 +59,12 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
 class FeatureArticleDetailView(DetailView):
     model = FeatureArticle
+
+
+@require_GET
+@cache_control(max_age=60 * 60 * 24, immutable=True, public=True)  # one day
+def favicon_file(request: HttpRequest) -> HttpResponse:
+    """Serves favicons for various platforms"""
+    name = request.path.lstrip("/")
+    file = (settings.APPS_DIR / "static" / "images" / "favicon_package" / name).open("rb")
+    return FileResponse(file)

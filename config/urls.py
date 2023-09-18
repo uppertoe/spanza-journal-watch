@@ -16,7 +16,7 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
     path("", include("spanza_journal_watch.submissions.urls")),
-    path("feature/", include("spanza_journal_watch.layout.urls")),
+    path("", include("spanza_journal_watch.layout.urls")),
     path("newsletter/", include("spanza_journal_watch.newsletter.urls")),
     path("analytics/", include("spanza_journal_watch.analytics.urls")),
     path("backend/", include("spanza_journal_watch.backend.urls")),
