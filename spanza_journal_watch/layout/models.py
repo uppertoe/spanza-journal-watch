@@ -165,7 +165,7 @@ class ReviewSitemap(Sitemap):
     priority = 0.9
 
     def items(self):
-        return Review.objects.filter(active=True)
+        return Review.objects.filter(active=True).order_by("-created")
 
     def lastmod(self, obj):
         return obj.modified
@@ -176,7 +176,7 @@ class IssueSitemap(Sitemap):
     priority = 0.6
 
     def items(self):
-        return Issue.objects.filter(active=True)
+        return Issue.objects.filter(active=True).order_by("-created")
 
     def lastmod(self, obj):
         return obj.modified
@@ -187,7 +187,7 @@ class TagSitemap(Sitemap):
     priority = 0.7
 
     def items(self):
-        return Tag.objects.all()
+        return Tag.objects.all().order_by("text")
 
 
 class AuthorSitemap(Sitemap):
@@ -195,4 +195,4 @@ class AuthorSitemap(Sitemap):
     priority = 0.4
 
     def items(self):
-        return Author.objects.filter(anonymous=False)
+        return Author.objects.filter(anonymous=False).order_by("name")
