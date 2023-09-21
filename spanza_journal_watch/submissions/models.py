@@ -276,7 +276,7 @@ class Review(TimeStampedModel):
         # Perform an initial save
         super().save(*args, **kwargs)
 
-        if not self.publish_date:
+        if not self.publish_date and self.active:
             Review.objects.filter(pk=self.pk).update(publish_date=self.created)
 
         # Delegate resizing to Celery

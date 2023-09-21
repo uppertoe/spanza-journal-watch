@@ -1,8 +1,9 @@
+from django.contrib.sitemaps import Sitemap
 from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
 
-from spanza_journal_watch.submissions.models import Issue, Review
+from spanza_journal_watch.submissions.models import Author, Issue, Review, Tag
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import HTMLShortener, get_unique_slug
 from spanza_journal_watch.utils.modelmethods import name_image
@@ -153,3 +154,45 @@ class Gradient(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# Sitemaps
+# -----------
+
+
+class ReviewSitemap(Sitemap):
+    changefreq = "monthly"
+    priority = 0.9
+
+    def items(self):
+        return Review.objects.filter(active=True)
+
+    def lastmod(self, obj):
+        return obj.modified
+
+
+class IssueSitemap(Sitemap):
+    changefreq = "monthly"
+    priority = 0.6
+
+    def items(self):
+        return Issue.objects.filter(active=True)
+
+    def lastmod(self, obj):
+        return obj.modified
+
+
+class TagSitemap(Sitemap):
+    changefreq = "monthly"
+    priority = 0.7
+
+    def items(self):
+        return Tag.objects.all()
+
+
+class AuthorSitemap(Sitemap):
+    changefreq = "monthly"
+    priority = 0.4
+
+    def items(self):
+        return Author.objects.filter(anonymous=False)
