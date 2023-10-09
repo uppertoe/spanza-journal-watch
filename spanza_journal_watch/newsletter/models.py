@@ -258,7 +258,7 @@ class Newsletter(models.Model):
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
                 body=self.generate_txt_content(context),
-                from_email="newsletter@journalwatch.org.au",
+                from_email="SPANZA Journal Watch <newsletter@journalwatch.org.au>",
                 to=[subscriber.email],
                 headers={
                     "List-Unsubscribe": unsubscribe_header,
