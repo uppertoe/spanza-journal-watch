@@ -230,6 +230,7 @@ class Review(TimeStampedModel):
 
     search_vector = SearchVectorField(null=True, blank=True)
     title_similarity = 0.1
+    author_similarity = 0.1
     body_rank = 0.3
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
@@ -292,15 +293,17 @@ class Review(TimeStampedModel):
             cls.objects.exclude(active=False)
             .annotate(
                 title_similarity=TrigramSimilarity("article__name", query),
+                author_similarity=TrigramSimilarity("author__name", query),
                 rank=SearchRank("search_vector", SearchQuery(query)),
             )
             .filter(
                 Q(title_similarity__gt=cls.title_similarity)
                 | Q(rank__gte=cls.body_rank)
-                | Q(search_vector=SearchQuery(query))  # Exact matches
+                | Q(search_vector=SearchQuery(query))
+                | Q(author_similarity__gt=cls.author_similarity)  # Exact matches
             )
             .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter="...<br>..."))
-            .order_by("-title_similarity", "-rank", "-created")
+            .order_by("-title_similarity", "-rank", "-author_similarity", "-created")
             .select_related("article", "author")
         )
         return results
