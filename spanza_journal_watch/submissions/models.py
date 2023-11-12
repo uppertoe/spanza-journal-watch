@@ -230,7 +230,7 @@ class Review(TimeStampedModel):
 
     search_vector = SearchVectorField(null=True, blank=True)
     title_similarity = 0.1
-    author_similarity = 0.1
+    author_similarity = 0.3
     body_rank = 0.3
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
