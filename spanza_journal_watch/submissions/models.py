@@ -299,12 +299,12 @@ class Review(TimeStampedModel):
             .filter(
                 Q(title_similarity__gt=cls.title_similarity)
                 | Q(rank__gte=cls.body_rank)
-                | Q(search_vector=SearchQuery(query))
-                | Q(author_similarity__gt=cls.author_similarity)  # Exact matches
+                | Q(search_vector=SearchQuery(query))  # Exact matches
+                | Q(author_similarity__gt=cls.author_similarity)
             )
             .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter="...<br>..."))
             .order_by("-title_similarity", "-rank", "-author_similarity", "-created")
-            .select_related("article", "author")
+            .select_related("article__journal", "author")
         )
         return results
 
