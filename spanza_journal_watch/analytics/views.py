@@ -1,7 +1,9 @@
+from urllib.parse import urlparse
+
 from django.contrib.staticfiles import finders
 from django.core.exceptions import MultipleObjectsReturned
-from django.http import HttpResponse
-from django.shortcuts import redirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.urls import resolve
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen, PageView
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
@@ -26,9 +28,21 @@ def _get_subscriber(email):
     return subscriber
 
 
+def _get_next_url(request, next):
+    # Catch malformed URLs
+    response = HttpResponseRedirect(next)
+    view, args, kwargs = resolve(urlparse(next)[2])
+    kwargs["request"] = request
+    try:
+        view(*args, **kwargs)
+    except Http404:
+        return HttpResponseRedirect("/")
+    return response
+
+
 def track_email_open(request):
-    email = request.GET.get("email")
-    token = request.GET.get("token")
+    email = request.GET.get("email") or None
+    token = request.GET.get("token") or None
 
     newsletter = _get_newsletter(token)
     subscriber = _get_subscriber(email)
@@ -48,8 +62,8 @@ def track_email_open(request):
 
 
 def track_newsletter_link(request, newsletter_token):
-    next = request.GET.get("next")
-    email = request.GET.get("email")
+    next = request.GET.get("next") or "/"  # is a hardcoded URL
+    email = request.GET.get("email") or None
 
     newsletter = _get_newsletter(newsletter_token)
     subscriber = _get_subscriber(email)
@@ -61,7 +75,7 @@ def track_newsletter_link(request, newsletter_token):
         # Identify the subscriber in the session
         request.session["subscriber_id"] = subscriber.pk
 
-    return redirect(next)
+    return _get_next_url(request, next)
 
 
 def page_view(request, model=None, slug=None):
@@ -78,8 +92,8 @@ def page_view(request, model=None, slug=None):
 
 def track_email_click(request):
     # Sets the session ID on following an email link
-    email = request.GET.get("email")
-    next = request.GET.get("next")
+    email = request.GET.get("email") or None
+    next = request.GET.get("next") or "/"
 
     try:
         subscriber = Subscriber.objects.get(email=email)
@@ -88,4 +102,4 @@ def track_email_click(request):
         subscriber = None
         print(f"No subscriber by this email: {email}")
 
-    return redirect(next)
+    return _get_next_url(request, next)
