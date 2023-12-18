@@ -15,6 +15,17 @@ def success(request):
 def unsubscribe(request, unsubscribe_token):
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
+    except Subscriber.DoesNotExist:
+        messages.error(request, "Invalid unsubscribe link.")
+        return redirect("home")
+
+    context = {"unsubscribe_token": unsubscribe_token, "email": subscriber.email}
+    return render(request, "newsletter/unsubscribe.html", context)
+
+
+def confirm_unsubscribe(request, unsubscribe_token):
+    try:
+        subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
         subscriber.subscribed = False
         subscriber.save()
         messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")

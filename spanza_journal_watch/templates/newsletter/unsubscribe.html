@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="p-3">
+            <img src="{% static "images/errors/bell-slash.svg" %}" alt="Unsubscribe?" width="100px">
+        </div>
+        <h1>Unsubscribe from Journal Watch?</h1>
+
+        <p>Follow the link below to unsubscribe {{ email }} from the Journal Watch newsletter:</p>
+        <p><a href="{% url "newsletter:confirm-unsubscribe" unsubscribe_token=unsubscribe_token %}" class="text-decoration-none">Unsubscribe here</a></p>
+    </div>
+</div>
+{% endblock content %}
