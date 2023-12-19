@@ -130,7 +130,7 @@ class Subscriber(models.Model):
             from_email="SPANZA Journal Watch <subscribe@journalwatch.org.au>",
             to=[self.email],
             headers={
-                "List-Unsubscribe": unsubscribe_header,
+                "List-Unsubscribe": f"<{unsubscribe_header}>",
             },
         )
         email.attach_alternative(html, "text/html")
@@ -261,7 +261,7 @@ class Newsletter(models.Model):
                 from_email="SPANZA Journal Watch <newsletter@journalwatch.org.au>",
                 to=[subscriber.email],
                 headers={
-                    "List-Unsubscribe": unsubscribe_header,
+                    "List-Unsubscribe": f"<{unsubscribe_header}>",
                 },
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
