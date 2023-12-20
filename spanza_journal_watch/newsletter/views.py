@@ -1,6 +1,7 @@
 from django.contrib import messages
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
+from django.views.decorators.csrf import csrf_exempt
 
 from .forms import SubscriberForm
 from .models import Subscriber
@@ -12,7 +13,12 @@ def success(request):
     return render(request, "newsletter/success.html", {"messages": messages_to_render})
 
 
+@csrf_exempt  # Allow POST for list-unsubscribe-post
 def unsubscribe(request, unsubscribe_token):
+    # Support single-click unsubscribe for POST requests
+    if request.method == "POST":
+        return redirect("newsletter:confirm-unsubscribe", unsubscribe_token=unsubscribe_token)
+
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
     except Subscriber.DoesNotExist:
@@ -20,9 +26,11 @@ def unsubscribe(request, unsubscribe_token):
         return redirect("home")
 
     context = {"unsubscribe_token": unsubscribe_token, "email": subscriber.email}
+
     return render(request, "newsletter/unsubscribe.html", context)
 
 
+@csrf_exempt  # Allow POST for list-unsubscribe-postt
 def confirm_unsubscribe(request, unsubscribe_token):
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
@@ -39,6 +47,10 @@ def confirm_unsubscribe(request, unsubscribe_token):
 
     except Subscriber.DoesNotExist:
         messages.error(request, "Invalid unsubscribe link.")
+
+    # Return 204 for list-unsubscribe-post
+    if request.method == "POST":
+        return HttpResponse(status=204)
 
     return redirect("home")
 

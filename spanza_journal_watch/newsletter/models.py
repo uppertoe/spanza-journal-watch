@@ -131,6 +131,7 @@ class Subscriber(models.Model):
             to=[self.email],
             headers={
                 "List-Unsubscribe": f"<{unsubscribe_header}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
             },
         )
         email.attach_alternative(html, "text/html")
@@ -262,6 +263,7 @@ class Newsletter(models.Model):
                 to=[subscriber.email],
                 headers={
                     "List-Unsubscribe": f"<{unsubscribe_header}>",
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
                 },
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
