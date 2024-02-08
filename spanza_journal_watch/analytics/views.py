@@ -29,21 +29,22 @@ def _get_subscriber(email):
 
 
 def _is_external_url(parsed_url):
+    # External URLs should not be resolved before redirection
     return bool(parsed_url.scheme and parsed_url.netloc)
 
 
 def _get_next_url(request, next):
     parsed_next = urlparse(next)
 
-    # Redirect to absolute (external) URLs
+    # Redirect absolute (external) URLs
     if _is_external_url(parsed_next):
         return HttpResponseRedirect(next)
 
-    # Catch malformed URLs
-    response = HttpResponseRedirect(next)
-    view, args, kwargs = resolve(parsed_next[2])
-    kwargs["request"] = request
     try:
+        # Catch malformed URLs
+        response = HttpResponseRedirect(next)
+        view, args, kwargs = resolve(parsed_next[2])
+        kwargs["request"] = request
         view(*args, **kwargs)
     except Http404:
         return HttpResponseRedirect("/")
