@@ -269,6 +269,19 @@ class Review(TimeStampedModel):
         # Fall back to issue date if publish date not set
         return self.publish_date if self.publish_date else self.issues.all()[0].date
 
+    def get_hits(self):
+        object_id = self.id
+        content_type = ContentType.objects.get_for_model(self)
+
+        try:
+            hit = Hit.objects.get(
+                content_type=content_type,
+                object_id=object_id,
+            )
+            return hit.count
+        except Hit.DoesNotExist:
+            return 0
+
     def save(self, *args, **kwargs):
         # Create the slug if it doesn't exist
         if not self.slug:

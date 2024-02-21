@@ -2,9 +2,10 @@
     {% for review in articles %}
     <article class="article-post" id="list-item-{{ review.slug }}">
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>
-    <h5 class="mb-2">{{ review.article.get_subtitle|capfirst }}</h5></a>
-    <p class="article-post-meta mb-1 fst-italic">{{ review.article.journal }}</p>
-    <p class="mb-3">{{ review.get_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+    <h5 class="mb-1">{{ review.article.get_subtitle|capfirst }}</h5></a>
+    <p class="mb-1 fst-italic">{{ review.article.journal }}</p>
+    <p class="mb-1">Submitted {{ review.get_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+    <p class="mb-3 fw-lighter">Read by {{ review.get_hits }} Journal Watch subscribers</p>
     <div class="d-flex mt-auto justify-content-between align-items-center">
         <div class="btn-group">
             <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</a>

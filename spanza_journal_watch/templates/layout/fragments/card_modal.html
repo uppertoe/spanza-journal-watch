@@ -2,7 +2,8 @@
 {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
 <hr>
 <p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal }}</a>
-<p>{{ review.article.citation }}</p>
+<p class="mb-1">{{ review.article.citation }}</p>
 <p class="card-subtitle text-muted mb-1">Reviewed {{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+<p class="mb-1 fw-lighter">Read by {{ review.get_hits }} Journal Watch subscribers</p>
 <a href="{{ review.article.url }}" class="my-2 icon-link gap-1 icon-link-hover text-decoration-none" target="_blank" rel="noopener noreferrer">View full text article<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
 {{ review.body|wrapchars|safe|linebreaks }}
