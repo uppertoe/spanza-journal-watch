@@ -29,9 +29,6 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
     # HTMX
     htmx_templates = ["layout/fragments/card_modal.html"]
 
-    # Include page header
-    page_header = ReviewPage.get_latest_instance()
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 

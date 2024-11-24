@@ -4,6 +4,7 @@ import io
 from django import forms
 from django.core.exceptions import ValidationError
 
+from ..layout.models import FeatureArticle, Homepage
 from .models import InboundEmail, SubscriberCSV
 
 
@@ -101,3 +102,44 @@ class InboundAnymailEmailForm(forms.ModelForm):
 
     def clean_attachments(self):
         return bool(self.cleaned_data["attachments"])
+
+
+# Data entry
+# ----------------------------------------------------
+
+
+class FeatureArticleForm(forms.ModelForm):
+    class Meta:
+        model = FeatureArticle
+        fields = [
+            "title",
+            "body",
+            "image",
+        ]
+
+
+class HomepageForm(forms.ModelForm):
+    # Create a new Homepage
+    # Default HomepagePage with its associated FeatureArticle
+    # Method for creating a new FeatureArticle with the following:
+    # - Title
+    # - Body
+    # - Image
+    class Meta:
+        model = Homepage
+        fields = [
+            "issue",
+            "override_main",
+        ]
+
+
+class ArticleForm(forms.ModelForm):
+    pass
+
+
+class ReviewForm(forms.ModelForm):
+    pass
+
+
+class IssueForm(forms.ModelForm):
+    pass

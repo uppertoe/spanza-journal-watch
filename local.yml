@@ -34,6 +34,7 @@ services:
     volumes:
       - spanza_journal_watch_local_postgres_data:/var/lib/postgresql/data
       - spanza_journal_watch_local_postgres_data_backups:/backups
+      - ./backups:/backups
     env_file:
       - ./.envs/.local/.postgres
 
