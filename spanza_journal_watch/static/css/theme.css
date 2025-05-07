@@ -4,6 +4,14 @@
   overflow: hidden;
 }
 
+br {
+  display: none;
+}
+
+p br {
+  display: inline;
+}
+
 .transparent-overlay {
   position: absolute;
   top: 0;

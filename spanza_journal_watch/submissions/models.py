@@ -17,7 +17,9 @@ from django.db import models
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.text import slugify
+from markdownx.utils import markdownify
 
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text
@@ -250,11 +252,14 @@ class Review(TimeStampedModel):
         # Requires from django.contrib.postgres.operations import BtreeGinExtension in the migration
         indexes = [GinIndex(fields=("search_vector",))]
 
+    def get_markdown_body(self, strip=False):
+        return markdownify(self.body) if not strip else strip_tags(markdownify(self.body))
+
     def get_truncated_body(self):
-        return shorten_text(self.body, self.TRUNCATED_BODY_LENGTH)
+        return shorten_text(self.get_markdown_body(strip=True), self.TRUNCATED_BODY_LENGTH)
 
     def get_longer_truncated_body(self):
-        return shorten_text(self.body, 500)
+        return shorten_text(self.get_markdown_body(), 500)
 
     def get_absolute_url(self):
         return reverse("submissions:review_detail", kwargs={"slug": self.slug})
@@ -302,6 +307,8 @@ class Review(TimeStampedModel):
 
     @classmethod
     def search(cls, query):
+        PLACEHOLDER = " FRAGDELIM "
+
         results = (
             cls.objects.exclude(active=False)
             .annotate(
@@ -315,10 +322,17 @@ class Review(TimeStampedModel):
                 | Q(search_vector=SearchQuery(query))  # Exact matches
                 | Q(author_similarity__gt=cls.author_similarity)
             )
-            .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter="...<br>..."))
+            .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter=" FRAGDELIM "))
             .order_by("-title_similarity", "-rank", "-author_similarity", "-created")
             .select_related("article__journal", "author")
         )
+
+        # Post-process each result:
+        for r in results:
+            # 1) strip _all_ HTML tags
+            text = strip_tags(markdownify(r.headline))
+            # 2) restore your real delimiter
+            r.headline = text.replace(PLACEHOLDER, "...<p></p>...")
         return results
 
     def __str__(self):

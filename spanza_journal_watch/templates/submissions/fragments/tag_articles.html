@@ -14,7 +14,7 @@
                     <p class="card-subtitle text-muted mb-1 fst-italic">{{ article.journal }}</a>
                     <p class="card-subtitle text-muted mb-1">Reviewed {{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
                     <div class="mb-2"></div>
-                    <p class="card-text">{{ review.get_truncated_body }}</p>
+                    <p class="card-text">{{ review.get_truncated_body|safe }}</p>
                         <div class="d-flex mt-auto justify-content-between align-items-center">
                                 <div class="btn-group">
                                     <a

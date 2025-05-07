@@ -90,6 +90,7 @@ THIRD_PARTY_APPS = [
     "view_breadcrumbs",
     "tinymce",
     "mjml",
+    "markdownx",
 ]
 
 LOCAL_APPS = [
@@ -352,6 +353,13 @@ WEBPACK_LOADER = {
 }
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+# MarkdownX
+MARKDOWNX_MARKDOWN_EXTENSIONS = [
+    "markdown.extensions.extra",  # tables, footnotes, etc.
+    "markdown.extensions.sane_lists",  # if you like smarter lists
+    # <-- NO 'nl2br' here!
+]
 
 # tiny-MCE
 # ------------------------------------------------------------------------------

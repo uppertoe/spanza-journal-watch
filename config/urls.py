@@ -5,6 +5,7 @@ from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic.base import TemplateView
+from markdownx import urls as markdownx
 
 from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
 from spanza_journal_watch.layout.views import HomepageView
@@ -34,6 +35,7 @@ urlpatterns = [
     path("backend/", include("spanza_journal_watch.backend.urls")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
+    path("markdownx/", include(markdownx)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if not settings.DEBUG:

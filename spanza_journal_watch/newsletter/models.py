@@ -156,7 +156,7 @@ class Subscriber(models.Model):
         if test_email:
             subscribers = cls.objects.filter(tester=True)
         else:
-            subscribers = Subscriber.objects.filter(
+            subscribers = cls.objects.filter(
                 bounced=False,
                 complained=False,
                 subscribed=True,
