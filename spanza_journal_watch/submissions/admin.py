@@ -1,4 +1,5 @@
 from django.contrib import admin
+from markdownx.admin import MarkdownxModelAdmin
 
 from . import models
 
@@ -38,7 +39,7 @@ class ArticleAdmin(admin.ModelAdmin):
     ]
 
 
-class ReviewAdmin(admin.ModelAdmin):
+class ReviewAdmin(MarkdownxModelAdmin):
     list_display = ("article", "author")
     list_filter = ("author", "issues__name")
     search_fields = ("article__name",)

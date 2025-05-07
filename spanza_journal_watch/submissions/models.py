@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
 from django.utils.text import slugify
+from markdownx.models import MarkdownxField
 from markdownx.utils import markdownify
 
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
@@ -238,7 +239,7 @@ class Review(TimeStampedModel):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True, related_name="reviews")
-    body = models.TextField()
+    body = MarkdownxField()
     publish_date = models.DateField(blank=True, null=True)
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
