@@ -15,18 +15,27 @@ def success(request):
 
 @csrf_exempt  # Allow POST for list-unsubscribe-post
 def unsubscribe(request, unsubscribe_token):
-    # Support single-click unsubscribe for POST requests
-    if request.method == "POST":
-        return redirect("newsletter:confirm-unsubscribe", unsubscribe_token=unsubscribe_token)
-
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
     except Subscriber.DoesNotExist:
+        if request.method == "POST":
+            return HttpResponse(status=204)  # Silent fail for Gmail
         messages.error(request, "Invalid unsubscribe link.")
         return redirect("home")
 
-    context = {"unsubscribe_token": unsubscribe_token, "email": subscriber.email}
+    if request.method == "POST":
+        # Perform the unsubscribe directly here
+        subscriber.subscribed = False
+        subscriber.save()
 
+        # Optional: mark session or analytics if relevant
+        request.session["subscribed"] = False
+        reset_unsubscribe_token.apply_async((subscriber.pk,), countdown=3 * 60)
+
+        return HttpResponse(status=204)  # No redirect or content for Gmail
+
+    # For manual GET-based unsubscribe with confirmation UI
+    context = {"unsubscribe_token": unsubscribe_token, "email": subscriber.email}
     return render(request, "newsletter/unsubscribe.html", context)
 
 
