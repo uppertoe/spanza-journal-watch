@@ -132,6 +132,7 @@ class Subscriber(models.Model):
             headers={
                 "List-Unsubscribe": f"<{unsubscribe_header}>",
                 "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
             },
         )
         email.attach_alternative(html, "text/html")
@@ -264,6 +265,7 @@ class Newsletter(models.Model):
                 headers={
                     "List-Unsubscribe": f"<{unsubscribe_header}>",
                     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
                 },
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
