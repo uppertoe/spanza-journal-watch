@@ -1,8 +1,42 @@
 {% extends "backend/backend_base.html" %}
 {% block content %}
 <h1>Newsletter statistics</h1>
-<h5>Sent newsletters:</h5>
-{% for newsletter in newsletters %}
-<p><a href="{{ newsletter.get_stats_absolute_url }}" class="text-decoration-none">{{ newsletter }}</a></p>
-{% endfor %}
+<p class="text-muted">Review delivery and engagement metrics for previously sent newsletters.</p>
+
+{% if newsletters %}
+<div class="table-responsive">
+	<table class="table table-striped table-hover align-middle">
+		<thead>
+			<tr>
+				<th scope="col">Newsletter</th>
+				<th scope="col">Sent date</th>
+				<th scope="col">Emails sent</th>
+				<th scope="col">Status</th>
+				<th scope="col"></th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for newsletter in newsletters %}
+			<tr>
+				<td>{{ newsletter }}</td>
+				<td>{{ newsletter.send_date|date:"Y-m-d H:i"|default:"-" }}</td>
+				<td>{{ newsletter.emails_sent }}</td>
+				<td>
+					{% if newsletter.is_sent %}
+						<span class="badge text-bg-success">Sent</span>
+					{% else %}
+						<span class="badge text-bg-secondary">Draft</span>
+					{% endif %}
+				</td>
+				<td class="text-end">
+					<a href="{{ newsletter.get_stats_absolute_url }}" class="btn btn-sm btn-outline-primary">View stats</a>
+				</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+</div>
+{% else %}
+	<div class="alert alert-info mb-0">No sent newsletters found yet.</div>
+{% endif %}
 {% endblock content %}

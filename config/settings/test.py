@@ -14,6 +14,7 @@ SECRET_KEY = env(
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#test-runner
 TEST_RUNNER = "django.test.runner.DiscoverRunner"
+DEBUG = True
 
 # PASSWORDS
 # ------------------------------------------------------------------------------
@@ -28,8 +29,9 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 # DEBUGGING FOR TEMPLATES
 # ------------------------------------------------------------------------------
 TEMPLATES[0]["OPTIONS"]["debug"] = True  # type: ignore # noqa: F405
+
 # django-webpack-loader
 # ------------------------------------------------------------------------------
-WEBPACK_LOADER["DEFAULT"]["LOADER_CLASS"] = "webpack_loader.loader.FakeWebpackLoader"  # noqa: F405
+WEBPACK_LOADER["DEFAULT"]["LOADER_CLASS"] = "webpack_loader.loaders.FakeWebpackLoader"  # noqa: F405
 # Your stuff...
 # ------------------------------------------------------------------------------

@@ -1,0 +1,32 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<h1>Newsletter release</h1>
+<p class="text-muted">Select a newsletter to send a test email and, once tested, publish to subscribers.</p>
+
+<p>
+  <a class="btn btn-primary" href="{% url "backend:create_newsletter" %}">Create newsletter</a>
+</p>
+
+<div class="list-group">
+  {% for newsletter in newsletters %}
+    <a class="list-group-item list-group-item-action" href="{% url "backend:final_newsletter" newsletter.send_token %}">
+      <div class="d-flex w-100 justify-content-between align-items-center">
+        <h5 class="mb-1">{{ newsletter }}</h5>
+        <div>
+          {% if newsletter.is_sent %}
+            <span class="badge text-bg-success">Sent</span>
+          {% elif newsletter.is_test_sent %}
+            <span class="badge text-bg-primary">Tested</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Draft</span>
+          {% endif %}
+        </div>
+      </div>
+      <small class="text-body-secondary">Ready to send: {{ newsletter.ready_to_send|yesno:"Yes,No" }}</small>
+    </a>
+  {% empty %}
+    <div class="list-group-item text-muted">No newsletters available.</div>
+  {% endfor %}
+</div>
+{% endblock content %}

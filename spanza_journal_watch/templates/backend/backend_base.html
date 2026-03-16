@@ -48,6 +48,12 @@
                 <a class="nav-link{% if request.resolver_match.url_name in 'backend:upload_subscribers' %} active{% endif %}" href="{% url "backend:upload_subscribers" %}">Upload Subscribers</a>
               </li>
               <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'backend:issue_builder,backend:save_issue_draft,backend:update_issue_draft' %} active{% endif %}" href="{% url "backend:issue_builder" %}">Issue Builder</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'backend:newsletter_release_list,backend:create_newsletter,backend:final_newsletter,backend:send_test_newsletter,backend:enable_newsletter_resend,backend:send_final_newsletter' %} active{% endif %}" href="{% url "backend:newsletter_release_list" %}">Newsletter Release</a>
+              </li>
+              <li class="nav-item">
                 <a class="nav-link{% if request.resolver_match.url_name in 'backend:newsletter_stats_list, backend:newsletter_stats_detail' %} active{% endif %}" href="{% url "backend:newsletter_stats_list" %}">Newsletter Statistics</a>
               </li>
               {% endif %}
@@ -65,9 +71,11 @@
       </nav>
 
     <!-- Main container -->
-    <main class="container p-3 col-md-8 offset-md-2">
+    <main class="container p-3 col-xl-10 offset-xl-1 col-12">
         {% block content %}{% endblock content %}
     </main>
+
+    {% block inline_javascript %}{% endblock inline_javascript %}
 
   </body>
 

@@ -1,0 +1,50 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Contributing health services</h3>
+    <span class="badge text-bg-light">{{ service_count }} service{{ service_count|pluralize }}</span>
+</div>
+
+{% if health_services %}
+<div class="row g-4">
+    {% for service in health_services %}
+    <div class="col-12 col-xl-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex gap-3 align-items-start mb-3">
+                    <div style="width: 110px; min-width: 110px;">
+                        {% if service.is_logo_authorised %}
+                            <img src="{{ service.logo.url }}" alt="{{ service.name }} logo" class="img-fluid object-fit-contain" style="max-height: 80px; width: 100%;">
+                        {% else %}
+                            <svg class="rounded" height="80" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#777"/></svg>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <h4 class="h5 mb-1">{{ service }}</h4>
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="badge text-bg-primary">{{ service.contributor_count }} contributor{{ service.contributor_count|pluralize }}</span>
+                            <span class="badge text-bg-secondary">{{ service.review_count }} review{{ service.review_count|pluralize }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if service.authors.all %}
+                    <ul class="list-unstyled mb-0">
+                    {% for author in service.authors.all %}
+                        <li class="mb-1">
+                            <a href="{{ author.get_absolute_url }}" class="text-decoration-none">{{ author }}</a>
+                            <span class="text-muted"> · {{ author.review_count }} review{{ author.review_count|pluralize }}</span>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">No active contributors listed.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info mb-0">
+    No health services matched your filters.
+</div>
+{% endif %}

@@ -202,6 +202,7 @@ TEMPLATES = [
                 "django.template.context_processors.tz",
                 "django.contrib.messages.context_processors.messages",
                 "spanza_journal_watch.users.context_processors.allauth_settings",
+                "spanza_journal_watch.utils.context_processors.content_cache_version",
             ],
             "builtins": [
                 "spanza_journal_watch.submissions.templatetags.wrapchars",  # Add your app's templatetags module here
@@ -252,12 +253,16 @@ MJML_TCPSERVERS = [
 # ------------------------------------------------------------------------------
 DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", default=10_000_000)
 
+# ISSUE BUILDER
+# ------------------------------------------------------------------------------
+ISSUE_BUILDER_MAX_FEATURED_REVIEWS = env.int("ISSUE_BUILDER_MAX_FEATURED_REVIEWS", default=2)
+
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL.
 ADMIN_URL = "admin/"
 # https://docs.djangoproject.com/en/dev/ref/settings/#admins
-ADMINS = [("""Eamonn Upperton""", "eamonn.upperton@gmail.com")]
+ADMINS = ["eamonn.upperton@gmail.com"]
 # https://docs.djangoproject.com/en/dev/ref/settings/#managers
 MANAGERS = ADMINS
 
@@ -322,11 +327,9 @@ CELERY_TASK_SEND_SENT_EVENT = True
 # ------------------------------------------------------------------------------
 ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
-ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_LOGIN_METHODS = {"email"}
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
-ACCOUNT_EMAIL_REQUIRED = True
-# https://django-allauth.readthedocs.io/en/latest/configuration.html
-ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # https://django-allauth.readthedocs.io/en/latest/configuration.html

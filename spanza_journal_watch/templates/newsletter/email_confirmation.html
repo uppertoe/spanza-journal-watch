@@ -2,6 +2,7 @@
 {% mjml %}
 <mjml>
   <mj-head>
+    <mj-preview>Subscription confirmed for SPANZA Journal Watch. You will receive updates with each new issue.</mj-preview>
     <mj-style inline="inline">
       .link-nostyle { color: inherit; text-decoration: none; }
       .link-inherit-color { color: inherit; }
@@ -15,7 +16,7 @@
     </mj-section>
     <mj-section>
       <mj-column>
-        <mj-image width="300px" src="{{ image_domain }}{{ element.get_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
+        <mj-image width="300px" src="{{ image_domain }}{{ email_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
       </mj-column>
     </mj-section>
     <mj-section>
@@ -34,7 +35,7 @@
     <!-- Icons -->
     <mj-section background-color="#fbfbfb">
       <mj-column>
-        <mj-image width="200px" src="{{ image_domain }}{{ element.get_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
+        <mj-image width="200px" src="{{ image_domain }}{{ email_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
       </mj-column>
     </mj-section>
     <mj-section background-color="#152b3b" padding="0">

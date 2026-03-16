@@ -1,5 +1,5 @@
 @import 'custom_bootstrap_vars';
-@import '~bootstrap/scss/bootstrap';
+@import 'bootstrap/scss/bootstrap';
 
 // project specific CSS goes here
 $breadcrumb-divider: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'><path d='M2.5 0L1 1.5 3.5 4 1 6.5 2.5 8l4-4-4-4z' fill='#{$breadcrumb-divider-color}'/></svg>");
@@ -34,4 +34,87 @@ $red: #b94a48;
   background-color: $pink;
   border-color: $dark-pink;
   color: $red;
+}
+
+.share-actions {
+  align-items: center;
+}
+
+.share-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--bs-border-color);
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.72rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease,
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.share-chip:hover,
+.share-chip:focus-visible {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.share-chip__icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.share-chip--bluesky:hover,
+.share-chip--bluesky:focus-visible {
+  border-color: #0ea5e9;
+  background-color: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+}
+
+.share-chip--x:hover,
+.share-chip--x:focus-visible {
+  border-color: var(--bs-emphasis-color);
+  background-color: rgba(33, 37, 41, 0.12);
+  color: var(--bs-emphasis-color);
+}
+
+.share-chip--facebook:hover,
+.share-chip--facebook:focus-visible {
+  border-color: #1877f2;
+  background-color: rgba(24, 119, 242, 0.12);
+  color: #1877f2;
+}
+
+.share-chip--email:hover,
+.share-chip--email:focus-visible {
+  border-color: #6c757d;
+  background-color: rgba(108, 117, 125, 0.15);
+}
+
+.js-review-card-modal,
+.js-card-link {
+  cursor: pointer;
+}
+
+.review-tags {
+  line-height: 1.45;
+}
+
+.review-tags__link {
+  color: var(--bs-secondary-color);
+  text-decoration: none;
+}
+
+.review-tags__link:hover,
+.review-tags__link:focus-visible {
+  color: var(--bs-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }

@@ -163,7 +163,24 @@ p br {
 }
 
 .bd-mode-toggle {
+  position: fixed;
+  right: 0;
+  bottom: 0;
   z-index: 1500;
+}
+
+@media (max-width: 767.98px) {
+  .bd-mode-toggle {
+    top: 0.75rem;
+    right: 0.5rem;
+    bottom: auto;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .bd-mode-toggle .btn {
+    margin: 0 !important;
+  }
 }
 
 /* stylelint-disable stylistic/selector-list-comma-newline-after */

@@ -2,18 +2,31 @@
 {% load static %}
 
 {% block title %}Server Error{% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-6 offset-md-3">
-        <div class="p-3">
-            <img src="{% static "images/errors/bug.svg" %}" alt="Error 500" width="100px">
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+                <div class="mb-3">
+                    <img src="{% static 'images/errors/bug.svg' %}" alt="500" width="72" height="72">
+                </div>
+                <p class="text-uppercase text-secondary fw-semibold mb-2">Error 500</p>
+                <h1 class="h3 mb-3">Something went wrong</h1>
+                <p class="text-body-secondary mb-4">We track these errors automatically. Please try again in a moment.</p>
+
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <a class="btn btn-primary" href="{% url 'home' %}">Go to home</a>
+                    <a class="btn btn-outline-secondary" href="{% url 'submissions:issue_list' %}">Browse issues</a>
+                </div>
+
+                <p class="small text-body-secondary mt-4 mb-0">If the issue persists, contact us and include what you were trying to do.</p>
+            </div>
         </div>
-        <h1>500 Server Error</h1>
-
-        <h3>Looks like something went wrong!</h3>
-
-        <p>We track these errors automatically, but if the problem persists feel free to contact us. In the meantime, try refreshing.</p>
     </div>
 </div>
 {% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

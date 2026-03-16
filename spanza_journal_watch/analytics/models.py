@@ -4,6 +4,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.db import models
 from django.template.loader import render_to_string
 
+from spanza_journal_watch.analytics.utils import is_probable_automated_event
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.utils.functions import get_domain_url
 
@@ -12,6 +13,8 @@ class NewsletterOpen(models.Model):
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
     subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
+    user_agent = models.TextField(blank=True, default="")
+    automated = models.BooleanField(default=False)
 
     @staticmethod
     def render_tracking_pixel(email, token):
@@ -31,6 +34,8 @@ class NewsletterClick(models.Model):
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
     subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
+    user_agent = models.TextField(blank=True, default="")
+    automated = models.BooleanField(default=False)
 
     @staticmethod
     def generate_tracking_link(email, token):
@@ -53,6 +58,9 @@ class PageView(models.Model):
     content_object = GenericForeignKey("content_type", "object_id")
     timestamp = models.DateTimeField(auto_now_add=True)
     subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
+    user_agent = models.TextField(blank=True, default="")
+    automated = models.BooleanField(default=False)
+    session_key = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         indexes = [
@@ -72,7 +80,7 @@ class PageView(models.Model):
         return cls.objects.filter(content_type=content_type, object_id=object_id)
 
     @classmethod
-    def record_view(cls, object, subscriber_id=None):
+    def record_view(cls, object, subscriber_id=None, request=None):
         content_type = ContentType.objects.get_for_model(object)
         id = object.id
 
@@ -83,7 +91,22 @@ class PageView(models.Model):
             subscriber = None
             print(f"Unable to attach subscriber to pageview: {e} {subscriber_id}")
 
-        view = cls(content_type=content_type, object_id=id, subscriber=subscriber)
+        user_agent = ""
+        automated = False
+        session_key = ""
+        if request is not None:
+            user_agent = request.headers.get("user-agent", "")
+            automated = is_probable_automated_event(request)
+            session_key = request.session.session_key or ""
+
+        view = cls(
+            content_type=content_type,
+            object_id=id,
+            subscriber=subscriber,
+            user_agent=user_agent,
+            automated=automated,
+            session_key=session_key,
+        )
         view.save()
 
     def __str__(self):

@@ -23,8 +23,42 @@
 
     {% block pagination %}
     {% if page_obj.paginator.num_pages > 1 %}
-    {% include "fragments/pagination.html" %}
+        {% include "submissions/fragments/issue_list_pagination.html" %}
     {% endif %}
     {% endblock pagination %}
 </div>
 {% endblock article-block %}
+
+{% block inline_javascript %}
+{{ block.super }}
+<script>
+    (function () {
+        const bindIssueListBottomActions = () => {
+            const actions = document.getElementById('issue-list-scroll-actions');
+            if (!actions) return;
+
+            const updateVisibility = () => {
+                const viewportBottom = window.scrollY + window.innerHeight;
+                const docHeight = Math.max(
+                    document.body.scrollHeight,
+                    document.documentElement.scrollHeight
+                );
+                const nearBottom = viewportBottom >= (docHeight - 260);
+                actions.classList.toggle('d-none', !nearBottom);
+            };
+
+            window.removeEventListener('scroll', updateVisibility);
+            window.addEventListener('scroll', updateVisibility, { passive: true });
+            window.addEventListener('resize', updateVisibility);
+            updateVisibility();
+        };
+
+        document.addEventListener('DOMContentLoaded', bindIssueListBottomActions);
+        document.body.addEventListener('htmx:afterSwap', function (event) {
+            if (event.target && event.target.id === 'article-block') {
+                bindIssueListBottomActions();
+            }
+        });
+    })();
+</script>
+{% endblock inline_javascript %}

@@ -6,6 +6,9 @@ python_files = [
     "tests.py",
     "test_*.py",
 ]
+markers = [
+    "mailhog: optional integration checks requiring MailHog container",
+]
 
 # ==== Coverage ====
 [tool.coverage.run]
@@ -34,7 +37,7 @@ skip_glob = ["**/migrations/*.py"]
 
 # ==== mypy ====
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true

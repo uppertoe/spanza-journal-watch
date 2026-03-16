@@ -1,3 +1,5 @@
+{% load cache %}
+{% cache 1800 "issue_detail_articles" content_cache_version request.get_full_path %}
 <div id="articles" data-bs-spy="scroll" data-bs-target="#list-reviews"  tabindex="0">
     {% for review in articles %}
     <article class="article-post" id="list-item-{{ review.slug }}">
@@ -12,11 +14,17 @@
             <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">View full text article</a>
         </div>
     </div>
+    <div class="mt-3 mb-3">
+        {% include 'fragments/share_buttons.html' with share_title=review.share_title canonical_url=review.canonical_url share_text=review.share_text bluesky_share_url=review.bluesky_share_url x_share_url=review.x_share_url facebook_share_url=review.facebook_share_url email_share_url=review.email_share_url %}
+    </div>
     <p class="text-break">{{ review.get_markdown_body|safe }}</p>
+    {% include 'fragments/review_tags_inline.html' %}
     <p class="mb-3"><a href="#top">Back to top</a></p>
     </article>
     <div
     hx-get="/analytics/page/review/{{ review.slug }}"
-    hx-trigger="revealed"></div>
+    hx-trigger="intersect once threshold:0.6"
+    hx-swap="none"></div>
 {% endfor %}
 </div>
+{% endcache %}

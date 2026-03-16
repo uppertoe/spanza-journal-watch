@@ -8,7 +8,7 @@ from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Review
 from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
 
-from .models import FeatureArticle, Homepage
+from .models import FeatureArticle, Homepage, PageHeader
 
 
 class HomepageView(SidebarMixin, HtmxMixin, ListView):
@@ -17,7 +17,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     context_object_name = "reviews"
 
     # HTMX
-    htmx_templates = ["layout/fragments/articles.html", "fragments/pagination.html"]
+    htmx_templates = ["layout/fragments/articles.html", "layout/fragments/home_pagination.html"]
 
     # Layout variables
     number_of_card_features = 2
@@ -27,7 +27,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     def get_queryset(self):
         homepage = Homepage.get_current_homepage()
         subscriber_id = self.request.session.get("subscriber_id")
-        PageView.record_view(homepage, subscriber_id)
+        PageView.record_view(homepage, subscriber_id, request=self.request)
 
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)
@@ -51,7 +51,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
         # Override header
         override = {}
-        header = homepage.homepage_page
+        header = PageHeader.get_active_for(PageHeader.PageType.HOME)
         context["page_header"] = header.collate_fields(**override) if header else override
 
         return context

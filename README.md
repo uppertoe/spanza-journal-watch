@@ -29,6 +29,31 @@ Running type checks with mypy:
 
     $ mypy spanza_journal_watch
 
+### Dependency management (pip-tools)
+
+Direct dependencies now live in:
+
+- requirements/base.in
+- requirements/local.in
+- requirements/production.in
+- requirements/docs.in
+
+Generate/update pinned lock files with:
+
+```bash
+pip-compile requirements/base.in -o requirements/base.txt
+pip-compile requirements/local.in -o requirements/local.txt
+pip-compile requirements/production.in -o requirements/production.txt
+```
+
+Upgrade specific packages (example: Django on 4.2 LTS):
+
+```bash
+pip-compile requirements/base.in -o requirements/base.txt --upgrade-package django
+pip-compile requirements/local.in -o requirements/local.txt
+pip-compile requirements/production.in -o requirements/production.txt
+```
+
 ### Test coverage
 
 To run the tests, check your test coverage, and generate an HTML coverage report:
@@ -95,6 +120,10 @@ The following details how to deploy this application.
 ### Docker
 
 See detailed [cookiecutter-django Docker documentation](http://cookiecutter-django.readthedocs.io/en/latest/deployment-with-docker.html).
+
+For this project specifically (prebuilt images on Docker Hub + minimal production compose), see:
+
+- [docs/dockerhub_minimal_production.md](docs/dockerhub_minimal_production.md)
 
 ### Custom Bootstrap Compilation
 

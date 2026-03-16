@@ -1,0 +1,86 @@
+{
+  "home": {
+    "path": "/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/home.html"
+  },
+  "review_list_redirect": {
+    "path": "/reviews",
+    "status_code": 302,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/review_list_redirect.html"
+  },
+  "review_detail": {
+    "path": "/reviews/point-of-care-ultrasonography-to-predict-fluid",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/review_detail.html"
+  },
+  "issue_list": {
+    "path": "/issues",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/issue_list.html"
+  },
+  "issue_latest": {
+    "path": "/issues/latest",
+    "status_code": 302,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/issue_latest.html"
+  },
+  "issue_detail": {
+    "path": "/issues/january-february-2023",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/issue_detail.html"
+  },
+  "tag_list": {
+    "path": "/tags",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/tag_list.html"
+  },
+  "tag_detail": {
+    "path": "/tags/ultrasound",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/tag_detail.html"
+  },
+  "search": {
+    "path": "/search?q=anaesthesia",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/search.html"
+  },
+  "about": {
+    "path": "/about",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/about.html"
+  },
+  "author_detail": {
+    "path": "/about/justin-skowno",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/author_detail.html"
+  },
+  "newsletter_subscribe_htmx": {
+    "path": "/newsletter/subscribe",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/newsletter_subscribe_htmx.html"
+  },
+  "newsletter_success": {
+    "path": "/newsletter/success",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/newsletter_success.html"
+  },
+  "newsletter_unsubscribe": {
+    "path": "/newsletter/unsubscribe/HXJM0_2kRw2WY6_Z0funKA",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/newsletter_unsubscribe.html"
+  }
+}

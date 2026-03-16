@@ -2,6 +2,7 @@
 {% mjml %}
 <mjml>
   <mj-head>
+    <mj-preview>{{ newsletter.issue }} is live — {{ newsletter.subject }}. Open for featured reviews and issue highlights.</mj-preview>
     <mj-style inline="inline">
       .link-nostyle { color: inherit; text-decoration: none; }
       .italics { font-style: italic; }
@@ -11,7 +12,7 @@
     </mj-style>
         <mj-attributes>
       <mj-accordion border="none" padding="1px" />
-      <mj-accordion-element icon-wrapped-url="{{ image_domain }}{{ element.get_down_chevron_url }}" icon-unwrapped-url="{{ image_domain }}{{ element.get_up_chevron_url }}" icon-height="24px" icon-width="24px" />
+      <mj-accordion-element icon-wrapped-url="{{ image_domain }}{{ email_down_chevron_url }}" icon-unwrapped-url="{{ image_domain }}{{ email_up_chevron_url }}" icon-height="24px" icon-width="24px" />
       <mj-accordion-title font-family="Helvetica Neue, Arial, sans-serif" background-color="#fff" color="#626262" padding="25px" font-size="18px" />
       <mj-accordion-text font-family="Helvetica Neue, Arial, sans-serif" background-color="#fff" padding="0px 40px" color="#525252" font-size="14px" />
     </mj-attributes>
@@ -25,7 +26,7 @@
     <!-- Company Header -->
     <mj-section background-color="#f0f0f0">
       <mj-column>
-        <mj-image width="300px" src="{{ image_domain }}{{ element.get_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
+        <mj-image width="300px" src="{{ image_domain }}{{ email_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
       </mj-column>
     </mj-section>
 
@@ -118,7 +119,7 @@
     <!-- Icons -->
     <mj-section background-color="#fbfbfb">
       <mj-column>
-        <mj-image width="200px" src="{{ image_domain }}{{ element.get_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
+        <mj-image width="200px" src="{{ image_domain }}{{ email_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
       </mj-column>
     </mj-section>
 

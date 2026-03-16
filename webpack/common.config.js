@@ -50,7 +50,22 @@ module.exports = {
               },
             },
           },
-          'sass-loader',
+          {
+            loader: 'sass-loader',
+            options: {
+              api: 'modern',
+              sassOptions: {
+                loadPaths: ['node_modules'],
+                quietDeps: true,
+                silenceDeprecations: [
+                  'legacy-js-api',
+                  'import',
+                  'global-builtin',
+                  'color-functions',
+                ],
+              },
+            },
+          },
         ],
       },
     ],

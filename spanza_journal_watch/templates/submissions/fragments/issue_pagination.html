@@ -1,0 +1,56 @@
+<div class="mt-5 mb-3 p-3 p-md-4 rounded border bg-body-tertiary shadow-sm">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h3 class="h5 fst-italic mb-0">Continue exploring this issue</h3>
+        <span class="badge text-bg-secondary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </div>
+
+    <nav aria-label="Issue page navigation">
+        <ul class="pagination justify-content-center flex-wrap mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block">Previous</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <a class="page-link">Previous</a>
+            </li>
+            {% endif %}
+
+            {% for page in page_obj.paginator.page_range %}
+            {% if page == page_obj.number %}
+            <li class="page-item active" aria-current="page">
+                <a class="page-link">{{ page }}</a>
+            </li>
+            {% else %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page }}#articles" hx-get="{{ request.path }}?page={{ page }}" hx-target="#article-block">{{ page }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block">Next</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <a class="page-link">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+
+<div id="issue-scroll-actions" class="position-fixed bottom-0 end-0 p-3 d-none" style="z-index: 1040;">
+    <div class="btn-group shadow" role="group" aria-label="Issue quick navigation">
+        {% if page_obj.has_previous %}
+        <a class="btn btn-light" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block">Previous</a>
+        {% endif %}
+
+        <a class="btn btn-primary" href="#top">Back to top</a>
+
+        {% if page_obj.has_next %}
+        <a class="btn btn-light" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block">Next</a>
+        {% endif %}
+    </div>
+</div>

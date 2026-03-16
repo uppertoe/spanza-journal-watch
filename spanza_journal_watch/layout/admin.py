@@ -1,26 +1,11 @@
 from django.contrib import admin
 
-from .models import (
-    FeatureArticle,
-    Gradient,
-    Homepage,
-    HomepagePage,
-    IssueDetailPage,
-    IssuePage,
-    ReviewPage,
-    SearchPage,
-    TagPage,
-)
+from .models import FeatureArticle, Homepage, PageHeader
 
 
 # Inlines
 class FeatureInline(admin.TabularInline):
     model = FeatureArticle
-    extra = 1
-
-
-class HomepageInline(admin.TabularInline):
-    model = Homepage
     extra = 1
 
 
@@ -37,37 +22,6 @@ class FeatureArticleAdmin(admin.ModelAdmin):
     list_display = ("title",)
 
 
-@admin.register(SearchPage)
-class SearchPageAdmin(admin.ModelAdmin):
-    list_display = ("feature_article", "active")
-
-
-@admin.register(IssuePage)
-class IssuePageAdmin(admin.ModelAdmin):
-    list_display = ("feature_article", "active")
-
-
-@admin.register(ReviewPage)
-class ReviewPageAdmin(admin.ModelAdmin):
-    list_display = ("feature_article", "active")
-
-
-@admin.register(TagPage)
-class TagPageAdmin(admin.ModelAdmin):
-    list_display = ("feature_article", "active")
-
-
-@admin.register(IssueDetailPage)
-class IssueDetailPageAdmin(admin.ModelAdmin):
-    list_display = ("feature_article", "active")
-
-
-@admin.register(HomepagePage)
-class HomepagePageAdmin(admin.ModelAdmin):
-    list_display = ("feature_article", "active")
-    inlines = [HomepageInline]
-
-
-@admin.register(Gradient)
-class GradientAdmin(admin.ModelAdmin):
-    list_display = ("name",)
+@admin.register(PageHeader)
+class PageHeaderAdmin(admin.ModelAdmin):
+    list_display = ("page_type", "feature_article", "active")

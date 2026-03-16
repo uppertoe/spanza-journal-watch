@@ -1,3 +1,6 @@
+import base64
+import uuid
+
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.mail import send_mail
@@ -64,6 +67,11 @@ def send_newsletter_distribution_link(newsletter_pk):
 BATCH_SIZE = 50  # Adjust this batch size as needed
 
 
+def _generate_token():
+    r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
+    return r_uuid.replace("=", "")
+
+
 def get_subscriber_batches(subscriber_pks, batch_size):
     from .models import Subscriber
 
@@ -115,14 +123,16 @@ def send_newsletter(newsletter_pk, test_email=True):
     # Perform checks before sending
     if test_email:
         newsletter_queryset.update(is_test_sent=True)
-    elif newsletter.is_sent:
+    elif not newsletter.is_test_sent:
+        raise NewsletterNotReadyToSendError(f"Newsletter {newsletter} has not been test sent")
+    elif not newsletter.ready_to_send:
+        raise NewsletterNotReadyToSendError(f"Newsletter {newsletter} not marked ready to send")
+    elif newsletter.is_sent and not newsletter.resend_enabled:
         raise NewsletterNotReadyToSendError(
             f"Newsletter {newsletter} already sent to {newsletter.emails_sent} recipients; sending aborted"
         )
-    elif not newsletter.ready_to_send:
-        raise NewsletterNotReadyToSendError(f"Newsletter {newsletter} not marked ready to send")
     else:
-        newsletter_queryset.update(is_sent=True)
+        newsletter_queryset.update(is_sent=True, resend_enabled=False)
 
     # Serialise queryset for Celery
     subscriber_pks = list(subscribers.values_list("pk", flat=True))
@@ -141,6 +151,24 @@ def send_newsletter(newsletter_pk, test_email=True):
         # Send statistics of the operation to the administrator
         subscriber_count = len(subscriber_pks)
         send_newsletter_stats.delay(newsletter_pk, subscriber_count, batch_count)
+
+
+@celery_app.task()
+def send_newsletter_test_email(newsletter_pk, recipient_email):
+    from .models import Newsletter, Subscriber
+
+    newsletter_queryset = Newsletter.objects.filter(pk=newsletter_pk)
+    newsletter = newsletter_queryset.get()
+
+    # Create a lightweight in-memory subscriber instance for rendering templates
+    subscriber = Subscriber(email=recipient_email, unsubscribe_token=_generate_token())
+    connection = mail.get_connection()
+    messages = newsletter.generate_emails([subscriber])
+    successful = connection.send_messages(messages)
+
+    if successful:
+        newsletter_queryset.update(is_test_sent=True)
+        send_newsletter_distribution_link.delay(newsletter_pk)
 
 
 @celery_app.task(bind=True, max_retries=3)

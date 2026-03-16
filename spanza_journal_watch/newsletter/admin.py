@@ -12,8 +12,3 @@ class SubscriberAdmin(admin.ModelAdmin):
 @admin.register(models.Newsletter)
 class NewsletterAdmin(admin.ModelAdmin):
     list_display = ("subject", "ready_to_send", "is_test_sent", "is_sent", "emails_sent")
-
-
-@admin.register(models.ElementImage)
-class ElementImageAdmin(admin.ModelAdmin):
-    list_display = ("name", "type")

@@ -1,4 +1,4 @@
-FROM node:18-bullseye-slim as client-builder
+FROM node:22-bookworm-slim AS client-builder
 
 ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
@@ -10,10 +10,10 @@ COPY . ${APP_HOME}
 #RUN npm run build
 RUN yarn run build
 # define an alias for the specific python version used in this file.
-FROM python:3.11.3-slim-bullseye as python
+FROM python:3.13-slim-bookworm AS python
 
 # Python build stage
-FROM python as python-build-stage
+FROM python AS python-build-stage
 
 ARG BUILD_ENVIRONMENT=production
 
@@ -33,14 +33,14 @@ RUN pip wheel --wheel-dir /usr/src/app/wheels  \
 
 
 # Python 'run' stage
-FROM python as python-run-stage
+FROM python AS python-run-stage
 
 ARG BUILD_ENVIRONMENT=production
 ARG APP_HOME=/app
 
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV BUILD_ENV ${BUILD_ENVIRONMENT}
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV BUILD_ENV=${BUILD_ENVIRONMENT}
 
 WORKDIR ${APP_HOME}
 

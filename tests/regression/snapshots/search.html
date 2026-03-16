@@ -1,0 +1,1789 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script src="/static/js/color-modes.js"></script>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Journal Watch</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature."
+    />
+    <meta name="author" content="Eamonn Upperton" />
+    <link
+      rel="icon"
+      href="/static/images/logo/square-brackets.svg"
+      type="image/svg"
+      size="any"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      rel="icon"
+      href="/static/images/logo/square-brackets-white.svg"
+      type="image/svg"
+      size="any"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta name="theme-color" content="#152b3b" />
+    <!-- Google tag (gtag.js) -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-W3HW0RB27V"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+      gtag('config', 'G-W3HW0RB27V');
+    </script>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5" />
+    <meta name="msapplication-TileColor" content="#00aba9" />
+    <meta name="theme-color" content="#152b3b" />
+    <!-- Your stuff: Third-party CSS libraries go here -->
+    <!-- This file stores project-specific CSS -->
+    <link rel="stylesheet" href="/static/css/theme.css" />
+    <!-- Le javascript ================================================== -->
+    <!-- Vendor dependencies bundled as one file -->
+    <script src="http://localhost/static/bundles/test.bundle.js" defer></script>
+    <!-- place project specific Javascript in this file -->
+    <script src="http://localhost/static/bundles/test.bundle.js" defer></script>
+  </head>
+  <body>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none">
+      <symbol id="check2" viewBox="0 0 16 16">
+        <path
+          d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"
+        />
+      </symbol>
+      <symbol id="circle-half" viewBox="0 0 16 16">
+        <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z" />
+      </symbol>
+      <symbol id="moon-stars-fill" viewBox="0 0 16 16">
+        <path
+          d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"
+        />
+        <path
+          d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"
+        />
+      </symbol>
+      <symbol id="sun-fill" viewBox="0 0 16 16">
+        <path
+          d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"
+        />
+      </symbol>
+    </svg>
+    <div
+      class="dropdown position-fixed bottom-0 end-0 bd-mode-toggle px-3 px-lg-5"
+    >
+      <button
+        class="btn btn-bd-primary py-2 my-3 dropdown-toggle d-flex align-items-center"
+        id="bd-theme"
+        type="button"
+        aria-expanded="false"
+        data-bs-toggle="dropdown"
+        aria-label="Toggle theme (auto)"
+      >
+        <svg class="bi my-1 theme-icon-active" width="1em" height="1em">
+          <use href="#circle-half"></use>
+        </svg>
+        <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+      </button>
+      <ul
+        class="dropdown-menu dropdown-menu-end shadow"
+        aria-labelledby="bd-theme-text"
+      >
+        <li>
+          <button
+            type="button"
+            class="dropdown-item d-flex align-items-center"
+            data-bs-theme-value="light"
+            aria-pressed="false"
+          >
+            <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em">
+              <use href="#sun-fill"></use>
+            </svg>
+            Light
+            <svg class="bi ms-auto d-none" width="1em" height="1em">
+              <use href="#check2"></use>
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="dropdown-item d-flex align-items-center"
+            data-bs-theme-value="dark"
+            aria-pressed="false"
+          >
+            <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em">
+              <use href="#moon-stars-fill"></use>
+            </svg>
+            Dark
+            <svg class="bi ms-auto d-none" width="1em" height="1em">
+              <use href="#check2"></use>
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="dropdown-item d-flex align-items-center active"
+            data-bs-theme-value="auto"
+            aria-pressed="true"
+          >
+            <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em">
+              <use href="#circle-half"></use>
+            </svg>
+            Auto
+            <svg class="bi ms-auto d-none" width="1em" height="1em">
+              <use href="#check2"></use>
+            </svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none">
+      <symbol
+        id="aperture"
+        fill="none"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path
+          d="M14.31 8l5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16L3.95 6.06M14.31 16H2.83m13.79-4l-5.74 9.94"
+        />
+      </symbol>
+      <symbol id="cart" viewBox="0 0 16 16">
+        <path
+          d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l.84 4.479 9.144-.459L13.89 4H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"
+        />
+      </symbol>
+      <symbol id="chevron-right" viewBox="0 0 16 16">
+        <path
+          fill-rule="evenodd"
+          d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"
+        />
+      </symbol>
+    </svg>
+    <!-- Container for HTMX messages -->
+    <div
+      class="container-fluid p-0 sticky-top"
+      id="oob-message"
+      hx-swap-oob="true"
+    ></div>
+    <!-- /container -->
+    <div class="container">
+      <header class="border-bottom lh-1 py-3">
+        <div class="row align-items-center">
+          <div
+            class="col-sm-4 d-flex order-3 order-sm-3 justify-content-center justify-content-sm-end align-items-center"
+            id="subscribe-container"
+          >
+            <a
+              class="btn btn-outline-secondary btn-sm"
+              hx-get="/newsletter/subscribe"
+              hx-target="#subscribe-container"
+              hx-swap="innerHTML transition:true"
+              >Subscribe</a
+            >
+          </div>
+          <div class="col-sm-4 order-2 order-sm-2 pb-2 pb-sm-0 text-center">
+            <a
+              class="blog-header-logo text-body-emphasis text-decoration-none"
+              href="/"
+              >Journal Watch</a
+            >
+          </div>
+          <div
+            class="col-sm-4 d-flex order-1 order-sm-1 justify-content-center justify-content-sm-start align-items-center"
+          >
+            <a
+              href="https://www.spanza.org.au/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="/static/images/logo/spanza-logo-blue.png"
+                alt="SPANZA Logo"
+                width="200"
+                class="py-3"
+              />
+            </a>
+          </div>
+        </div>
+      </header>
+      <div class="nav-scroller py-1 mb-3 border-bottom">
+        <nav class="nav nav-underline justify-content-between">
+          <a class="nav-item nav-link link-body-emphasis" href="/">Home</a>
+          <a class="nav-item nav-link link-body-emphasis" href="/issues/latest"
+            >This issue</a
+          >
+          <a class="nav-item nav-link link-body-emphasis" href="/issues"
+            >Previous issues</a
+          >
+          <a
+            class="nav-item nav-link link-body-emphasis active"
+            href="/search"
+            href="#"
+            aria-label="Search"
+          >
+            <svg
+              class="d-inline-flex"
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              class="mx-3"
+              role="img"
+              viewBox="0 0 24 24"
+            >
+              <title>Search</title>
+              <circle cx="10.5" cy="10.5" r="7.5" />
+              <path d="M21 21l-5.2-5.2" />
+            </svg>
+            Reviews
+          </a>
+          <a class="nav-item nav-link link-body-emphasis" href="/about"
+            >About</a
+          >
+        </nav>
+      </div>
+    </div>
+    <main class="container">
+      <div
+        class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary main-feature"
+      >
+        <div class="transparent-overlay"></div>
+        <img
+          src="/media/uploads/featurearticle/search-image.jpg"
+          alt="Feature Image"
+          class="feature-image"
+        />
+        <div class="row">
+          <div class="col-lg-8 feature-content">
+            <h1 class="display-4 fst-italic">Search</h1>
+            <div class="lead my-3">
+              Find articles previously reviewed by contributors to Journal Watch
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row py-2" id="top">
+        <div class="col-md-8 pb-4">
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item"><a href="/">Home</a></li>
+              <li class="breadcrumb-item active" aria-current="page">Search</li>
+            </ol>
+          </nav>
+          <div class="d-flex">
+            <div class="input-group m-3">
+              <input
+                autofocus
+                type="search"
+                id="autocompleteInput"
+                class="form-control"
+                placeholder="Start typing here..."
+                aria-label="Search"
+                aria-describedby="button-addon"
+                name="q"
+                hx-get="/search"
+                hx-trigger="keyup changed delay:500ms, search"
+                hx-target="#search-results"
+                hx-indicator=".htmx-indicator"
+              />
+            </div>
+          </div>
+          <span class="d-flex justify-content-center htmx-indicator">
+            <img src="/static/images/spinners/3-dots-move.svg" />
+          </span>
+          <div id="search-results" class="mx-3">
+            <h3>Results</h3>
+            <hr />
+            <a
+              href="/reviews/anaesthesia-for-surgery-in-infancy"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Anaesthesia for surgery in infancy</h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia &amp; Intensive Care Medicine
+            </p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/oh-ryong-ryan-kwan">Dr Oh Ryong (Ryan) Kwen</a>
+            </p>
+            <blockquote class="blockquote">
+              "case provides a useful framework for each of the pre-, intra- and
+              post-operative phases of the anaesthesia. The physiological
+              impacts of minimally invasive techniques such as laparoscopy or
+              thoracoscopy are also described"
+            </blockquote>
+            <a
+              href="/reviews/principles-of-anaesthesia-for-term-neonates"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Principles of anaesthesia for term neonates</h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia &amp; Intensive Care Medicine
+            </p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/oh-ryong-ryan-kwan">Dr Oh Ryong (Ryan) Kwen</a>
+            </p>
+            <blockquote class="blockquote">
+              "paediatric anaesthetic practice and can be especially useful to
+              provide the basic knowledge of the paediatric anaesthesia"
+            </blockquote>
+            <a
+              href="/reviews/new-blocks-on-the-kids-core-basic-nerve-blocks-in"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">New blocks on the kids</h3>
+              <h5 class="text-muted">
+                Core basic nerve blocks in paediatric anaesthesia
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anaesthesia</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/derek-rosen">Dr Derek Rosen</a>
+            </p>
+            <blockquote class="blockquote">
+              "This useful review article discusses the benefits of regional
+              anaesthesia in children (anaesthesia sparing, opioid sparing, and
+              a reduction in emergence delirium severity) despite its lower use
+              compared with adult anaesthesia and highlights seven high"
+            </blockquote>
+            <a
+              href="/reviews/rapid-sequence-induction-in-paediatric"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Rapid sequence induction in Paediatric Anaesthesia
+              </h3>
+              <h5 class="text-muted">A narrative review</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Trends in Anaesthesia and Critical Care
+            </p>
+            <p class="mb-3">
+              March 2023 by
+              <a href="/about/christoher-dawson">Dr Christoher Dawson</a>
+            </p>
+            <blockquote class="blockquote">
+              "them had muscle relaxants. (Notably in a recent ANZCA survey
+              [Mistry et al, Anaesthesia and Intensive Care 2021] the numbers
+              were closer to 75% amongst those who use cricoid). The article
+              presents several risk factors...
+              <p></p>
+              ...potential for decrease in lower oesophageal sphincter tone
+              leading to aspiration. They note that several European paediatric
+              anaesthesia societies no longer recommended use of cricoid
+              pressure during RSI, and that the Near 4 Kids trial"
+            </blockquote>
+            <a
+              href="/reviews/measures-to-prolong-duration-of-sensory-block"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Measures to prolong duration of sensory block after regional
+                anaesthesia
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Current Opinion in Anaesthesiology</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/derek-rosen">Dr Derek Rosen</a>
+            </p>
+            <blockquote class="blockquote">
+              "This review article discusses the evidence for the different
+              techniques used to prolong sensory neural"
+            </blockquote>
+            <a
+              href="/reviews/fatigue-in-anaesthesiology-call-for-a-change-of"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Fatigue in anaesthesiology</h3>
+              <h5 class="text-muted">
+                Call for a change of culture and regulations
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">European Journal of Anaesthesiology</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/shona-chung">Dr Shona Chung</a>
+            </p>
+            <blockquote class="blockquote">
+              "focuses on the difficulties of implementing Fatigue Risk
+              Management Systems (FRMS) in healthcare – and more specifically in
+              anaesthesia and intensive care. Written by members of the European
+              Board of Anaesthesiology Standing Committee on Work Force"
+            </blockquote>
+            <a
+              href="/reviews/anesthesia-and-neurodevelopment-after-20-years"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Anesthesia and neurodevelopment after 20 years
+              </h3>
+              <h5 class="text-muted">Where are we now and where to next?</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anaesthesia</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/shona-chung">Dr Shona Chung</a>
+            </p>
+            <blockquote class="blockquote">
+              "This extensive editorial starts with the history of research into
+              neurodevelopmental effects of general anaesthesia in children:
+              from the initial study in rats in 2003 to the FDA black box
+              warning...
+              <p></p>
+              ...MASK which have recently been combined in a meta-analysis. This
+              meta-analysis confirmed that exposure to anaesthesia did not alter
+              FSIQ (full scale intelligence quotient) scores but was related to
+              parental reports of behavioural...
+              <p></p>
+              ...authors comment on a recent study by Moser et all which looks
+              at very preterm infants receiving anaesthesia and how this affects
+              their FSIQ at 3 years of age. They highlight that this
+              retrospective study"
+            </blockquote>
+            <a
+              href="/reviews/unique-issues-related-to-regional-anesthesia-in"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Unique Issues Related to Regional Anesthesia in Pediatric
+                Orthopedics
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesiology Clinics</p>
+            <p class="mb-3">
+              September 2022 by
+              <a href="/about/sinead-farrell">Dr Sinead Farrell</a>
+            </p>
+            <blockquote class="blockquote">
+              "This review article addresses key questions about regional
+              anaesthesia in paediatric practice. Blocks under GA or deep
+              sedation are safe in children and should be the default. • The
+              benefit of an awake patient (ability...
+              <p></p>
+              ...damage and 0.76:100,000 of local anaesthetic systemic toxicity.
+              There is no evidence that regional anaesthesia increases the risk
+              of compartment syndrome. • Both American and European Societies
+              for Regional Anaesthesia have found...
+              <p></p>
+              ...convincing evidence that regional anaesthesia increases the
+              risk or delays diagnosis of compartment syndrome, however debate
+              continues among individual practitioners. • Presence of a
+              functional block could expedite the diagnosis of a compartment
+              syndrome "
+            </blockquote>
+            <a
+              href="/reviews/medication-safety-in-pediatric-anesthesia-an"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Medication safety in pediatric anesthesia</h3>
+              <h5 class="text-muted">
+                An educational review and a call to action
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/andrew-weatherall">Dr Andrew Weatherall</a>
+            </p>
+            <blockquote class="blockquote">
+              "improve medication safety. There is a clear summary of the
+              contributors to medication error in the anaesthesia context, and
+              the review specifically addresses the contributors to a higher
+              risk of medication error in the paediatric"
+            </blockquote>
+            <a
+              href="/reviews/evaluation-of-quality-of-care-in-neonatal"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Evaluation of quality of care in neonatal anesthesia using a
+                bundle of intraoperative parameters
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              December 2023 by
+              <a href="/about/eamonn-upperton">Dr Eamonn Upperton</a>
+            </p>
+            <blockquote class="blockquote">
+              "Inspired by the SAFETOTS ‘10Ns’ of quality in paediatric
+              anaesthesia, this paper sets out to measure how often
+              physiological variables stray outside the target range during and
+              after neonatal surgery. The authors retrospectively analysed
+              parameters...
+              <p></p>
+              ...findings in this paper demonstrate some of the challenges
+              inherent to developing indicators of quality in anaesthesia;
+              namely, that measured parameters are often a surrogate for the
+              actual variable of interest. Here...
+              <p></p>
+              ...neonates undergoing anaesthesia experienced blood pressure
+              measurements below the target for greater than 25% of the duration
+              of the case; whether this translates to low end-organ perfusion is
+              not clear. As a less frequently"
+            </blockquote>
+            <a
+              href="/reviews/pediatric-anesthesia-in-australia-and-new-zealand"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Pediatric anesthesia in Australia and New Zealand and health
+                inequity among First Nations and Māori children
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              November 2024 by <a href="/about/meg-cooney">Dr Meghan Cooney</a>
+            </p>
+            <blockquote class="blockquote">
+              "devastating impact on health outcomes for these populations. The
+              article provides a detailed exploration of paediatric anaesthesia
+              in Australia and New Zealand including training and professional
+              organisations such as SPANZA. They highlight that both ANZCA...
+              <p></p>
+              ...background; to review factors that drive health inequity, and
+              to determine how to improve their care in anaesthesia and pain
+              management. This article artfully “highlights the importance of
+              clinicians having an appreciation of First Nations"
+            </blockquote>
+            <a
+              href="/reviews/comparison-of-postoperative-pain-in-children"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Comparison of postoperative pain in children after maintenance
+                anaesthesia with propofol or sevoflurane
+              </h3>
+              <h5 class="text-muted">
+                A systematic review and meta-analysis
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">British Journal of Anaesthesia</p>
+            <p class="mb-3">
+              August 2024 by <a href="/about/rory-walsh">Dr Rory Walsh</a>
+            </p>
+            <blockquote class="blockquote">
+              "meta-analysis of 13 randomised controlled trials that compared
+              post-operative pain between sevoflurane and propofol anaesthesia
+              in children. Methods: The primary outcome was overall
+              post-operative pain - assessed via the need for rescue
+              analgesia...
+              <p></p>
+              ...been unclear whether post-operative pain is significantly
+              affected by the choice of propofol or sevoflurane anaesthesia. In
+              2016 Peng et al published a meta-analysis of adult RCTs. This
+              analysis found that compared...
+              <p></p>
+              ...volatile anaesthesia, propofol anaesthesia was associated with
+              reduced post-operative pain. However, due to substantial
+              heterogeneity of the included trials, the authors could not draw
+              firm conclusions and recommended further large RCTs be performed.
+              There"
+            </blockquote>
+            <a
+              href="/reviews/awake-caudal-anesthesia-in-ex-premature-infants"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Awake caudal anesthesia in ex-premature infants undergoing lower
+                abdominal surgery
+              </h3>
+              <h5 class="text-muted">A narrative review.</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              July 2024 by <a href="/about/john-burnett">Dr John Burnett</a>
+            </p>
+            <blockquote class="blockquote">
+              "question that is front of mind for most paediatric anaesthetists
+              is “how can we use regional anaesthesia safely and effectively to
+              improve outcomes for this vulnerable group of patients?” We know
+              that spinal anaesthesia...
+              <p></p>
+              ...clinicians opine that there is a learning curve involved in
+              performing spinals in this group. Awake caudal anaesthesia is
+              proposed as a potential solution to these limitations. The aim of
+              this narrative review...
+              <p></p>
+              ...determine, from the available literature, whether awake caudal
+              anaesthesia is a feasible and reliable procedure with low
+              complication rates in ex-prem infants having abdominal surgery.
+              The authors (both with significant knowledge and experience"
+            </blockquote>
+            <a
+              href="/reviews/perioperative-anaphylaxis"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Perioperative Anaphylaxis</h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesiology</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/renee-burton">Dr Renee Burton</a>
+            </p>
+            <blockquote class="blockquote">
+              "with initial management, proceeding with surgery after a reaction
+              and allergy work up. A rare complication of anaesthesia,
+              anaphylaxis is explored well in this article and is useful in
+              updating knowledge in this area"
+            </blockquote>
+            <a
+              href="/reviews/postanesthesia-complications-in-pediatric"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Postanesthesia complications in pediatric patients with previous
+                SARS-CoV-2 infection
+              </h3>
+              <h5 class="text-muted">A cohort study</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              July 2023 by <a href="/about/ian-miles">Dr Ian Miles</a>
+            </p>
+            <blockquote class="blockquote">
+              "Report of a single centre, retrospective, case–control study
+              comparing complications after anaesthesia within 90 days of a
+              known positive PCR, as compared to matched controls. The study
+              period was between January 3–October...
+              <p></p>
+              ...complications looked for were at the serious end of the scale
+              (unexplained escalation in care &lt;48hrs post anaesthesia,
+              cardiac, respiratory, thrombotic, and haemorrhagic events within
+              30 days), in addition to 30- day mortality and hospital...
+              <p></p>
+              ...increased in patients who had a positive PCR test more that 7
+              days prior to anaesthesia compared to matched controls. Commentary
+              The low rate of complications in paediatric patients having
+              anaesthesia more than 7 days"
+            </blockquote>
+            <a
+              href="/reviews/exposure-to-operative-anesthesia-in-childhood-and"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Exposure to Operative Anesthesia in Childhood and Subsequent
+                Neurobehavioral Diagnoses
+              </h3>
+              <h5 class="text-muted">
+                A Natural Experiment Using Appendectomy
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesiology</p>
+            <p class="mb-3">
+              November 2024 by
+              <a href="/about/eamonn-upperton">Dr Eamonn Upperton</a>
+            </p>
+            <blockquote class="blockquote">
+              "these disorders compared with their matched controls; the medical
+              group moreso than the appendicectomy group. Exposure to
+              anaesthesia occurred in 100% of the appendicectomy group, and only
+              8% of the medical group. In the absence...
+              <p></p>
+              ...excess in the primary outcome in the group with higher
+              anaesthesia exposure, this study supports the conclusion that a
+              neurobehavioural diagnosis after hospital admission is likely due
+              to factors other than anaesthesia. Study design: Medicaid...
+              <p></p>
+              ...need to exclude these – it only aims to show that the cohorts’
+              dissimilarity in exposure to anaesthesia is not matched by a
+              dissimilarity in primary outcome. Interestingly, both
+              appendicectomy and medical groups showed higher rates"
+            </blockquote>
+            <a
+              href="/reviews/effect-of-bis-guided-anesthesia-on-emergence"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Effect of BIS-guided anesthesia on emergence delirium following
+                general anesthesia in children
+              </h3>
+              <h5 class="text-muted">
+                A prospective randomized controlled trial
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia Critical Care &amp; Pain Medicine
+            </p>
+            <p class="mb-3">
+              February 2024 by
+              <a href="/about/priya-sreedharan">Dr Priya Sreedharan</a>
+            </p>
+            <blockquote class="blockquote">
+              "University hospital of Ostrava in the Czech Republic. The study
+              hypothesized that optimizing the depth of general anaesthesia
+              using BIS as a guide (BIGA) could reduce the incidence of
+              Emergence Delirium (ED) in the high...
+              <p></p>
+              ...risk paediatric population (pre-school children, sevoflurane
+              anaesthesia, otolaryngology procedure) compared with the
+              traditional assessment of anaesthetic depth using MAC value. 165
+              children with ASA I- II undergoing endoscopic adenoidectomy under
+              general anaesthesia were included...
+              <p></p>
+              ...children received volatile induction with sevoflurane 8% in
+              oxygen and air (1:1) mixture. Depth of anaesthesia was monitored
+              with ET sevoflurane and BIS applied in the intervention group as
+              soon as possible. Sufentanil"
+            </blockquote>
+            <a
+              href="/reviews/peri-operative-cardiac-arrest-in-children-as"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Peri-operative cardiac arrest in children as reported to the 7th
+                National Audit Project of the Royal College of Anaesthetists
+              </h3>
+              <h5 class="text-muted">
+                Operative cardiac arrest in children as reported to the 7th
+                National Audit Project of the Royal College of Anaesthetists
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anaesthesia</p>
+            <p class="mb-3">
+              August 2024 by
+              <a href="/about/heather-patterson">Dr Heather Patterson</a>
+            </p>
+            <blockquote class="blockquote">
+              "invites reflection on these themes in the Australian and New
+              Zealand context. Methods All NHS hospitals undertaking anaesthesia
+              care in the UK were invited to participate. Data collection
+              included a baseline survey of anaesthesia departments...
+              <p></p>
+              ...provide denominator data), and a 12-month prospective registry
+              of perioperative cardiac arrests. Critically ill children
+              undergoing anaesthesia before retrieval to tertiary centres were
+              also included. Multidisciplinary peer review allowed qualitative
+              analysis of events surrounding...
+              <p></p>
+              ...underscore the importance of risk stratification, early
+              appropriate monitoring, and appropriate drug selection and dosing
+              in paediatric anaesthesia. The results are relevant to
+              practitioners in Australia and New Zealand, particularly regarding
+              the management of high"
+            </blockquote>
+            <a
+              href="/reviews/perioperative-management-of-the-child-with-asthma"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Perioperative management of the child with asthma
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              British Journal of Anaesthesia Education
+            </p>
+            <p class="mb-3">
+              September 2022 by
+              <a href="/about/heather-patterson">Dr Heather Patterson</a>
+            </p>
+            <blockquote class="blockquote">
+              "provides updates in asthma treatment from multinational
+              guidelines, including recommendations for the treatment of
+              bronchospasm under anaesthesia. This review focuses on the ‘Th2’
+              or ‘atopic, aspirin exacerbated respiratory disease’ (AERD)
+              endotype...
+              <p></p>
+              ...considered. - Administer short acting inhaled beta agonist via
+              spacer or nebuliser preoperatively - Ensure adequate depth of
+              anaesthesia before instrumenting airway or painful stimuli -
+              Consider sevoflurane and ketamine use to promote bronchodilation
+              (as well as magnesium...
+              <p></p>
+              ...Minimise histamine releasing drugs (e.g., synthetic opioids
+              over morphine) Management of severe bronchospasm under general
+              anaesthesia - Pharmacological agents: o First line: inhaled
+              salbutamol via anaesthetic circuit o Deepen anaesthesia and
+              consider changing to volatile"
+            </blockquote>
+            <a
+              href="/reviews/anesthesia-and-sedation-exposure-and"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Anesthesia and Sedation Exposure and Neurodevelopmental Outcomes
+                in Infants Undergoing Congenital Cardiac Surgery
+              </h3>
+              <h5 class="text-muted">A Retrospective Cohort Study</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesiology</p>
+            <p class="mb-3">
+              December 2023 by
+              <a href="/about/rebecca-mcintyre">Dr Rebecca McIntyre</a>
+            </p>
+            <blockquote class="blockquote">
+              "authors of this retrospective study hypothesized that greater
+              exposure to sedation and anaesthesia in children undergoing
+              complex cardiac surgery is associated with lower
+              neurodevelopmental scores at 18 months. They found the use of
+              ketamine"
+            </blockquote>
+            <a
+              href="/reviews/acute-pain-management-in-the-neonate"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Acute pain management in the neonate</h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia &amp; Intensive Care Medicine
+            </p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/david-sainsbury">Dr David Sainsbury</a>
+            </p>
+            <blockquote class="blockquote">
+              "sections on physiology, pain assessment, non-pharmacological
+              approaches, pharmacological approaches, and regional anaesthesia.
+              It reads more as a report of their local practice than a review.
+              It is useful as it provides a framework"
+            </blockquote>
+            <a
+              href="/reviews/the-effect-of-intranasal-dexmedetomidine"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                The effect of intranasal dexmedetomidine administration on
+                emergence agitation or delirium in pediatric patients after
+                general anesthesia
+              </h3>
+              <h5 class="text-muted">
+                A meta-analysis of randomized controlled trials
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              September 2023 by <a href="/about/matt-jenke">Dr Matt Jenke</a>
+            </p>
+            <blockquote class="blockquote">
+              "preoperative intranasal dexmedetomidine on emergence agitation
+              (EA) and emergence delirium (ED) in paediatric patients after
+              general anaesthesia. Primary Outcome: Proportion of patients
+              experiencing emergence agitation or delirium. Secondary Outcome:
+              Emergence time and rate of post...
+              <p></p>
+              ...study did not assess the alleviation of pre-operative agitation
+              and distress with dexmedetomidine. Maintenance inhalational
+              anaesthesia was used in 17 out of 20 studies with only one study
+              mandating the use of TIVA. Propofol...
+              <p></p>
+              ...based anaesthesia is associated with both the primary outcome
+              of reduced EA/ED and secondary outcome of reduced PONV. Greater
+              use of propofol maintenance anaesthesia in the included trials may
+              have impacted strength of this analysis"
+            </blockquote>
+            <a
+              href="/reviews/comparison-of-intravenous-and-inhalation"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Comparison of intravenous and inhalation anesthesia on
+                postoperative behavior changes in children undergoing ambulatory
+                endoscopic procedures
+              </h3>
+              <h5 class="text-muted">A randomized clinical trial</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              March 2023 by
+              <a href="/about/priya-sreedharan">Dr Priya Sreedharan</a>
+            </p>
+            <blockquote class="blockquote">
+              "outpatient endoscopic clinic between October 2018 and December
+              2021 was designed to determine if intravenous anaesthesia was
+              effective at reducing post operative behavioural changes in
+              children undergoing ambulatory endoscopic procedures when compared
+              to inhalational anaesthesia...
+              <p></p>
+              ...were included and analysed in the study and randomised to
+              receive either inhalational or intravenous maintenance of
+              anaesthesia post induction. All children received inhalational
+              induction with sevoflurane. The intravenous group was then
+              maintained with propofol...
+              <p></p>
+              ...assessed using a 100mm Visual analog scale (VAS-anx). Post
+              procedure emergence delirium was assessed using Paediatric
+              Anaesthesia Emergence Delirium (PAED) scale whilst pain was
+              assessed using FLACC scale. Severe emergence delirium (ED) was
+              treated"
+            </blockquote>
+            <a
+              href="/reviews/pediatric-anesthetic-for-tracheobronchial-foreign"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Pediatric anesthetic for tracheobronchial foreign body
+                extraction
+              </h3>
+              <h5 class="text-muted">A survey of practice in France</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              December 2023 by <a href="/about/meg-cooney">Dr Meghan Cooney</a>
+            </p>
+            <blockquote class="blockquote">
+              "unable to co-operate with the required breath holds. The article
+              rightly identifies that if general anaesthesia would be required
+              for the CT, then it would be wise to proceed directly to
+              bronchoscopy. Flexible bronchoscopy...
+              <p></p>
+              ...there seemed to be a dominating aim to maintain spontaneous
+              ventilation using inhalational, intravenous and local anaesthesia"
+            </blockquote>
+            <a
+              href="/reviews/second-infant-spinal-anesthetic-incidence-dose"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Second infant spinal anesthetic</h3>
+              <h5 class="text-muted">
+                Incidence, dose modification, and adverse events after initial
+                failure
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              June 2024 by <a href="/about/h-hack">Dr H Hack</a>
+            </p>
+            <blockquote class="blockquote">
+              "Royal Children's Hospital, Melbourne has a long established
+              practice of providing (and teaching) awake spinal anaesthesia for
+              infants undergoing lower abdominal surgery such as inguinal hernia
+              repair (this reviewer learnt the technique whilst working...
+              <p></p>
+              ...reports valuable data from a centre with a huge amount of
+              departmental experience of providing awake spinal anaesthesia for
+              infant surgery. The vast majority of cases were done by a
+              consultant or fellow. This experience...
+              <p></p>
+              ...second dose? The author does not discuss the rationale and/or
+              evidence behind the choice of second spinal anaesthesia rather
+              than the alternative technique of a combined spinal followed by
+              caudal anaesthesia"
+            </blockquote>
+            <a
+              href="/reviews/special-considerations-in-the-premature-and-ex"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Special considerations in the premature and ex-premature infant
+              </h3>
+              <h5 class="text-muted">Premature infant</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia &amp; Intensive Care Medicine
+            </p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/oh-ryong-ryan-kwan">Dr Oh Ryong (Ryan) Kwen</a>
+            </p>
+            <blockquote class="blockquote">
+              "pathological consequences of prematurity in various systems, as
+              well as their subsequent implications in the provision of
+              anaesthesia. Its succinct description of the common pathological
+              processes of the prematurity makes this article very relevant...
+              <p></p>
+              ...daily practice. The author also provides caveats for different
+              phases of the anaesthesia which serves as a useful framework while
+              planning/delivering anaesthesia to this population. The
+              description of common neonatal surgical emergencies and their
+              clinical"
+            </blockquote>
+            <a
+              href="/reviews/2023-american-society-of-anesthesiologists"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                2023 American Society of Anesthesiologists Practice Guidelines
+                for Preoperative Fasting
+              </h3>
+              <h5 class="text-muted">
+                Carbohydrate-containing Clear Liquids with or without Protein,
+                Chewing Gum, and Pediatric Fasting Duration-A Modular Update of
+                the 2017 American Society of Anesthesiologists Practice
+                Guidelines for Preoperative Fasting
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesiology</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/don-hannah">Dr Don Hannah</a>
+            </p>
+            <blockquote class="blockquote">
+              "adults to drink carbohydrate-containing (CHO-containing) clear
+              liquids until 2 h before elective procedures requiring general
+              anaesthesia. When comparing CHO-containing and clear fluids: •
+              Patients reported less sensations of hunger • There were no
+              differences"
+            </blockquote>
+            <a
+              href="/reviews/a-review-of-pediatric-fasting-guidelines-and"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                A review of pediatric fasting guidelines and strategies to help
+                children manage preoperative fasting
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              September 2023 by
+              <a href="/about/david-pachter">Dr David Pachter</a>
+            </p>
+            <blockquote class="blockquote">
+              "adverse consequences of prolonged fasting times is one of the
+              age-old conundrums of paediatric anaesthesia. This article
+              summarises some of the recent updates in fasting guidelines that
+              have been published by various anaesthesia societies"
+            </blockquote>
+            <a
+              href="/reviews/inverse-ratio-ventilation-versus-conventional"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Inverse ratio ventilation versus conventional ratio ventilation
+                during one lung ventilation in neonatal open repair of
+                esophageal atresia/tracheoesophageal fistula
+              </h3>
+              <h5 class="text-muted">A randomized clinical trial.</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              July 2024 by <a href="/about/k-c-law">Dr K C Law</a>
+            </p>
+            <blockquote class="blockquote">
+              "comparable way at a neonatal intensive care unit preoperatively
+              under neonatologist guidance; had standardised anaesthesia
+              monitoring including preductal and postductal pulse oximetry;
+              standardised anaesthesia medication and maintenance aims
+              specifically keeping FiO2 at lower limit"
+            </blockquote>
+            <a
+              href="/reviews/pediatric-intraoperative-electromyographic"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Pediatric Intraoperative Electromyographic Responses at the
+                Adductor Pollicis and Flexor Hallucis Brevis Muscles
+              </h3>
+              <h5 class="text-muted">A Prospective, Comparative Analysis</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesia Analgesia</p>
+            <p class="mb-3">
+              August 2024 by
+              <a href="/about/aileen-fenelon">Dr Aileen Fenelon</a>
+            </p>
+            <blockquote class="blockquote">
+              "different between the two sites. Take Home Message - Routine
+              neuromuscular monitoring is possible in paediatric anaesthesia. -
+              The foot is an acceptable alternative when upper limbs
+              inaccessible. - Slight delay in block onset time at the foot...
+              <p></p>
+              ...administration of neuromuscular blocking agents. Considering
+              that neuromuscular monitoring has become a standard of care in
+              adult anaesthesia, this study is clinically relevant and timely.
+              As a small single centre study, it is unlikely...
+              <p></p>
+              ...change clinical practise but demonstrates the feasibility of
+              routine neuromuscular monitoring in paediatric anaesthesia, and
+              the possibility of safe and effective alternatives to adductor
+              pollicis muscle monitoring. The authors correctly conclude that
+              additional studies correlating"
+            </blockquote>
+            <a
+              href="/reviews/a-prospective-comparison-of-invasive-and-non"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                A prospective comparison of invasive and non-invasive blood
+                pressure in children undergoing cardiac catheterization
+              </h3>
+              <h5 class="text-muted">
+                Invasive blood pressure in children undergoing cardiac
+                catheterization
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              December 2023 by <a href="/about/su-may-koh">Dr Su May Koh</a>
+            </p>
+            <blockquote class="blockquote">
+              "high-risk cases. This is an important study as accuracy of blood
+              pressure monitoring is vital during anaesthesia especially during
+              high-risk anaesthesia or periods of hypotension. Invasive arterial
+              monitoring remains the gold standard...
+              <p></p>
+              ...measurements. The authors also highlight the limited studies
+              comparing NIBP and invasive BP monitoring in children under
+              anaesthesia, hence the importance of their study. The study
+              included patients for cardiac catheterisation where invasive BP
+              monitoring"
+            </blockquote>
+            <a
+              href="/reviews/point-of-care-ultrasonography-to-predict-fluid"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Point-of-care ultrasonography to predict fluid responsiveness in
+                children
+              </h3>
+              <h5 class="text-muted">
+                A systematic review and meta-analysis
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/justin-skowno">Dr Justin Skowno</a>
+            </p>
+            <blockquote class="blockquote">
+              "measurements and have high heterogeneity. Commentary Fluid
+              responsiveness is such a core diagnostic concept in paediatric
+              anaesthesia and critical care that we almost forget that, despite
+              not having a nice gold standard device to help"
+            </blockquote>
+            <a
+              href="/reviews/supplemental-intraoperative-crystalloids-for"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Supplemental intraoperative crystalloids for pediatric
+                postoperative nausea and vomiting
+              </h3>
+              <h5 class="text-muted">
+                A systematic review and meta-analysis
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/justin-skowno">Dr Justin Skowno</a>
+            </p>
+            <blockquote class="blockquote">
+              "PONV is an unpleasant complication of anaesthesia and surgery
+              that we should all be doing our best to minimise. This
+              meta-analysis cobbles together the relatively meagre number of
+              studies looking at the role...
+              <p></p>
+              ...fact that the studies didn’t use any anti-emetics, used mostly
+              sevoflurane and nitrous oxide (emetogenic anaesthesia) and no TIVA
+              was used. Thus, they may be fairly far from current state"
+            </blockquote>
+            <a
+              href="/reviews/the-effect-of-intraoperative-cerebral-oxygen"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                The effect of intraoperative cerebral oxygen desaturations on
+                postoperative cerebral oxygen metabolism in neonates and infants
+                a pilot study
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              June 2024 by <a href="/about/laura-panizza">Dr Laura Panizza</a>
+            </p>
+            <blockquote class="blockquote">
+              "from Germany and was published in Pediatric Anesthesia in 2024.
+              Thirty-seven neonates and infants undergoing general anaesthesia
+              for greater than 30 minutes and necessitating invasive arterial
+              blood pressure monitoring were enrolled. A non-invasive...
+              <p></p>
+              ...with the non-event group. Commentary: We already know cerebral
+              oxygen desaturation occurs in neonatal and infant anaesthesia. An
+              international multicentre observational study used near-infrared
+              spectroscopy (NIRS) to measure regional cerebral oxygenation and
+              reported...
+              <p></p>
+              ...arterial partial pressure of carbon dioxide (PaCO2), blood
+              pressure, and temperature. Haemoglobin, anaesthetic medications,
+              and depth of anaesthesia were not documented in this study.
+              Cerebral desaturations were associated with lower arterial
+              pressures, suggesting that adequate"
+            </blockquote>
+            <a
+              href="/reviews/the-influence-of-positive-end-expiratory-pressure"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                The Influence of Positive End-Expiratory Pressure on Leakage and
+                Oxygenation Using a Laryngeal Mask Airway
+              </h3>
+              <h5 class="text-muted">A Randomized Trial</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesia Analgesia</p>
+            <p class="mb-3">
+              September 2022 by
+              <a href="/about/liam-odoherty">Dr Liam O&#x27;Doherty</a>
+            </p>
+            <blockquote class="blockquote">
+              "group (ZEEP 49 ml/mbar vs PEEP 57 ml/mbar). No difference in
+              duration of surgery or duration of anaesthesia. No difference in
+              mild or severe desaturations in the PACU. No difference in PACU
+              length of stay"
+            </blockquote>
+            <a
+              href="/reviews/preoperative-clear-fluid-fasting-and-endoscopy"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Preoperative clear fluid fasting and endoscopy-measured gastric
+                fluid volume in children
+              </h3>
+              <h5 class="text-muted">
+                Measured gastric fluid volume in children
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              October 2023 by
+              <a href="/about/pallavi-kumar">Dr Pallavi Kumar</a>
+            </p>
+            <blockquote class="blockquote">
+              "gastric fluid. Take Home Message/Commentary 1) This study does
+              address a relevant and important question in clinical anaesthesia
+              – given there has been a push to reduce the clear fluid fasting
+              time from the standard...
+              <p></p>
+              ...strengths of this study are that it brings to light an
+              important question in paediatric anaesthesia – should we shorten
+              the clear fluid fasting time. 4) The limitations of this study are
+              that"
+            </blockquote>
+            <a
+              href="/reviews/videolaryngoscopy-in-neonates-a-narrative-review"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Videolaryngoscopy in neonates</h3>
+              <h5 class="text-muted">
+                A narrative review exploring the current state of the art
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Trends in Anaesthesia and Critical Care
+            </p>
+            <p class="mb-3">
+              March 2023 by <a href="/about/ashton-speed">Dr Ashton Speed</a>
+            </p>
+            <blockquote class="blockquote">
+              "first pass intubation in neonates and infants &lt;6.5kg by 5%.
+              The Neonate and Children adult of Anaesthesia practise in Europe
+              (NECTARINE) observational cohort study of critical events during
+              anaesthesia in neonates and infants found"
+            </blockquote>
+            <a
+              href="/reviews/reducing-the-environmental-impact-of-mask"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Reducing the environmental impact of mask inductions in children
+              </h3>
+              <h5 class="text-muted">A quality improvement report</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              December 2023 by
+              <a href="/about/tracy-jackson">Dr Tracy Jackson</a>
+            </p>
+            <blockquote class="blockquote">
+              "usage with repeat education, visual reminders of recommended
+              minimum FGF rates, FGF rates as screen saver on anaesthesia work
+              stations. The authors analysed 33 285 anaesthesia records over a
+              20 month period. Emergency surgery, planned"
+            </blockquote>
+            <a
+              href="/reviews/possibilities-and-challenges-for-artificial"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Possibilities and challenges for artificial intelligence and
+                machine learning in perioperative care
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              British Journal of Anaesthesia Education
+            </p>
+            <p class="mb-3">
+              September 2023 by
+              <a href="/about/hamish-johnston">Dr Hamish Johnston</a>
+            </p>
+            <blockquote class="blockquote">
+              "pitfalls when AI is integrated into medicine is then discussed.
+              Take home messages/commentary: AI applications relevant to
+              anaesthesia that are currently under development include risk
+              prediction modelling, estimating surgical time, risk of surgery
+              cancellation, ultrasound"
+            </blockquote>
+            <a
+              href="/reviews/the-relationship-between-gastric-ultrasound"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                The relationship between gastric ultrasound findings and
+                endoscopically aspirated volume in infants and determining the
+                antral cutoff value for empty stomach diagnosis
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              August 2024 by
+              <a href="/about/aisling-gormley">Dr Aisling Gormley</a>
+            </p>
+            <blockquote class="blockquote">
+              "those of us less experienced with gastric ultrasound may need to
+              upskill prior to committing to anaesthesia based on our ultrasound
+              findings alone"
+            </blockquote>
+            <a
+              href="/reviews/bilateral-erector-spinae-plane-blocks-in-children"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Bilateral erector spinae plane blocks in children undergoing
+                cardiac surgery
+              </h3>
+              <h5 class="text-muted">A randomized, controlled study</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Journal of Clinical Anesthesia</p>
+            <p class="mb-3">
+              September 2022 by <a href="/about/neil-hauser">Dr Neil Hauser</a>
+            </p>
+            <blockquote class="blockquote">
+              "Blocks were performed at a standardized period in the
+              perioperative journey (prior to surgery &amp; after induction of
+              anaesthesia). Weakness of the study were the small number of
+              patients included and no explanation"
+            </blockquote>
+            <a
+              href="/reviews/natural-airway-as-an-alternative-to-intubation"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Natural airway as an alternative to intubation for pediatric
+                endoscopic esophageal foreign body removal
+              </h3>
+              <h5 class="text-muted">
+                A retrospective cohort study of 326 patients
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              August 2024 by <a href="/about/chloe-heath">Dr Chloe Heath</a>
+            </p>
+            <blockquote class="blockquote">
+              "bodies (EFB) in children is an urgent or emergency procedure
+              traditionally performed with endotracheal intubation under general
+              anaesthesia. A shift in practice has seen use of a natural airway
+              combined with propofol based anaesthesia...
+              <p></p>
+              ...technique referred to as Monitored Anaesthesia Care (MAC) in
+              select patients. This single-centre retrospective cohort study
+              looked at flexible endoscopic EFB removal in children (aged 1.6 –
+              8.2 years) comparing the MAC and endotracheal intubation...
+              <p></p>
+              ...proximal versus distal EFB. Intubation was associated with a
+              median of 15 minutes extra operating time. Post anaesthesia care
+              unit times were similar between groups (no statistically
+              significant difference). Commentary and Take Home Messages"
+            </blockquote>
+            <a
+              href="/reviews/the-effect-of-hyperventilation-versus"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                The effect of hyperventilation versus normoventilation on
+                cerebral oxygenation using near infrared spectroscopy in
+                children undergoing posterior fossa tumor resection
+              </h3>
+              <h5 class="text-muted">
+                A randomized controlled cross-over trial
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia Critical Care &amp; Pain Medicine
+            </p>
+            <p class="mb-3">
+              March 2023 by <a href="/about/rosalyn-boyd">Dr Rosalyn Boyd</a>
+            </p>
+            <blockquote class="blockquote">
+              "between the groups. Commentary This study helps to clarify the
+              utility of different ventilation strategies during neuro
+              anaesthesia. Hyperventilation has historically been used as a
+              strategy to emergently reduce ICP through its effect on cerebral"
+            </blockquote>
+            <a
+              href="/reviews/dexmedetomidine-diminishes-but-does-not-prevent"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Dexmedetomidine Diminishes, but Does Not Prevent, Developmental
+                Effects of Sevoflurane in Neonatal Rats
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesia Analgesia</p>
+            <p class="mb-3">
+              September 2022 by <a href="/about/suze-bruins">Dr Suze Bruins</a>
+            </p>
+            <blockquote class="blockquote">
+              "samples for in vitro studies. A subset was instrumented for EEG.
+              Baseline recordings and recordings whilst receiving anaesthesia
+              were made. Blood was taken on completion of the EEG recording for
+              corticosterone levels. Primary outcome...
+              <p></p>
+              ...changes found in DNA methylation marks lead to transcriptional,
+              translational, and functional abnormalities. DEX alone, without
+              SEVO anaesthesia, did not cause acute or long-term functional
+              abnormalities. Summary: Small animal study that suggests
+              administering dexmedetomidine"
+            </blockquote>
+            <a
+              href="/reviews/high-flow-nasal-oxygen-for-childrens-airway"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                High-flow nasal oxygen for children&#x27;s airway surgery to
+                reduce hypoxaemic events
+              </h3>
+              <h5 class="text-muted">A randomised controlled trial</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">The Lancet Respiratory Medicine</p>
+            <p class="mb-3">
+              November 2024 by
+              <a href="/about/richard-barnes">Dr Richard Barnes</a>
+            </p>
+            <blockquote class="blockquote">
+              "certain advantages: the ability to deliver sevoflurane (which was
+              chosen either alone or in combination with intravenous anaesthesia
+              in half the standard care cases); and the ability to deliver
+              positive pressure without surgical interruption. From"
+            </blockquote>
+            <a
+              href="/reviews/respiratory-adverse-events-after-lma-mask-removal"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Respiratory Adverse Events After LMA® Mask Removal in Children
+              </h3>
+              <h5 class="text-muted">
+                A Randomized Trial Comparing Propofol to Sevoflurane
+              </h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesia Analgesia</p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/justin-skowno">Dr Justin Skowno</a>
+            </p>
+            <blockquote class="blockquote">
+              "This RCT in 134 low risk children having general anaesthesia with
+              an LMA were randomized between propofol and sevoflurane
+              anaesthesia, with fentanyl analgesia, awake LMA removal and other
+              clinical processes standardized between groups. They measure"
+            </blockquote>
+            <a
+              href="/reviews/ultrasound-assessment-of-gastric-fluid-volume-in"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Ultrasound Assessment of Gastric Fluid Volume in Children
+                Scheduled for Elective Surgery After Clear Fluid Fasting for 1
+                Versus 2 Hours
+              </h3>
+              <h5 class="text-muted">A Randomized Controlled Trial</h5></a
+            >
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesia Analgesia</p>
+            <p class="mb-3">
+              March 2023 by <a href="/about/david-stoeter">Dr David Stoeter</a>
+            </p>
+            <blockquote class="blockquote">
+              "fluid volumes after a 1-hour versus a 2-hour clear fluid fast in
+              children undergoing general anaesthesia for elective surgery. It
+              is the first utilising ultrasound. The authors (from a major
+              university hospital"
+            </blockquote>
+            <a
+              href="/reviews/population-pharmacokinetics-of-single-bolus-dose"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Population Pharmacokinetics of Single Bolus Dose Fentanyl in
+                Obese Children
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Anesthesia Analgesia</p>
+            <p class="mb-3">
+              June 2024 by <a href="/about/mark-moll">Dr Mark Moll</a>
+            </p>
+            <blockquote class="blockquote">
+              "significant problem. Obesity may alter the pharmacokinetics (PKs)
+              of many medications. Fentanyl is commonly used in paediatric
+              anaesthesia, but there is a paucity in the pharmacokinetics of
+              bolus dose fentanyl data in obese children. Study...
+              <p></p>
+              ...mean TBW of 15.8 kg. - No additional doses of fentanyl for the
+              procedure or in the post-anaesthesia care unit. - Additional
+              opioid and anaesthetic medications were administered at the
+              discretion of the anaesthetist. Additional opioids...
+              <p></p>
+              ...administered during the case and in the post anaesthesia care
+              unit were tracked and converted to morphine milligram equivalents
+              for analysis. - Adverse respiratory events requiring bag mask
+              ventilation were concurrently recorded. Commentry:
+              Adenotonsillectomy"
+            </blockquote>
+            <a
+              href="/reviews/its-time-to-stop-using-nitrous-oxide-for"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                It&#x27;s time to stop using nitrous oxide for pediatric mask
+                induction
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              June 2024 by <a href="/about/andrew-chazan">Dr Andrew Chazan</a>
+            </p>
+            <blockquote class="blockquote">
+              "aimed at getting anaesthetists to reconsider the routine use of
+              nitrous oxide in mask induction of anaesthesia. The points raised
+              in the article include: Greater time until desaturation in the
+              event of laryngospasm...
+              <p></p>
+              ...potentially flawed. The main studies looking at this phenomenon
+              reportedly involved using halothane +/- N2O in adult patients.
+              Anaesthesia of small children with sevoflurane is a different
+              pharmacological and physiological scenario. The article concludes
+              with"
+            </blockquote>
+            <a
+              href="/reviews/should-we-change-women-to-become-leaders-or"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">
+                Should we change women to become leaders or should we change
+                leadership for everyone?
+              </h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">Pediatric Anesthesia</p>
+            <p class="mb-3">
+              January 2023 by <a href="/about/susan-hale">Dr Susan Hale</a>
+            </p>
+            <blockquote class="blockquote">
+              "This editorial, written by authors from the Department of
+              Anaesthesia and Pain Management at Perth Children’s Hospital,
+              describes various initiatives such as the Woman’s Empowerment and
+              Leadership Initiative (WELI) and ANZCA’s Panel"
+            </blockquote>
+            <a
+              href="/reviews/cardiac-disease-in-neonates"
+              class="text-decoration-none mb-0"
+              ><h3 class="mb-0">Cardiac disease in neonates</h3>
+              <h5 class="text-muted"></h5
+            ></a>
+            <div class="mb-3"></div>
+            <p class="mb-0 fst-italic">
+              Anaesthesia &amp; Intensive Care Medicine
+            </p>
+            <p class="mb-3">
+              January 2023 by
+              <a href="/about/oh-ryong-ryan-kwan">Dr Oh Ryong (Ryan) Kwen</a>
+            </p>
+            <blockquote class="blockquote">
+              "well as several congenital cardiac abnormalities and their
+              presentations. It is very relevant to the paediatric anaesthesia
+              as congenital heart disease represents the most common significant
+              congenital abnormality. The succinct description of the
+              pathophysiology"
+            </blockquote>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="position-sticky" style="top: 2rem">
+            <div class="p-3 mb-3 bg-body-tertiary rounded">
+              <h4 class="fst-italic">About</h4>
+              <p class="mb-0">
+                Journal Watch is a community of SPANZA members who work to
+                identify and review articles of interest in the paediatric
+                anaesthesia literature.
+              </p>
+              <hr />
+              <p class="mb-0">
+                Subscribe for email updates, or
+                <a
+                  href="mailto:queries@journalwatch.org.au?subject=Journal Watch enquiry"
+                  >contact us</a
+                >
+                to get involved.
+              </p>
+            </div>
+            <div class="">
+              <h4 class="fst-italic">Issues</h4>
+              <ul class="list-unstyled">
+                <li>
+                  <a
+                    class="d-flex flex-column flex-lg-row gap-3 align-items-start align-items-lg-center p-3 p-md-0 py-md-3 link-body-emphasis text-decoration-none border-top"
+                    href="/issues/november-2024"
+                  >
+                    <div class="col-4 d-none d-lg-block">
+                      <svg
+                        class="rounded"
+                        height="150"
+                        width="100%"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                        preserveAspectRatio="xMidYMid slice"
+                        focusable="false"
+                      >
+                        <rect width="100%" height="100%" fill="#777" />
+                      </svg>
+                    </div>
+                    <div class="col-lg-8">
+                      <h6 class="mb-0">November 2024</h6>
+                      <small class="text-body-secondary"
+                        >Articles from July 2024 onwards</small
+                      >
+                    </div>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class="d-flex flex-column flex-lg-row gap-3 align-items-start align-items-lg-center p-3 p-md-0 py-md-3 link-body-emphasis text-decoration-none border-top"
+                    href="/issues/september-2024"
+                  >
+                    <div class="col-4 d-none d-lg-block">
+                      <svg
+                        class="rounded"
+                        height="150"
+                        width="100%"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                        preserveAspectRatio="xMidYMid slice"
+                        focusable="false"
+                      >
+                        <rect width="100%" height="100%" fill="#777" />
+                      </svg>
+                    </div>
+                    <div class="col-lg-8">
+                      <h6 class="mb-0">September 2024</h6>
+                      <small class="text-body-secondary"
+                        >Articles from May 2024 onwards</small
+                      >
+                    </div>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class="d-flex flex-column flex-lg-row gap-3 align-items-start align-items-lg-center p-3 p-md-0 py-md-3 link-body-emphasis text-decoration-none border-top"
+                    href="/issues/august-2024"
+                  >
+                    <div class="col-4 d-none d-lg-block">
+                      <svg
+                        class="rounded"
+                        height="150"
+                        width="100%"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                        preserveAspectRatio="xMidYMid slice"
+                        focusable="false"
+                      >
+                        <rect width="100%" height="100%" fill="#777" />
+                      </svg>
+                    </div>
+                    <div class="col-lg-8">
+                      <h6 class="mb-0">August 2024</h6>
+                      <small class="text-body-secondary"
+                        >Articles from March 2024 onwards</small
+                      >
+                    </div>
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div class="p-3 p-md-0 py-md-4">
+              <h4 class="fst-italic">Topics</h4>
+              <ol class="list-unstyled mb-0">
+                <li><a href="/tags/neonate">#neonate</a></li>
+                <li><a href="/tags/airway">#airway</a></li>
+                <li><a href="/tags/ultrasound">#ultrasound</a></li>
+                <li><a href="/tags/regional">#regional</a></li>
+                <li><a href="/tags/cardiac">#cardiac</a></li>
+                <li><a href="/tags/guideline">#guideline</a></li>
+                <li><a href="/tags/volatile">#volatile</a></li>
+                <li><a href="/tags/equipment">#equipment</a></li>
+              </ol>
+            </div>
+            <div class="p-3 p-md-0 py-md-4">
+              <h4 class="fst-italic">Links</h4>
+              <ol class="list-unstyled">
+                <li>
+                  <a
+                    href="https://www.spanza.org.au/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >SPANZA</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://www.spanza.org.au/resources-links/publications/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Journal Watch archives</a
+                  >
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <footer class="py-5 text-center text-body-secondary bg-body-tertiary">
+      <a
+        href="https://www.spanza.org.au/"
+        target="_blank"
+        rel="noopener noreferrer"
+        ><img
+          src="/static/images/logo/spanza-logo-blue.png"
+          alt="SPANZA Logo"
+          width="300"
+          class="py-3"
+      /></a>
+      <p class="mb-5"><a href="#">Back to top</a></p>
+    </footer>
+  </body>
+</html>

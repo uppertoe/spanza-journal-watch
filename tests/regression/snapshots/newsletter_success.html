@@ -1,0 +1,18 @@
+<div
+  class="col-sm-4 d-flex order-2 order-sm-1 justify-content-center justify-content-sm-start align-items-center"
+  id="subscribe-container"
+>
+  <a
+    class="btn btn-outline-secondary btn-sm"
+    href="#"
+    hx-get="/newsletter/subscribe"
+    hx-target="#subscribe-container"
+    hx-swap="innerHTML transition:true"
+    >Subscribe</a
+  >
+</div>
+<div
+  class="container-fluid p-0 sticky-top"
+  id="oob-message"
+  hx-swap-oob="true"
+></div>

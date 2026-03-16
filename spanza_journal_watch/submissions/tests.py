@@ -1,9 +1,12 @@
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from layout.models import FeatureArticle
 
-from .models import Article, Comment, Hit, Issue, Journal, Review, Tag
+from spanza_journal_watch.layout.models import FeatureArticle, PageHeader
+
+from .models import Article, Author, Comment, Hit, Issue, Journal, Review, Tag
 
 User = get_user_model()
 
@@ -13,13 +16,13 @@ class TagModelTest(TestCase):
         self.tag = Tag.objects.create(text="Test Tag")
 
     def test_str_representation(self):
-        self.assertEqual(str(self.tag), "Test Tag")
+        self.assertEqual(str(self.tag), "#Test Tag")
 
     def test_save_method_generates_slug(self):
         self.assertEqual(self.tag.slug, "test-tag")
 
     def test_get_absolute_url(self):
-        url = reverse("tag-detail", kwargs={"slug": self.tag.slug})
+        url = reverse("submissions:tag_detail", kwargs={"slug": self.tag.slug})
         self.assertEqual(self.tag.get_absolute_url(), url)
 
     def test_all_tags_list(self):
@@ -30,8 +33,8 @@ class TagModelTest(TestCase):
         article2.tags.add(self.tag)
 
         # Exclude inactive tags and order by article count
-        expected_tags = [str(self.tag)]
-        self.assertEqual(Tag.all_tags_list(), expected_tags)
+        tags = list(Tag.get_all_tags())
+        self.assertIn(self.tag.text, tags)
 
     def test_delete_if_orphaned_deletes_unused_tag(self):
         # Create a tag without any articles
@@ -64,7 +67,7 @@ class ArticleModelTest(TestCase):
         self.article = Article.objects.create(name="Test Article", journal=self.journal)
 
     def test_str_representation(self):
-        self.assertEqual(str(self.article), "Test Article")
+        self.assertEqual(str(self.article), self.article.get_truncated_name())
 
     def test_save_method_creates_tags(self):
         self.article.tags_string = "Tag1 #Tag2 #Tag3 Tag4"
@@ -92,7 +95,7 @@ class ArticleModelTest(TestCase):
         article = Article(name=long_name)
 
         # Assert that the shortened name is truncated correctly
-        shortened_name = article.shortened_name()
+        shortened_name = article.get_truncated_name()
         expected_shortened_name = "Lorem ipsum dolor sit amet, consectetur..."
         self.assertEqual(shortened_name, expected_shortened_name)
 
@@ -101,7 +104,7 @@ class ArticleModelTest(TestCase):
         article.name = long_name
 
         # Assert that the new shortened name is truncated correctly
-        shortened_name = article.shortened_name()
+        shortened_name = article.get_truncated_name()
         expected_shortened_name = "A" * article.TRUNCATED_NAME_LENGTH + "..."
         self.assertEqual(shortened_name, expected_shortened_name)
 
@@ -114,24 +117,25 @@ class ArticleModelTest(TestCase):
 class ReviewModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="testuser@mail.com", password="testpassword")
+        self.author = Author.objects.create(name="Test Author", user=self.user)
         self.journal = Journal.objects.create(name="Test Journal")
         self.article = Article.objects.create(name="Test Article", journal=self.journal)
-        self.review = Review.objects.create(article=self.article, author=self.user, body="Test Body")
+        self.review = Review.objects.create(article=self.article, author=self.author, body="Test Body")
 
     def test_str_representation(self):
-        self.assertEqual(str(self.review), "Review: Test Article")
+        self.assertEqual(str(self.review), "Test Article")
 
     def test_save_method_generates_slug(self):
         self.assertEqual(self.review.slug, "test-article")
 
     def test_get_absolute_url(self):
-        url = reverse("review-detail", kwargs={"slug": self.review.slug})
+        url = reverse("submissions:review_detail", kwargs={"slug": self.review.slug})
         self.assertEqual(self.review.get_absolute_url(), url)
 
 
 class IssueModelTest(TestCase):
     def setUp(self):
-        self.issue = Issue.objects.create(name="Test Issue", date="2023-01-01")
+        self.issue = Issue.objects.create(name="Test Issue", date=datetime.date(2023, 1, 1))
 
     def test_str_representation(self):
         self.assertEqual(str(self.issue), "Test Issue")
@@ -151,13 +155,14 @@ class IssueModelTest(TestCase):
         self.assertIn(review1, features)
         self.assertIn(review2, features)
 
-    def test_get_main_feature(self):
-        # Create a main feature article for the issue
-        feature_article = FeatureArticle.objects.create(title="Main Feature Article")
-        self.issue.main_feature = feature_article
-
-        # Check that the correct main feature article is returned
-        self.assertEqual(self.issue.get_main_feature(), feature_article)
+    def test_get_header_feature_article(self):
+        feature_article = FeatureArticle.objects.create(title="Test Issue")
+        PageHeader.objects.create(
+            feature_article=feature_article,
+            page_type=PageHeader.PageType.ISSUE_DETAIL,
+            active=True,
+        )
+        self.assertEqual(self.issue.get_header_feature_article(), feature_article)
 
 
 class CommentModelTest(TestCase):

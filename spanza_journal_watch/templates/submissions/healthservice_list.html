@@ -8,29 +8,42 @@
 </div>
 {% endblock main-feature %}
 {% block article-block %}
-<div class="container pt-3">
-    {% for service in health_services %}
-    <div class="row g-4 pb-5 d-flex align-items-start justify-content-start ">
-        <div class="col-12 col-lg-3">
-            {% if service.is_logo_authorised %}
-            <div class="fs-2 mb-3">
-                <img src="{{ service.logo.url }}" height="100" class="w-100 object-fit-contain">
-            </div>
-            {% else %}
-            <div class="fs-2 mb-3">
-                <svg class="rounded" height="100" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#777"/></svg>
-            </div>
-            {% endif %}
+<form
+    id="about-filter-form"
+    class="card card-body mb-3"
+    hx-get="{% url "submissions:about" %}"
+    hx-target="#about-results"
+    hx-push-url="true"
+    hx-trigger="change"
+>
+    <div class="row g-2 align-items-center">
+        <div class="col-12 col-lg-7">
+            <input
+                type="search"
+                name="q"
+                class="form-control"
+                placeholder="Filter by health service or contributor"
+                value="{{ query|default:'' }}"
+                hx-get="{% url "submissions:about" %}"
+                hx-target="#about-results"
+                hx-include="#about-filter-form"
+                hx-trigger="input changed delay:300ms, search"
+                hx-push-url="true">
         </div>
-        <div class="col-12 col-lg-6">
-            <h3 class="fs-2 text-body-emphasis">{{ service }}</h3>
-            {% for author in service.authors.all %}
-            <p><a href="{{ author.get_absolute_url}}" class="text-decoration-none">{{ author }}</a>
-                {% comment "" %}<br><small>{{ author.get_review_count }} review{{ author.get_review_count|pluralize }}</small>{% endcomment %}
-            </p>
-            {% endfor %}
+        <div class="col-12 col-sm-7 col-lg-3">
+            <select class="form-select" name="sort" aria-label="Sort services">
+                <option value="contributors" {% if sort == "contributors" %}selected{% endif %}>Contributors (high to low)</option>
+                <option value="reviews" {% if sort == "reviews" %}selected{% endif %}>Reviews (high to low)</option>
+                <option value="name" {% if sort == "name" %}selected{% endif %}>Name A–Z</option>
+            </select>
+        </div>
+        <div class="col-12 col-sm-5 col-lg-2 d-grid d-lg-flex justify-content-lg-end">
+            <a class="btn btn-outline-secondary" href="{% url "submissions:about" %}" hx-get="{% url "submissions:about" %}" hx-target="#about-results" hx-push-url="true">Clear</a>
         </div>
     </div>
-    {% endfor %}
+</form>
+
+<div id="about-results">
+    {% include "submissions/fragments/healthservice_cards.html" %}
 </div>
 {% endblock article-block %}

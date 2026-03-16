@@ -1,0 +1,24 @@
+{% load static %}
+<div class="row justify-content-center py-4 py-md-5">
+  <div class="col-12 col-lg-8 col-xl-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4 p-md-5 text-center">
+        <div class="mb-3">
+          <img src="{% static image_path %}" alt="{{ status_code }}" width="72" height="72">
+        </div>
+        <p class="text-uppercase text-secondary fw-semibold mb-2">Error {{ status_code }}</p>
+        <h1 class="h3 mb-3">{{ heading }}</h1>
+        <p class="text-body-secondary mb-4">{{ message }}</p>
+
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+          <a class="btn btn-primary" href="{% url 'home' %}">Go to home</a>
+          <a class="btn btn-outline-secondary" href="{% url 'submissions:issue_list' %}">Browse issues</a>
+        </div>
+
+        {% if extra_message %}
+          <p class="small text-body-secondary mt-4 mb-0">{{ extra_message }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

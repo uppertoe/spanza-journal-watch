@@ -1,8 +1,9 @@
 from http import HTTPStatus
 
-from django.test import SimpleTestCase, TestCase
+from django.test import TestCase
 from django.urls import reverse
-from submissions.models import Article, Issue, Review
+
+from spanza_journal_watch.submissions.models import Article, Issue, Review
 
 from .models import FeatureArticle, Homepage
 
@@ -21,13 +22,14 @@ class FeatureArticleModelTest(TestCase):
 
     def test_get_absolute_url(self):
         article = FeatureArticle.objects.create(title="Test Article")
-        url = reverse("feature_article_detail", kwargs={"slug": article.slug})
+        url = reverse("layout:feature_article_detail", kwargs={"slug": article.slug})
 
         self.assertEqual(article.get_absolute_url(), url)
 
 
 class HomepageModelTest(TestCase):
     def setUp(self):
+        Homepage.objects.all().delete()
         self.issue = Issue.objects.create(name="Test Issue")
         self.homepage = Homepage.objects.create(issue=self.issue)
 
@@ -48,26 +50,7 @@ class HomepageModelTest(TestCase):
 
         self.assertIsNone(Homepage.get_current_homepage())
 
-    def test_get_main_feature_with_override(self):
-        self.homepage.override_main = True
-        feature_article = FeatureArticle.objects.create(title="Test Feature Article")
-        self.homepage.main_feature = feature_article
-        self.homepage.save()
-
-        main_feature = self.homepage.get_main_feature()
-
-        self.assertEqual(main_feature, feature_article)
-
-    def test_get_main_feature_without_override(self):
-        feature_article = FeatureArticle.objects.create(title="Test Feature Article")
-        self.issue.main_feature = feature_article
-        self.issue.save()
-
-        main_feature = self.homepage.get_main_feature()
-
-        self.assertEqual(main_feature, feature_article)
-
-    def test_get_articles(self):
+    def test_get_card_features(self):
         article1 = Article.objects.create(name="Article 1")
         article2 = Article.objects.create(name="Article 2")
         article3 = Article.objects.create(name="Article 3")
@@ -77,15 +60,13 @@ class HomepageModelTest(TestCase):
         review4 = Review.objects.create(article=article3, is_featured=True, active=False)
         self.issue.reviews.add(review1, review2, review3, review4)
 
-        articles = self.homepage.get_articles()
+        card_features = self.homepage.get_card_features()
 
-        self.assertEqual(articles["features"].count(), 1)
-        self.assertEqual(articles["features"][0], review1)
-        self.assertEqual(articles["body_articles"].count(), 3)
-        self.assertListEqual(list(articles["body_articles"]), [review1, review2, review3])
+        self.assertEqual(card_features.count(), 1)
+        self.assertEqual(card_features[0], review1)
 
 
-class FaviconFileTests(SimpleTestCase):
+class FaviconFileTests(TestCase):
     def test_get(self):
         names = [
             "android-chrome-192x192.png",

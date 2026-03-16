@@ -1,0 +1,6 @@
+# Docs-only requirements for Read the Docs
+
+-r base.in
+
+sphinx
+sphinx-autobuild

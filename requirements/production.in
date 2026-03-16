@@ -1,0 +1,16 @@
+-r base.in
+
+# Production-only
+
+# WSGI server
+gunicorn
+
+# Postgres adapter
+psycopg2
+
+# Error reporting
+sentry-sdk
+
+# Django integrations
+django-storages[boto3]
+django-anymail[amazon-ses]

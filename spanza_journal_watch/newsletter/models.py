@@ -1,5 +1,6 @@
 import base64
 import uuid
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -15,70 +16,10 @@ from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contr
 from spanza_journal_watch.utils.functions import get_domain_url
 from spanza_journal_watch.utils.modelmethods import name_image
 
-from .tasks import send_newsletter
-
-
-class ElementImage(models.Model):
-    UPCHEVRON = "UP"
-    DOWNCHEVRON = "DN"
-    LOGO = "LO"
-    HEADING = "HE"
-    OTHER = "OT"
-    CHOICES = [
-        (UPCHEVRON, "Up chevron"),
-        (DOWNCHEVRON, "Down chevron"),
-        (LOGO, "Logo"),
-        (HEADING, "Heading"),
-        (OTHER, "Other"),
-    ]
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=2, choices=CHOICES, default=OTHER, unique=True)
-    image = models.ImageField(
-        upload_to=name_image,
-        blank=True,
-        null=True,
-    )
-
-    @classmethod
-    def _get_unique_image_url(cls, type):
-        try:
-            url = cls.objects.get(type=type).image.url
-        except cls.DoesNotExist:  # Still raises MultipleObjectsReturned
-            url = None
-        return url
-
-    @classmethod
-    def get_up_chevron_url(cls):
-        return cls._get_unique_image_url(cls.UPCHEVRON)
-
-    @classmethod
-    def get_down_chevron_url(cls):
-        return cls._get_unique_image_url(cls.DOWNCHEVRON)
-
-    @classmethod
-    def get_heading_url(cls):
-        return cls._get_unique_image_url(cls.HEADING)
-
-    @classmethod
-    def get_logo_url(cls):
-        return cls._get_unique_image_url(cls.LOGO)
-
-    def save(self, *args, **kwargs):
-        # Ensure only a single instance of each type is created
-        if not self.pk:
-            try:
-                # Update existing instance
-                instance = ElementImage.objects.get(type=self.type)
-                self.pk = instance.pk
-            except ElementImage.DoesNotExist:
-                # Create new instance
-                pass
-
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
+EMAIL_ASSET_UP_CHEVRON_URL = "/media/uploads/elementimage/up-chevron-image.png"
+EMAIL_ASSET_DOWN_CHEVRON_URL = "/media/uploads/elementimage/down-chevron-image.png"
+EMAIL_ASSET_LOGO_URL = "/media/uploads/elementimage/logo-image.png"
+EMAIL_ASSET_HEADING_URL = "/media/uploads/elementimage/heading-image.png"
 
 
 class Subscriber(models.Model):
@@ -101,7 +42,10 @@ class Subscriber(models.Model):
         context = {
             "domain": domain,
             "image_domain": image_domain,
-            "element": ElementImage,
+            "email_up_chevron_url": EMAIL_ASSET_UP_CHEVRON_URL,
+            "email_down_chevron_url": EMAIL_ASSET_DOWN_CHEVRON_URL,
+            "email_logo_url": EMAIL_ASSET_LOGO_URL,
+            "email_heading_url": EMAIL_ASSET_HEADING_URL,
             "subscriber": self,
             "tracker": click_tracker(self.email),
         }
@@ -122,18 +66,14 @@ class Subscriber(models.Model):
         context = self.get_email_context()
         body = Subscriber.generate_confirmation_email_txt(context)
         html = Subscriber.generate_confirmation_email_html(context)
-        unsubscribe_header = self.get_unsubscribe_link()
+        headers = self.get_list_unsubscribe_headers()
 
         email = mail.EmailMultiAlternatives(
             subject="Journal Watch Subscription",
             body=body,
             from_email="SPANZA Journal Watch <subscribe@journalwatch.org.au>",
             to=[self.email],
-            headers={
-                "List-Unsubscribe": f"<{unsubscribe_header}>",
-                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
-            },
+            headers=headers,
         )
         email.attach_alternative(html, "text/html")
         return email
@@ -151,6 +91,19 @@ class Subscriber(models.Model):
             domain = Site.objects.get_current().domain
             return f"https://{domain}{path}"
         return path
+
+    def get_list_unsubscribe_headers(self):
+        one_click_url = self.get_unsubscribe_link(absolute=True)
+        mailto = f"mailto:unsubscribe@journalwatch.org.au?subject={quote('unsubscribe')}"
+        return {
+            "List-Unsubscribe": f"<{mailto}>, <{one_click_url}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
+            "Precedence": "bulk",
+            "Auto-Submitted": "auto-generated",
+            "X-Auto-Response-Suppress": "All",
+            "Feedback-ID": "journalwatch:newsletter:spanza",
+        }
 
     @classmethod
     def get_valid_subscribers(cls, test_email=True):
@@ -183,6 +136,7 @@ class Newsletter(models.Model):
     ready_to_send = models.BooleanField(default=False)
     is_sent = models.BooleanField(default=False)
     is_test_sent = models.BooleanField(default=False)
+    resend_enabled = models.BooleanField(default=False)
     issue = models.ForeignKey(Issue, on_delete=models.PROTECT)
     header_image = models.ImageField(
         upload_to=name_image,
@@ -234,7 +188,10 @@ class Newsletter(models.Model):
             "non_featured_reviews": self.get_non_featured_reviews(count=self.non_featured_review_count),
             "domain": domain,
             "image_domain": image_domain,
-            "element": ElementImage,
+            "email_up_chevron_url": EMAIL_ASSET_UP_CHEVRON_URL,
+            "email_down_chevron_url": EMAIL_ASSET_DOWN_CHEVRON_URL,
+            "email_logo_url": EMAIL_ASSET_LOGO_URL,
+            "email_heading_url": EMAIL_ASSET_HEADING_URL,
         }
         return context
 
@@ -256,17 +213,13 @@ class Newsletter(models.Model):
             context["subscriber"] = subscriber
             context["pixel"] = NewsletterOpen.render_tracking_pixel(subscriber.email, token)
             context["tracker"] = NewsletterClick.generate_tracking_link(subscriber.email, token)
-            unsubscribe_header = subscriber.get_unsubscribe_link()
+            headers = subscriber.get_list_unsubscribe_headers()
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
                 body=self.generate_txt_content(context),
                 from_email="SPANZA Journal Watch <newsletter@journalwatch.org.au>",
                 to=[subscriber.email],
-                headers={
-                    "List-Unsubscribe": f"<{unsubscribe_header}>",
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                    "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
-                },
+                headers=headers,
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
 
@@ -278,7 +231,7 @@ class Newsletter(models.Model):
 
     # Send emails
     def is_ready_to_send(self):
-        return self.ready_to_send and self.is_test_sent and not self.is_sent
+        return self.ready_to_send and self.is_test_sent and (not self.is_sent or self.resend_enabled)
 
     def send_test_email(self):
         pass
@@ -287,8 +240,41 @@ class Newsletter(models.Model):
         pass
 
     def save(self, *args, **kwargs):
+        previous = None
+        if self.pk:
+            previous = (
+                Newsletter.objects.filter(pk=self.pk)
+                .values(
+                    "subject",
+                    "content_heading",
+                    "content",
+                    "issue_id",
+                    "header_image",
+                    "non_featured_review_count",
+                )
+                .first()
+            )
+
         if not self.email_token:
             self.email_token = self.generate_email_token()
+
+        if previous:
+            old_header_image = previous["header_image"] or ""
+            new_header_image = self.header_image.name if self.header_image else ""
+
+            content_changed = any(
+                [
+                    previous["subject"] != self.subject,
+                    previous["content_heading"] != self.content_heading,
+                    previous["content"] != self.content,
+                    previous["issue_id"] != self.issue_id,
+                    previous["non_featured_review_count"] != self.non_featured_review_count,
+                    old_header_image != new_header_image,
+                ]
+            )
+
+            if content_changed:
+                self.is_test_sent = False
 
         # Refresh send token on every save
         self.send_token = self.generate_email_token()
@@ -298,9 +284,6 @@ class Newsletter(models.Model):
         if self.header_image and not self.header_image_processed:
             celery_resize_greyscale_contrast_image.delay(self.header_image.name)
             Newsletter.objects.filter(pk=self.pk).update(header_image_processed=True)
-
-        if not self.is_test_sent:
-            send_newsletter.apply_async((self.pk,), {"test_email": True}, countdown=1)
 
     def __str__(self):
         return self.subject

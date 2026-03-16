@@ -1,9 +1,12 @@
+from django.core.cache import cache
 from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
 from spanza_journal_watch.analytics.models import PageView
+from spanza_journal_watch.analytics.utils import is_probable_automated_event
 from spanza_journal_watch.submissions.models import Hit, Issue, Tag
+from spanza_journal_watch.utils.cache import get_content_cache_version
 
 
 class HtmxMixin:
@@ -39,7 +42,11 @@ class HitMixin:
 
         # All views recorded in PageView
         subscriber_id = self.request.session.get("subscriber_id")
-        PageView.record_view(obj, subscriber_id)
+        PageView.record_view(obj, subscriber_id, request=self.request)
+
+        # Keep human-facing hit counters resilient to scanners/prefetchers
+        if is_probable_automated_event(self.request):
+            return obj
 
         # Only unique hits recorded
         model_class = str(obj.__class__.__name__).lower()
@@ -66,13 +73,24 @@ class SidebarMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["sidebar_issues"] = Issue.objects.exclude(active=False).order_by("-date")[
-            : self.number_of_sidebar_issues
-        ]
-        context["sidebar_tags"] = (
-            Tag.objects.exclude(active=False)
-            .annotate(article_count=Count("articles"))
-            .order_by("-article_count")[: self.number_of_tags]
+        cache_version = get_content_cache_version()
+
+        issues_cache_key = f"sidebar_issues:v{cache_version}:n{self.number_of_sidebar_issues}"
+        tags_cache_key = f"sidebar_tags:v{cache_version}:n{self.number_of_tags}"
+
+        context["sidebar_issues"] = cache.get_or_set(
+            issues_cache_key,
+            lambda: list(Issue.objects.exclude(active=False).order_by("-date")[: self.number_of_sidebar_issues]),
+            timeout=60 * 30,
+        )
+        context["sidebar_tags"] = cache.get_or_set(
+            tags_cache_key,
+            lambda: list(
+                Tag.objects.exclude(active=False)
+                .annotate(article_count=Count("articles"))
+                .order_by("-article_count")[: self.number_of_tags]
+            ),
+            timeout=60 * 30,
         )
         return context
 

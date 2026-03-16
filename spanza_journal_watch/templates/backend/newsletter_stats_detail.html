@@ -1,17 +1,97 @@
 {% extends "backend/backend_base.html" %}
 {% block content %}
-<h1>Newsletter stats</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+	<div>
+		<h1 class="mb-1">Newsletter stats</h1>
+		<p class="text-muted mb-0">{{ newsletter }}</p>
+	</div>
+	<a href="{% url "backend:newsletter_stats_list" %}" class="btn btn-outline-secondary btn-sm">Back to all statistics</a>
+</div>
 
-<h5>Newsletter:</h5>
-<p>{{ newsletter }}</p>
-<h5>Emails sent:</h5>
-<p>{{ newsletters_sent }}</p>
-<h5>Distinct (total) emails opened:</h5>
-<p>{{ opens }} ({{ total_opens }})</p>
-<h5>Email open rate:</h5>
-<p>{{ open_rate }}</p>
-<h5>Distinct (total) links clicked:</h5>
-<p>{{ clicks }} ({{ total_clicks }})</p>
-<h5>Click-through rate</h5>
-<p>{{ click_through_rate }}</p>
+<div class="row g-3 mb-4">
+	<div class="col-12 col-md-4">
+		<div class="card h-100">
+			<div class="card-body">
+				<h6 class="text-muted mb-2">Emails sent</h6>
+				<p class="display-6 mb-0">{{ newsletters_sent }}</p>
+			</div>
+		</div>
+	</div>
+	<div class="col-12 col-md-4">
+		<div class="card h-100 border-primary-subtle">
+			<div class="card-body">
+				<h6 class="text-muted mb-2">Open rate (raw)</h6>
+				<p class="display-6 mb-0">{{ open_rate }}</p>
+			</div>
+		</div>
+	</div>
+	<div class="col-12 col-md-4">
+		<div class="card h-100 border-success-subtle">
+			<div class="card-body">
+				<h6 class="text-muted mb-2">Click-through rate (raw)</h6>
+				<p class="display-6 mb-0">{{ click_through_rate }}</p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="card mb-4">
+	<div class="card-header">Raw event totals</div>
+	<div class="card-body">
+		<div class="row g-3">
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Distinct (total) emails opened:</h6>
+				<p class="mb-0 fs-5">{{ opens }} <span class="text-muted">({{ total_opens }})</span></p>
+			</div>
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Distinct (total) links clicked:</h6>
+				<p class="mb-0 fs-5">{{ clicks }} <span class="text-muted">({{ total_clicks }})</span></p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="card mb-4">
+	<div class="card-header d-flex justify-content-between align-items-center">
+		<span>Automation-filtered metrics (estimated human activity)</span>
+		<span class="badge text-bg-info">Recommended for reporting</span>
+	</div>
+	<div class="card-body">
+		<p class="text-muted">This excludes events likely triggered by link scanners and image proxy fetches.</p>
+		<div class="row g-3">
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Distinct (total) human opens</h6>
+				<p class="mb-0 fs-5">{{ human_opens }} <span class="text-muted">({{ total_human_opens }})</span></p>
+			</div>
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Human open rate</h6>
+				<p class="mb-0 fs-5">{{ human_open_rate }}</p>
+			</div>
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Distinct (total) human clicks</h6>
+				<p class="mb-0 fs-5">{{ human_clicks }} <span class="text-muted">({{ total_human_clicks }})</span></p>
+			</div>
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Human click-through rate</h6>
+				<p class="mb-0 fs-5">{{ human_click_through_rate }}</p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="card">
+	<div class="card-header">Automation filter impact</div>
+	<div class="card-body">
+		<div class="row g-3">
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Likely automated opens</h6>
+				<p class="mb-0 fs-5">{{ automated_opens }} <span class="text-muted">({{ automated_open_share }} of open events)</span></p>
+			</div>
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Likely automated clicks</h6>
+				<p class="mb-0 fs-5">{{ automated_clicks }} <span class="text-muted">({{ automated_click_share }} of click events)</span></p>
+			</div>
+		</div>
+	</div>
+</div>
 {% endblock content %}

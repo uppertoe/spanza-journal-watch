@@ -1,0 +1,35 @@
+-r base.in
+
+# Local / development tools
+Werkzeug[watchdog]
+ipdb
+psycopg2
+watchfiles
+pur
+pip-tools
+
+# Testing
+mypy
+django-stubs
+pytest
+pytest-sugar
+pytest-django
+factory-boy
+
+# Documentation
+sphinx
+sphinx-autobuild
+
+# Code quality
+flake8
+flake8-isort
+coverage
+black
+pylint-django
+pylint-celery
+pre-commit
+
+# Django local-only helpers
+django-debug-toolbar
+django-extensions
+django-coverage-plugin

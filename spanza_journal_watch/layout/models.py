@@ -37,7 +37,7 @@ class FeatureArticle(TimeStampedModel):
         celery_resize_image.delay(self.image.name)
 
     def get_absolute_url(self):
-        return reverse("feature_article_detail", kwargs={"slug": self.slug})
+        return reverse("layout:feature_article_detail", kwargs={"slug": self.slug})
 
     # Special methods
     def __str__(self):
@@ -51,8 +51,6 @@ class Homepage(TimeStampedModel):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     override_main = models.BooleanField(default=False)
     publication_ready = models.BooleanField(default=False)
-    # Relationships
-    homepage_page = models.ForeignKey("HomepagePage", on_delete=models.CASCADE, blank=True, null=True)
 
     # Class methods
     @classmethod
@@ -66,6 +64,10 @@ class Homepage(TimeStampedModel):
 
     @classmethod
     def get_current_homepage(cls):
+        if cls.CURRENT_HOMEPAGE is None:
+            latest_homepage = cls.objects.filter(publication_ready=True).order_by("-created").first()
+            if latest_homepage:
+                cls.publish_homepage(latest_homepage)
         return cls.CURRENT_HOMEPAGE
 
     # Instance methods
@@ -83,77 +85,23 @@ class Homepage(TimeStampedModel):
         return f"{self.issue} homepage - {self.created}"
 
 
-# Individual related_names to avoid clashes
-class SearchPage(PageModel):
-    light_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="search_page_light"
-    )
-    dark_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="search_page_dark"
-    )
+class PageHeader(PageModel):
+    class PageType(models.TextChoices):
+        HOME = "home", "Home"
+        SEARCH = "search", "Search"
+        ISSUE_LIST = "issue_list", "Issue list"
+        ISSUE_DETAIL = "issue_detail", "Issue detail"
+        REVIEW_DETAIL = "review_detail", "Review detail"
+        TAG = "tag", "Tag pages"
 
+    page_type = models.CharField(max_length=32, choices=PageType.choices, db_index=True)
 
-class IssuePage(PageModel):
-    light_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_page_light"
-    )
-    dark_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_page_dark"
-    )
-
-
-class IssueDetailPage(PageModel):
-    light_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_detail_page_light"
-    )
-    dark_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="issue_detail_page_dark"
-    )
-
-
-class ReviewPage(PageModel):
-    light_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="review_page_light"
-    )
-    dark_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="review_page_dark"
-    )
-
-
-class TagPage(PageModel):
-    light_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="tag_page_light"
-    )
-    dark_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="tag_page_dark"
-    )
-
-
-class HomepagePage(PageModel):
-    light_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="homepage_page_light"
-    )
-    dark_gradient = models.ForeignKey(
-        "Gradient", on_delete=models.CASCADE, null=True, blank=True, related_name="homepage_page_dark"
-    )
-
-    def save(self, *args, **kwargs):
-        # Refresh the homepage
-        try:
-            latest_homepage = Homepage.objects.filter(publication_ready=True).latest("created")
-            Homepage.publish_homepage(latest_homepage)
-        except:  # noqa
-            print("Skipped Homepage import")
-
-        return super().save(*args, **kwargs)
-
-
-class Gradient(models.Model):
-    name = models.CharField(max_length=255)
-    css = models.TextField()
+    @classmethod
+    def get_active_for(cls, page_type):
+        return cls.objects.filter(page_type=page_type, active=True).order_by("-modified").first()
 
     def __str__(self):
-        return self.name
+        return f"{self.get_page_type_display()}: {self.feature_article}"
 
 
 # Sitemaps

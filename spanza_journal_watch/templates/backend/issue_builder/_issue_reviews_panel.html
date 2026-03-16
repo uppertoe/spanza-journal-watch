@@ -1,0 +1,80 @@
+{% load crispy_forms_tags %}
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Reviews in this issue</span>
+    <span class="text-muted">Featured limit: {{ max_featured_reviews }}</span>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th style="min-width: 22rem;">Review</th>
+            <th>Author</th>
+            <th style="min-width: 18rem;">Article</th>
+            <th>Flags</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for review in selected_issue.reviews.all %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ review.article.get_title }}</div>
+                {% if review.article.get_subtitle %}
+                  <div class="text-muted small">{{ review.article.get_subtitle }}</div>
+                {% endif %}
+              </td>
+              <td>{{ review.author }}</td>
+              <td>{{ review.article.name|truncatechars:70 }}</td>
+              <td>
+                {% if review.is_featured %}<span class="badge text-bg-warning">Featured</span>{% endif %}
+                {% if review.active %}<span class="badge text-bg-success">Review live</span>{% endif %}
+                {% if review.article.active %}<span class="badge text-bg-success">Article live</span>{% endif %}
+                {% if review.feature_image %}<span class="badge text-bg-info">Has image</span>{% endif %}
+              </td>
+              <td class="text-end">
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  hx-get="{% url "backend:edit_issue_review_form" selected_issue.pk review.pk %}"
+                  hx-target="#issue-review-form"
+                  hx-swap="outerHTML"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn btn-outline-danger btn-sm"
+                  hx-post="{% url "backend:remove_issue_review" selected_issue.pk review.pk %}"
+                  hx-target="#issue-reviews-panel"
+                  hx-swap="outerHTML"
+                  hx-confirm="Remove this review from the issue?"
+                >
+                  Remove
+                </button>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-muted">No reviews added yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-end mt-3">
+      <button
+        class="btn btn-success"
+        hx-post="{% url "backend:publish_issue_bundle" selected_issue.pk %}"
+        hx-target="#issue-reviews-panel"
+        hx-swap="outerHTML"
+        hx-confirm="Publish this issue and set all attached reviews/articles live?"
+      >
+        Publish issue + reviews + articles
+      </button>
+    </div>
+  </div>
+</div>
+
+{% include "backend/issue_builder/_review_form.html" with review_form=review_form selected_issue=selected_issue form_action=review_form_action is_edit=review_form_is_edit %}

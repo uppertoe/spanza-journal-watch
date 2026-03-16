@@ -2,17 +2,31 @@
 {% load static %}
 
 {% block title %}Forbidden (403){% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-6 offset-md-3">
-        <div class="p-3">
-            <img src="{% static "images/errors/exclamation-octagon.svg" %}" alt="Error 403" width="100px">
-        </div>
-        <h1>403 Forbidden</h1>
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+                <div class="mb-3">
+                    <img src="{% static 'images/errors/exclamation-octagon.svg' %}" alt="403" width="72" height="72">
+                </div>
+                <p class="text-uppercase text-secondary fw-semibold mb-2">Error 403</p>
+                <h1 class="h3 mb-3">Access denied</h1>
+                <p class="text-body-secondary mb-4">Your account does not currently have permission to view this page.</p>
 
-        <p>Your login does not have permission to view this page</p>
-        <p>Contact your local Journal Watch coordinator if you need access to be arranged for you</p>
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <a class="btn btn-primary" href="{% url 'home' %}">Go to home</a>
+                    <a class="btn btn-outline-secondary" href="{% url 'submissions:issue_list' %}">Browse issues</a>
+                </div>
+
+                <p class="small text-body-secondary mt-4 mb-0">If you need access, contact your local Journal Watch coordinator.</p>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

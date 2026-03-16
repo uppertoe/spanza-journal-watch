@@ -1,0 +1,32 @@
+<nav class="mt-4" aria-label="Tag pagination">
+    <p class="small text-body-secondary text-center mb-2">Page {{ page_obj.number }} of {{ total_pages }}</p>
+    <ul class="pagination justify-content-center flex-wrap">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" hx-target="#article-block" hx-push-url="true">Previous</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Previous</span></li>
+        {% endif %}
+
+        {% for page in page_links %}
+            {% if not page %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% elif page == page_obj.number %}
+            <li class="page-item active" aria-current="page"><span class="page-link">{{ page }}</span></li>
+            {% else %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page }}#articles" hx-get="{{ request.path }}?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page }}" hx-target="#article-block" hx-push-url="true">{{ page }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.next_page_number }}" hx-target="#article-block" hx-push-url="true">Next</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Next</span></li>
+        {% endif %}
+    </ul>
+</nav>

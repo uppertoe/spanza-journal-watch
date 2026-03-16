@@ -19,15 +19,56 @@
 {% endblock article-title %}
 
 {% block article-block %}
-<div id="article-block">
-    {% block articles %}
-    {% include "submissions/fragments/tags.html" %}
-    {% endblock articles %}
+<section class="card border-0 bg-body-tertiary mb-3">
+    <div class="card-body">
+        <form
+            id="tag-filters"
+            class="row g-2 align-items-end"
+            hx-get="{{ request.path }}"
+            hx-target="#article-block"
+            hx-push-url="true"
+        >
+            <div class="col-12 col-md-8">
+                <label class="form-label mb-1" for="id-tag-query">Search tags</label>
+                <input
+                    id="id-tag-query"
+                    name="q"
+                    class="form-control"
+                    type="search"
+                    placeholder="e.g. airway, sedation, neonatal"
+                    value="{{ query }}"
+                    autocomplete="off"
+                    hx-get="{{ request.path }}"
+                    hx-target="#article-block"
+                    hx-include="#tag-filters"
+                    hx-trigger="input changed delay:250ms, search"
+                    hx-push-url="true"
+                >
+            </div>
+            <div class="col-8 col-md-3">
+                <label class="form-label mb-1" for="id-tag-sort">Sort</label>
+                <select
+                    id="id-tag-sort"
+                    name="sort"
+                    class="form-select"
+                    hx-get="{{ request.path }}"
+                    hx-target="#article-block"
+                    hx-include="#tag-filters"
+                    hx-trigger="change"
+                    hx-push-url="true"
+                >
+                    <option value="popular" {% if sort == 'popular' %}selected{% endif %}>Most reviews</option>
+                    <option value="name" {% if sort == 'name' %}selected{% endif %}>A–Z</option>
+                </select>
+            </div>
+            <div class="col-4 col-md-1 d-grid">
+                <a class="btn btn-outline-secondary" href="{{ request.path }}">Clear</a>
+            </div>
+        </form>
+    </div>
+</section>
 
-    {% block pagination %}
-    {% if page_obj.paginator.num_pages > 1 %}
-    {% include "fragments/pagination.html" %}
-    {% endif %}
-    {% endblock pagination %}
+<div id="article-block">
+    {% include "submissions/fragments/tag_results.html" %}
 </div>
 {% endblock article-block %}

@@ -3,30 +3,35 @@ from django.conf import settings
 from .forms import InboundAnymailEmailForm
 
 if not settings.DEBUG:  # Anymail only available in production
-    from anymail.signals import inbound
-    from django.dispatch import receiver
+    try:
+        from anymail.signals import inbound  # type: ignore[import-not-found]
+        from django.dispatch import receiver
+    except ModuleNotFoundError:
+        inbound = None
 
-    @receiver(inbound)  # add weak=False if inside some other function/class
-    def handle_inbound_email(sender, event, esp_name, **kwargs):
-        message = event.message
-        recipients = ", ".join([str(message) for message in message.to])
+    if inbound:
 
-        email = {
-            "sender": message.envelope_sender,
-            "recipient": message.envelope_recipient,
-            "header_sender": message.from_email,
-            "header_recipients": recipients,
-            "subject": message.subject,
-            "body": message.text,
-            "body_html": message.html,
-            "sent_timestamp": message.date,
-            "attachments": message.attachments,
-            "email_file": event.event_id,  # Corresponds to S3 object
-        }
+        @receiver(inbound)  # add weak=False if inside some other function/class
+        def handle_inbound_email(sender, event, esp_name, **kwargs):
+            message = event.message
+            recipients = ", ".join([str(message) for message in message.to])
 
-        form = InboundAnymailEmailForm(email)
+            email = {
+                "sender": message.envelope_sender,
+                "recipient": message.envelope_recipient,
+                "header_sender": message.from_email,
+                "header_recipients": recipients,
+                "subject": message.subject,
+                "body": message.text,
+                "body_html": message.html,
+                "sent_timestamp": message.date,
+                "attachments": message.attachments,
+                "email_file": event.event_id,  # Corresponds to S3 object
+            }
 
-        if form.is_valid():
-            form.save()
+            form = InboundAnymailEmailForm(email)
 
-        print(f"Email received from {message.envelope_sender}: {event.event_id}")
+            if form.is_valid():
+                form.save()
+
+            print(f"Email received from {message.envelope_sender}: {event.event_id}")

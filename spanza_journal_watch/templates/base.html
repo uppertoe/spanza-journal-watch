@@ -6,8 +6,9 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>{% block title %}Journal Watch{% endblock title %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature.">
+    <meta name="description" content="{% block meta_description %}Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature.{% endblock meta_description %}">
     <meta name="author" content="Eamonn Upperton">
+    {% block head_meta %}{% endblock head_meta %}
 
     <link rel="icon" href="{% static 'images/logo/square-brackets.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: light)">
     <link rel="icon" href="{% static 'images/logo/square-brackets-white.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: dark)">
@@ -70,7 +71,7 @@
         <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
       </symbol>
     </svg>
-    <div class="dropdown position-fixed bottom-0 end-0 bd-mode-toggle px-3 px-lg-5">
+    <div class="dropdown bd-mode-toggle px-3 px-lg-5">
       <button class="btn btn-bd-primary py-2 my-3 dropdown-toggle d-flex align-items-center"
               id="bd-theme"
               type="button"
@@ -108,6 +109,21 @@
       <symbol id="aperture" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10"/>
         <path d="M14.31 8l5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16L3.95 6.06M14.31 16H2.83m13.79-4l-5.74 9.94"/>
+      </symbol>
+      <symbol id="icon-bluesky" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M5.202 2.857C7.954 4.922 10.913 9.11 12 11.358c1.087-2.247 4.046-6.436 6.798-8.501C20.783 1.366 24 .213 24 3.883c0 .732-.42 6.156-.667 7.037-.856 3.061-3.978 3.842-6.755 3.37 4.854.826 6.089 3.562 3.422 6.299-5.065 5.196-7.28-1.304-7.847-2.97-.104-.305-.152-.448-.153-.327 0-.121-.05.022-.153.327-.568 1.666-2.782 8.166-7.847 2.97-2.667-2.737-1.432-5.473 3.422-6.3-2.777.473-5.899-.308-6.755-3.369C.42 10.04 0 4.615 0 3.883c0-3.67 3.217-2.517 5.202-1.026"/>
+      </symbol>
+      <symbol id="icon-x" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/>
+      </symbol>
+      <symbol id="icon-facebook" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z"/>
+      </symbol>
+      <symbol id="icon-email" viewBox="0 0 16 16">
+        <path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414zM0 4.697v7.104l5.803-3.558zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586zm3.436-.586L16 11.801V4.697z"/>
+      </symbol>
+      <symbol id="icon-share" viewBox="0 0 16 16">
+        <path fill="currentColor" d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
       </symbol>
       <symbol id="cart" viewBox="0 0 16 16">
         <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM3.102 4l.84 4.479 9.144-.459L13.89 4H3.102zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
@@ -159,11 +175,11 @@
       </div>
     </div>
 
-    <main class="container">
+    <main class="{% block main_container_class %}container{% endblock main_container_class %}">
       {% block main-feature %}{% endblock main-feature %}
       {% block card-feature %}{% endblock card-feature %}
       <div class="row py-2" id="top">
-        <div class="col-md-8 pb-4">
+        <div class="{% block content_column_class %}col-md-8 pb-4{% endblock content_column_class %}">
           {% block content %}{% endblock content %}
           {% block breadcrumbs %}
           {% render_breadcrumbs %}

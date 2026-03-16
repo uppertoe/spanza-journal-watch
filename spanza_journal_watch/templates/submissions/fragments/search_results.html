@@ -1,19 +1,62 @@
 {% if result_reviews %}
-<h3>Results</h3>
-<hr>
-{% for review in result_reviews %}
-    <a href="{{ review.get_absolute_url }}" class="text-decoration-none mb-0"><h3 class="mb-0">{{ review.article.get_title|capfirst }}</h3>
-    <h5 class="text-muted">{{ review.article.get_subtitle|capfirst }}</h5></a>
-    <div class="mb-3"></div>
-    <p class="mb-0 fst-italic">{{ review.article.journal }}</p>
-    <p class="mb-3">{{ review.get_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
-    <blockquote class="blockquote">"{{ review.headline|safe }}"</blockquote>
-{% endfor %}
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        {% if is_browse_mode %}
+            <h3 class="mb-0">Browse reviews</h3>
+        {% else %}
+            <h3 class="mb-0">Search results</h3>
+        {% endif %}
+        <span class="badge text-bg-light">{{ result_count }} found</span>
+    </div>
+    <hr>
+
+    {% if is_browse_mode %}
+    <p class="text-muted">Tip: use year and tags above to explore the back catalogue without typing a specific article name.</p>
+    {% endif %}
+
+    {% for review in result_reviews %}
+        <div class="mb-4 pb-3 border-bottom">
+            <a href="{{ review.get_absolute_url }}" class="text-decoration-none mb-0">
+                <h3 class="mb-0">{{ review.article.get_title|capfirst }}</h3>
+                <h5 class="text-muted">{{ review.article.get_subtitle|capfirst }}</h5>
+            </a>
+
+            <p class="mb-0 fst-italic">{{ review.article.journal }}</p>
+            <p class="mb-2">
+                <a href="{% url "submissions:search" %}?year={{ review.get_review_date|date:'Y' }}"
+                   hx-get="{% url "submissions:search" %}?year={{ review.get_review_date|date:'Y' }}"
+                   hx-target="#search-results"
+                   hx-push-url="true"
+                   class="text-decoration-none">{{ review.get_review_date|date:"F Y" }}</a>
+                by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a>
+            </p>
+
+            {% with review.article.tags.all as review_tags %}
+            {% if review_tags %}
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    {% for tag in review_tags|slice:":6" %}
+                        <a
+                            href="{% url "submissions:search" %}?tag={{ tag.slug }}"
+                            hx-get="{% url "submissions:search" %}?tag={{ tag.slug }}"
+                            hx-target="#search-results"
+                            hx-push-url="true"
+                            class="badge rounded-pill text-bg-secondary text-decoration-none"
+                        >{{ tag }}</a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% endwith %}
+
+            {% if review.headline %}
+                <blockquote class="blockquote mb-0">"{{ review.headline|safe }}"</blockquote>
+            {% endif %}
+        </div>
+    {% endfor %}
 {% else %}
     {% if no_result_message %}
-        <p>{{ no_result_message }}</p>
+        <h3 class="mb-2">No matching reviews</h3>
+        <p>{{ no_result_message }}. Try broadening filters or removing a tag.</p>
     {% else %}
-        <h3 class="text-decoration-none">Results will appear here</h3>
-        <p>Use multiple keywords to refine your search</p>
+        <h3 class="text-decoration-none">Start browsing the archive</h3>
+        <p>Use the year and tag filters above to explore reviews by topic or period.</p>
     {% endif %}
 {% endif %}

@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: prettier
         args: ['--tab-width', '2', '--single-quote']
-        exclude: 'spanza_journal_watch/templates/'
+        exclude: 'spanza_journal_watch/templates/|tests/regression/snapshots/'
 
   - repo: https://github.com/adamchainz/django-upgrade
     rev: '1.13.0'

@@ -1,0 +1,95 @@
+volumes:
+  postgres_data: {}
+  access_logs: {}
+
+services:
+  django:
+    image: ${DOCKERHUB_NAMESPACE}/journalwatch-app:${APP_TAG}
+    restart: unless-stopped
+    command: /start
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mjml:
+        condition: service_started
+    env_file:
+      - ./.envs/.production/.django
+      - ./.envs/.production/.postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - '5000:5000'
+    volumes:
+      - access_logs:/app/access_logs
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file:
+      - ./.envs/.production/.postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  mjml:
+    image: ${DOCKERHUB_NAMESPACE}/journalwatch-mjml:${APP_TAG}
+    restart: unless-stopped
+    command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
+    expose:
+      - '28101'
+
+  celeryworker:
+    image: ${DOCKERHUB_NAMESPACE}/journalwatch-app:${APP_TAG}
+    restart: unless-stopped
+    command: /start-celeryworker
+    profiles: ['workers']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mjml:
+        condition: service_started
+    env_file:
+      - ./.envs/.production/.django
+      - ./.envs/.production/.postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+
+  celerybeat:
+    image: ${DOCKERHUB_NAMESPACE}/journalwatch-app:${APP_TAG}
+    restart: unless-stopped
+    command: /start-celerybeat
+    profiles: ['workers']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mjml:
+        condition: service_started
+    env_file:
+      - ./.envs/.production/.django
+      - ./.envs/.production/.postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0

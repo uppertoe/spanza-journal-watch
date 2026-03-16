@@ -6,8 +6,9 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.urls import resolve
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen, PageView
+from spanza_journal_watch.analytics.utils import is_probable_automated_event
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.submissions.models import Review
+from spanza_journal_watch.submissions.models import Hit, Review
 
 
 def _get_newsletter(token):
@@ -59,7 +60,12 @@ def track_email_open(request):
     subscriber = _get_subscriber(email)
 
     if newsletter and subscriber:
-        tracker = NewsletterOpen(subscriber=subscriber, newsletter=newsletter)
+        tracker = NewsletterOpen(
+            subscriber=subscriber,
+            newsletter=newsletter,
+            user_agent=request.headers.get("user-agent", ""),
+            automated=is_probable_automated_event(request),
+        )
         tracker.save()
 
         # Identify the subscriber in the session
@@ -80,7 +86,12 @@ def track_newsletter_link(request, newsletter_token):
     subscriber = _get_subscriber(email)
 
     if newsletter and subscriber:
-        tracker = NewsletterClick(subscriber=subscriber, newsletter=newsletter)
+        tracker = NewsletterClick(
+            subscriber=subscriber,
+            newsletter=newsletter,
+            user_agent=request.headers.get("user-agent", ""),
+            automated=is_probable_automated_event(request),
+        )
         tracker.save()
 
         # Identify the subscriber in the session
@@ -94,7 +105,16 @@ def page_view(request, model=None, slug=None):
         try:
             review = Review.objects.get(slug=slug)
             subscriber_id = request.session.get("subscriber_id")
-            PageView.record_view(review, subscriber_id)
+            PageView.record_view(review, subscriber_id, request=request)
+
+            # Keep human-facing hit count resilient to scanners and duplicate viewport triggers
+            if not is_probable_automated_event(request):
+                viewed_key = "model_review_viewed"
+                viewed_objects = request.session.get(viewed_key, [])
+                if review.id not in viewed_objects:
+                    Hit.update_page_count(review)
+                    viewed_objects.append(review.id)
+                    request.session[viewed_key] = viewed_objects
         except (Review.DoesNotExist, MultipleObjectsReturned) as e:
             print(e)
 

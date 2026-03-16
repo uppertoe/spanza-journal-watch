@@ -1,7 +1,54 @@
 {% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
 {% block content %}
-<h1>Double check</h1>
-<p>Are you sure you're ready to send the newsletter?</p>
-<p>Use the following button to confirm</p>
-<a href="{% url "backend:send_final_newsletter" send_token %}" class="btn btn-outline-danger my-3">Send Newsletter</a>
+<h1>Newsletter release check</h1>
+
+{% if newsletter %}
+	<p class="mb-1"><strong>Newsletter:</strong> {{ newsletter }}</p>
+	<p class="mb-3"><strong>Status:</strong>
+		{% if newsletter.is_sent %}
+			<span class="badge text-bg-success">Already sent</span>
+		{% endif %}
+		{% if newsletter.is_test_sent %}
+			<span class="badge text-bg-success">Tested</span>
+		{% else %}
+			<span class="badge text-bg-warning">Not yet tested</span>
+		{% endif %}
+		{% if newsletter.resend_enabled %}
+			<span class="badge text-bg-danger">Resend enabled</span>
+		{% endif %}
+	</p>
+
+	<div class="card mb-4">
+		<div class="card-header">Send test newsletter</div>
+		<div class="card-body">
+			<p class="text-muted">Send a test email to verify layout/rendering in a mail client before publishing.</p>
+			<form method="post" action="{% url "backend:send_test_newsletter" send_token %}">
+				{% csrf_token %}
+				{{ test_form|crispy }}
+				<button type="submit" class="btn btn-outline-primary">Send test email</button>
+			</form>
+		</div>
+	</div>
+
+	<div class="card border-danger">
+		<div class="card-header text-danger">Publish to subscriber list</div>
+		<div class="card-body">
+			{% if newsletter.is_sent and not newsletter.resend_enabled %}
+				<p>This newsletter has already been sent. Resending is disabled by default.</p>
+				<form method="post" action="{% url "backend:enable_newsletter_resend" send_token %}">
+					{% csrf_token %}
+					<button type="submit" class="btn btn-outline-danger my-2">Enable one resend</button>
+				</form>
+			{% elif newsletter.is_test_sent %}
+				<p>Are you sure you're ready to send the newsletter to all subscribers?</p>
+				<a href="{% url "backend:send_final_newsletter" send_token %}" class="btn btn-outline-danger my-2">Send Newsletter</a>
+			{% else %}
+				<p class="mb-0">You must send a test newsletter first. Only tested newsletters may be published.</p>
+			{% endif %}
+		</div>
+	</div>
+{% else %}
+	<p>There is no newsletter associated with this link.</p>
+{% endif %}
 {% endblock content %}

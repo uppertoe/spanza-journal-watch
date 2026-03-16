@@ -1,0 +1,27 @@
+# Core runtime dependencies (direct only)
+
+python-slugify
+Pillow>=11.0
+argon2-cffi
+whitenoise
+redis
+hiredis
+celery<6
+django-celery-beat
+flower
+
+django-tinymce
+django-mjml
+
+# Django
+django>=6.0,<7.0
+django-environ
+django-model-utils
+django-allauth
+django-crispy-forms
+crispy-bootstrap5
+django-redis
+django-webpack-loader
+django-view-breadcrumbs
+django-request-logging
+django-markdownx

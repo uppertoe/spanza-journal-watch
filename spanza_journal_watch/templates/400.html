@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Bad Request (400){% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+
+{% block content %}
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+                <div class="mb-3">
+                    <img src="{% static 'images/errors/exclamation-octagon.svg' %}" alt="400" width="72" height="72">
+                </div>
+                <p class="text-uppercase text-secondary fw-semibold mb-2">Error 400</p>
+                <h1 class="h3 mb-3">Bad request</h1>
+                <p class="text-body-secondary mb-4">The request could not be processed.</p>
+
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <a class="btn btn-primary" href="{% url 'home' %}">Go to home</a>
+                    <a class="btn btn-outline-secondary" href="{% url 'submissions:issue_list' %}">Browse issues</a>
+                </div>
+
+                <p class="small text-body-secondary mt-4 mb-0">Please return to the site and try again.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

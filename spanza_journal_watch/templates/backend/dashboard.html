@@ -1,1 +1,20 @@
 {% extends 'backend/backend_base.html' %}
+
+{% block content %}
+<h1>Backend Dashboard</h1>
+
+<div class="list-group">
+	<a class="list-group-item list-group-item-action" href="{% url "backend:issue_builder" %}">
+		Issue Builder
+	</a>
+	<a class="list-group-item list-group-item-action" href="{% url "backend:upload_subscribers" %}">
+		Upload Subscribers
+	</a>
+	<a class="list-group-item list-group-item-action" href="{% url "backend:newsletter_stats_list" %}">
+		Newsletter Statistics
+	</a>
+	<a class="list-group-item list-group-item-action" href="{% url "backend:newsletter_release_list" %}">
+		Newsletter Release
+	</a>
+</div>
+{% endblock content %}

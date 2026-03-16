@@ -1,0 +1,99 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Issue Builder</h1>
+  <a class="btn btn-outline-primary" href="{% url "backend:issue_builder" %}">Create new issue</a>
+</div>
+<p class="text-muted">Create draft issues, add reviews/articles, and publish all content live in one action.</p>
+
+<div class="mb-3">
+  <button
+    id="toggle-recent-issues"
+    class="btn btn-outline-secondary btn-sm"
+    type="button"
+    aria-expanded="true"
+    aria-controls="recent-issues-sidebar"
+  >
+    Hide recent issues
+  </button>
+</div>
+
+<div class="row g-4 align-items-start">
+  <div class="col-12 col-md-4 col-lg-3" id="recent-issues-sidebar">
+    <div class="card sticky-top" style="top: 1rem;">
+      <div class="card-header">Recent issues</div>
+      <ul class="list-group list-group-flush">
+        {% for issue in issues %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <a href="{% url "backend:issue_builder" %}?issue={{ issue.pk }}">{{ issue.name }}</a>
+            {% if issue.active %}
+              <span class="badge text-bg-success">Live</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Draft</span>
+            {% endif %}
+          </li>
+        {% empty %}
+          <li class="list-group-item text-muted">No issues yet</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-8 col-lg-9" id="issue-draft-column">
+    <div class="card mb-4">
+      <div class="card-header">{% if selected_issue %}Edit issue draft{% else %}Create issue draft{% endif %}</div>
+      <div class="card-body">
+        <form method="post" action="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}">
+          {% csrf_token %}
+          {{ issue_form|crispy }}
+          <button type="submit" class="btn btn-primary">Save issue draft</button>
+        </form>
+      </div>
+    </div>
+
+    {% if selected_issue %}
+      <div id="issue-reviews-panel">
+        {% include "backend/issue_builder/_issue_reviews_panel.html" %}
+      </div>
+    {% else %}
+      <div class="alert alert-info">Save the issue draft first, then add reviews and articles.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block inline_javascript %}
+{{ block.super }}
+<script>
+  window.addEventListener('DOMContentLoaded', function () {
+    const toggleButton = document.getElementById('toggle-recent-issues');
+    const sidebar = document.getElementById('recent-issues-sidebar');
+    const draftColumn = document.getElementById('issue-draft-column');
+
+    if (!toggleButton || !sidebar || !draftColumn) {
+      return;
+    }
+
+    const updateState = () => {
+      const isVisible = !sidebar.classList.contains('d-none');
+      toggleButton.setAttribute('aria-expanded', String(isVisible));
+      toggleButton.textContent = isVisible ? 'Hide recent issues' : 'Show recent issues';
+
+      if (isVisible) {
+        draftColumn.classList.add('col-md-8', 'col-lg-9');
+      } else {
+        draftColumn.classList.remove('col-md-8', 'col-lg-9');
+      }
+    };
+
+    toggleButton.addEventListener('click', function () {
+      sidebar.classList.toggle('d-none');
+      updateState();
+    });
+
+    updateState();
+  });
+</script>
+{% endblock inline_javascript %}

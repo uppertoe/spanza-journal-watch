@@ -1,17 +1,31 @@
+{% load cache %}
+{% cache 1800 "tag_list_results" content_cache_version request.get_full_path %}
 <div id="articles">
+    <div class="d-flex justify-content-between align-items-center py-1">
+        <p class="text-body-secondary mb-0">{{ result_count }} tag{{ result_count|pluralize }}</p>
+    </div>
+
+    {% if tags %}
     <div class="row g-3 py-2">
         {% for tag in tags %}
-        <div class="col-12 col-lg-6">
-            <div class="card ">
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title"><a href="{{ tag.get_absolute_url }}" class="text-decoration-none">{{ tag }}</a></h5>
-                    <p class="card-text"></p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-body-secondary">{{ tag.articles.all|length }} article{{ tag.articles.all|pluralize }}</small>
-                        </div>
+                    <h5 class="card-title mb-1">
+                        <a href="{{ tag.get_absolute_url }}" class="text-decoration-none">{{ tag }}</a>
+                    </h5>
+                    <p class="small text-body-secondary mb-0">
+                        {{ tag.review_count }} review{{ tag.review_count|pluralize }}
+                    </p>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="alert alert-light border mt-3 mb-0">
+        No tags match this search. Try a broader keyword.
+    </div>
+    {% endif %}
 </div>
+{% endcache %}

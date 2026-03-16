@@ -1,5 +1,6 @@
 import datetime
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -347,13 +348,11 @@ class Issue(TimeStampedModel):
     body = models.TextField()
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
     active = models.BooleanField(default=False)
-    issue_detail_page = models.ForeignKey(
-        to="layout.IssueDetailPage",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="issue_detail_page",
-    )
+
+    class Meta:
+        permissions = [
+            ("manage_issue_builder", "Can create and publish issue bundles in backend issue builder"),
+        ]
 
     def get_card_features(self):
         features = []
@@ -367,6 +366,38 @@ class Issue(TimeStampedModel):
 
     def get_reading_time(self):
         return estimate_reading_time(self.body)
+
+    def get_header_feature_article(self):
+        PageHeader = apps.get_model("layout", "PageHeader")
+        headers = PageHeader.objects.filter(page_type=PageHeader.PageType.ISSUE_DETAIL, active=True).select_related(
+            "feature_article"
+        )
+
+        issue_slug = (self.slug or "").strip()
+        issue_name = (self.name or "").strip()
+        header = None
+
+        if issue_slug:
+            header = headers.filter(feature_article__slug__iexact=issue_slug).order_by("-modified").first()
+            if not header:
+                header = headers.filter(feature_article__slug__istartswith=issue_slug).order_by("-modified").first()
+
+        if not header and issue_name:
+            header = headers.filter(feature_article__title__iexact=issue_name).order_by("-modified").first()
+            if not header:
+                header = headers.filter(feature_article__title__istartswith=issue_name).order_by("-modified").first()
+
+        if not header and self.date:
+            month_year = self.date.strftime("%B %Y")
+            header = headers.filter(feature_article__title__icontains=month_year).order_by("-modified").first()
+
+        return header.feature_article if header else None
+
+    def get_issue_image(self):
+        feature_article = self.get_header_feature_article()
+        if feature_article and feature_article.image:
+            return feature_article.image
+        return None
 
     def save(self, *args, **kwargs):
         if not self.slug:
