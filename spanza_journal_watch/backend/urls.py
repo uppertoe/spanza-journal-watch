@@ -26,6 +26,21 @@ urlpatterns = [
         name="remove_issue_review",
     ),
     path("issues/builder/<int:issue_id>/publish", views.publish_issue_bundle, name="publish_issue_bundle"),
+    path(
+        "issues/builder/<int:issue_id>/planka/setup",
+        views.planka_setup_issue_project,
+        name="planka_setup_issue_project",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/planka/publish-cards",
+        views.planka_refresh_publish_cards,
+        name="planka_refresh_publish_cards",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/planka/import-card",
+        views.planka_import_publish_card,
+        name="planka_import_publish_card",
+    ),
     path("subscribers/upload", views.upload_subscriber_csv, name="upload_subscribers"),
     path("subscribers/upload/change-header/<str:save_token>", views.edit_csv_header, name="edit_csv_header"),
     path("subscribers/upload/process-csv/<str:save_token>", views.process_csv, name="process_csv"),

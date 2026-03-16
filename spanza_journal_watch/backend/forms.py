@@ -345,3 +345,10 @@ class IssueBuilderReviewForm(forms.Form):
 
         self.issue.reviews.add(review)
         return review
+
+
+class PlankaProjectSetupForm(forms.Form):
+    project_name = forms.CharField(max_length=128)
+
+    def clean_project_name(self):
+        return self.cleaned_data["project_name"].strip()

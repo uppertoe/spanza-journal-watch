@@ -1,0 +1,106 @@
+{% load crispy_forms_tags %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Planka integration</span>
+    {% if planka_binding %}
+      <span class="text-muted small">{{ planka_binding.project_name }}</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if not planka_binding %}
+      <p class="text-muted">
+        Link this issue to a new Planka project. A <strong>Reviews</strong> board will be created with lists:
+        Instructions, Articles, Candidates, Under review, Editing, Publish, and Imported.
+      </p>
+      <form
+        method="post"
+        hx-post="{% url "backend:planka_setup_issue_project" selected_issue.pk %}"
+        hx-target="#planka-panel"
+        hx-swap="outerHTML"
+      >
+        {% csrf_token %}
+        <div class="row g-3 align-items-end">
+          <div class="col-md-8">
+            {{ planka_setup_form.project_name|as_crispy_field }}
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-primary w-100">Create + link project</button>
+          </div>
+        </div>
+      </form>
+    {% else %}
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <div class="fw-semibold">Project linked</div>
+          <div class="text-muted small">Project ID: {{ planka_binding.project_id }} · Board ID: {{ planka_binding.board_id }}</div>
+        </div>
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}"
+          hx-target="#planka-panel"
+          hx-swap="outerHTML"
+        >
+          Refresh Publish cards
+        </button>
+      </div>
+
+      {% if planka_publish_cards %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Card</th>
+                <th>Article URL</th>
+                <th>Validation</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for card in planka_publish_cards %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ card.name }}</div>
+                    <div class="text-muted small">Card ID: {{ card.id }}</div>
+                  </td>
+                  <td>
+                    {% if card.schema.article_url %}
+                      <a href="{{ card.schema.article_url }}" target="_blank" rel="noopener noreferrer">{{ card.schema.article_url|truncatechars:80 }}</a>
+                    {% else %}
+                      <span class="text-muted">(missing)</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if card.already_imported %}
+                      <span class="badge text-bg-secondary">Already imported</span>
+                    {% elif card.is_valid %}
+                      <span class="badge text-bg-success">Valid</span>
+                    {% else %}
+                      <span class="badge text-bg-danger">Missing: {{ card.missing_required|join:", " }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    <form
+                      method="post"
+                      hx-post="{% url "backend:planka_import_publish_card" selected_issue.pk %}"
+                      hx-target="#planka-panel"
+                      hx-swap="outerHTML"
+                    >
+                      {% csrf_token %}
+                      <input type="hidden" name="card_id" value="{{ card.id }}">
+                      <button type="submit" class="btn btn-sm btn-primary" {% if not card.is_valid or card.already_imported %}disabled{% endif %}>
+                        Import as draft review
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-light border mb-0">No cards loaded yet. Click <strong>Refresh Publish cards</strong>.</div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>

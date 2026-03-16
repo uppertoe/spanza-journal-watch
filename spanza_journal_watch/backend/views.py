@@ -1,3 +1,5 @@
+import datetime
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
@@ -10,7 +12,7 @@ from django.urls import reverse
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter
 from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
-from spanza_journal_watch.submissions.models import Issue
+from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
 from spanza_journal_watch.utils.cache import bump_content_cache_version
 
 from .forms import (
@@ -19,11 +21,53 @@ from .forms import (
     IssueBuilderReviewForm,
     NewsletterCreateForm,
     NewsletterTestSendForm,
+    PlankaProjectSetupForm,
     SubscriberCSVForm,
     peek_csv,
 )
-from .models import SubscriberCSV
+from .models import PlankaCardImport, PlankaIssueBinding, SubscriberCSV
+from .planka import PlankaAPIError, PlankaClient
 from .tasks import process_subscriber_csv
+
+PLANKA_LIST_ORDER = [
+    "instructions",
+    "articles",
+    "candidates",
+    "under_review",
+    "editing",
+    "publish",
+    "imported",
+]
+
+PLANKA_LIST_LABELS = {
+    "instructions": "Instructions",
+    "articles": "Articles",
+    "candidates": "Candidates",
+    "under_review": "Under review",
+    "editing": "Editing",
+    "publish": "Publish",
+    "imported": "Imported",
+}
+
+PLANKA_SCHEMA_FIELDS = [
+    {"key": "article_url", "label": "Article URL", "required": True, "show_on_front": True},
+    {"key": "article_name", "label": "Article Name", "required": True, "show_on_front": True},
+    {"key": "journal_name", "label": "Journal Name", "required": False, "show_on_front": False},
+    {"key": "article_year", "label": "Article Year", "required": False, "show_on_front": False},
+    {"key": "article_citation", "label": "Article Citation", "required": False, "show_on_front": False},
+    {"key": "author_name", "label": "Author Name", "required": True, "show_on_front": True},
+    {"key": "author_title", "label": "Author Title", "required": False, "show_on_front": False},
+    {
+        "key": "review_body_markdown",
+        "label": "Review Body Markdown",
+        "required": True,
+        "show_on_front": False,
+    },
+    {"key": "is_featured", "label": "Is Featured", "required": False, "show_on_front": True},
+    {"key": "tags_string", "label": "Tags", "required": False, "show_on_front": False},
+]
+
+PLANKA_FIELD_LABEL_TO_KEY = {item["label"].lower(): item["key"] for item in PLANKA_SCHEMA_FIELDS}
 
 
 @login_required
@@ -304,22 +348,111 @@ def newsletter_stats_detail(request, pk):
     return render(request, template, context)
 
 
-def _issue_builder_base_context(issue=None, review_form=None, form_action=None, is_edit=False):
+def _bool_from_value(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_planka_client():
+    client = PlankaClient()
+    if not client.configured:
+        raise PlankaAPIError(
+            "Planka is not configured. Set PLANKA_BASE_URL and PLANKA_API_KEY or PLANKA_ACCESS_TOKEN."
+        )
+    return client
+
+
+def _extract_publish_cards(binding):
+    client = _build_planka_client()
+    _, included = client.get_board(binding.board_id)
+
+    lists = included.get("lists", []) or []
+    cards = included.get("cards", []) or []
+    custom_fields = included.get("customFields", []) or []
+    custom_field_values = included.get("customFieldValues", []) or []
+
+    publish_list_id = binding.get_list_id("publish")
+    if not publish_list_id:
+        publish_list = next((item for item in lists if str(item.get("name", "")).strip().lower() == "publish"), None)
+        publish_list_id = publish_list.get("id") if publish_list else None
+
+    field_name_by_id = {
+        item["id"]: str(item.get("name") or "").strip().lower() for item in custom_fields if item.get("id")
+    }
+    values_by_card = {}
+    for value in custom_field_values:
+        card_id = value.get("cardId")
+        field_id = value.get("customFieldId")
+        if not card_id or not field_id:
+            continue
+        field_label = field_name_by_id.get(field_id, "")
+        field_key = PLANKA_FIELD_LABEL_TO_KEY.get(field_label)
+        if not field_key:
+            continue
+        content = value.get("content")
+        values_by_card.setdefault(card_id, {})[field_key] = str(content or "").strip()
+
+    imported_card_ids = set(binding.imports.values_list("card_id", flat=True))
+    publish_cards = []
+    for card in cards:
+        if publish_list_id and card.get("listId") != publish_list_id:
+            continue
+
+        card_schema = values_by_card.get(card.get("id"), {})
+        missing_required = [
+            field["label"] for field in PLANKA_SCHEMA_FIELDS if field["required"] and not card_schema.get(field["key"])
+        ]
+
+        publish_cards.append(
+            {
+                "id": card.get("id"),
+                "name": card.get("name") or "(Untitled card)",
+                "schema": card_schema,
+                "missing_required": missing_required,
+                "is_valid": not missing_required,
+                "already_imported": card.get("id") in imported_card_ids,
+            }
+        )
+
+    return sorted(publish_cards, key=lambda item: item["name"].lower())
+
+
+def _render_planka_panel(request, issue, publish_cards=None):
+    context = _issue_builder_base_context(issue=issue, planka_publish_cards=publish_cards)
+    return render(request, "backend/issue_builder/_planka_panel.html", context)
+
+
+def _issue_builder_base_context(
+    issue=None,
+    review_form=None,
+    form_action=None,
+    is_edit=False,
+    planka_publish_cards=None,
+):
     issue_qs = Issue.objects.prefetch_related("reviews__article", "reviews__author").order_by("-modified")
     context = {
         "issues": issue_qs[:25],
         "selected_issue": issue,
         "issue_form": IssueBuilderIssueForm(instance=issue) if issue else IssueBuilderIssueForm(),
         "max_featured_reviews": int(getattr(settings, "ISSUE_BUILDER_MAX_FEATURED_REVIEWS", 2)),
+        "planka_binding": None,
+        "planka_setup_form": PlankaProjectSetupForm(),
+        "planka_publish_cards": planka_publish_cards,
     }
 
     if issue:
+        binding = PlankaIssueBinding.objects.filter(issue=issue).first()
+        context["planka_binding"] = binding
+        context["planka_setup_form"] = PlankaProjectSetupForm(initial={"project_name": issue.name})
+
         context["review_form"] = review_form or IssueBuilderReviewForm(issue=issue)
         context["review_form_action"] = form_action or reverse(
             "backend:add_issue_review",
             kwargs={"issue_id": issue.pk},
         )
         context["review_form_is_edit"] = is_edit
+
+        if context["planka_publish_cards"] is None:
+            context["planka_publish_cards"] = []
 
     return context
 
@@ -507,3 +640,196 @@ def publish_issue_bundle(request, issue_id):
 
     messages.success(request, "Issue, reviews, and articles are now live.")
     return _render_issue_panel(request, issue)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_setup_issue_project(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    if hasattr(issue, "planka_binding"):
+        messages.info(request, "This issue is already linked to a Planka project.")
+        return _render_planka_panel(request, issue)
+
+    form = PlankaProjectSetupForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Project name is required.")
+        return _render_planka_panel(request, issue)
+
+    project_name = form.cleaned_data["project_name"]
+
+    try:
+        client = _build_planka_client()
+        project = client.create_project(project_name)
+        board = client.create_board(project["id"], name="Reviews")
+
+        list_mapping = {}
+        for index, key in enumerate(PLANKA_LIST_ORDER, start=1):
+            list_obj = client.create_list(
+                board_id=board["id"],
+                name=PLANKA_LIST_LABELS[key],
+                position=index * 65536,
+                list_type="active",
+            )
+            list_mapping[key] = list_obj["id"]
+
+        field_group = client.create_custom_field_group(board["id"])
+        custom_fields = {}
+        for index, field in enumerate(PLANKA_SCHEMA_FIELDS, start=1):
+            field_obj = client.create_custom_field(
+                custom_field_group_id=field_group["id"],
+                name=field["label"],
+                position=index * 65536,
+                show_on_front=field["show_on_front"],
+            )
+            custom_fields[field["key"]] = field_obj["id"]
+
+    except (KeyError, PlankaAPIError) as error:
+        messages.error(request, f"Unable to set up Planka project: {error}")
+        return _render_planka_panel(request, issue)
+
+    PlankaIssueBinding.objects.create(
+        issue=issue,
+        project_id=project["id"],
+        project_name=project_name,
+        board_id=board["id"],
+        board_name=board.get("name") or "Reviews",
+        lists=list_mapping,
+        custom_fields=custom_fields,
+        custom_field_group_id=field_group["id"],
+    )
+
+    messages.success(request, "Planka project linked to this issue.")
+    return _render_planka_panel(request, issue)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_refresh_publish_cards(request, issue_id):
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+
+    try:
+        publish_cards = _extract_publish_cards(binding)
+    except PlankaAPIError as error:
+        messages.error(request, f"Could not refresh Planka cards: {error}")
+        publish_cards = []
+
+    return _render_planka_panel(request, issue, publish_cards=publish_cards)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_import_publish_card(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+    card_id = (request.POST.get("card_id") or "").strip()
+    if not card_id:
+        messages.error(request, "Card id missing.")
+        return _render_planka_panel(request, issue)
+
+    if PlankaCardImport.objects.filter(card_id=card_id).exists():
+        messages.info(request, "This card has already been imported.")
+        try:
+            publish_cards = _extract_publish_cards(binding)
+        except PlankaAPIError as error:
+            messages.warning(request, f"Card already imported, and refresh failed: {error}")
+            publish_cards = []
+        return _render_planka_panel(request, issue, publish_cards=publish_cards)
+
+    try:
+        publish_cards = _extract_publish_cards(binding)
+    except PlankaAPIError as error:
+        messages.error(request, f"Could not fetch Planka cards: {error}")
+        return _render_planka_panel(request, issue)
+
+    selected = next((item for item in publish_cards if item["id"] == card_id), None)
+    if not selected:
+        messages.error(request, "Card not found in Publish list.")
+        return _render_planka_panel(request, issue, publish_cards=publish_cards)
+
+    if not selected["is_valid"]:
+        missing = ", ".join(selected["missing_required"])
+        messages.error(request, f"Card is missing required fields: {missing}")
+        return _render_planka_panel(request, issue, publish_cards=publish_cards)
+
+    schema = selected["schema"]
+    article_url = schema.get("article_url", "")
+
+    journal = None
+    journal_name = schema.get("journal_name", "")
+    if journal_name:
+        journal, _ = Journal.objects.get_or_create(name=journal_name)
+
+    try:
+        article_year = int(schema.get("article_year") or datetime.date.today().year)
+    except ValueError:
+        article_year = datetime.date.today().year
+
+    article, _ = Article.objects.get_or_create(
+        url=article_url,
+        defaults={
+            "name": schema.get("article_name") or selected["name"],
+            "journal": journal,
+            "year": article_year,
+            "citation": schema.get("article_citation") or "",
+            "tags_string": schema.get("tags_string") or "",
+            "active": False,
+        },
+    )
+
+    author_name = schema.get("author_name", "")
+    author_matches = Author.objects.filter(name=author_name)
+    author = None
+    if author_matches.count() == 1:
+        author = author_matches.first()
+    elif author_matches.count() == 0:
+        author = Author.objects.create(
+            title=schema.get("author_title") or "Dr",
+            name=author_name,
+        )
+    else:
+        messages.warning(
+            request,
+            "Multiple matching authors found. Review author left blank for manual selection.",
+        )
+
+    review = Review.objects.create(
+        article=article,
+        author=author,
+        body=schema.get("review_body_markdown") or "",
+        is_featured=_bool_from_value(schema.get("is_featured")),
+        active=False,
+    )
+    issue.reviews.add(review)
+
+    PlankaCardImport.objects.create(
+        issue=issue,
+        binding=binding,
+        card_id=card_id,
+        card_name=selected["name"],
+        review=review,
+        imported_by=request.user,
+    )
+
+    imported_list_id = binding.get_list_id("imported")
+    if imported_list_id:
+        try:
+            client = _build_planka_client()
+            client.move_card(card_id, imported_list_id)
+        except PlankaAPIError as error:
+            messages.warning(request, f"Review imported, but card could not be moved to Imported: {error}")
+
+    messages.success(request, "Review imported from Planka into this issue draft.")
+
+    try:
+        refreshed_cards = _extract_publish_cards(binding)
+    except PlankaAPIError:
+        refreshed_cards = []
+
+    return _render_planka_panel(request, issue, publish_cards=refreshed_cards)

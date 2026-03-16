@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.html import escape, strip_tags
 
 from spanza_journal_watch.utils.modelmethods import name_csv
+from spanza_journal_watch.utils.models import TimeStampedModel
 
 
 class SubscriberCSV(models.Model):
@@ -74,3 +75,59 @@ class InboundEmail(models.Model):
     def __str__(self):
         created = self.created.strftime("%m/%d/%Y, %H:%M:%S")
         return f"Email from {self.sender} - received {created}"
+
+
+class PlankaIssueBinding(TimeStampedModel):
+    """
+    One Planka project + Reviews board per Issue.
+    """
+
+    issue = models.OneToOneField("submissions.Issue", on_delete=models.CASCADE, related_name="planka_binding")
+    project_id = models.CharField(max_length=64, unique=True)
+    project_name = models.CharField(max_length=255)
+    board_id = models.CharField(max_length=64, unique=True)
+    board_name = models.CharField(max_length=128, default="Reviews")
+
+    lists = models.JSONField(default=dict, blank=True)
+    custom_fields = models.JSONField(default=dict, blank=True)
+    custom_field_group_id = models.CharField(max_length=64, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Planka Issue Binding"
+        verbose_name_plural = "Planka Issue Bindings"
+
+    def get_list_id(self, name):
+        return (self.lists or {}).get(name)
+
+    def get_custom_field_id(self, name):
+        return (self.custom_fields or {}).get(name)
+
+    def __str__(self):
+        return f"{self.issue} -> {self.project_name}"
+
+
+class PlankaCardImport(TimeStampedModel):
+    """
+    Ledger of imported Planka cards to prevent duplicate imports.
+    """
+
+    issue = models.ForeignKey("submissions.Issue", on_delete=models.CASCADE, related_name="planka_imports")
+    binding = models.ForeignKey(PlankaIssueBinding, on_delete=models.CASCADE, related_name="imports")
+    card_id = models.CharField(max_length=64, unique=True)
+    card_name = models.CharField(max_length=1024)
+    review = models.ForeignKey(
+        "submissions.Review",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="planka_imports",
+    )
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True)
+
+    class Meta:
+        ordering = ("-created",)
+        verbose_name = "Planka Card Import"
+        verbose_name_plural = "Planka Card Imports"
+
+    def __str__(self):
+        return f"{self.card_name} ({self.card_id})"

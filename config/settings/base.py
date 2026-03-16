@@ -257,6 +257,13 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", defa
 # ------------------------------------------------------------------------------
 ISSUE_BUILDER_MAX_FEATURED_REVIEWS = env.int("ISSUE_BUILDER_MAX_FEATURED_REVIEWS", default=2)
 
+# PLANKA
+# ------------------------------------------------------------------------------
+PLANKA_BASE_URL = env("PLANKA_BASE_URL", default="")
+PLANKA_API_KEY = env("PLANKA_API_KEY", default="")
+PLANKA_ACCESS_TOKEN = env("PLANKA_ACCESS_TOKEN", default="")
+PLANKA_TIMEOUT_SECONDS = env.int("PLANKA_TIMEOUT_SECONDS", default=15)
+
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL.
