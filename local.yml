@@ -44,6 +44,7 @@ services:
       dockerfile: ./compose/local/docs/Dockerfile
     env_file:
       - ./.envs/.local/.django
+    profiles: ['tools']
     volumes:
       - ./docs:/docs:z
       - ./config:/app/config:z
@@ -66,6 +67,7 @@ services:
     <<: *django
     image: spanza_journal_watch_local_celeryworker
     container_name: spanza_journal_watch_local_celeryworker
+    profiles: ['workers']
     depends_on:
       - redis
       - postgres
@@ -78,6 +80,7 @@ services:
     <<: *django
     image: spanza_journal_watch_local_celerybeat
     container_name: spanza_journal_watch_local_celerybeat
+    profiles: ['workers']
     depends_on:
       - redis
       - postgres
@@ -90,6 +93,7 @@ services:
     <<: *django
     image: spanza_journal_watch_local_flower
     container_name: spanza_journal_watch_local_flower
+    profiles: ['workers']
     ports:
       - '5555:5555'
     command: /start-flower
@@ -106,6 +110,8 @@ services:
       - .:/app:z
       # http://jdlm.info/articles/2016/03/06/lessons-building-node-app-docker.html
       - /app/node_modules
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
     command: npm run dev
     ports:
       - '3000:3000'
