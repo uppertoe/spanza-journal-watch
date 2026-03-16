@@ -45,7 +45,13 @@
     <div class="card mb-4">
       <div class="card-header">{% if selected_issue %}Edit issue draft{% else %}Create issue draft{% endif %}</div>
       <div class="card-body">
-        <form method="post" action="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}">
+        <form
+          method="post"
+          action="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}"
+          hx-post="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}"
+          hx-target="#issue-reviews-panel"
+          hx-swap="outerHTML"
+        >
           {% csrf_token %}
           {{ issue_form|crispy }}
           <button type="submit" class="btn btn-primary">Save issue draft</button>

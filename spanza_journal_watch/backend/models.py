@@ -1,6 +1,8 @@
 import base64
+import hashlib
 import uuid
 
+from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import models
 from django.utils.html import escape, strip_tags
@@ -77,6 +79,95 @@ class InboundEmail(models.Model):
         return f"Email from {self.sender} - received {created}"
 
 
+class PlankaIntegrationCredential(TimeStampedModel):
+    class AuthMode(models.TextChoices):
+        API_KEY = "api_key", "Manual API key"
+        PASSWORD = "password", "Username/password"
+        OIDC = "oidc", "OIDC code exchange"
+
+    singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    auth_mode = models.CharField(max_length=24, choices=AuthMode.choices)
+    api_key = models.TextField()
+    api_key_prefix = models.CharField(max_length=32, blank=True)
+    configured_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="configured_planka_credentials",
+    )
+    last_validated_at = models.DateTimeField(blank=True, null=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Planka Integration Credential"
+        verbose_name_plural = "Planka Integration Credentials"
+
+    @staticmethod
+    def _derive_fernet_key(secret):
+        digest = hashlib.sha256(secret.encode("utf-8")).digest()
+        return base64.urlsafe_b64encode(digest)
+
+    @classmethod
+    def _get_fernet(cls):
+        secret = (getattr(settings, "PLANKA_CREDENTIAL_ENCRYPTION_KEY", "") or "").strip() or getattr(
+            settings, "SECRET_KEY", ""
+        )
+        return Fernet(cls._derive_fernet_key(secret))
+
+    @classmethod
+    def _decrypt_if_possible(cls, value):
+        if not value:
+            return ""
+
+        try:
+            return cls._get_fernet().decrypt(value.encode("utf-8")).decode("utf-8")
+        except (InvalidToken, ValueError, TypeError):
+            return None
+
+    @classmethod
+    def _encrypt(cls, value):
+        return cls._get_fernet().encrypt(value.encode("utf-8")).decode("utf-8")
+
+    @classmethod
+    def get_solo(cls):
+        return cls.objects.order_by("pk").first()
+
+    def set_api_key(self, plain_api_key):
+        plain_api_key = (plain_api_key or "").strip()
+        self.api_key = self._encrypt(plain_api_key) if plain_api_key else ""
+
+    def get_api_key(self):
+        stored = self.api_key or ""
+        if not stored:
+            return ""
+
+        decrypted = self._decrypt_if_possible(stored)
+        if decrypted is not None:
+            return decrypted
+
+        return stored
+
+    def save(self, *args, **kwargs):
+        if self.api_key:
+            decrypted = self._decrypt_if_possible(self.api_key)
+            if decrypted is None:
+                self.api_key = self._encrypt(self.api_key)
+
+        super().save(*args, **kwargs)
+
+    def get_masked_api_key(self):
+        api_key = self.get_api_key()
+        if not api_key:
+            return ""
+        if len(api_key) <= 10:
+            return "*" * len(api_key)
+        return f"{api_key[:6]}…{api_key[-4:]}"
+
+    def __str__(self):
+        return f"Planka credential ({self.get_auth_mode_display()})"
+
+
 class PlankaIssueBinding(TimeStampedModel):
     """
     One Planka project + Reviews board per Issue.
@@ -87,10 +178,20 @@ class PlankaIssueBinding(TimeStampedModel):
     project_name = models.CharField(max_length=255)
     board_id = models.CharField(max_length=64, unique=True)
     board_name = models.CharField(max_length=128, default="Reviews")
+    instructions_board_id = models.CharField(max_length=64, blank=True, null=True)
+    instructions_board_name = models.CharField(max_length=128, default="Instructions")
 
     lists = models.JSONField(default=dict, blank=True)
+    instructions_lists = models.JSONField(default=dict, blank=True)
     custom_fields = models.JSONField(default=dict, blank=True)
     custom_field_group_id = models.CharField(max_length=64, blank=True, null=True)
+    background_asset = models.ForeignKey(
+        "backend.PlankaBoardBackgroundAsset",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="issue_bindings",
+    )
 
     class Meta:
         verbose_name = "Planka Issue Binding"
@@ -104,6 +205,26 @@ class PlankaIssueBinding(TimeStampedModel):
 
     def __str__(self):
         return f"{self.issue} -> {self.project_name}"
+
+
+class PlankaBoardBackgroundAsset(TimeStampedModel):
+    name = models.CharField(max_length=255)
+    image = models.ImageField(upload_to="backend/planka/backgrounds")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="uploaded_planka_background_assets",
+    )
+
+    class Meta:
+        ordering = ("name", "-created")
+        verbose_name = "Planka Board Background Asset"
+        verbose_name_plural = "Planka Board Background Assets"
+
+    def __str__(self):
+        return self.name
 
 
 class PlankaCardImport(TimeStampedModel):
@@ -123,6 +244,8 @@ class PlankaCardImport(TimeStampedModel):
         related_name="planka_imports",
     )
     imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True)
+    last_review_modified_at = models.DateTimeField(blank=True, null=True)
+    last_card_payload_hash = models.CharField(max_length=64, blank=True)
 
     class Meta:
         ordering = ("-created",)

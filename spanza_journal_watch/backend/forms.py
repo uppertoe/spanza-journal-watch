@@ -1,6 +1,7 @@
 import csv
 import datetime
 import io
+from pathlib import Path
 
 from django import forms
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.core.exceptions import ValidationError
 from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
 from ..submissions.models import Article, Author, Issue, Journal, Review
-from .models import InboundEmail, SubscriberCSV
+from .models import InboundEmail, PlankaBoardBackgroundAsset, SubscriberCSV
 
 
 def csv_size(file):
@@ -19,10 +20,86 @@ def csv_size(file):
 
 
 DELIMITERS = [",", ";", "\t", " "]
+EMAIL_HEADER_CANDIDATES = {"email", "email address", "e-mail", "e-mail address", "mail"}
+
+
+class PreviewTable:
+    def __init__(self, fieldnames, rows):
+        self.fieldnames = fieldnames
+        self._rows = rows
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+def _normalize_cell(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _looks_like_email_header(value):
+    normalized = (value or "").strip().lower()
+    return normalized in EMAIL_HEADER_CANDIDATES
+
+
+def _build_preview_from_rows(rows, user_header=None):
+    if not rows:
+        return {"preview": PreviewTable(["Column 1"], []), "has_header": False}
+
+    first_row = rows[0]
+    guessed_header = any(_looks_like_email_header(value) for value in first_row) and all(
+        "@" not in (value or "") for value in first_row
+    )
+
+    has_header = guessed_header if user_header is None else bool(user_header)
+
+    max_cols = max(len(row) for row in rows) if rows else 1
+    padded_rows = [row + [""] * (max_cols - len(row)) for row in rows]
+
+    if has_header:
+        fieldnames = [value or f"Column {idx + 1}" for idx, value in enumerate(padded_rows[0])]
+        data_rows = padded_rows[1:]
+    else:
+        fieldnames = [f"Column {idx + 1}" for idx in range(max_cols)]
+        data_rows = padded_rows
+
+    dict_rows = [dict(zip(fieldnames, row, strict=False)) for row in data_rows]
+    return {"preview": PreviewTable(fieldnames, dict_rows), "has_header": has_header}
+
+
+def _peek_xlsx(file, user_header=None):
+    try:
+        from openpyxl import load_workbook
+    except Exception as error:
+        raise ValidationError({"file": f"XLSX support requires openpyxl: {error}"})
+
+    try:
+        file.seek(0)
+        workbook = load_workbook(filename=file, read_only=True, data_only=True)
+    except Exception as error:
+        raise ValidationError({"file": f"Not a valid XLSX file: {error}"})
+
+    worksheet = workbook.active
+    rows = []
+    for raw_row in worksheet.iter_rows(min_row=1, max_row=25, values_only=True):
+        row = [_normalize_cell(value) for value in raw_row]
+        while row and row[-1] == "":
+            row.pop()
+        if not row:
+            continue
+        rows.append(row)
+
+    return _build_preview_from_rows(rows, user_header=user_header)
 
 
 def peek_csv(file, user_header=None):
+    filename = Path(getattr(file, "name", "")).suffix.lower()
+    if filename == ".xlsx":
+        return _peek_xlsx(file, user_header=user_header)
+
     try:
+        file.seek(0)
         decoded_file = file.read(1024).decode("UTF-8-SIG")
     except UnicodeDecodeError as error:
         print(f"Error handling uploaded CSV: {error}")
@@ -57,9 +134,13 @@ def peek_csv(file, user_header=None):
         fieldnames = None  # Allow DictReader to use the first row as fieldnames
 
     io_string = io.StringIO(decoded_file)
-    preview = csv.DictReader(io_string, fieldnames=fieldnames, dialect=dialect)
+    preview_rows = list(csv.DictReader(io_string, fieldnames=fieldnames, dialect=dialect))
+    file.seek(0)
 
-    return {"preview": preview, "has_header": has_header}
+    return {
+        "preview": PreviewTable(preview_rows[0].keys() if preview_rows else fieldnames or [], preview_rows),
+        "has_header": has_header,
+    }
 
 
 class SubscriberCSVForm(forms.ModelForm):
@@ -202,7 +283,7 @@ class IssueBuilderIssueForm(forms.ModelForm):
         required=False,
         input_formats=["%Y-%m", "%Y-%m-%d"],
         widget=forms.DateInput(attrs={"type": "month"}),
-        help_text="Select issue month (saved as first day of month).",
+        help_text="Select issue month and year.",
     )
 
     class Meta:
@@ -349,6 +430,79 @@ class IssueBuilderReviewForm(forms.Form):
 
 class PlankaProjectSetupForm(forms.Form):
     project_name = forms.CharField(max_length=128)
+    background_asset = forms.ModelChoiceField(
+        queryset=PlankaBoardBackgroundAsset.objects.none(),
+        required=False,
+        empty_label="No background image",
+        help_text="Choose a previously uploaded background image.",
+    )
+    background_upload = forms.ImageField(
+        required=False,
+        help_text="Or upload a new image (will be converted to WebP, max 1920×1080).",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["background_asset"].queryset = PlankaBoardBackgroundAsset.objects.order_by("name")
 
     def clean_project_name(self):
         return self.cleaned_data["project_name"].strip()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        background_asset = cleaned_data.get("background_asset")
+        background_upload = cleaned_data.get("background_upload")
+
+        if background_asset and background_upload:
+            self.add_error("background_upload", "Choose either an existing image or upload a new one, not both.")
+
+        return cleaned_data
+
+
+class PlankaApiKeyForm(forms.Form):
+    api_key = forms.CharField(
+        required=True,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Create a key in Planka (Profile/Settings → API key) and paste it here.",
+    )
+    issue_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+
+    def clean_api_key(self):
+        value = (self.cleaned_data.get("api_key") or "").strip()
+        if not value:
+            raise ValidationError("API key is required.")
+        return value
+
+
+class PlankaProjectBackgroundForm(forms.Form):
+    background_asset = forms.ModelChoiceField(
+        queryset=PlankaBoardBackgroundAsset.objects.none(),
+        required=False,
+        empty_label="Keep current background",
+        help_text="Choose a previously uploaded background image.",
+    )
+    background_upload = forms.ImageField(
+        required=False,
+        help_text="Or upload a new image (will be converted to WebP, max 1920×1080).",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["background_asset"].queryset = PlankaBoardBackgroundAsset.objects.order_by("name")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        background_asset = cleaned_data.get("background_asset")
+        background_upload = cleaned_data.get("background_upload")
+
+        if background_asset and background_upload:
+            self.add_error("background_upload", "Choose either an existing image or upload a new one, not both.")
+
+        return cleaned_data
+
+
+class PlankaProjectNameForm(forms.Form):
+    project_name = forms.CharField(max_length=128)
+
+    def clean_project_name(self):
+        return (self.cleaned_data.get("project_name") or "").strip()

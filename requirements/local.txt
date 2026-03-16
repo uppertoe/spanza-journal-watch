@@ -42,7 +42,9 @@ celery==5.6.2
 certifi==2026.2.25
     # via requests
 cffi==2.0.0
-    # via argon2-cffi-bindings
+    # via
+    #   argon2-cffi-bindings
+    #   cryptography
 cfgv==3.5.0
     # via pre-commit
 charset-normalizer==3.4.6
@@ -73,6 +75,8 @@ crispy-bootstrap5==2026.3
     # via -r requirements/base.in
 cron-descriptor==1.4.5
     # via django-celery-beat
+cryptography==46.0.3
+    # via -r requirements/base.in
 decorator==5.2.1
     # via
     #   ipdb

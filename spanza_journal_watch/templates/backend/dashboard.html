@@ -3,18 +3,33 @@
 {% block content %}
 <h1>Backend Dashboard</h1>
 
-<div class="list-group">
-	<a class="list-group-item list-group-item-action" href="{% url "backend:issue_builder" %}">
-		Issue Builder
-	</a>
-	<a class="list-group-item list-group-item-action" href="{% url "backend:upload_subscribers" %}">
-		Upload Subscribers
-	</a>
-	<a class="list-group-item list-group-item-action" href="{% url "backend:newsletter_stats_list" %}">
-		Newsletter Statistics
-	</a>
-	<a class="list-group-item list-group-item-action" href="{% url "backend:newsletter_release_list" %}">
-		Newsletter Release
-	</a>
+<div class="row g-3">
+	<div class="col-md-4">
+		<div class="card h-100">
+			<div class="card-header">Editorial</div>
+			<div class="list-group list-group-flush">
+				<a class="list-group-item list-group-item-action" href="{% url "backend:issue_builder" %}">Issue Builder</a>
+				<a class="list-group-item list-group-item-action" href="{% url "backend:issue_planka_import" %}">Planka Sync</a>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-4">
+		<div class="card h-100">
+			<div class="card-header">Subscribers</div>
+			<div class="list-group list-group-flush">
+				<a class="list-group-item list-group-item-action" href="{% url "backend:upload_subscribers" %}">Upload Subscribers</a>
+				<a class="list-group-item list-group-item-action" href="{% url "backend:subscriber_list" %}">Mailing List</a>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-4">
+		<div class="card h-100">
+			<div class="card-header">Newsletter</div>
+			<div class="list-group list-group-flush">
+				<a class="list-group-item list-group-item-action" href="{% url "backend:newsletter_release_list" %}">Release</a>
+				<a class="list-group-item list-group-item-action" href="{% url "backend:newsletter_stats_list" %}">Statistics</a>
+			</div>
+		</div>
+	</div>
 </div>
 {% endblock content %}

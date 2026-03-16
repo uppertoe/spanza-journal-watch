@@ -1,6 +1,7 @@
 volumes:
   spanza_journal_watch_local_postgres_data: {}
   spanza_journal_watch_local_postgres_data_backups: {}
+  spanza_journal_watch_local_planka_data: {}
 
 services:
   django: &django
@@ -126,3 +127,39 @@ services:
     ports:
       - '28101:28101'
     command: ['--mjml.validationLevel=strict']
+
+  planka:
+    image: ghcr.io/plankanban/planka:2.0.3
+    container_name: spanza_journal_watch_local_planka
+    profiles: ['planka']
+    restart: on-failure
+    depends_on:
+      planka_postgres:
+        condition: service_healthy
+    volumes:
+      - spanza_journal_watch_local_planka_data:/app/data
+    ports:
+      - '3001:1337'
+    environment:
+      BASE_URL: http://localhost:3001
+      DATABASE_URL: postgresql://postgres@planka_postgres/planka
+      SECRET_KEY: notsecretkey
+      SWAGGER_EXPOSED: 'true'
+      DEFAULT_ADMIN_EMAIL: demo@demo.demo
+      DEFAULT_ADMIN_PASSWORD: demo
+      DEFAULT_ADMIN_NAME: Demo Demo
+      DEFAULT_ADMIN_USERNAME: demo
+
+  planka_postgres:
+    image: postgres:16-alpine
+    container_name: spanza_journal_watch_local_planka_postgres
+    profiles: ['planka']
+    restart: on-failure
+    environment:
+      POSTGRES_DB: planka
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d planka']
+      interval: 10s
+      timeout: 5s
+      retries: 5

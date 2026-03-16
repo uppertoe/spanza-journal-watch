@@ -3,6 +3,7 @@
 python-slugify
 Pillow>=11.0
 argon2-cffi
+cryptography
 whitenoise
 redis
 hiredis
@@ -25,3 +26,4 @@ django-webpack-loader
 django-view-breadcrumbs
 django-request-logging
 django-markdownx
+openpyxl

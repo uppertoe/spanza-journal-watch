@@ -22,7 +22,9 @@ celery==5.6.2
     #   django-celery-beat
     #   flower
 cffi==2.0.0
-    # via argon2-cffi-bindings
+    # via
+    #   argon2-cffi-bindings
+    #   cryptography
 click==8.3.1
     # via
     #   celery
@@ -39,6 +41,8 @@ crispy-bootstrap5==2026.3
     # via -r requirements/base.in
 cron-descriptor==1.4.5
     # via django-celery-beat
+cryptography==46.0.3
+    # via -r requirements/base.in
 django==6.0.3
     # via
     #   -r requirements/base.in
@@ -82,6 +86,8 @@ django-view-breadcrumbs==2.5.1
     # via -r requirements/base.in
 django-webpack-loader==3.2.3
     # via -r requirements/base.in
+et-xmlfile==2.0.0
+    # via openpyxl
 flower==2.0.1
     # via -r requirements/base.in
 hiredis==3.3.0
@@ -92,6 +98,8 @@ kombu==5.6.2
     # via celery
 markdown==3.10.2
     # via django-markdownx
+openpyxl==3.1.5
+    # via -r requirements/base.in
 packaging==26.0
     # via kombu
 pillow==12.1.1

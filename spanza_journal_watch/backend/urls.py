@@ -6,6 +6,8 @@ app_name = "backend"
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("issues/builder", views.issue_builder, name="issue_builder"),
+    path("issues/planka", views.issue_planka_import, name="issue_planka_import"),
+    path("issues/planka/api-key", views.planka_save_api_key, name="planka_save_api_key"),
     path("issues/builder/save", views.save_issue_draft, name="save_issue_draft"),
     path("issues/builder/<int:issue_id>/save", views.save_issue_draft, name="update_issue_draft"),
     path("issues/builder/<int:issue_id>/reviews/new", views.new_review_form, name="new_issue_review_form"),
@@ -37,11 +39,22 @@ urlpatterns = [
         name="planka_refresh_publish_cards",
     ),
     path(
+        "issues/builder/<int:issue_id>/planka/background",
+        views.planka_update_project_background,
+        name="planka_update_project_background",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/planka/project-name",
+        views.planka_update_project_name,
+        name="planka_update_project_name",
+    ),
+    path(
         "issues/builder/<int:issue_id>/planka/import-card",
         views.planka_import_publish_card,
         name="planka_import_publish_card",
     ),
     path("subscribers/upload", views.upload_subscriber_csv, name="upload_subscribers"),
+    path("subscribers/list", views.subscriber_list, name="subscriber_list"),
     path("subscribers/upload/change-header/<str:save_token>", views.edit_csv_header, name="edit_csv_header"),
     path("subscribers/upload/process-csv/<str:save_token>", views.process_csv, name="process_csv"),
     path("newsletter/release", views.newsletter_release_list, name="newsletter_release_list"),

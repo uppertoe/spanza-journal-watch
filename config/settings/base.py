@@ -263,6 +263,7 @@ PLANKA_BASE_URL = env("PLANKA_BASE_URL", default="")
 PLANKA_API_KEY = env("PLANKA_API_KEY", default="")
 PLANKA_ACCESS_TOKEN = env("PLANKA_ACCESS_TOKEN", default="")
 PLANKA_TIMEOUT_SECONDS = env.int("PLANKA_TIMEOUT_SECONDS", default=15)
+PLANKA_CREDENTIAL_ENCRYPTION_KEY = env("PLANKA_CREDENTIAL_ENCRYPTION_KEY", default="")
 
 # ADMIN
 # ------------------------------------------------------------------------------

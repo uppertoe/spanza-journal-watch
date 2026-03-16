@@ -41,21 +41,59 @@
             <ul class="navbar-nav">
             {% if request.user.is_authenticated %}
             {% if request.user.is_staff %}
+              {% with current=request.resolver_match.url_name %}
               <li class="nav-item">
-                <a class="nav-link{% if request.resolver_match.url_name in 'backend:dashboard' %} active{% endif %}" href="{% url "backend:dashboard" %}">Dashboard</a>
+                <a class="nav-link{% if current == 'dashboard' %} active{% endif %}" href="{% url "backend:dashboard" %}">Dashboard</a>
               </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.resolver_match.url_name in 'backend:upload_subscribers' %} active{% endif %}" href="{% url "backend:upload_subscribers" %}">Upload Subscribers</a>
+
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle{% if current == 'issue_builder' or current == 'save_issue_draft' or current == 'update_issue_draft' or current == 'new_issue_review_form' or current == 'add_issue_review' or current == 'edit_issue_review_form' or current == 'update_issue_review' or current == 'remove_issue_review' or current == 'publish_issue_bundle' or current == 'issue_planka_import' or current == 'planka_save_api_key' or current == 'planka_setup_issue_project' or current == 'planka_refresh_publish_cards' or current == 'planka_import_publish_card' or current == 'planka_update_project_background' or current == 'planka_update_project_name' %} active{% endif %}"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  Editorial
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url "backend:issue_builder" %}">Issue Builder</a></li>
+                  <li><a class="dropdown-item" href="{% url "backend:issue_planka_import" %}">Planka Sync</a></li>
+                </ul>
               </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.resolver_match.url_name in 'backend:issue_builder,backend:save_issue_draft,backend:update_issue_draft' %} active{% endif %}" href="{% url "backend:issue_builder" %}">Issue Builder</a>
+
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle{% if current == 'upload_subscribers' or current == 'edit_csv_header' or current == 'process_csv' or current == 'subscriber_list' %} active{% endif %}"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  Subscribers
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url "backend:upload_subscribers" %}">Upload Subscribers</a></li>
+                  <li><a class="dropdown-item" href="{% url "backend:subscriber_list" %}">Mailing List</a></li>
+                </ul>
               </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.resolver_match.url_name in 'backend:newsletter_release_list,backend:create_newsletter,backend:final_newsletter,backend:send_test_newsletter,backend:enable_newsletter_resend,backend:send_final_newsletter' %} active{% endif %}" href="{% url "backend:newsletter_release_list" %}">Newsletter Release</a>
+
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle{% if current == 'newsletter_release_list' or current == 'create_newsletter' or current == 'final_newsletter' or current == 'send_test_newsletter' or current == 'enable_newsletter_resend' or current == 'send_final_newsletter' or current == 'newsletter_stats_list' or current == 'newsletter_stats_detail' %} active{% endif %}"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  Newsletter
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url "backend:newsletter_release_list" %}">Release</a></li>
+                  <li><a class="dropdown-item" href="{% url "backend:newsletter_stats_list" %}">Statistics</a></li>
+                </ul>
               </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.resolver_match.url_name in 'backend:newsletter_stats_list, backend:newsletter_stats_detail' %} active{% endif %}" href="{% url "backend:newsletter_stats_list" %}">Newsletter Statistics</a>
-              </li>
+              {% endwith %}
               {% endif %}
               <li class="nav-item">
                 <a class="nav-link{% if request.resolver_match.url_name in 'account_logout' %} active{% endif %}" href="{% url "account_logout" %}">Log Out</a>

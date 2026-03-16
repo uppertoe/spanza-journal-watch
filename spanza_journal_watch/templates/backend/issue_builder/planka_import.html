@@ -1,0 +1,127 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Planka Sync</h1>
+  <a class="btn btn-outline-secondary" href="{% url "backend:issue_builder" %}{% if selected_issue %}?issue={{ selected_issue.pk }}{% endif %}">Back to Issue Builder</a>
+</div>
+<p class="text-muted">Link an issue to Planka and sync cards from the Publish ready list.</p>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Planka API key</span>
+    {% if planka_credential %}
+      <span class="badge text-bg-success">Configured</span>
+    {% else %}
+      <span class="badge text-bg-warning">Not configured</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="text-muted small">
+        {% if planka_credential %}
+          API key: {{ planka_credential.get_masked_api_key }} · Last validated: {{ planka_credential.last_validated_at|default:"Never" }}
+        {% else %}
+          Add an API key from Planka to enable sync.
+        {% endif %}
+      </div>
+      <button
+        id="planka-api-key-toggle"
+        class="btn btn-sm btn-outline-secondary"
+        type="button"
+        aria-expanded="{% if not planka_credential %}true{% else %}false{% endif %}"
+        aria-controls="planka-api-key-panel"
+      >
+        {% if planka_credential %}Change API key{% else %}Set API key{% endif %}
+      </button>
+    </div>
+
+    <div class="mt-3 {% if planka_credential %}d-none{% endif %}" id="planka-api-key-panel">
+      <div class="border rounded p-3" style="background-color: var(--bs-tertiary-bg); color: var(--bs-body-color);">
+        <p class="text-muted mb-3">Paste a Planka API key. There is no key delete action in this UI.</p>
+        <form method="post" action="{% url "backend:planka_save_api_key" %}">
+          {% csrf_token %}
+          {{ planka_api_key_form.issue_id }}
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-9">
+              {{ planka_api_key_form.api_key|as_crispy_field }}
+            </div>
+            <div class="col-12 col-md-3">
+              <button type="submit" class="btn btn-primary w-100">Save API key</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if planka_credential and planka_credential.last_error %}
+      <div class="alert alert-warning py-2 mt-3 mb-0">
+        Last Planka error: {{ planka_credential.last_error }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  (() => {
+    const toggle = document.getElementById("planka-api-key-toggle");
+    const panel = document.getElementById("planka-api-key-panel");
+    if (!toggle || !panel) return;
+
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("d-none");
+      toggle.setAttribute("aria-expanded", panel.classList.contains("d-none") ? "false" : "true");
+    });
+  })();
+</script>
+
+<div class="row g-4 align-items-start">
+  <div class="col-12 col-md-4 col-lg-3">
+    <div class="card sticky-top" style="top: 1rem;">
+      <div class="card-header">Recent issues</div>
+      <ul class="list-group list-group-flush">
+        {% for issue in issues %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <a href="{% url "backend:issue_planka_import" %}?issue={{ issue.pk }}">{{ issue.name }}</a>
+            {% if issue.active %}
+              <span class="badge text-bg-success">Live</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Draft</span>
+            {% endif %}
+          </li>
+        {% empty %}
+          <li class="list-group-item text-muted">No issues yet</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-8 col-lg-9">
+    {% if selected_issue %}
+      {% if planka_binding %}
+        {% include "backend/issue_builder/_planka_project_context_card.html" %}
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Selected issue</span>
+          <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_builder" %}?issue={{ selected_issue.pk }}">Edit in Issue Builder</a>
+        </div>
+        <div class="card-body">
+          <div class="fw-semibold">{{ selected_issue.name }}</div>
+          <div class="text-muted small">
+            {% if selected_issue.date %}{{ selected_issue.date|date:"F Y" }}{% else %}No issue date set{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div id="planka-panel">
+        {% include "backend/issue_builder/_planka_panel.html" %}
+      </div>
+    {% else %}
+      <div class="alert alert-info mb-0">Select an issue to use Planka sync.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

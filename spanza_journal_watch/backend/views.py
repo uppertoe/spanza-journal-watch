@@ -1,16 +1,26 @@
 import datetime
+import hashlib
+import io
+import json
+import re
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import MultipleObjectsReturned
+from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
+from PIL import Image, UnidentifiedImageError
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
-from spanza_journal_watch.newsletter.models import Newsletter
+from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
 from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
 from spanza_journal_watch.utils.cache import bump_content_cache_version
@@ -21,33 +31,46 @@ from .forms import (
     IssueBuilderReviewForm,
     NewsletterCreateForm,
     NewsletterTestSendForm,
+    PlankaApiKeyForm,
+    PlankaProjectBackgroundForm,
+    PlankaProjectNameForm,
     PlankaProjectSetupForm,
     SubscriberCSVForm,
     peek_csv,
 )
-from .models import PlankaCardImport, PlankaIssueBinding, SubscriberCSV
+from .models import (
+    PlankaBoardBackgroundAsset,
+    PlankaCardImport,
+    PlankaIntegrationCredential,
+    PlankaIssueBinding,
+    SubscriberCSV,
+)
 from .planka import PlankaAPIError, PlankaClient
 from .tasks import process_subscriber_csv
 
 PLANKA_LIST_ORDER = [
-    "instructions",
     "articles",
     "candidates",
     "under_review",
-    "editing",
-    "publish",
-    "imported",
+    "publish_ready",
 ]
 
 PLANKA_LIST_LABELS = {
-    "instructions": "Instructions",
     "articles": "Articles",
     "candidates": "Candidates",
     "under_review": "Under review",
-    "editing": "Editing",
-    "publish": "Publish",
-    "imported": "Imported",
+    "publish_ready": "Publish ready",
 }
+
+PLANKA_INSTRUCTIONS_LIST_ORDER = ["reviewers", "editors", "administrators"]
+
+PLANKA_INSTRUCTIONS_LIST_LABELS = {
+    "reviewers": "Reviewers",
+    "editors": "Editors",
+    "administrators": "Administrators",
+}
+
+PLANKA_INSTRUCTIONS_DIR = Path(__file__).resolve().parent / "planka_instructions"
 
 PLANKA_SCHEMA_FIELDS = [
     {"key": "article_url", "label": "Article URL", "required": True, "show_on_front": True},
@@ -68,6 +91,71 @@ PLANKA_SCHEMA_FIELDS = [
 ]
 
 PLANKA_FIELD_LABEL_TO_KEY = {item["label"].lower(): item["key"] for item in PLANKA_SCHEMA_FIELDS}
+
+
+def _parse_instruction_cards(markdown_text):
+    cards = []
+    current_title = None
+    current_body = []
+
+    for line in (markdown_text or "").splitlines():
+        heading_match = re.match(r"^##\s+(.+?)\s*$", line)
+        if heading_match:
+            if current_title:
+                cards.append({"title": current_title, "body": "\n".join(current_body).strip()})
+            current_title = heading_match.group(1).strip()
+            current_body = []
+            continue
+        current_body.append(line)
+
+    if current_title:
+        cards.append({"title": current_title, "body": "\n".join(current_body).strip()})
+
+    return [card for card in cards if card["title"]]
+
+
+def _load_instruction_cards_by_bucket():
+    cards_by_bucket = {}
+    for bucket in PLANKA_INSTRUCTIONS_LIST_ORDER:
+        path = PLANKA_INSTRUCTIONS_DIR / f"{bucket}.md"
+        if not path.exists():
+            cards_by_bucket[bucket] = []
+            continue
+        cards_by_bucket[bucket] = _parse_instruction_cards(path.read_text(encoding="utf-8"))
+
+    return cards_by_bucket
+
+
+def _normalize_background_to_webp(uploaded_file):
+    try:
+        uploaded_file.seek(0)
+        with Image.open(uploaded_file) as image:
+            image = image.convert("RGB")
+            image.thumbnail((1920, 1080), Image.Resampling.LANCZOS)
+            buffer = io.BytesIO()
+            image.save(buffer, format="WEBP", quality=90, method=6)
+            return buffer.getvalue()
+    except (UnidentifiedImageError, OSError) as error:
+        raise ValueError("Uploaded file is not a valid image.") from error
+
+
+def _resolve_background_asset(form, user):
+    selected_asset = form.cleaned_data.get("background_asset")
+    uploaded_file = form.cleaned_data.get("background_upload")
+
+    if uploaded_file:
+        webp_bytes = _normalize_background_to_webp(uploaded_file)
+        filename_slug = slugify(Path(uploaded_file.name).stem) or "background"
+        asset = PlankaBoardBackgroundAsset(
+            name=f"{filename_slug} ({timezone.now().strftime('%Y-%m-%d %H:%M')})",
+            uploaded_by=user,
+        )
+        asset.image.save(
+            f"{filename_slug}-{timezone.now().strftime('%Y%m%d%H%M%S')}.webp", ContentFile(webp_bytes), save=True
+        )
+        return asset
+
+    return selected_asset
 
 
 @login_required
@@ -164,20 +252,56 @@ def process_csv(request, save_token):
     subscriber_csv.confirmed = True
     subscriber_csv.save()
 
-    # Send the task to Celery
+    summary = None
     if subscriber_csv.is_ready_to_process:
-        process_subscriber_csv.apply_async((subscriber_csv.pk,), countdown=1)
+        try:
+            summary = process_subscriber_csv(subscriber_csv.pk)
+            messages.success(request, "Subscriber import complete.")
+        except Exception as error:
+            messages.error(request, f"Subscriber import failed: {_safe_planka_error(error)}")
 
-    # Messages included in the template fragment
-    messages.success(request, "CSV successfully sent for processing")
-
-    return render(request, "backend/process_csv_success.html")
+    return render(request, "backend/process_csv_success.html", {"summary": summary})
 
 
 @login_required
 @permission_required("backend.manage_subscriber_csv", raise_exception=True)  # Prevents login loop
 def dashboard(request):
     return render(request, "backend/dashboard.html")
+
+
+@login_required
+@permission_required("backend.manage_subscriber_csv", raise_exception=True)
+def subscriber_list(request):
+    query = (request.GET.get("q") or "").strip()
+    subscribed = (request.GET.get("subscribed") or "").strip()
+    bounced = (request.GET.get("bounced") or "").strip()
+    complained = (request.GET.get("complained") or "").strip()
+
+    subscribers = Subscriber.objects.select_related("from_csv").order_by("-modified", "-pk")
+    if query:
+        subscribers = subscribers.filter(Q(email__icontains=query) | Q(from_csv__name__icontains=query))
+    if subscribed in {"true", "false"}:
+        subscribers = subscribers.filter(subscribed=(subscribed == "true"))
+    if bounced in {"true", "false"}:
+        subscribers = subscribers.filter(bounced=(bounced == "true"))
+    if complained in {"true", "false"}:
+        subscribers = subscribers.filter(complained=(complained == "true"))
+
+    context = {
+        "subscribers": subscribers[:300],
+        "subscriber_filters": {
+            "q": query,
+            "subscribed": subscribed,
+            "bounced": bounced,
+            "complained": complained,
+        },
+        "subscriber_total": subscribers.count(),
+    }
+
+    if request.headers.get("HX-Request") == "true":
+        return render(request, "backend/_subscriber_list_results.html", context)
+
+    return render(request, "backend/subscriber_list.html", context)
 
 
 @login_required
@@ -352,12 +476,54 @@ def _bool_from_value(value):
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _safe_planka_error(error):
+    text = str(error or "").strip()
+    if not text:
+        return "Planka request failed."
+
+    redacted = re.sub(r"(?i)(authorization\s*[:=]\s*)(bearer\s+[^\s,;]+)", r"\1[REDACTED]", text)
+    redacted = re.sub(r"(?i)(api[_-]?key\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]", redacted)
+    redacted = re.sub(r"(?i)(password\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]", redacted)
+    redacted = re.sub(r"(?i)(token\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]", redacted)
+
+    return redacted[:500]
+
+
+def _is_planka_connection_error(error):
+    text = _safe_planka_error(error).lower()
+    if not text:
+        return False
+
+    indicators = (
+        "could not connect to planka",
+        "connection refused",
+        "failed to establish a new connection",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "timed out",
+        "max retries exceeded",
+        "connection aborted",
+        "connection reset",
+    )
+    return any(marker in text for marker in indicators)
+
+
+def _get_planka_integration_credential():
+    return PlankaIntegrationCredential.get_solo()
+
+
 def _build_planka_client():
-    client = PlankaClient()
+    credential = _get_planka_integration_credential()
+    if credential and credential.api_key:
+        client = PlankaClient(api_key=credential.get_api_key(), access_token="")
+    else:
+        client = PlankaClient()
+
     if not client.configured:
         raise PlankaAPIError(
-            "Planka is not configured. Set PLANKA_BASE_URL and PLANKA_API_KEY or PLANKA_ACCESS_TOKEN."
+            "Planka is not configured. Add integration credentials or set PLANKA_BASE_URL and PLANKA_API_KEY."
         )
+
     return client
 
 
@@ -370,9 +536,12 @@ def _extract_publish_cards(binding):
     custom_fields = included.get("customFields", []) or []
     custom_field_values = included.get("customFieldValues", []) or []
 
-    publish_list_id = binding.get_list_id("publish")
+    publish_list_id = binding.get_list_id("publish_ready")
     if not publish_list_id:
-        publish_list = next((item for item in lists if str(item.get("name", "")).strip().lower() == "publish"), None)
+        publish_list = next(
+            (item for item in lists if str(item.get("name", "")).strip().lower() in {"publish ready", "publish"}),
+            None,
+        )
         publish_list_id = publish_list.get("id") if publish_list else None
 
     field_name_by_id = {
@@ -391,7 +560,7 @@ def _extract_publish_cards(binding):
         content = value.get("content")
         values_by_card.setdefault(card_id, {})[field_key] = str(content or "").strip()
 
-    imported_card_ids = set(binding.imports.values_list("card_id", flat=True))
+    imports_by_card = {item.card_id: item for item in binding.imports.select_related("review").all()}
     publish_cards = []
     for card in cards:
         if publish_list_id and card.get("listId") != publish_list_id:
@@ -402,23 +571,80 @@ def _extract_publish_cards(binding):
             field["label"] for field in PLANKA_SCHEMA_FIELDS if field["required"] and not card_schema.get(field["key"])
         ]
 
+        card_id = card.get("id")
+        existing_sync = imports_by_card.get(card_id)
+        already_synced = existing_sync is not None
+        sync_blocked_reason = ""
+        if existing_sync and existing_sync.review and existing_sync.last_review_modified_at:
+            if existing_sync.review.modified > existing_sync.last_review_modified_at:
+                sync_blocked_reason = "Review has local edits since last sync."
+
         publish_cards.append(
             {
-                "id": card.get("id"),
+                "id": card_id,
                 "name": card.get("name") or "(Untitled card)",
                 "schema": card_schema,
                 "missing_required": missing_required,
                 "is_valid": not missing_required,
-                "already_imported": card.get("id") in imported_card_ids,
+                "already_imported": already_synced,
+                "sync_blocked_reason": sync_blocked_reason,
             }
         )
 
     return sorted(publish_cards, key=lambda item: item["name"].lower())
 
 
-def _render_planka_panel(request, issue, publish_cards=None):
-    context = _issue_builder_base_context(issue=issue, planka_publish_cards=publish_cards)
+def _build_card_payload_hash(selected_card):
+    payload = {
+        "id": selected_card.get("id"),
+        "name": selected_card.get("name"),
+        "schema": selected_card.get("schema") or {},
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _build_planka_publish_summary(publish_cards):
+    cards = publish_cards or []
+    total_cards = len(cards)
+    valid_cards = sum(1 for card in cards if card.get("is_valid") and not card.get("already_imported"))
+    missing_cards = sum(1 for card in cards if not card.get("is_valid"))
+    already_imported_cards = sum(1 for card in cards if card.get("already_imported"))
+    return {
+        "total": total_cards,
+        "valid": valid_cards,
+        "missing": missing_cards,
+        "already_imported": already_imported_cards,
+    }
+
+
+def _render_planka_panel(
+    request,
+    issue,
+    publish_cards=None,
+    panel_status=None,
+    panel_status_level="info",
+    planka_disconnected=False,
+):
+    cards = publish_cards if publish_cards is not None else []
+    context = _issue_builder_base_context(
+        issue=issue,
+        planka_publish_cards=cards,
+        planka_publish_summary=_build_planka_publish_summary(cards),
+        planka_panel_status=panel_status,
+        planka_panel_status_level=panel_status_level,
+        planka_disconnected=planka_disconnected,
+    )
     return render(request, "backend/issue_builder/_planka_panel.html", context)
+
+
+def _render_planka_project_context_card(request, issue, card_status=None, card_status_level="info"):
+    context = _issue_builder_base_context(
+        issue=issue,
+        planka_context_status=card_status,
+        planka_context_status_level=card_status_level,
+    )
+    return render(request, "backend/issue_builder/_planka_project_context_card.html", context)
 
 
 def _issue_builder_base_context(
@@ -427,22 +653,48 @@ def _issue_builder_base_context(
     form_action=None,
     is_edit=False,
     planka_publish_cards=None,
+    planka_publish_summary=None,
+    planka_panel_status=None,
+    planka_panel_status_level="info",
+    planka_api_key_form=None,
+    planka_background_form=None,
+    planka_project_name_form=None,
+    planka_context_status=None,
+    planka_context_status_level="info",
+    planka_disconnected=False,
 ):
     issue_qs = Issue.objects.prefetch_related("reviews__article", "reviews__author").order_by("-modified")
+    credential = _get_planka_integration_credential()
+    background_assets = PlankaBoardBackgroundAsset.objects.order_by("name")
     context = {
         "issues": issue_qs[:25],
         "selected_issue": issue,
         "issue_form": IssueBuilderIssueForm(instance=issue) if issue else IssueBuilderIssueForm(),
         "max_featured_reviews": int(getattr(settings, "ISSUE_BUILDER_MAX_FEATURED_REVIEWS", 2)),
+        "planka_credential": credential,
+        "planka_api_key_form": planka_api_key_form or PlankaApiKeyForm(),
         "planka_binding": None,
         "planka_setup_form": PlankaProjectSetupForm(),
+        "planka_background_form": planka_background_form or PlankaProjectBackgroundForm(),
+        "planka_project_name_form": planka_project_name_form or PlankaProjectNameForm(),
+        "planka_background_assets": background_assets,
         "planka_publish_cards": planka_publish_cards,
+        "planka_publish_summary": planka_publish_summary,
+        "planka_panel_status": planka_panel_status,
+        "planka_panel_status_level": planka_panel_status_level,
+        "planka_disconnected": planka_disconnected,
+        "planka_context_status": planka_context_status,
+        "planka_context_status_level": planka_context_status_level,
     }
 
     if issue:
         binding = PlankaIssueBinding.objects.filter(issue=issue).first()
         context["planka_binding"] = binding
         context["planka_setup_form"] = PlankaProjectSetupForm(initial={"project_name": issue.name})
+        if binding and binding.background_asset_id:
+            context["planka_background_form"].fields["background_asset"].initial = binding.background_asset_id
+        if binding:
+            context["planka_project_name_form"].fields["project_name"].initial = binding.project_name
 
         context["review_form"] = review_form or IssueBuilderReviewForm(issue=issue)
         context["review_form_action"] = form_action or reverse(
@@ -453,6 +705,10 @@ def _issue_builder_base_context(
 
         if context["planka_publish_cards"] is None:
             context["planka_publish_cards"] = []
+        if context["planka_publish_summary"] is None:
+            context["planka_publish_summary"] = _build_planka_publish_summary(context["planka_publish_cards"])
+
+        context["planka_api_key_form"].fields["issue_id"].initial = issue.pk
 
     return context
 
@@ -501,6 +757,93 @@ def issue_builder(request):
 
     context = _issue_builder_base_context(issue=issue)
     return render(request, "backend/issue_builder/issue_builder.html", context)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_planka_import(request):
+    issue_id = request.GET.get("issue")
+    issue = get_object_or_404(Issue, pk=issue_id) if issue_id else None
+
+    context = _issue_builder_base_context(issue=issue)
+    binding = context.get("planka_binding")
+    if issue and binding:
+        try:
+            publish_cards = _extract_publish_cards(binding)
+            context["planka_publish_cards"] = publish_cards
+            context["planka_publish_summary"] = _build_planka_publish_summary(publish_cards)
+            if request.GET.get("refresh") == "1":
+                summary = context["planka_publish_summary"]
+                context["planka_panel_status"] = (
+                    f"Refresh complete. {summary['total']} publish cards loaded "
+                    f"({summary['valid']} ready, {summary['missing']} with missing fields, "
+                    f"{summary['already_imported']} already synced)."
+                )
+                context["planka_panel_status_level"] = "success"
+        except PlankaAPIError as error:
+            safe_error = _safe_planka_error(error)
+            context["planka_publish_cards"] = []
+            context["planka_publish_summary"] = _build_planka_publish_summary([])
+            if _is_planka_connection_error(error):
+                context["planka_panel_status"] = "Not connected to Planka. Retrying in background…"
+                context["planka_disconnected"] = True
+            else:
+                context["planka_panel_status"] = f"Could not refresh Planka cards: {safe_error}"
+            context["planka_panel_status_level"] = "danger"
+
+    return render(request, "backend/issue_builder/planka_import.html", context)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_save_api_key(request):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    form = PlankaApiKeyForm(request.POST)
+    issue_id = (request.POST.get("issue_id") or "").strip()
+    issue = get_object_or_404(Issue, pk=issue_id) if issue_id else None
+
+    if not form.is_valid():
+        messages.error(request, "Please provide a valid Planka API key.")
+        context = _issue_builder_base_context(
+            issue=issue,
+            planka_api_key_form=form,
+        )
+        return render(request, "backend/issue_builder/planka_import.html", context)
+
+    api_key = form.cleaned_data["api_key"]
+    try:
+        validation_client = PlankaClient(api_key=api_key, access_token="")
+        validation_client.get_current_user()
+
+        credential = _get_planka_integration_credential() or PlankaIntegrationCredential(singleton=1)
+        credential.auth_mode = PlankaIntegrationCredential.AuthMode.API_KEY
+        credential.set_api_key(api_key)
+        credential.api_key_prefix = api_key.split("_", 1)[0] if "_" in api_key else ""
+        credential.configured_by = request.user
+        credential.last_validated_at = timezone.now()
+        credential.last_error = ""
+        credential.save()
+    except PlankaAPIError as error:
+        safe_error = _safe_planka_error(error)
+        credential = _get_planka_integration_credential()
+        if credential:
+            credential.last_error = safe_error
+            credential.save(update_fields=["last_error", "modified"])
+
+        messages.error(request, f"Could not validate Planka API key: {safe_error}")
+        context = _issue_builder_base_context(
+            issue=issue,
+            planka_api_key_form=form,
+        )
+        return render(request, "backend/issue_builder/planka_import.html", context)
+
+    messages.success(request, "Planka API key saved successfully.")
+    redirect_url = reverse("backend:issue_planka_import")
+    if issue:
+        redirect_url = f"{redirect_url}?issue={issue.pk}"
+    return redirect(redirect_url)
 
 
 @login_required
@@ -650,20 +993,56 @@ def planka_setup_issue_project(request, issue_id):
 
     issue = get_object_or_404(Issue, pk=issue_id)
     if hasattr(issue, "planka_binding"):
-        messages.info(request, "This issue is already linked to a Planka project.")
-        return _render_planka_panel(request, issue)
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status="This issue is already linked to a Planka project.",
+            panel_status_level="info",
+        )
 
-    form = PlankaProjectSetupForm(request.POST)
+    form = PlankaProjectSetupForm(request.POST, request.FILES)
     if not form.is_valid():
-        messages.error(request, "Project name is required.")
-        return _render_planka_panel(request, issue)
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status="Project name is required.",
+            panel_status_level="danger",
+        )
 
     project_name = form.cleaned_data["project_name"]
+    try:
+        background_asset = _resolve_background_asset(form, request.user)
+    except ValueError as error:
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status=str(error),
+            panel_status_level="danger",
+        )
+    instruction_cards = _load_instruction_cards_by_bucket()
 
     try:
         client = _build_planka_client()
         project = client.create_project(project_name)
+
+        if background_asset:
+            with background_asset.image.open("rb") as image_file:
+                background_image = client.upload_project_background_image(
+                    project["id"],
+                    image_file,
+                    filename=Path(background_asset.image.name).name,
+                    content_type="image/webp",
+                )
+            background_image_id = background_image.get("id")
+            if background_image_id:
+                client.update_project_background(
+                    project["id"],
+                    background_type="image",
+                    background_image_id=background_image_id,
+                )
+
         board = client.create_board(project["id"], name="Reviews")
+        instructions_board = client.create_board(project["id"], name="Instructions", position=2 * 65536)
 
         list_mapping = {}
         for index, key in enumerate(PLANKA_LIST_ORDER, start=1):
@@ -674,6 +1053,26 @@ def planka_setup_issue_project(request, issue_id):
                 list_type="active",
             )
             list_mapping[key] = list_obj["id"]
+
+        instruction_list_mapping = {}
+        for index, key in enumerate(PLANKA_INSTRUCTIONS_LIST_ORDER, start=1):
+            list_obj = client.create_list(
+                board_id=instructions_board["id"],
+                name=PLANKA_INSTRUCTIONS_LIST_LABELS[key],
+                position=index * 65536,
+                list_type="active",
+            )
+            instruction_list_mapping[key] = list_obj["id"]
+
+            cards_for_list = instruction_cards.get(key, [])
+            for card_index, card in enumerate(cards_for_list, start=1):
+                client.create_card(
+                    list_id=list_obj["id"],
+                    name=card["title"],
+                    description=card["body"],
+                    position=card_index * 65536,
+                    card_type="story",
+                )
 
         field_group = client.create_custom_field_group(board["id"])
         custom_fields = {}
@@ -687,8 +1086,12 @@ def planka_setup_issue_project(request, issue_id):
             custom_fields[field["key"]] = field_obj["id"]
 
     except (KeyError, PlankaAPIError) as error:
-        messages.error(request, f"Unable to set up Planka project: {error}")
-        return _render_planka_panel(request, issue)
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status=f"Unable to set up Planka project: {error}",
+            panel_status_level="danger",
+        )
 
     PlankaIssueBinding.objects.create(
         issue=issue,
@@ -696,13 +1099,167 @@ def planka_setup_issue_project(request, issue_id):
         project_name=project_name,
         board_id=board["id"],
         board_name=board.get("name") or "Reviews",
+        instructions_board_id=instructions_board["id"],
+        instructions_board_name=instructions_board.get("name") or "Instructions",
         lists=list_mapping,
+        instructions_lists=instruction_list_mapping,
         custom_fields=custom_fields,
         custom_field_group_id=field_group["id"],
+        background_asset=background_asset,
     )
 
-    messages.success(request, "Planka project linked to this issue.")
-    return _render_planka_panel(request, issue)
+    return _render_planka_panel(
+        request,
+        issue,
+        panel_status="Planka project linked to this issue.",
+        panel_status_level="success",
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_update_project_name(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+    form = PlankaProjectNameForm(request.POST)
+    redirect_url = f"{reverse('backend:issue_planka_import')}?issue={issue.pk}"
+
+    if not form.is_valid():
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status="Please enter a valid project name.",
+                card_status_level="danger",
+            )
+        messages.error(request, "Please enter a valid project name.")
+        return redirect(redirect_url)
+
+    project_name = form.cleaned_data["project_name"]
+
+    try:
+        client = _build_planka_client()
+        client.update_project_name(binding.project_id, project_name)
+    except PlankaAPIError as error:
+        safe_error = _safe_planka_error(error)
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status=f"Could not rename project: {safe_error}",
+                card_status_level="danger",
+            )
+        messages.error(request, f"Could not rename project: {safe_error}")
+        return redirect(redirect_url)
+
+    binding.project_name = project_name
+    binding.save(update_fields=["project_name", "modified"])
+
+    if request.headers.get("HX-Request") == "true":
+        return _render_planka_project_context_card(
+            request,
+            issue,
+            card_status="Project name updated.",
+            card_status_level="success",
+        )
+
+    messages.success(request, "Project name updated.")
+    return redirect(redirect_url)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_update_project_background(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+    form = PlankaProjectBackgroundForm(request.POST, request.FILES)
+    redirect_url = f"{reverse('backend:issue_planka_import')}?issue={issue.pk}"
+
+    if not form.is_valid():
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status="Please fix background image form errors.",
+                card_status_level="danger",
+            )
+        messages.error(request, "Please fix background image form errors.")
+        return redirect(redirect_url)
+
+    try:
+        background_asset = _resolve_background_asset(form, request.user)
+    except ValueError as error:
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status=str(error),
+                card_status_level="danger",
+            )
+        messages.error(request, str(error))
+        return redirect(redirect_url)
+
+    if not background_asset:
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status="Select or upload a background image first.",
+                card_status_level="info",
+            )
+        messages.info(request, "Select or upload a background image first.")
+        return redirect(redirect_url)
+
+    try:
+        client = _build_planka_client()
+        with background_asset.image.open("rb") as image_file:
+            background_image = client.upload_project_background_image(
+                binding.project_id,
+                image_file,
+                filename=Path(background_asset.image.name).name,
+                content_type="image/webp",
+            )
+
+        background_image_id = background_image.get("id")
+        if not background_image_id:
+            raise PlankaAPIError("Planka did not return a background image id.")
+
+        client.update_project_background(
+            binding.project_id,
+            background_type="image",
+            background_image_id=background_image_id,
+        )
+    except PlankaAPIError as error:
+        safe_error = _safe_planka_error(error)
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status=f"Could not update background image: {safe_error}",
+                card_status_level="danger",
+            )
+        messages.error(request, f"Could not update background image: {safe_error}")
+        return redirect(redirect_url)
+
+    binding.background_asset = background_asset
+    binding.save(update_fields=["background_asset", "modified"])
+
+    if request.headers.get("HX-Request") == "true":
+        return _render_planka_project_context_card(
+            request,
+            issue,
+            card_status="Background image updated.",
+            card_status_level="success",
+        )
+
+    messages.success(request, "Background image updated.")
+    return redirect(redirect_url)
 
 
 @login_required
@@ -714,10 +1271,33 @@ def planka_refresh_publish_cards(request, issue_id):
     try:
         publish_cards = _extract_publish_cards(binding)
     except PlankaAPIError as error:
-        messages.error(request, f"Could not refresh Planka cards: {error}")
-        publish_cards = []
+        safe_error = _safe_planka_error(error)
+        disconnected = _is_planka_connection_error(error)
+        return _render_planka_panel(
+            request,
+            issue,
+            publish_cards=[],
+            panel_status=(
+                "Not connected to Planka. Retrying in background…"
+                if disconnected
+                else f"Could not refresh Planka cards: {safe_error}"
+            ),
+            panel_status_level="danger",
+            planka_disconnected=disconnected,
+        )
 
-    return _render_planka_panel(request, issue, publish_cards=publish_cards)
+    summary = _build_planka_publish_summary(publish_cards)
+    return _render_planka_panel(
+        request,
+        issue,
+        publish_cards=publish_cards,
+        panel_status=(
+            f"Refresh complete. {summary['total']} publish cards loaded "
+            f"({summary['valid']} ready, {summary['missing']} with missing fields, "
+            f"{summary['already_imported']} already synced)."
+        ),
+        panel_status_level="success",
+    )
 
 
 @login_required
@@ -730,106 +1310,184 @@ def planka_import_publish_card(request, issue_id):
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     card_id = (request.POST.get("card_id") or "").strip()
     if not card_id:
-        messages.error(request, "Card id missing.")
-        return _render_planka_panel(request, issue)
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status="Card id missing.",
+            panel_status_level="danger",
+        )
 
-    if PlankaCardImport.objects.filter(card_id=card_id).exists():
-        messages.info(request, "This card has already been imported.")
-        try:
-            publish_cards = _extract_publish_cards(binding)
-        except PlankaAPIError as error:
-            messages.warning(request, f"Card already imported, and refresh failed: {error}")
-            publish_cards = []
-        return _render_planka_panel(request, issue, publish_cards=publish_cards)
+    existing_sync = (
+        PlankaCardImport.objects.filter(card_id=card_id).select_related("review", "review__article").first()
+    )
 
     try:
         publish_cards = _extract_publish_cards(binding)
-    except PlankaAPIError as error:
-        messages.error(request, f"Could not fetch Planka cards: {error}")
-        return _render_planka_panel(request, issue)
 
-    selected = next((item for item in publish_cards if item["id"] == card_id), None)
-    if not selected:
-        messages.error(request, "Card not found in Publish list.")
-        return _render_planka_panel(request, issue, publish_cards=publish_cards)
+        selected = next((item for item in publish_cards if item["id"] == card_id), None)
+        if not selected:
+            return _render_planka_panel(
+                request,
+                issue,
+                publish_cards=publish_cards,
+                panel_status="Card not found in Publish ready list.",
+                panel_status_level="danger",
+            )
 
-    if not selected["is_valid"]:
-        missing = ", ".join(selected["missing_required"])
-        messages.error(request, f"Card is missing required fields: {missing}")
-        return _render_planka_panel(request, issue, publish_cards=publish_cards)
+        if selected.get("sync_blocked_reason"):
+            return _render_planka_panel(
+                request,
+                issue,
+                publish_cards=publish_cards,
+                panel_status=selected["sync_blocked_reason"],
+                panel_status_level="danger",
+            )
 
-    schema = selected["schema"]
-    article_url = schema.get("article_url", "")
+        schema = selected["schema"]
+        article_url = (schema.get("article_url") or "").strip()
 
-    journal = None
-    journal_name = schema.get("journal_name", "")
-    if journal_name:
-        journal, _ = Journal.objects.get_or_create(name=journal_name)
+        journal = None
+        journal_name = (schema.get("journal_name") or "").strip()
+        if journal_name:
+            journal, _ = Journal.objects.get_or_create(name=journal_name)
 
-    try:
-        article_year = int(schema.get("article_year") or datetime.date.today().year)
-    except ValueError:
-        article_year = datetime.date.today().year
-
-    article, _ = Article.objects.get_or_create(
-        url=article_url,
-        defaults={
-            "name": schema.get("article_name") or selected["name"],
-            "journal": journal,
-            "year": article_year,
-            "citation": schema.get("article_citation") or "",
-            "tags_string": schema.get("tags_string") or "",
-            "active": False,
-        },
-    )
-
-    author_name = schema.get("author_name", "")
-    author_matches = Author.objects.filter(name=author_name)
-    author = None
-    if author_matches.count() == 1:
-        author = author_matches.first()
-    elif author_matches.count() == 0:
-        author = Author.objects.create(
-            title=schema.get("author_title") or "Dr",
-            name=author_name,
-        )
-    else:
-        messages.warning(
-            request,
-            "Multiple matching authors found. Review author left blank for manual selection.",
-        )
-
-    review = Review.objects.create(
-        article=article,
-        author=author,
-        body=schema.get("review_body_markdown") or "",
-        is_featured=_bool_from_value(schema.get("is_featured")),
-        active=False,
-    )
-    issue.reviews.add(review)
-
-    PlankaCardImport.objects.create(
-        issue=issue,
-        binding=binding,
-        card_id=card_id,
-        card_name=selected["name"],
-        review=review,
-        imported_by=request.user,
-    )
-
-    imported_list_id = binding.get_list_id("imported")
-    if imported_list_id:
         try:
-            client = _build_planka_client()
-            client.move_card(card_id, imported_list_id)
+            article_year = int(schema.get("article_year") or datetime.date.today().year)
+        except ValueError:
+            article_year = datetime.date.today().year
+
+        review = existing_sync.review if existing_sync and existing_sync.review_id else None
+        article = review.article if review and review.article_id else None
+        if not article and article_url:
+            article = Article.objects.filter(url=article_url).first()
+        if not article:
+            article = Article.objects.create(
+                name=(schema.get("article_name") or selected["name"] or "Untitled article").strip(),
+                journal=journal,
+                year=article_year,
+                citation=(schema.get("article_citation") or "").strip(),
+                url=article_url or None,
+                tags_string=(schema.get("tags_string") or "").strip(),
+                active=False,
+            )
+        else:
+            article.name = (
+                schema.get("article_name") or article.name or selected["name"] or "Untitled article"
+            ).strip()
+            if journal is not None:
+                article.journal = journal
+            article.year = article_year
+            if schema.get("article_citation") is not None:
+                article.citation = schema.get("article_citation") or ""
+            if article_url:
+                article.url = article_url
+            if schema.get("tags_string") is not None:
+                article.tags_string = schema.get("tags_string") or ""
+            article.save()
+
+        author_name = (schema.get("author_name") or "").strip()
+        author = review.author if review and review.author_id else None
+        if author_name:
+            author_matches = Author.objects.filter(name=author_name)
+            if author_matches.count() == 1:
+                author = author_matches.first()
+            elif author_matches.count() == 0:
+                author = Author.objects.create(
+                    title=(schema.get("author_title") or "Dr").strip() or "Dr",
+                    name=author_name,
+                )
+            else:
+                messages.warning(
+                    request,
+                    "Multiple matching authors found. Existing review author retained for sync.",
+                )
+
+        if not review:
+            review = Review.objects.create(
+                article=article,
+                author=author,
+                body=schema.get("review_body_markdown") or "",
+                is_featured=_bool_from_value(schema.get("is_featured")),
+                active=False,
+            )
+            issue.reviews.add(review)
+        else:
+            review.article = article
+            if author is not None:
+                review.author = author
+            if schema.get("review_body_markdown") is not None:
+                review.body = schema.get("review_body_markdown") or ""
+            if schema.get("is_featured") is not None:
+                review.is_featured = _bool_from_value(schema.get("is_featured"))
+            review.save()
+
+        card_payload_hash = _build_card_payload_hash(selected)
+        if existing_sync:
+            existing_sync.issue = issue
+            existing_sync.binding = binding
+            existing_sync.card_name = selected["name"]
+            existing_sync.review = review
+            existing_sync.imported_by = request.user
+            existing_sync.last_card_payload_hash = card_payload_hash
+            existing_sync.last_review_modified_at = review.modified
+            existing_sync.save()
+        else:
+            PlankaCardImport.objects.create(
+                issue=issue,
+                binding=binding,
+                card_id=card_id,
+                card_name=selected["name"],
+                review=review,
+                imported_by=request.user,
+                last_card_payload_hash=card_payload_hash,
+                last_review_modified_at=review.modified,
+            )
+
+        missing_required = selected.get("missing_required") or []
+        if missing_required:
+            panel_status = (
+                "Review synced with missing fields: "
+                + ", ".join(missing_required)
+                + ". You can fill remaining data and sync again later."
+            )
+            panel_level = "warning"
+        else:
+            panel_status = "Review synced from Planka into this issue draft."
+            panel_level = "success"
+
+        try:
+            refreshed_cards = _extract_publish_cards(binding)
         except PlankaAPIError as error:
-            messages.warning(request, f"Review imported, but card could not be moved to Imported: {error}")
+            refreshed_cards = []
+            panel_status = f"{panel_status} Could not refresh cards after sync: {error}"
+            panel_level = "warning"
 
-    messages.success(request, "Review imported from Planka into this issue draft.")
+        return _render_planka_panel(
+            request,
+            issue,
+            publish_cards=refreshed_cards,
+            panel_status=panel_status,
+            panel_status_level=panel_level,
+        )
 
-    try:
-        refreshed_cards = _extract_publish_cards(binding)
-    except PlankaAPIError:
-        refreshed_cards = []
-
-    return _render_planka_panel(request, issue, publish_cards=refreshed_cards)
+    except PlankaAPIError as error:
+        safe_error = _safe_planka_error(error)
+        disconnected = _is_planka_connection_error(error)
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status=(
+                "Not connected to Planka. Retrying in background…"
+                if disconnected
+                else f"Could not fetch Planka cards: {safe_error}"
+            ),
+            panel_status_level="danger",
+            planka_disconnected=disconnected,
+        )
+    except Exception as error:
+        return _render_planka_panel(
+            request,
+            issue,
+            panel_status=f"Sync failed: {_safe_planka_error(error)}",
+            panel_status_level="danger",
+        )
