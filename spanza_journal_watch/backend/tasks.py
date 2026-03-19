@@ -207,3 +207,222 @@ def process_subscriber_csv(subscriber_csv_pk):
 
     subscriber_csv = SubscriberCSV.objects.get(pk=subscriber_csv_pk)
     return process_subscriber_csv_record(subscriber_csv)
+
+
+@celery_app.task(bind=True)
+def run_pubmed_batch_import_task(self, batch_id):
+    from .models import PubmedImportBatch
+    from .pubmed import PubmedAPIError
+    from .views import _import_pubmed_batch, _safe_planka_error
+
+    batch = PubmedImportBatch.objects.get(pk=batch_id)
+    batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
+    batch.task_id = self.request.id or batch.task_id
+    batch.task_note = "Fetching articles from PubMed..."
+    batch.save(update_fields=["task_state", "task_id", "task_note", "modified"])
+
+    watched_journals = list(batch.watched_journals.filter(active=True))
+    if not watched_journals:
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        batch.task_note = "No active watched journals on this batch."
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "error", "note": batch.task_note}
+
+    try:
+        _import_pubmed_batch(batch, watched_journals)
+        batch.task_state = PubmedImportBatch.TASK_STATE_SUCCESS
+        batch.task_note = f"PubMed fetch complete. {batch.result_count} article(s) loaded."
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "success", "count": batch.result_count}
+    except PubmedAPIError as error:
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        batch.task_note = f"PubMed fetch failed: {_safe_planka_error(error)}"
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "error", "note": batch.task_note}
+
+
+@celery_app.task(bind=True)
+def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
+    from django.conf import settings
+    from django.utils import timezone
+
+    from .models import PubmedImportBatch
+    from .planka import PlankaAPIError
+    from .views import (
+        _attach_journal_label_to_card,
+        _build_planka_client,
+        _build_pubmed_planka_card,
+        _ensure_planka_board_mappings,
+        _get_board_label_map,
+        _get_board_list_type_map,
+        _get_issue_planka_candidates_list,
+        _is_planka_card_archived,
+        _is_planka_card_not_found_error,
+        _is_planka_list_not_found_error,
+        _safe_planka_error,
+    )
+
+    batch = PubmedImportBatch.objects.get(pk=batch_id)
+    batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
+    batch.task_id = self.request.id or batch.task_id
+    batch.task_note = "Pushing staged articles to Planka..."
+    batch.save(update_fields=["task_state", "task_id", "task_note", "modified"])
+
+    issue, binding, list_error = _get_issue_planka_candidates_list(batch, require_candidates_list=False)
+    if list_error:
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        batch.task_note = list_error
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "error", "note": list_error}
+
+    if push_scope == "filtered":
+        target_rows = list(batch.batch_articles.select_related("article", "issue").filter(is_selected=True))
+    else:
+        target_rows = list(batch.batch_articles.select_related("article", "issue").filter(is_selected=True))
+
+    if not target_rows:
+        batch.task_state = PubmedImportBatch.TASK_STATE_SUCCESS
+        batch.task_note = "No staged articles available to push."
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "success", "note": batch.task_note}
+
+    try:
+        client = _build_planka_client()
+        _ensure_planka_board_mappings(client=client, binding=binding)
+        label_cache = _get_board_label_map(client=client, board_id=binding.board_id)
+        list_type_map = _get_board_list_type_map(client=client, board_id=binding.board_id)
+    except PlankaAPIError as error:
+        safe_error = _safe_planka_error(error)
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        if "board not found" in safe_error.lower():
+            batch.task_note = "Linked Planka board was not found. Re-link this issue to a valid Planka project/board."
+        else:
+            batch.task_note = f"Could not prepare Planka board: {safe_error}"
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "error", "note": batch.task_note}
+
+    candidates_list_id = binding.get_list_id("candidates")
+    if not candidates_list_id:
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        batch.task_note = "Candidates list is not configured for this Planka board."
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        return {"status": "error", "note": batch.task_note}
+    created = 0
+    already_pushed = 0
+    failed = 0
+    recreated_missing = 0
+
+    for row in target_rows:
+        if row.planka_card_id:
+            try:
+                existing_card = client.get_card(row.planka_card_id)
+                if _is_planka_card_archived(existing_card):
+                    row.planka_card_id = ""
+                    row.planka_card_url = ""
+                    row.planka_pushed_at = None
+                    row.planka_push_error = "Planka status: previous card deleted/archived; recreating now."
+                    row.save(
+                        update_fields=[
+                            "planka_card_id",
+                            "planka_card_url",
+                            "planka_pushed_at",
+                            "planka_push_error",
+                            "modified",
+                        ]
+                    )
+                    recreated_missing += 1
+                else:
+                    existing_list_id = str(existing_card.get("listId") or "")
+                    existing_list_type = list_type_map.get(existing_list_id, "")
+                    if existing_list_type == "trash":
+                        row.planka_card_id = ""
+                        row.planka_card_url = ""
+                        row.planka_pushed_at = None
+                        row.planka_push_error = "Planka status: previous card deleted/archived; recreating now."
+                        row.save(
+                            update_fields=[
+                                "planka_card_id",
+                                "planka_card_url",
+                                "planka_pushed_at",
+                                "planka_push_error",
+                                "modified",
+                            ]
+                        )
+                        recreated_missing += 1
+                    else:
+                        if existing_list_id and existing_list_id != str(candidates_list_id):
+                            row.planka_push_error = "Planka status: card moved from Candidates."
+                            row.save(update_fields=["planka_push_error", "modified"])
+                        elif row.planka_push_error:
+                            row.planka_push_error = ""
+                            row.save(update_fields=["planka_push_error", "modified"])
+                        already_pushed += 1
+                        continue
+            except PlankaAPIError as error:
+                if _is_planka_card_not_found_error(error):
+                    row.planka_card_id = ""
+                    row.planka_card_url = ""
+                    row.planka_pushed_at = None
+                    row.planka_push_error = "Planka status: previous card deleted/archived; recreating now."
+                    row.save(
+                        update_fields=[
+                            "planka_card_id",
+                            "planka_card_url",
+                            "planka_pushed_at",
+                            "planka_push_error",
+                            "modified",
+                        ]
+                    )
+                    recreated_missing += 1
+                else:
+                    row.planka_push_error = f"Could not verify existing Planka card: {_safe_planka_error(error)}"
+                    row.save(update_fields=["planka_push_error", "modified"])
+                    failed += 1
+                    continue
+
+        title, description = _build_pubmed_planka_card(row)
+        try:
+            card = client.create_card(candidates_list_id, title, description=description, card_type="project")
+            card_id = str(card.get("id") or "").strip()
+            _attach_journal_label_to_card(
+                client=client,
+                binding=binding,
+                card_id=card_id,
+                row=row,
+                label_cache=label_cache,
+            )
+            row.planka_card_id = card_id
+            base_url = (getattr(settings, "PLANKA_BASE_URL", "") or "").strip().rstrip("/")
+            row.planka_card_url = f"{base_url}/cards/{card_id}" if base_url and card_id else ""
+            row.planka_pushed_at = timezone.now()
+            row.planka_push_error = ""
+            row.save(
+                update_fields=[
+                    "planka_card_id",
+                    "planka_card_url",
+                    "planka_pushed_at",
+                    "planka_push_error",
+                    "modified",
+                ]
+            )
+            created += 1
+        except PlankaAPIError as error:
+            row.planka_push_error = _safe_planka_error(error)
+            row.save(update_fields=["planka_push_error", "modified"])
+            if _is_planka_list_not_found_error(error):
+                batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+                batch.task_note = (
+                    "Candidates list was not found in Planka. "
+                    "Create or re-link a Planka board for this issue and try again."
+                )
+                batch.save(update_fields=["task_state", "task_note", "modified"])
+                return {"status": "error", "note": batch.task_note}
+            failed += 1
+
+    batch.task_state = PubmedImportBatch.TASK_STATE_ERROR if failed else PubmedImportBatch.TASK_STATE_SUCCESS
+    batch.task_note = (
+        f"Push complete: {created} created, {already_pushed} already pushed, "
+        f"{recreated_missing} recreated missing, {failed} failed."
+    )
+    batch.save(update_fields=["task_state", "task_note", "modified"])
+    return {"status": "error" if failed else "success", "created": created, "failed": failed}

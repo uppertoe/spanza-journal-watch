@@ -265,6 +265,11 @@ PLANKA_ACCESS_TOKEN = env("PLANKA_ACCESS_TOKEN", default="")
 PLANKA_TIMEOUT_SECONDS = env.int("PLANKA_TIMEOUT_SECONDS", default=15)
 PLANKA_CREDENTIAL_ENCRYPTION_KEY = env("PLANKA_CREDENTIAL_ENCRYPTION_KEY", default="")
 
+# PUBMED
+# ------------------------------------------------------------------------------
+PUBMED_TIMEOUT_SECONDS = env.int("PUBMED_TIMEOUT_SECONDS", default=20)
+PUBMED_CREDENTIAL_ENCRYPTION_KEY = env("PUBMED_CREDENTIAL_ENCRYPTION_KEY", default="")
+
 # ADMIN
 # ------------------------------------------------------------------------------
 # Django Admin URL.

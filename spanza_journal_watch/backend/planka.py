@@ -166,6 +166,20 @@ class PlankaClient:
         )
         return payload["item"]
 
+    def update_list(self, list_id, *, name=None, color=None, position=None):
+        payload = {}
+        if name is not None:
+            payload["name"] = name
+        if color is not None:
+            payload["color"] = color
+        if position is not None:
+            payload["position"] = position
+        if not payload:
+            return {}
+
+        result = self._request("PATCH", f"/lists/{list_id}", json=payload)
+        return result.get("item", {})
+
     def create_card(self, list_id, name, description="", position=65536, card_type="story"):
         payload = self._request(
             "POST",
@@ -195,6 +209,43 @@ class PlankaClient:
         )
         return payload["item"]
 
+    def create_custom_field_value(self, card_id, custom_field_group_id, custom_field_id, content=""):
+        payload = self._request(
+            "PATCH",
+            (
+                f"/cards/{card_id}/custom-field-values/"
+                f"customFieldGroupId:{custom_field_group_id}:customFieldId:{custom_field_id}"
+            ),
+            json={"content": str(content or "")},
+        )
+        return payload.get("item", {})
+
+    def create_label(self, board_id, name, color="berry-red", position=65536):
+        payload = self._request(
+            "POST",
+            f"/boards/{board_id}/labels",
+            json={"name": name, "color": color, "position": position},
+        )
+        return payload.get("item", {})
+
+    def update_label(self, label_id, *, name=None, color=None, position=None):
+        payload = {}
+        if name is not None:
+            payload["name"] = name
+        if color is not None:
+            payload["color"] = color
+        if position is not None:
+            payload["position"] = position
+        if not payload:
+            return {}
+
+        result = self._request("PATCH", f"/labels/{label_id}", json=payload)
+        return result.get("item", {})
+
+    def add_label_to_card(self, card_id, label_id):
+        payload = self._request("POST", f"/cards/{card_id}/card-labels", json={"labelId": label_id})
+        return payload.get("item", {})
+
     def get_board(self, board_id):
         payload = self._request("GET", f"/boards/{board_id}")
         return payload.get("item", {}), payload.get("included", {})
@@ -202,3 +253,11 @@ class PlankaClient:
     def move_card(self, card_id, list_id, position=65536):
         payload = self._request("PATCH", f"/cards/{card_id}", json={"listId": list_id, "position": position})
         return payload.get("item", {})
+
+    def get_card(self, card_id):
+        payload = self._request("GET", f"/cards/{card_id}")
+        return payload.get("item", {})
+
+    def delete_card(self, card_id):
+        self._request("DELETE", f"/cards/{card_id}")
+        return True

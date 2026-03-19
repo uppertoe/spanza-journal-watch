@@ -6,10 +6,15 @@ from django.urls import reverse
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.backend.models import (
+    BackendPreference,
     PlankaCardImport,
     PlankaIntegrationCredential,
     PlankaIssueBinding,
+    PubmedBatchArticle,
+    PubmedImportBatch,
+    PubmedIntegrationCredential,
     SubscriberCSV,
+    WatchedJournal,
 )
 from spanza_journal_watch.backend.planka import PlankaAPIError
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
@@ -997,3 +1002,674 @@ class TestIssueBuilderPlankaIntegration:
         assert "Why sync blocked?" in body
         review.refresh_from_db()
         assert review.body == "Locally changed after sync"
+
+
+@pytest.mark.django_db
+class TestArticleIntakeWorkflow:
+    def test_watched_journals_add_and_toggle(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        create_response = route_client.post(
+            reverse("backend:watched_journals"),
+            data={
+                "name": "Journal of Test Anaesthesia",
+                "issn_print": "1234-5678",
+                "issn_electronic": "8765-4321",
+                "active": True,
+            },
+        )
+
+        assert create_response.status_code == 302
+        watched = WatchedJournal.objects.get(name="Journal of Test Anaesthesia")
+        assert watched.active is True
+        assert watched.journal is not None
+        assert watched.journal.name == "Journal of Test Anaesthesia"
+
+        toggle_response = route_client.post(
+            reverse("backend:watched_journal_toggle_active", kwargs={"watched_journal_id": watched.pk})
+        )
+        assert toggle_response.status_code == 302
+        watched.refresh_from_db()
+        assert watched.active is False
+
+    def test_watched_journal_search_endpoint(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        class _FakePubmedClient:
+            def search_journals(self, query, retmax=20):
+                assert query == "anesthesiology"
+                assert retmax == 20
+                return [
+                    {
+                        "nlm_id": "12345",
+                        "name": "Anesthesiology",
+                        "medline_ta": "Anesthesiology",
+                        "issn_print": "0003-3022",
+                        "issn_electronic": "1528-1175",
+                    }
+                ]
+
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views._build_pubmed_client",
+            lambda **kwargs: _FakePubmedClient(),
+        )
+
+        short_query_response = route_client.get(reverse("backend:watched_journal_search"), data={"q": "an"})
+        assert short_query_response.status_code == 200
+        assert short_query_response.json() == {"results": []}
+
+        response = route_client.get(reverse("backend:watched_journal_search"), data={"q": "anesthesiology"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert len(payload["results"]) == 1
+        assert payload["results"][0]["name"] == "Anesthesiology"
+        assert payload["results"][0]["issn_print"] == "0003-3022"
+        assert payload["results"][0]["issn_electronic"] == "1528-1175"
+
+    def test_pubmed_save_api_key(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        class _Validator:
+            def ping(self):
+                return None
+
+        monkeypatch.setattr("spanza_journal_watch.backend.views._build_pubmed_client", lambda **kwargs: _Validator())
+
+        response = route_client.post(
+            reverse("backend:pubmed_save_api_key"),
+            data={"api_key": "test-pubmed-key-1234"},
+        )
+
+        assert response.status_code == 302
+        assert reverse("backend:article_intake") in response.headers.get("Location", "")
+
+        credential = PubmedIntegrationCredential.objects.get()
+        assert credential.get_api_key() == "test-pubmed-key-1234"
+        assert credential.configured_by_id == user.pk
+        assert credential.last_validated_at is not None
+
+    def test_article_intake_month_inputs_render_valid_defaults(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        default_issue = Issue.objects.create(
+            name="Default Intake Issue", body="Issue body", date="2030-06-01", active=True
+        )
+
+        response = route_client.get(reverse("backend:article_intake"))
+        assert response.status_code == 200
+
+        body = response.content.decode("utf-8", errors="ignore")
+        assert default_issue.pk is not None
+
+        # Defaults: issue month -4 to issue month -2 (2030-06 -> 2030-02 and 2030-04)
+        assert 'name="from_month_month"' in body
+        assert 'name="from_month_year"' in body
+        assert 'name="to_month_month"' in body
+        assert 'name="to_month_year"' in body
+        assert '<option value="2" selected>February</option>' in body
+        assert '<option value="4" selected>April</option>' in body
+        assert '<option value="2030" selected>2030</option>' in body
+
+    def test_article_intake_rejects_more_than_12_months(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        watched = WatchedJournal.objects.create(name="Range Watch", issn_print="1212-3434")
+
+        response = route_client.post(
+            reverse("backend:article_intake"),
+            data={
+                "action": "fetch",
+                "watched_journals": [watched.pk],
+                "from_month": "2025-01",
+                "to_month": "2026-02",
+            },
+        )
+        assert response.status_code == 200
+
+        body = response.content.decode("utf-8", errors="ignore")
+        assert "Date range cannot exceed 12 months." in body
+
+    def test_article_intake_fetch_creates_batch_and_results(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        credential = PubmedIntegrationCredential(singleton=1)
+        credential.set_api_key("pubmed-valid-key")
+        credential.configured_by = user
+        credential.save()
+
+        issue = Issue.objects.create(name="Intake Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watched Journal", issn_print="1234-5678")
+
+        def _fake_import(batch, watched_journals):
+            assert watched in watched_journals
+            batch.result_count = 1
+            batch.selected_count = 0
+            batch.save(update_fields=["result_count", "selected_count", "modified"])
+
+        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+
+        response = route_client.post(
+            reverse("backend:article_intake"),
+            data={
+                "action": "fetch",
+                "issue": issue.pk,
+                "watched_journals": [watched.pk],
+                "from_month": "2026-01",
+                "to_month": "2026-02",
+            },
+        )
+
+        assert response.status_code == 302
+        batch = PubmedImportBatch.objects.order_by("-pk").first()
+        assert batch is not None
+        assert batch.issue_id == issue.pk
+        assert batch.from_month.strftime("%Y-%m") == "2026-01"
+        assert batch.to_month.strftime("%Y-%m") == "2026-02"
+        assert batch.keyword_query == ""
+        assert batch.watched_journals.filter(pk=watched.pk).exists()
+
+    def test_article_intake_fetch_without_api_key(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Intake No Key Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="No Key Watched", issn_print="9999-0000")
+
+        called = {"value": False}
+
+        def _fake_import(batch, watched_journals):
+            called["value"] = True
+            assert watched in watched_journals
+            batch.result_count = 0
+            batch.selected_count = 0
+            batch.save(update_fields=["result_count", "selected_count", "modified"])
+
+        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+
+        response = route_client.post(
+            reverse("backend:article_intake"),
+            data={
+                "action": "fetch",
+                "issue": issue.pk,
+                "watched_journals": [watched.pk],
+                "from_month": "2026-01",
+                "to_month": "2026-01",
+            },
+        )
+
+        assert response.status_code == 302
+        assert called["value"] is True
+        batch = PubmedImportBatch.objects.order_by("-pk").first()
+        assert batch is not None
+        assert batch.watched_journals.filter(pk=watched.pk).exists()
+
+    def test_article_intake_remembers_watched_journal_selection(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        watched_one = WatchedJournal.objects.create(name="Remember Watch A", issn_print="9090-1111")
+        watched_two = WatchedJournal.objects.create(name="Remember Watch B", issn_print="9090-2222")
+
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views._import_pubmed_batch", lambda batch, watched_journals: None
+        )
+
+        create_response = route_client.post(
+            reverse("backend:article_intake"),
+            data={
+                "action": "fetch",
+                "watched_journals": [watched_one.pk, watched_two.pk],
+                "from_month": "2026-01",
+                "to_month": "2026-02",
+            },
+        )
+        assert create_response.status_code == 302
+
+        preference = BackendPreference.objects.get()
+        remembered_ids = set(preference.default_watched_journals.values_list("pk", flat=True))
+        assert remembered_ids == {watched_one.pk, watched_two.pk}
+
+        response = route_client.get(reverse("backend:article_intake"))
+        body = response.content.decode("utf-8", errors="ignore")
+        assert f'value="{watched_one.pk}" selected' in body
+        assert f'value="{watched_two.pk}" selected' in body
+
+    def test_article_intake_defaults_watched_journals_to_all_active(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        BackendPreference.objects.all().delete()
+        watched_one = WatchedJournal.objects.create(name="Default Select A", issn_print="7171-1111", active=True)
+        watched_two = WatchedJournal.objects.create(name="Default Select B", issn_print="7171-2222", active=True)
+
+        response = route_client.get(reverse("backend:article_intake"))
+        assert response.status_code == 200
+        body = response.content.decode("utf-8", errors="ignore")
+
+        assert f'value="{watched_one.pk}" selected' in body
+        assert f'value="{watched_two.pk}" selected' in body
+
+    def test_article_intake_bulk_select_all(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Selection Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch A", issn_print="1111-2222")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.date or issue.created.date().replace(day=1),
+            to_month=issue.date or issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        pubmed_one = PubmedArticle.objects.create(pmid="1001", title="Airway study")
+        pubmed_two = PubmedArticle.objects.create(pmid="1002", title="Cardiac study")
+
+        PubmedBatchArticle.objects.create(batch=batch, article=pubmed_one, watched_journal=watched, issue=issue)
+        PubmedBatchArticle.objects.create(batch=batch, article=pubmed_two, watched_journal=watched, issue=issue)
+
+        response = route_client.post(
+            reverse("backend:article_intake_bulk_selection", kwargs={"batch_id": batch.pk}),
+            data={
+                "bulk_action": "select_all",
+                "q": "",
+                "journal": "",
+                "filter_selected": "",
+                "paediatric_only": "0",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert response.status_code == 200
+        assert batch.batch_articles.filter(is_selected=True).count() == 2
+
+    def test_article_intake_stage_checked_includes_persisted_rows(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Persisted Stage Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Persisted", issn_print="2121-3434")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        pubmed_one = PubmedArticle.objects.create(pmid="9001", title="Visible page article")
+        pubmed_two = PubmedArticle.objects.create(pmid="9002", title="Persisted page article")
+
+        row_one = PubmedBatchArticle.objects.create(
+            batch=batch, article=pubmed_one, watched_journal=watched, issue=issue
+        )
+        row_two = PubmedBatchArticle.objects.create(
+            batch=batch, article=pubmed_two, watched_journal=watched, issue=issue
+        )
+
+        response = route_client.post(
+            reverse("backend:article_intake_bulk_selection", kwargs={"batch_id": batch.pk}),
+            data={
+                "bulk_action": "stage_checked",
+                "row_ids": [str(row_one.pk)],
+                "persisted_row_ids": str(row_two.pk),
+                "q": "",
+                "journal": "",
+                "filter_selected": "",
+                "page": "2",
+                "paediatric_only": "0",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert response.status_code == 200
+        row_one.refresh_from_db()
+        row_two.refresh_from_db()
+        assert row_one.is_selected is True
+        assert row_two.is_selected is True
+
+    def test_article_intake_toggle_selection_persists_across_pages(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Toggle Persist Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Toggle Persist", issn_print="5151-6262")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        pubmed_one = PubmedArticle.objects.create(pmid="9101", title="Page one article")
+        pubmed_two = PubmedArticle.objects.create(pmid="9102", title="Page two article")
+
+        row_one = PubmedBatchArticle.objects.create(
+            batch=batch, article=pubmed_one, watched_journal=watched, issue=issue
+        )
+        row_two = PubmedBatchArticle.objects.create(
+            batch=batch, article=pubmed_two, watched_journal=watched, issue=issue
+        )
+
+        toggle_one = route_client.post(
+            reverse("backend:article_intake_toggle_selection", kwargs={"batch_id": batch.pk, "item_id": row_one.pk}),
+            data={"selected": "1", "page": "1", "q": "", "journal": "", "filter_selected": ""},
+            HTTP_HX_REQUEST="true",
+        )
+        toggle_two = route_client.post(
+            reverse("backend:article_intake_toggle_selection", kwargs={"batch_id": batch.pk, "item_id": row_two.pk}),
+            data={"selected": "1", "page": "2", "q": "", "journal": "", "filter_selected": ""},
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert toggle_one.status_code == 200
+        assert toggle_two.status_code == 200
+
+        stage_response = route_client.post(
+            reverse("backend:article_intake_bulk_selection", kwargs={"batch_id": batch.pk}),
+            data={
+                "bulk_action": "stage_checked",
+                "row_ids": [str(row_two.pk)],
+                "q": "",
+                "journal": "",
+                "filter_selected": "",
+                "page": "2",
+                "paediatric_only": "0",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert stage_response.status_code == 200
+        row_one.refresh_from_db()
+        row_two.refresh_from_db()
+        assert row_one.is_selected is True
+        assert row_two.is_selected is True
+
+    def test_article_intake_paediatric_filter_is_opt_in(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Peds Filter Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Peds", issn_print="3333-4444")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        peds = PubmedArticle.objects.create(
+            pmid="2001",
+            title="Paediatric airway paper",
+            metadata_json={"mesh_terms": ["Pediatrics"], "keywords": [], "publication_types": ["Journal Article"]},
+        )
+        adult = PubmedArticle.objects.create(
+            pmid="2002",
+            title="Adult perioperative paper",
+            metadata_json={"mesh_terms": ["Adults"], "keywords": [], "publication_types": ["Journal Article"]},
+        )
+
+        PubmedBatchArticle.objects.create(batch=batch, article=peds, watched_journal=watched, issue=issue)
+        PubmedBatchArticle.objects.create(batch=batch, article=adult, watched_journal=watched, issue=issue)
+
+        response = route_client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+
+        assert response.status_code == 200
+        body = response.content.decode("utf-8", errors="ignore")
+        assert "Paediatric airway paper" in body
+        assert "Adult perioperative paper" in body
+
+        filtered_response = route_client.get(
+            reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}),
+            data={"paediatric_only": "1"},
+        )
+        assert filtered_response.status_code == 200
+        filtered_body = filtered_response.content.decode("utf-8", errors="ignore")
+        assert "Paediatric airway paper" in filtered_body
+        assert "Adult perioperative paper" not in filtered_body
+
+    def test_article_intake_paediatric_filter_matches_text_without_mesh(self, route_client, regression_baseline):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Peds Keyword Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Peds Keyword", issn_print="3333-4455")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        peds_keyword = PubmedArticle.objects.create(
+            pmid="2010",
+            title="Airway rescue in paediatric critical care",
+            metadata_json={"mesh_terms": [], "keywords": ["paediatric"], "publication_types": ["Journal Article"]},
+        )
+        adult = PubmedArticle.objects.create(
+            pmid="2011",
+            title="Adult perioperative paper",
+            metadata_json={"mesh_terms": [], "keywords": ["adults"], "publication_types": ["Journal Article"]},
+        )
+
+        PubmedBatchArticle.objects.create(batch=batch, article=peds_keyword, watched_journal=watched, issue=issue)
+        PubmedBatchArticle.objects.create(batch=batch, article=adult, watched_journal=watched, issue=issue)
+
+        filtered_response = route_client.get(
+            reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}),
+            data={"paediatric_only": "1"},
+        )
+
+        assert filtered_response.status_code == 200
+        filtered_body = filtered_response.content.decode("utf-8", errors="ignore")
+        assert "Airway rescue in paediatric critical care" in filtered_body
+        assert "Adult perioperative paper" not in filtered_body
+
+    def test_article_intake_refresh_batch(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        credential = PubmedIntegrationCredential(singleton=1)
+        credential.set_api_key("pubmed-valid-key")
+        credential.configured_by = user
+        credential.save()
+
+        issue = Issue.objects.create(name="Refresh Batch Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Refresh", issn_print="5555-6666")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        called = {"value": False}
+
+        def _fake_import(target_batch, watched_journals):
+            called["value"] = True
+            assert target_batch.pk == batch.pk
+            assert watched in watched_journals
+
+        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+
+        response = route_client.post(reverse("backend:article_intake_refresh_batch", kwargs={"batch_id": batch.pk}))
+
+        assert response.status_code == 302
+        assert called["value"] is True
+        assert f"batch={batch.pk}" in response.headers.get("Location", "")
+
+    def test_article_intake_refresh_batch_without_api_key(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Refresh No Key Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Refresh No Key", issn_print="1010-2020")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        called = {"value": False}
+
+        def _fake_import(target_batch, watched_journals):
+            called["value"] = True
+            assert target_batch.pk == batch.pk
+            assert watched in watched_journals
+
+        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+
+        response = route_client.post(reverse("backend:article_intake_refresh_batch", kwargs={"batch_id": batch.pk}))
+
+        assert response.status_code == 302
+        assert called["value"] is True
+        assert f"batch={batch.pk}" in response.headers.get("Location", "")
+
+    def test_article_intake_push_to_planka_stores_card_id(self, route_client, regression_baseline, monkeypatch):
+        user = User.objects.filter(is_superuser=False).order_by("pk").first()
+        assert user is not None
+
+        permission = Permission.objects.get(codename="manage_issue_builder")
+        user.user_permissions.add(permission)
+        route_client.force_login(user)
+
+        issue = Issue.objects.create(name="Push Batch Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Push", issn_print="7777-8888")
+        batch = PubmedImportBatch.objects.create(
+            issue=issue,
+            created_by=user,
+            from_month=issue.created.date().replace(day=1),
+            to_month=issue.created.date().replace(day=1),
+        )
+        batch.watched_journals.add(watched)
+
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        article = PubmedArticle.objects.create(
+            pmid="3001",
+            title="Push this paper",
+            metadata_json={"mesh_terms": ["Pediatrics"], "keywords": [], "publication_types": ["Journal Article"]},
+        )
+        row = PubmedBatchArticle.objects.create(
+            batch=batch,
+            article=article,
+            watched_journal=watched,
+            issue=issue,
+            is_selected=True,
+        )
+
+        PlankaIssueBinding.objects.create(
+            issue=issue,
+            project_id="project-push-1",
+            project_name="Push Project",
+            board_id="board-push-1",
+            board_name="Reviews",
+            lists={"candidates": "list-candidates", "publish_ready": "list-publish"},
+            custom_fields={},
+            custom_field_group_id="cfg-1",
+        )
+
+        class FakePlankaClient:
+            def create_card(self, list_id, name, description="", position=65536, card_type="story"):
+                assert list_id == "list-candidates"
+                assert "Push this paper" in name
+                return {"id": "card-xyz"}
+
+        monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient())
+
+        response = route_client.post(
+            reverse("backend:article_intake_push_to_planka", kwargs={"batch_id": batch.pk}),
+            data={"push_scope": "selected"},
+        )
+
+        assert response.status_code == 302
+        row.refresh_from_db()
+        assert row.planka_card_id == "card-xyz"
+        assert row.planka_pushed_at is not None

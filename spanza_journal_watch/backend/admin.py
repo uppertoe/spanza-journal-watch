@@ -44,3 +44,43 @@ class PlankaIntegrationCredentialAdmin(admin.ModelAdmin):
 class PlankaBoardBackgroundAssetAdmin(admin.ModelAdmin):
     list_display = ("name", "uploaded_by", "created", "modified")
     search_fields = ("name",)
+
+
+@admin.register(models.PubmedIntegrationCredential)
+class PubmedIntegrationCredentialAdmin(admin.ModelAdmin):
+    list_display = ("configured_by", "last_validated_at", "modified")
+    exclude = ("api_key",)
+    readonly_fields = ("singleton", "created", "modified", "last_validated_at")
+
+
+@admin.register(models.BackendPreference)
+class BackendPreferenceAdmin(admin.ModelAdmin):
+    list_display = ("singleton", "modified")
+    filter_horizontal = ("default_watched_journals",)
+    readonly_fields = ("singleton", "created", "modified")
+
+
+@admin.register(models.WatchedJournal)
+class WatchedJournalAdmin(admin.ModelAdmin):
+    list_display = ("name", "journal", "issn_print", "issn_electronic", "active", "modified")
+    list_filter = ("active",)
+    search_fields = ("name", "issn_print", "issn_electronic", "journal__name")
+
+
+@admin.register(models.PubmedImportBatch)
+class PubmedImportBatchAdmin(admin.ModelAdmin):
+    list_display = ("id", "issue", "from_month", "to_month", "result_count", "selected_count", "created")
+    search_fields = ("issue__name", "keyword_query")
+
+
+@admin.register(models.PubmedArticle)
+class PubmedArticleAdmin(admin.ModelAdmin):
+    list_display = ("pmid", "doi", "source_journal_name", "publication_date", "modified")
+    search_fields = ("pmid", "doi", "title", "source_journal_name")
+
+
+@admin.register(models.PubmedBatchArticle)
+class PubmedBatchArticleAdmin(admin.ModelAdmin):
+    list_display = ("batch", "article", "issue", "watched_journal", "is_selected", "modified")
+    list_filter = ("is_selected", "watched_journal")
+    search_fields = ("article__pmid", "article__doi", "article__title", "issue__name")

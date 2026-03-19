@@ -1,0 +1,17 @@
+{% if is_running %}
+  <div id="{{ container_id|default:'article-intake-task-status' }}" class="alert alert-info py-2 mb-3" hx-get="{{ poll_url|default:'' }}" hx-trigger="every 500ms" hx-target="this" hx-swap="outerHTML">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    <span>{{ batch.task_note|default:"Background task running..." }}</span>
+  </div>
+{% else %}
+  <div id="{{ container_id|default:'article-intake-task-status' }}" class="{% if is_done and batch.task_state == 'error' %}alert alert-warning{% elif is_done %}alert alert-success{% else %}d-none{% endif %} py-2 mb-3">
+    {% if is_done %}
+      {{ batch.task_note }}
+    {% endif %}
+  </div>
+  {% if is_done %}
+    <div id="article-intake-results" hx-swap-oob="true">
+      {% include "backend/_article_intake_results.html" %}
+    </div>
+  {% endif %}
+{% endif %}

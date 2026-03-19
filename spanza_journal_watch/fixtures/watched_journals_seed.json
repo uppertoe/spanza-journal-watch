@@ -1,0 +1,28 @@
+[
+  {
+    "model": "backend.watchedjournal",
+    "pk": 1,
+    "fields": {
+      "created": "2026-03-17T00:00:00Z",
+      "modified": "2026-03-17T00:00:00Z",
+      "name": "British Journal of Anaesthesia",
+      "journal": null,
+      "issn_print": "0007-0912",
+      "issn_electronic": "1471-6771",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 2,
+    "fields": {
+      "created": "2026-03-17T00:00:00Z",
+      "modified": "2026-03-17T00:00:00Z",
+      "name": "Anesthesiology",
+      "journal": null,
+      "issn_print": "0003-3022",
+      "issn_electronic": "1528-1175",
+      "active": true
+    }
+  }
+]

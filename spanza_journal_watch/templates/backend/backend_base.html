@@ -15,6 +15,33 @@
 
     {% block css %}
     {% render_bundle 'project' 'css' %}
+    <style>
+      .backend-htmx-spinner {
+        position: fixed;
+        top: 0.75rem;
+        right: 0.75rem;
+        z-index: 1080;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid var(--bs-border-color);
+        background: rgba(var(--bs-body-bg-rgb), 0.95);
+        color: var(--bs-body-color);
+        box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.12);
+        pointer-events: none;
+      }
+      .backend-htmx-spinner.htmx-indicator {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 120ms ease-in-out;
+      }
+      .backend-htmx-spinner.htmx-request {
+        opacity: 1;
+        visibility: visible;
+      }
+    </style>
     {% endblock %}
     {% block javascript %}
       <!-- Vendor dependencies bundled as one file -->
@@ -26,6 +53,11 @@
   </head>
 
   <body>
+    <div id="backend-htmx-spinner" class="backend-htmx-spinner htmx-indicator" aria-live="polite" aria-atomic="true">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      <span class="small">Loading</span>
+    </div>
+
     <!-- Container for HTMX messages -->
     {% include "fragments/messages.html" %}
     <!-- /container -->
@@ -48,7 +80,7 @@
 
               <li class="nav-item dropdown">
                 <a
-                  class="nav-link dropdown-toggle{% if current == 'issue_builder' or current == 'save_issue_draft' or current == 'update_issue_draft' or current == 'new_issue_review_form' or current == 'add_issue_review' or current == 'edit_issue_review_form' or current == 'update_issue_review' or current == 'remove_issue_review' or current == 'publish_issue_bundle' or current == 'issue_planka_import' or current == 'planka_save_api_key' or current == 'planka_setup_issue_project' or current == 'planka_refresh_publish_cards' or current == 'planka_import_publish_card' or current == 'planka_update_project_background' or current == 'planka_update_project_name' %} active{% endif %}"
+                  class="nav-link dropdown-toggle{% if current == 'watched_journals' or current == 'watched_journal_search' or current == 'watched_journal_toggle_active' or current == 'article_intake' or current == 'pubmed_save_api_key' or current == 'article_intake_results' or current == 'article_intake_toggle_selection' or current == 'article_intake_bulk_selection' or current == 'article_intake_assign_issue' or current == 'article_intake_refresh_batch' or current == 'article_intake_push_to_planka' or current == 'issue_builder' or current == 'save_issue_draft' or current == 'update_issue_draft' or current == 'new_issue_review_form' or current == 'add_issue_review' or current == 'edit_issue_review_form' or current == 'update_issue_review' or current == 'remove_issue_review' or current == 'publish_issue_bundle' or current == 'issue_planka_import' or current == 'planka_save_api_key' or current == 'planka_setup_issue_project' or current == 'planka_refresh_publish_cards' or current == 'planka_import_publish_card' or current == 'planka_update_project_background' or current == 'planka_update_project_name' %} active{% endif %}"
                   href="#"
                   role="button"
                   data-bs-toggle="dropdown"
@@ -57,6 +89,8 @@
                   Editorial
                 </a>
                 <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url "backend:watched_journals" %}">Watched Journals</a></li>
+                  <li><a class="dropdown-item" href="{% url "backend:article_intake" %}">Article Intake</a></li>
                   <li><a class="dropdown-item" href="{% url "backend:issue_builder" %}">Issue Builder</a></li>
                   <li><a class="dropdown-item" href="{% url "backend:issue_planka_import" %}">Planka Sync</a></li>
                 </ul>
@@ -109,7 +143,7 @@
       </nav>
 
     <!-- Main container -->
-    <main class="container p-3 col-xl-10 offset-xl-1 col-12">
+    <main class="container p-3 col-xl-10 offset-xl-1 col-12" hx-indicator="#backend-htmx-spinner">
         {% block content %}{% endblock content %}
     </main>
 

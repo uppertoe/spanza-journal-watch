@@ -2,46 +2,15 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
+<div id="issue-builder-page">
+<div id="issue-builder-content">
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Issue Builder</h1>
-  <a class="btn btn-outline-primary" href="{% url "backend:issue_builder" %}">Create new issue</a>
 </div>
 <p class="text-muted">Create draft issues, add reviews/articles, and publish all content live in one action.</p>
 
-<div class="mb-3">
-  <button
-    id="toggle-recent-issues"
-    class="btn btn-outline-secondary btn-sm"
-    type="button"
-    aria-expanded="true"
-    aria-controls="recent-issues-sidebar"
-  >
-    Hide recent issues
-  </button>
-</div>
-
 <div class="row g-4 align-items-start">
-  <div class="col-12 col-md-4 col-lg-3" id="recent-issues-sidebar">
-    <div class="card sticky-top" style="top: 1rem;">
-      <div class="card-header">Recent issues</div>
-      <ul class="list-group list-group-flush">
-        {% for issue in issues %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <a href="{% url "backend:issue_builder" %}?issue={{ issue.pk }}">{{ issue.name }}</a>
-            {% if issue.active %}
-              <span class="badge text-bg-success">Live</span>
-            {% else %}
-              <span class="badge text-bg-secondary">Draft</span>
-            {% endif %}
-          </li>
-        {% empty %}
-          <li class="list-group-item text-muted">No issues yet</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-
-  <div class="col-12 col-md-8 col-lg-9" id="issue-draft-column">
+  <div class="col-12" id="issue-draft-column">
     <div class="card mb-4">
       <div class="card-header">{% if selected_issue %}Edit issue draft{% else %}Create issue draft{% endif %}</div>
       <div class="card-body">
@@ -60,46 +29,151 @@
     </div>
 
     {% if selected_issue %}
-      <div id="issue-reviews-panel">
-        {% include "backend/issue_builder/_issue_reviews_panel.html" %}
-      </div>
+      {% include "backend/issue_builder/_issue_reviews_panel.html" %}
     {% else %}
       <div class="alert alert-info">Save the issue draft first, then add reviews and articles.</div>
     {% endif %}
   </div>
 </div>
-{% endblock content %}
+</div>
 
-{% block inline_javascript %}
-{{ block.super }}
+<button
+  id="issue-builder-recent-issues-toggle"
+  class="btn btn-outline-primary btn-lg recent-issues-fab"
+  type="button"
+  data-bs-toggle="offcanvas"
+  data-bs-target="#issue-builder-recent-issues-menu"
+  aria-controls="issue-builder-recent-issues-menu"
+  aria-expanded="false"
+>
+  Issues ▸
+</button>
+
+<div
+  class="offcanvas offcanvas-end recent-issues-offcanvas"
+  tabindex="-1"
+  id="issue-builder-recent-issues-menu"
+  aria-labelledby="issue-builder-recent-issues-menu-label"
+  data-bs-backdrop="false"
+  data-bs-scroll="true"
+>
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="issue-builder-recent-issues-menu-label">Recent issues</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body ps-0 pe-2">
+    {% include "backend/issue_builder/_recent_issues_sidebar_issue_builder.html" %}
+  </div>
+</div>
+
+<style>
+  .recent-issues-fab {
+    --recent-issues-panel-width: min(380px, calc(100vw - 1rem));
+    position: fixed;
+    right: 1rem;
+    top: 4.75rem;
+    z-index: 1035;
+    border-radius: 999px;
+    font-weight: 600;
+    padding: 0.55rem 1rem;
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+    transition: transform 300ms ease-in-out;
+  }
+
+  .recent-issues-fab.menu-open {
+    transform: translateX(calc(-1 * var(--recent-issues-panel-width)));
+  }
+
+  .recent-issues-offcanvas {
+    top: 4rem;
+    bottom: 0;
+    height: auto;
+    width: min(380px, calc(100vw - 1rem));
+    z-index: 1030;
+  }
+
+  .recent-issues-offcanvas .offcanvas-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .recent-issues-offcanvas .list-group {
+    flex: 1 1 auto;
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
+  }
+
+  .recent-issues-offcanvas .list-group-item {
+    padding-right: 1.1rem;
+  }
+</style>
+
 <script>
-  window.addEventListener('DOMContentLoaded', function () {
-    const toggleButton = document.getElementById('toggle-recent-issues');
-    const sidebar = document.getElementById('recent-issues-sidebar');
-    const draftColumn = document.getElementById('issue-draft-column');
-
-    if (!toggleButton || !sidebar || !draftColumn) {
+  (() => {
+    const toggle = document.getElementById('issue-builder-recent-issues-toggle');
+    const menu = document.getElementById('issue-builder-recent-issues-menu');
+    const storageKey = 'issue_builder_recent_issues_open';
+    if (!toggle || !menu) {
       return;
     }
 
-    const updateState = () => {
-      const isVisible = !sidebar.classList.contains('d-none');
-      toggleButton.setAttribute('aria-expanded', String(isVisible));
-      toggleButton.textContent = isVisible ? 'Hide recent issues' : 'Show recent issues';
-
-      if (isVisible) {
-        draftColumn.classList.add('col-md-8', 'col-lg-9');
-      } else {
-        draftColumn.classList.remove('col-md-8', 'col-lg-9');
+    const setClosed = () => {
+      toggle.textContent = 'Issues ◂';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.classList.remove('menu-open');
+      try {
+        sessionStorage.removeItem(storageKey);
+      } catch (e) {
+        // ignore
       }
     };
 
-    toggleButton.addEventListener('click', function () {
-      sidebar.classList.toggle('d-none');
-      updateState();
+    const setOpen = () => {
+      toggle.textContent = 'Issues ▸';
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.classList.add('menu-open');
+      try {
+        sessionStorage.setItem(storageKey, '1');
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    menu.addEventListener('show.bs.offcanvas', setOpen);
+    menu.addEventListener('hide.bs.offcanvas', setClosed);
+
+    menu.addEventListener('click', (event) => {
+      const link = event.target.closest('a[data-issue-link="1"]');
+      if (!link) {
+        return;
+      }
+
+      menu.querySelectorAll('.list-group-item.active').forEach((item) => item.classList.remove('active'));
+      menu.querySelectorAll('a.text-white[data-issue-link="1"]').forEach((a) => a.classList.remove('text-white'));
+
+      const row = link.closest('.list-group-item');
+      if (row) {
+        row.classList.add('active');
+      }
+      link.classList.add('text-white');
     });
 
-    updateState();
-  });
+    setClosed();
+
+    let shouldOpen = false;
+    try {
+      shouldOpen = sessionStorage.getItem(storageKey) === '1';
+    } catch (e) {
+      // ignore
+    }
+
+    if (shouldOpen && window.bootstrap && window.bootstrap.Offcanvas) {
+      const instance = window.bootstrap.Offcanvas.getOrCreateInstance(menu);
+      instance.show();
+    }
+  })();
 </script>
-{% endblock inline_javascript %}
+</div>
+{% endblock content %}

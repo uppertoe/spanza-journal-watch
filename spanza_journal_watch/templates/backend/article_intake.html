@@ -1,0 +1,286 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Article Intake</h1>
+  <a class="btn btn-outline-secondary" href="{% url "backend:watched_journals" %}">Manage watched journals</a>
+</div>
+<p class="text-muted">Fetch monthly article lists from PubMed for watched journals, then select candidate articles for Planka.</p>
+
+<div id="article-intake-page">
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>PubMed API key</span>
+    {% if pubmed_credential and pubmed_credential.get_api_key %}
+      <span class="badge text-bg-success">Configured</span>
+    {% else %}
+      <span class="badge text-bg-warning">Not configured</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="text-muted small">
+        {% if pubmed_credential and pubmed_credential.get_api_key %}
+          API key: {{ pubmed_credential.get_masked_api_key }} · Last validated: {{ pubmed_credential.last_validated_at|default:"Never" }}
+        {% else %}
+          NCBI API key is optional but recommended for higher request limits.
+        {% endif %}
+      </div>
+      <button
+        id="pubmed-api-key-toggle"
+        class="btn btn-sm btn-outline-secondary"
+        type="button"
+        aria-expanded="{% if not pubmed_credential or not pubmed_credential.get_api_key %}true{% else %}false{% endif %}"
+        aria-controls="pubmed-api-key-panel"
+      >
+        {% if pubmed_credential and pubmed_credential.get_api_key %}Change API key{% else %}Set API key{% endif %}
+      </button>
+    </div>
+
+    <div class="mt-3 {% if pubmed_credential and pubmed_credential.get_api_key %}d-none{% endif %}" id="pubmed-api-key-panel">
+      <div class="border rounded p-3" style="background-color: var(--bs-tertiary-bg); color: var(--bs-body-color);">
+        <form method="post" action="{% url "backend:pubmed_save_api_key" %}" class="row g-3">
+          {% csrf_token %}
+          <div class="col-12 col-md-9">{{ pubmed_api_key_form.api_key|as_crispy_field }}</div>
+          <div class="col-12 col-md-3 d-flex align-items-start"><button type="submit" class="btn btn-sm btn-primary">Save key</button></div>
+        </form>
+      </div>
+    </div>
+    {% if pubmed_credential and pubmed_credential.last_error %}
+      <div class="alert alert-warning mt-3 mb-0 py-2">Last PubMed error: {{ pubmed_credential.last_error }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% if not active_issue %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center">
+    <span>No active issue found. Create an issue before intake for cleaner workflow.</span>
+    <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_builder" %}">Create issue</a>
+  </div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Select issue</span>
+    <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_builder" %}">Create/edit issue</a>
+  </div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-8 col-lg-6">
+        <label class="form-label" for="issue-select">Issue</label>
+        <select id="issue-select" name="issue" class="form-select" required onchange="this.form.submit()">
+          <option value="">Select an issue</option>
+          {% for issue in issue_options %}
+            <option value="{{ issue.pk }}" {% if selected_issue and selected_issue.pk == issue.pk %}selected{% endif %}>{{ issue.name }}{% if issue.date %} · {{ issue.date|date:"M Y" }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="alert alert-light border mb-3">
+  <div class="fw-semibold mb-1">Workflow</div>
+  <ol class="mb-0 small">
+    <li><strong>Pull articles</strong>: choose month range + watched journals, then fetch.</li>
+    <li><strong>Stage articles</strong>: filter list and mark rows as staged.</li>
+    <li><strong>Push to Planka</strong>: send staged rows to Candidates.</li>
+  </ol>
+</div>
+
+{% if selected_issue %}
+<div class="card mb-3">
+  <div class="card-header">Step 1 · Pull articles</div>
+  <div class="card-body">
+    <form method="post" class="row g-3" hx-post="{% url "backend:article_intake" %}" hx-target="#article-intake-page" hx-select="#article-intake-page" hx-swap="outerHTML" hx-push-url="true">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="fetch">
+      <input type="hidden" name="async" value="1">
+      <input type="hidden" name="issue" value="{{ selected_issue.pk }}">
+      <div class="col-12 col-md-6">
+        <label class="form-label">From month (earliest)</label>
+        <div class="row g-2">
+          <div class="col-7">
+            <select class="form-select" name="from_month_month" required>
+              {% for month_number, month_label in month_options %}
+                <option value="{{ month_number }}" {% if month_number == from_month_month %}selected{% endif %}>{{ month_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-5">
+            <select class="form-select" name="from_month_year" required>
+              {% for year in year_options %}
+                <option value="{{ year }}" {% if year == from_month_year %}selected{% endif %}>{{ year }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        {% if fetch_form.from_month.errors %}<div class="text-danger small mt-1">{{ fetch_form.from_month.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">To month (latest)</label>
+        <div class="row g-2">
+          <div class="col-7">
+            <select class="form-select" name="to_month_month" required>
+              {% for month_number, month_label in month_options %}
+                <option value="{{ month_number }}" {% if month_number == to_month_month %}selected{% endif %}>{{ month_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-5">
+            <select class="form-select" name="to_month_year" required>
+              {% for year in year_options %}
+                <option value="{{ year }}" {% if year == to_month_year %}selected{% endif %}>{{ year }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        {% if fetch_form.to_month.errors %}<div class="text-danger small mt-1">{{ fetch_form.to_month.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div class="col-12">{{ fetch_form.watched_journals|as_crispy_field }}</div>
+      <div class="col-12">
+        <div class="d-flex gap-2">
+          <button type="button" id="watched-select-all" class="btn btn-sm btn-outline-secondary">Select all journals</button>
+          <button type="button" id="watched-select-none" class="btn btn-sm btn-outline-secondary">Clear selection</button>
+        </div>
+        <div class="form-text">Tip: on desktop, use Cmd/Ctrl-click to toggle individual items.</div>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary">Fetch from PubMed</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if batch %}
+  <div class="card mb-3">
+    <div class="card-header">Step 2 · Stage and review fetched articles</div>
+    <div class="card-body">
+      <div class="mb-2">
+        <strong>Range:</strong> {{ batch.from_month|date:"F Y" }} to {{ batch.to_month|date:"F Y" }}
+      </div>
+      <div class="text-muted small mb-3">
+        Loaded {{ batch.result_count }} articles · Selected {{ batch.selected_count }} in staging
+      </div>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <form method="post" action="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
+          {% csrf_token %}
+          <input type="hidden" name="async" value="1">
+          <button type="submit" class="btn btn-outline-secondary">Refresh current batch</button>
+        </form>
+      </div>
+
+      <div id="article-intake-task-status" {% if show_stage2_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
+
+      <div id="article-intake-results" class="mt-3" data-batch-id="{{ batch.pk }}">
+        {% include "backend/_article_intake_results.html" %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">Step 3 · Push staged articles to Planka</div>
+    <div class="card-body">
+      <div id="article-intake-push-messages" class="mb-3"></div>
+      <div id="article-intake-push-task-status" {% if show_push_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}?channel=push" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
+      {% if planka_push_hint %}
+        <div class="alert alert-warning d-flex justify-content-between align-items-center">
+          <span>{{ planka_push_hint }}</span>
+          {% if planka_issue %}
+            <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_planka_import" %}?issue={{ planka_issue.pk }}">Open Planka page</a>
+          {% else %}
+            <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_builder" %}">Open Issue Builder</a>
+          {% endif %}
+        </div>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url "backend:article_intake_push_to_planka" batch.pk %}" hx-post="{% url "backend:article_intake_push_to_planka" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context" hx-sync="#article-intake-results:queue all">
+          {% csrf_token %}
+          <input type="hidden" name="async" value="1">
+          <input type="hidden" name="push_scope" value="selected">
+          <button type="submit" class="btn btn-primary">Push staged articles to Planka candidates</button>
+        </form>
+        <form method="post" action="{% url "backend:article_intake_reconcile_planka_status" batch.pk %}" hx-post="{% url "backend:article_intake_reconcile_planka_status" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context" hx-sync="#article-intake-results:queue all">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-secondary">Reconcile Planka status</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-info">No intake batch yet for this issue. Run Step 1 to fetch articles.</div>
+{% endif %}
+{% else %}
+  <div class="alert alert-info">Select an issue to start article intake.</div>
+{% endif %}
+</div>
+{% endblock content %}
+
+{% block inline_javascript %}
+  {{ block.super }}
+  <script>
+    (() => {
+      const toggle = document.getElementById("pubmed-api-key-toggle");
+      const panel = document.getElementById("pubmed-api-key-panel");
+      if (!toggle || !panel) return;
+
+      toggle.addEventListener("click", () => {
+        panel.classList.toggle("d-none");
+        toggle.setAttribute("aria-expanded", panel.classList.contains("d-none") ? "false" : "true");
+      });
+
+      const watchedSelect = document.getElementById("id_watched_journals");
+      const selectAllButton = document.getElementById("watched-select-all");
+      const selectNoneButton = document.getElementById("watched-select-none");
+
+      if (watchedSelect && selectAllButton && selectNoneButton) {
+        selectAllButton.addEventListener("click", () => {
+          Array.from(watchedSelect.options).forEach((option) => {
+            option.selected = true;
+          });
+        });
+
+        selectNoneButton.addEventListener("click", () => {
+          Array.from(watchedSelect.options).forEach((option) => {
+            option.selected = false;
+          });
+        });
+      }
+
+      document.addEventListener("click", (event) => {
+        const resultsContainer = document.getElementById("article-intake-results");
+        if (!resultsContainer) return;
+
+        const clickedToggle = event.target.closest("[data-abstract-toggle='1']");
+        const clickedAbstractBody = event.target.closest("[id^='abstract-']");
+        if (clickedToggle || clickedAbstractBody) return;
+
+        resultsContainer.querySelectorAll("[id^='abstract-'].collapse.show").forEach((element) => {
+          if (window.bootstrap && window.bootstrap.Collapse) {
+            window.bootstrap.Collapse.getOrCreateInstance(element, { toggle: false }).hide();
+          }
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        const toggle = event.target.closest("[data-abstract-toggle='1']");
+        if (!toggle) return;
+
+        event.preventDefault();
+        const targetSelector = toggle.getAttribute("data-bs-target");
+        if (!targetSelector) return;
+        const target = document.querySelector(targetSelector);
+        if (!target) return;
+
+        if (window.bootstrap && window.bootstrap.Collapse) {
+          window.bootstrap.Collapse.getOrCreateInstance(target, { toggle: false }).toggle();
+          return;
+        }
+
+        target.classList.toggle("show");
+      });
+    })();
+  </script>
+{% endblock inline_javascript %}

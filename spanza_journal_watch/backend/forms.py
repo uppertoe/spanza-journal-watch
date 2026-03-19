@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
 from ..submissions.models import Article, Author, Issue, Journal, Review
-from .models import InboundEmail, PlankaBoardBackgroundAsset, SubscriberCSV
+from .models import InboundEmail, PlankaBoardBackgroundAsset, SubscriberCSV, WatchedJournal
 
 
 def csv_size(file):
@@ -506,3 +506,76 @@ class PlankaProjectNameForm(forms.Form):
 
     def clean_project_name(self):
         return (self.cleaned_data.get("project_name") or "").strip()
+
+
+class PubmedApiKeyForm(forms.Form):
+    api_key = forms.CharField(
+        required=True,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Create an NCBI API key and paste it here.",
+    )
+
+    def clean_api_key(self):
+        value = (self.cleaned_data.get("api_key") or "").strip()
+        if not value:
+            raise ValidationError("API key is required.")
+        return value
+
+
+class ArticleIntakeFetchForm(forms.Form):
+    issue = forms.ModelChoiceField(queryset=Issue.objects.order_by("-date", "-pk"), required=False)
+    watched_journals = forms.ModelMultipleChoiceField(
+        queryset=WatchedJournal.objects.filter(active=True).order_by("name"),
+        required=True,
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": "10"}),
+    )
+    from_month = forms.DateField(
+        input_formats=["%Y-%m", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m", attrs={"type": "month"}),
+        help_text="Select year and month.",
+    )
+    to_month = forms.DateField(
+        input_formats=["%Y-%m", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m", attrs={"type": "month"}),
+        help_text="Select year and month.",
+    )
+
+    def clean_from_month(self):
+        value = self.cleaned_data.get("from_month")
+        return value.replace(day=1) if value else value
+
+    def clean_to_month(self):
+        value = self.cleaned_data.get("to_month")
+        return value.replace(day=1) if value else value
+
+    def clean(self):
+        cleaned_data = super().clean()
+        from_month = cleaned_data.get("from_month")
+        to_month = cleaned_data.get("to_month")
+        if from_month and to_month and from_month > to_month:
+            self.add_error("to_month", "End month must be after or equal to start month.")
+
+        if from_month and to_month:
+            month_span = (to_month.year - from_month.year) * 12 + (to_month.month - from_month.month) + 1
+            if month_span > 12:
+                self.add_error("to_month", "Date range cannot exceed 12 months.")
+        return cleaned_data
+
+
+class ArticleIntakeAssignIssueForm(forms.Form):
+    issue = forms.ModelChoiceField(queryset=Issue.objects.order_by("-date", "-pk"), required=False)
+
+
+class WatchedJournalForm(forms.ModelForm):
+    class Meta:
+        model = WatchedJournal
+        fields = ["name", "issn_print", "issn_electronic", "active"]
+
+    def clean_name(self):
+        return (self.cleaned_data.get("name") or "").strip()
+
+    def clean_issn_print(self):
+        return (self.cleaned_data.get("issn_print") or "").strip()
+
+    def clean_issn_electronic(self):
+        return (self.cleaned_data.get("issn_electronic") or "").strip()

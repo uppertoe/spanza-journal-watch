@@ -1,0 +1,145 @@
+<div class="recent-issues-toggle-wrap">
+  <button
+    id="{{ sidebar_toggle_id }}"
+    class="btn btn-warning btn-sm shadow"
+    type="button"
+    aria-expanded="true"
+    aria-controls="{{ sidebar_id }}"
+  >
+    Hide recent issues
+  </button>
+</div>
+
+<div class="col-12 col-md-4 col-lg-3" id="{{ sidebar_id }}">
+  <div class="card sticky-top" style="top: 1rem;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Recent issues</span>
+      {% if sidebar_create_url_name %}
+        {% if sidebar_create_uses_htmx %}
+          <a
+            class="btn btn-sm btn-primary"
+            href="{% url sidebar_create_url_name %}"
+            hx-get="{% url sidebar_create_url_name %}"
+            hx-target="#{{ sidebar_page_container_id }}"
+            hx-select="#{{ sidebar_page_container_id }}"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+            Create new
+          </a>
+        {% else %}
+          <a class="btn btn-sm btn-primary" href="{% url sidebar_create_url_name %}">Create new</a>
+        {% endif %}
+      {% endif %}
+    </div>
+    <ul class="list-group list-group-flush">
+      {% for issue in issues %}
+        <li class="list-group-item d-flex justify-content-between align-items-center {% if selected_issue and selected_issue.pk == issue.pk %}active{% endif %}">
+          <a
+            class="{% if selected_issue and selected_issue.pk == issue.pk %}text-white{% endif %}"
+            href="{% url sidebar_issue_url_name %}?issue={{ issue.pk }}"
+            hx-get="{% url sidebar_issue_url_name %}?issue={{ issue.pk }}"
+            hx-target="#{{ sidebar_page_container_id }}"
+            hx-select="#{{ sidebar_page_container_id }}"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+            {{ issue.name }}
+          </a>
+          {% if issue.active %}
+            <span class="badge {% if selected_issue and selected_issue.pk == issue.pk %}text-bg-light text-success{% else %}text-bg-success{% endif %}">Live</span>
+          {% else %}
+            <span class="badge {% if selected_issue and selected_issue.pk == issue.pk %}text-bg-light text-secondary{% else %}text-bg-secondary{% endif %}">Draft</span>
+          {% endif %}
+        </li>
+      {% empty %}
+        <li class="list-group-item text-muted">No issues yet</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const toggleButton = document.getElementById('{{ sidebar_toggle_id }}');
+    const sidebar = document.getElementById('{{ sidebar_id }}');
+    const mainColumn = document.getElementById('{{ sidebar_main_column_id }}');
+    if (!toggleButton || !sidebar || !mainColumn) {
+      return;
+    }
+
+    let lastScrollY = window.scrollY;
+
+    const updateState = () => {
+      const isVisible = !sidebar.classList.contains('d-none');
+      toggleButton.setAttribute('aria-expanded', String(isVisible));
+      toggleButton.textContent = isVisible ? 'Hide recent issues' : 'Show recent issues';
+      toggleButton.classList.toggle('btn-warning', !isVisible);
+      toggleButton.classList.toggle('btn-outline-warning', isVisible);
+
+      if (isVisible) {
+        sidebar.classList.add('recent-issues-floating');
+        mainColumn.classList.add('col-md-8', 'col-lg-9');
+        mainColumn.classList.remove('col-md-12', 'col-lg-12');
+      } else {
+        sidebar.classList.remove('recent-issues-floating');
+        mainColumn.classList.remove('col-md-8', 'col-lg-9');
+        mainColumn.classList.add('col-md-12', 'col-lg-12');
+      }
+    };
+
+    const hideSidebar = () => {
+      sidebar.classList.add('d-none');
+      updateState();
+    };
+
+    toggleButton.addEventListener('click', () => {
+      sidebar.classList.toggle('d-none');
+      updateState();
+    });
+
+    document.addEventListener('click', (event) => {
+      const editButton = event.target.closest('[data-review-edit="1"]');
+      if (!editButton) {
+        return;
+      }
+      hideSidebar();
+    });
+
+    window.addEventListener('scroll', () => {
+      const currentScrollY = window.scrollY;
+      const isScrollingDown = currentScrollY > lastScrollY;
+      const passedThreshold = currentScrollY > 180;
+      if (isScrollingDown && passedThreshold && !sidebar.classList.contains('d-none')) {
+        hideSidebar();
+      }
+      lastScrollY = currentScrollY;
+    }, { passive: true });
+
+    updateState();
+  })();
+</script>
+
+<style>
+  .recent-issues-toggle-wrap {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1050;
+  }
+
+  .recent-issues-floating {
+    position: fixed;
+    top: 4.5rem;
+    right: 1rem;
+    z-index: 1040;
+    max-width: 360px;
+    width: min(360px, calc(100vw - 2rem));
+    max-height: calc(100vh - 6rem);
+    overflow: auto;
+  }
+
+  .recent-issues-floating .card {
+    position: static !important;
+  }
+</style>

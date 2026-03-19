@@ -36,7 +36,7 @@
         enctype="multipart/form-data"
         hx-encoding="multipart/form-data"
         hx-post="{% url "backend:planka_setup_issue_project" selected_issue.pk %}"
-        hx-target="#planka-panel"
+        hx-target="#planka-sync-panel"
         hx-swap="outerHTML"
       >
         {% csrf_token %}
@@ -147,87 +147,173 @@
     {% else %}
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
+          <ul class="nav nav-tabs mb-2">
+            <li class="nav-item">
+              <a
+                class="nav-link {% if planka_card_scope != 'all' %}active{% endif %}"
+                href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&scope=publish"
+                hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope=publish"
+                hx-target="#planka-sync-panel"
+                hx-swap="outerHTML"
+              >
+                Publish bucket
+                <span class="badge text-bg-secondary ms-1">{{ planka_scope_counts.publish|default:0 }}</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link {% if planka_card_scope == 'all' %}active{% endif %}"
+                href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&scope=all"
+                hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope=all"
+                hx-target="#planka-sync-panel"
+                hx-swap="outerHTML"
+              >
+                All cards
+                <span class="badge text-bg-secondary ms-1">{{ planka_scope_counts.all|default:0 }}</span>
+              </a>
+            </li>
+          </ul>
           {% if planka_publish_summary %}
             <div class="text-muted small mt-1">
-              Publish cards shown: {{ planka_publish_summary.total }} total ·
+              Cards shown: {{ planka_publish_summary.total }} total ·
               {{ planka_publish_summary.valid }} ready ·
               {{ planka_publish_summary.missing }} missing required fields ·
-              {{ planka_publish_summary.already_imported }} already synced
+              {{ planka_publish_summary.already_imported }} imported/protected
             </div>
           {% endif %}
         </div>
         <a
           class="btn btn-outline-secondary btn-sm"
-          href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&refresh=1"
-          hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}"
-          hx-target="#planka-panel"
+          href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&scope={{ planka_card_scope|default:'publish' }}&refresh=1"
+          hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope={{ planka_card_scope|default:'publish' }}"
+          hx-target="#planka-sync-panel"
           hx-swap="outerHTML"
         >
-          Refresh Publish cards
+          Refresh cards
         </a>
       </div>
 
+      {% if planka_board_missing %}
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span>Linked Reviews board is missing in Planka. Recreate and remap the board for this issue.</span>
+          <form
+            method="post"
+            action="{% url "backend:planka_recreate_issue_board" selected_issue.pk %}"
+            hx-post="{% url "backend:planka_recreate_issue_board" selected_issue.pk %}"
+            hx-target="#planka-sync-panel"
+            hx-swap="outerHTML"
+          >
+            {% csrf_token %}
+            <input type="hidden" name="card_scope" value="{{ planka_card_scope|default:'publish' }}">
+            <button type="submit" class="btn btn-sm btn-warning">Recreate Reviews board</button>
+          </form>
+        </div>
+      {% endif %}
+
       {% if planka_publish_cards %}
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th>Card</th>
-                <th>Article URL</th>
-                <th>Sync readiness</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for card in planka_publish_cards %}
+        <form
+          method="post"
+          action="{% url "backend:planka_import_publish_cards_bulk" selected_issue.pk %}"
+          hx-post="{% url "backend:planka_import_publish_cards_bulk" selected_issue.pk %}"
+          hx-target="#planka-sync-panel"
+          hx-swap="outerHTML"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="card_scope" value="{{ planka_card_scope|default:'publish' }}">
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
                 <tr>
-                  <td>
-                    <div class="fw-semibold">{{ card.name }}</div>
-                    <div class="text-muted small">Card ID: {{ card.id }}</div>
-                  </td>
-                  <td>
-                    {% if card.schema.article_url %}
-                      <a href="{{ card.schema.article_url }}" target="_blank" rel="noopener noreferrer">{{ card.schema.article_url|truncatechars:80 }}</a>
-                    {% else %}
-                      <span class="text-muted">(missing)</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if card.already_imported %}
-                      <span class="badge text-bg-secondary">Already synced</span>
-                      {% if card.sync_blocked_reason %}
-                        <div class="small text-danger mt-1">{{ card.sync_blocked_reason }}</div>
-                      {% endif %}
-                    {% endif %}
-                    {% if card.is_valid %}
-                      <span class="badge text-bg-success">Valid</span>
-                    {% else %}
-                      <span class="badge text-bg-danger">Missing required fields</span>
-                      <div class="small text-danger mt-1">{{ card.missing_required|join:", " }}</div>
-                    {% endif %}
-                  </td>
-                  <td class="text-end">
-                    <form
-                      method="post"
-                      action="{% url "backend:planka_import_publish_card" selected_issue.pk %}"
-                      hx-post="{% url "backend:planka_import_publish_card" selected_issue.pk %}"
-                      hx-target="#planka-panel"
-                      hx-swap="outerHTML"
-                    >
-                      {% csrf_token %}
-                      <input type="hidden" name="card_id" value="{{ card.id }}">
-                      <button type="submit" class="btn btn-sm {% if card.sync_blocked_reason %}btn-outline-danger{% else %}btn-primary{% endif %}">
-                        {% if card.sync_blocked_reason %}Why sync blocked?{% elif card.already_imported %}Sync updates{% else %}Sync as draft review{% endif %}
-                      </button>
-                    </form>
-                  </td>
+                  <th style="width: 2rem;"><input type="checkbox" class="form-check-input" id="planka-check-all"></th>
+                  <th>Card</th>
+                  <th>List</th>
+                  <th>Article URL</th>
+                  <th>Sync readiness</th>
+                  <th></th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {% for card in planka_publish_cards %}
+                  <tr>
+                    <td>
+                      <input class="form-check-input planka-card-check" type="checkbox" name="card_ids" value="{{ card.id }}" {% if card.has_associated_review %}disabled{% endif %}>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ card.name }}</div>
+                      <div class="text-muted small">Card ID: {{ card.id }}</div>
+                    </td>
+                    <td>
+                      <span class="badge text-bg-light border">{{ card.list_name }}</span>
+                      {% if card.list_type == 'trash' %}
+                        <span class="badge text-bg-warning ms-1">Trash</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if card.schema.article_url %}
+                        <a href="{{ card.schema.article_url }}" target="_blank" rel="noopener noreferrer">{{ card.schema.article_url|truncatechars:80 }}</a>
+                      {% else %}
+                        <span class="text-muted">(missing)</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if card.has_associated_review %}
+                        <span class="badge text-bg-secondary">Review exists (protected)</span>
+                        {% if card.associated_review_id %}
+                          <div class="small text-muted">Review ID: {{ card.associated_review_id }}</div>
+                        {% endif %}
+                      {% endif %}
+                      {% if card.is_valid %}
+                        <span class="badge text-bg-success">Valid</span>
+                      {% else %}
+                        <span class="badge text-bg-danger">Missing required fields</span>
+                        <div class="small text-danger mt-1">{{ card.missing_required|join:", " }}</div>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <div class="d-flex justify-content-end gap-2 align-items-center">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary js-planka-desc"
+                          data-card-name="{{ card.name|escapejs }}"
+                          data-card-description="{{ card.description|default:''|escapejs }}"
+                          data-bs-toggle="modal"
+                          data-bs-target="#planka-card-description-modal"
+                        >
+                          View description
+                        </button>
+                        {% if card.has_associated_review %}
+                          <span class="badge text-bg-secondary">Protected</span>
+                        {% else %}
+                          <span class="small text-muted">Select row to import</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="submit" name="selection_mode" value="selected" class="btn btn-primary">Create reviews from selected</button>
+            <button type="submit" name="selection_mode" value="publish_bucket" class="btn btn-outline-primary">Create reviews from Publish bucket</button>
+          </div>
+        </form>
+
+        <div class="modal fade" id="planka-card-description-modal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="planka-card-description-title">Card description</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body" id="planka-card-description-body" style="white-space: pre-wrap;"></div>
+            </div>
+          </div>
         </div>
       {% else %}
-        <div class="alert alert-light border mb-0">No cards loaded yet. Click <strong>Refresh Publish cards</strong>.</div>
+        <div class="alert alert-light border mb-0">No cards loaded yet. Click <strong>Refresh cards</strong>.</div>
       {% endif %}
     {% endif %}
   </div>
@@ -254,10 +340,38 @@
     window.setTimeout(() => {
       if (window.htmx) {
         window.htmx.ajax("GET", refreshUrl, {
-          target: "#planka-panel",
+          target: "#planka-sync-panel",
           swap: "outerHTML",
         });
       }
     }, delayMs);
+  })();
+
+  (() => {
+    const panel = document.getElementById("planka-sync-panel");
+    if (!panel) return;
+
+    const checkAll = panel.querySelector("#planka-check-all");
+    const cardChecks = panel.querySelectorAll(".planka-card-check");
+    if (checkAll) {
+      checkAll.addEventListener("change", () => {
+        cardChecks.forEach((checkbox) => {
+          if (!checkbox.disabled) checkbox.checked = checkAll.checked;
+        });
+      });
+    }
+
+    const title = document.getElementById("planka-card-description-title");
+    const body = document.getElementById("planka-card-description-body");
+    panel.querySelectorAll(".js-planka-desc").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (title) {
+          title.textContent = button.getAttribute("data-card-name") || "Card description";
+        }
+        if (body) {
+          body.textContent = button.getAttribute("data-card-description") || "(No description)";
+        }
+      });
+    });
   })();
 </script>

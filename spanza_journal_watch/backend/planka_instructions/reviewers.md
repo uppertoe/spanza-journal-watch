@@ -2,7 +2,9 @@
 
 1. Claim a card from **Candidates**.
 2. Move it to **Under review** when actively drafting.
-3. Ensure required custom fields are complete before handoff.
+3. Write your review in the card **description**, **below** the `< --- Please write your review below this line --- >` marker.
+4. Keep the article context section above the marker intact unless correction is needed.
+5. Ensure the card is moved to **Publish ready** when handoff is complete.
 
 ## Quality checklist
 
