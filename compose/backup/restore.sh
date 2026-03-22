@@ -223,8 +223,12 @@ restore_django() {
 
   create_db_if_missing_django "$target"
 
-  restic dump "$SNAPSHOT" django-db.sql \
-    | psql_django --dbname "$target" --quiet
+  # Use --tag django so 'latest' resolves to the most recent django snapshot,
+  # not the most recent snapshot overall (which may be the Planka one).
+  # The leading slash is required — restic stores stdin files as /filename.
+  # Discard psql stdout (sequence setval rows) and surface only stderr (errors).
+  restic dump "${SNAPSHOT}" --tag django /django-db.sql \
+    | psql_django --dbname "$target" >/dev/null
 
   info "Verifying restore — checking Django migrations table…"
   local count
@@ -263,8 +267,8 @@ restore_planka() {
 
   create_db_if_missing_planka "$target"
 
-  restic dump "$SNAPSHOT" planka-db.sql \
-    | psql_planka --dbname "$target" --quiet
+  restic dump "${SNAPSHOT}" --tag planka /planka-db.sql \
+    | psql_planka --dbname "$target" >/dev/null
 
   info "Verifying restore — checking Planka users table…"
   local count

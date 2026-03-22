@@ -312,7 +312,7 @@ verify_repository() {
   info "Repository OK."
 
   info "Recent snapshots:"
-  restic snapshots --last 5
+  restic snapshots --latest 5
 }
 
 # ---------------------------------------------------------------------------
