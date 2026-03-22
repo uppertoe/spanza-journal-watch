@@ -36,6 +36,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_data_backups:/backups
+    # Expose on loopback only so the VPS backup script (running on the host,
+    # outside Docker) can connect via 127.0.0.1:5432.
+    ports:
+      - '127.0.0.1:5432:5432'
     healthcheck:
       test:
         [
@@ -99,6 +103,10 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - planka_postgres_data:/var/lib/postgresql/data
+    # Exposed on port 5433 (host) → 5432 (container) to avoid conflict with
+    # the Django postgres on 5432.  The VPS backup script uses PLANKA_DB_PORT=5433.
+    ports:
+      - '127.0.0.1:5433:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d planka']
       interval: 10s

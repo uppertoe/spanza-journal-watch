@@ -3,6 +3,7 @@ volumes:
   spanza_journal_watch_local_postgres_data_backups: {}
   spanza_journal_watch_local_planka_data: {}
   spanza_journal_watch_local_planka_postgres_data: {}
+  spanza_journal_watch_local_backup_repo: {}
 
 services:
   django: &django
@@ -173,6 +174,65 @@ services:
       DEFAULT_ADMIN_USERNAME: demo
     extra_hosts:
       - 'localhost:host-gateway'
+
+  # ---------------------------------------------------------------------------
+  # Backup — local testing container (profile: backup)
+  # ---------------------------------------------------------------------------
+  # Provides a pre-built environment (restic + msmtp + postgresql-client) with
+  # the backup scripts bind-mounted from compose/backup/.  Changes to scripts
+  # on the host are reflected immediately without rebuilding the image.
+  #
+  # Mailhog is used as the SMTP server so notification emails can be inspected
+  # at http://localhost:8025 without sending real mail.
+  #
+  # Usage:
+  #   # Dry run — see what would happen
+  #   docker compose --profile backup run --rm backup /backup/backup.sh --dry-run
+  #
+  #   # Full backup + verify (emails appear in Mailhog)
+  #   docker compose --profile backup run --rm backup /backup/backup.sh --verify
+  #
+  #   # Test restore into a temporary database (safe — does not touch production)
+  #   docker compose --profile backup run --rm backup \
+  #     /backup/restore.sh --database django --target django_restore_test
+  #
+  #   # Interactive shell
+  #   docker compose --profile backup run --rm backup bash
+  backup:
+    build:
+      context: .
+      dockerfile: ./compose/local/backup/Dockerfile
+    profiles: ['backup']
+    volumes:
+      - ./compose/backup:/backup:ro # bind mount — edit scripts on host
+      - spanza_journal_watch_local_backup_repo:/restic-repo # local restic repo
+    environment:
+      # Restic — uses a local volume instead of S3
+      RESTIC_REPOSITORY: /restic-repo
+      RESTIC_PASSWORD: local-test-password
+      # Django postgres — same credentials as the local stack
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      # Planka postgres — only reachable when --profile planka is also active;
+      # backup.sh skips Planka gracefully if the host is not reachable
+      PLANKA_DB_HOST: planka_postgres
+      PLANKA_DB_PORT: '5432'
+      # Retention — short values to keep the local repo small
+      KEEP_DAILY: '3'
+      KEEP_WEEKLY: '2'
+      KEEP_MONTHLY: '1'
+      # Notifications via Mailhog (no auth, no TLS)
+      SMTP_HOST: mailhog
+      SMTP_PORT: '1025'
+      SMTP_TLS: 'off'
+      SMTP_FROM: backup@journalwatch.local
+      ALERT_EMAIL: admin@journalwatch.local
+      NOTIFY_ON_SUCCESS: 'true'
+    env_file:
+      - ./.envs/.local/.postgres # supplies POSTGRES_USER / POSTGRES_PASSWORD
+    depends_on:
+      - postgres
+      - mailhog
 
   planka_postgres:
     image: postgres:16-alpine

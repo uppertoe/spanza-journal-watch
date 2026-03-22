@@ -13,6 +13,12 @@ Welcome to SPANZA Journal Watch's documentation!
    howto
    users
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Operations:
+
+   operations/index
+
 
 
 Indices and tables
