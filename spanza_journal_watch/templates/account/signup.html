@@ -1,22 +1,38 @@
 {% extends "account/base.html" %}
+{% load i18n crispy_forms_tags %}
 
-{% load i18n %}
-{% load crispy_forms_tags %}
-
-{% block head_title %}{% translate "Signup" %}{% endblock %}
+{% block head_title %}Create account{% endblock %}
 
 {% block inner %}
-<h1>{% translate "Sign Up" %}</h1>
+<h5 class="mb-1">Create account</h5>
 
-<p>{% blocktranslate %}Already have an account? Then please <a href="{{ login_url }}">sign in</a>.{% endblocktranslate %}</p>
+{% if invite_email %}
+<p class="text-muted small mb-4">Creating an account to accept your invitation.</p>
+{% endif %}
 
 <form class="signup" id="signup_form" method="post" action="{% url 'account_signup' %}">
   {% csrf_token %}
-  {{ form|crispy }}
-  {% if redirect_field_value %}
-  <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+  {% if invite_email %}
+    {# Email is known from the invite — show it read-only and inject as hidden field #}
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Email</label>
+      <input type="email" class="form-control" value="{{ invite_email }}" readonly disabled>
+      <input type="hidden" name="email" value="{{ invite_email }}">
+    </div>
+    {# Render only the non-email fields (i.e. passwords) #}
+    {% for field in form %}
+      {% if field.html_name != "email" %}
+        {{ field|as_crispy_field }}
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    {{ form|crispy }}
   {% endif %}
-  <button class="btn btn-primary" type="submit">{% translate "Sign Up" %} &raquo;</button>
+  {% if redirect_field_value %}
+    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+  {% endif %}
+  <div class="d-grid mt-3">
+    <button class="btn btn-primary" type="submit">Create account</button>
+  </div>
 </form>
-
 {% endblock %}

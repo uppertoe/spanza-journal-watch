@@ -1,10 +1,12 @@
 {% load static %}
-<form class="input-group input-group-sm pe-sm-0 pe-5" id="subscribe-form">
+<div id="subscribe-container">
+<form class="input-group input-group-sm" id="subscribe-form">
 {% csrf_token %}
 <img id="subscribe-spinner" class="htmx-indicator px-2" src="{% static "images/spinners/pulse-rings-multiple.svg" %}"/>
-<button class="btn btn-outline-primary" type="submit" hx-post="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-indicator="#subscribe-spinner">Submit</button>
 {{ form.email }}
+<button class="btn btn-outline-warning btn-sm" type="submit" hx-post="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML" hx-indicator="#subscribe-spinner">Subscribe</button>
 </form>
+</div>
 {% if form.errors %}
 <div class="container-fluid p-0 sticky-top" id="oob-message" hx-swap-oob="true">
     <div class="alert alert-dismissible alert-primary">

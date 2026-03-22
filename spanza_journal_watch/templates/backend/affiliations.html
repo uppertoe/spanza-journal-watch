@@ -1,0 +1,89 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url "backend:backend_settings" %}" class="text-muted small text-decoration-none">← Settings</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Affiliations</h1>
+</div>
+<p class="text-muted">Health services and organisations associated with authors. These appear on author profiles.</p>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-5">
+    <div class="card">
+      <div class="card-header">{% if editing %}Edit: {{ editing.name }}{% else %}Add affiliation{% endif %}</div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data"
+              action="{% if editing %}{% url "backend:affiliation_edit" editing.pk %}{% else %}{% url "backend:affiliations_list" %}{% endif %}">
+          {% csrf_token %}
+          {{ form|crispy }}
+          <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn btn-primary">
+              {% if editing %}Save changes{% else %}Add affiliation{% endif %}
+            </button>
+            {% if editing %}
+              <a href="{% url "backend:affiliations_list" %}" class="btn btn-outline-secondary">Cancel</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-header">Affiliations ({{ affiliations|length }})</div>
+      <div class="card-body p-0">
+        {% if affiliations %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>URL</th>
+                  <th>Logo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for aff in affiliations %}
+                  <tr {% if editing and editing.pk == aff.pk %}class="table-primary"{% endif %}>
+                    <td>{{ aff.name }}</td>
+                    <td>
+                      {% if aff.url %}
+                        <a href="{{ aff.url }}" target="_blank" rel="noopener" class="text-truncate d-inline-block" style="max-width:160px">{{ aff.url }}</a>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if aff.logo %}
+                        <img src="{{ aff.logo.url }}" alt="{{ aff.name }} logo" style="height:32px; object-fit:contain;">
+                        {% if aff.logo_authorised %}
+                          <span class="badge text-bg-success ms-1">Authorised</span>
+                        {% else %}
+                          <span class="badge text-bg-secondary ms-1">Unauthorised</span>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-muted small">No logo</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{% url "backend:affiliation_edit" aff.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">No affiliations yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

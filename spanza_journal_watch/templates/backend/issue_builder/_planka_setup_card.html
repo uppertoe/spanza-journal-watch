@@ -1,0 +1,110 @@
+{% load crispy_forms_tags %}
+
+{% if planka_binding %}
+<div class="card mb-0">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Planka board</span>
+    <span class="badge text-bg-success">Connected</span>
+  </div>
+  <div class="card-body">
+    <p class="mb-1">Board linked: <strong>{{ planka_binding.project_name }}</strong></p>
+    <p class="text-muted small mb-0">
+      To import completed reviews from Planka, use the
+      <a href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}">Pull Reviews</a> tab.
+    </p>
+  </div>
+</div>
+{% else %}
+  {% if not planka_credential %}
+    <div class="alert alert-warning">
+      No Planka API key configured. Contact your administrator to set one up before this board can be initialised.
+    </div>
+  {% else %}
+    <div id="planka-sync-panel" class="card mb-0"
+      data-planka-disconnected="{% if planka_disconnected %}true{% else %}false{% endif %}"
+    >
+      <div class="card-header">Initialise Planka board</div>
+      <div class="card-body">
+        {% if planka_panel_status %}
+          <div class="alert alert-{{ planka_panel_status_level|default:'info' }} py-2">{{ planka_panel_status }}</div>
+        {% endif %}
+        <p class="text-muted mb-3">
+          Link this issue to a new Planka project. This creates a
+          <strong>Reviews</strong> board (Articles, Candidates, Under review, Publish ready)
+          and an <strong>Instructions</strong> board prefilled from local templates.
+        </p>
+        <form
+          method="post"
+          enctype="multipart/form-data"
+          hx-encoding="multipart/form-data"
+          hx-post="{% url "backend:planka_setup_issue_project" selected_issue.pk %}"
+          hx-target="#planka-sync-panel"
+          hx-swap="outerHTML"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="from_setup_page" value="1">
+          <div class="row g-3">
+            <div class="col-md-6">
+              {{ planka_setup_form.project_name|as_crispy_field }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="id_background_asset">Background image (optional)</label>
+              <select class="form-select" name="background_asset" id="id_background_asset">
+                <option value="">No background image</option>
+                {% for asset in planka_background_assets %}
+                  <option value="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}"
+                    {% if planka_setup_form.background_asset.value|stringformat:"s" == asset.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ asset.name }}
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Choose from uploaded assets or upload a new image below.</div>
+            </div>
+            <div class="col-12">
+              {{ planka_setup_form.background_upload|as_crispy_field }}
+            </div>
+            {% if planka_background_assets %}
+              <div class="col-12">
+                <div class="small text-muted mb-1">Available uploaded backgrounds</div>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for asset in planka_background_assets %}
+                    <button type="button" class="btn btn-light border p-1 js-bg-pick"
+                      data-asset-id="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}" title="{{ asset.name }}">
+                      <img src="{{ asset.image.url }}" alt="{{ asset.name }}" style="width: 84px; height: 56px; object-fit: cover;" class="rounded">
+                    </button>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+            <div class="col-md-4 ms-md-auto">
+              <button type="submit" class="btn btn-primary w-100">Create + link project</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const select = document.getElementById("id_background_asset");
+        const upload = document.getElementById("id_background_upload");
+        if (!select || !upload) return;
+
+        select.addEventListener("change", () => {
+          const opt = select.options[select.selectedIndex];
+          if (opt && opt.getAttribute("data-preview-url")) upload.value = "";
+        });
+
+        upload.addEventListener("change", () => {
+          if (upload.files && upload.files[0]) select.value = "";
+        });
+
+        document.querySelectorAll(".js-bg-pick").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-asset-id");
+            if (id) { select.value = id; upload.value = ""; }
+          });
+        });
+      })();
+    </script>
+  {% endif %}
+{% endif %}

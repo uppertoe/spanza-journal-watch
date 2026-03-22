@@ -2,98 +2,91 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
+<div id="issue-builder-page">
+<div id="issue-builder-content">
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Issue Builder</h1>
-  <a class="btn btn-outline-primary" href="{% url "backend:issue_builder" %}">Create new issue</a>
 </div>
-<p class="text-muted">Create draft issues, add reviews/articles, and publish all content live in one action.</p>
+<p class="text-muted">Create and edit the issue draft: name, date, and description.</p>
 
-<div class="mb-3">
-  <button
-    id="toggle-recent-issues"
-    class="btn btn-outline-secondary btn-sm"
-    type="button"
-    aria-expanded="true"
-    aria-controls="recent-issues-sidebar"
-  >
-    Hide recent issues
-  </button>
-</div>
-
-<div class="row g-4 align-items-start">
-  <div class="col-12 col-md-4 col-lg-3" id="recent-issues-sidebar">
-    <div class="card sticky-top" style="top: 1rem;">
-      <div class="card-header">Recent issues</div>
-      <ul class="list-group list-group-flush">
-        {% for issue in issues %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <a href="{% url "backend:issue_builder" %}?issue={{ issue.pk }}">{{ issue.name }}</a>
-            {% if issue.active %}
-              <span class="badge text-bg-success">Live</span>
-            {% else %}
-              <span class="badge text-bg-secondary">Draft</span>
-            {% endif %}
-          </li>
-        {% empty %}
-          <li class="list-group-item text-muted">No issues yet</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-
-  <div class="col-12 col-md-8 col-lg-9" id="issue-draft-column">
-    <div class="card mb-4">
-      <div class="card-header">{% if selected_issue %}Edit issue draft{% else %}Create issue draft{% endif %}</div>
-      <div class="card-body">
-        <form method="post" action="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}">
-          {% csrf_token %}
-          {{ issue_form|crispy }}
-          <button type="submit" class="btn btn-primary">Save issue draft</button>
-        </form>
+<div class="card mb-4">
+  <div class="card-header">{% if selected_issue %}Edit issue draft{% else %}Create issue draft{% endif %}</div>
+  <div class="card-body">
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      action="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}"
+      hx-post="{% if selected_issue %}{% url "backend:update_issue_draft" selected_issue.pk %}{% else %}{% url "backend:save_issue_draft" %}{% endif %}"
+      hx-encoding="multipart/form-data"
+      hx-target="#issue-builder-content"
+      hx-select="#issue-builder-content"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >
+      {% csrf_token %}
+      {{ issue_form.name|as_crispy_field }}
+      {{ issue_form.date|as_crispy_field }}
+      {{ issue_form.body|as_crispy_field }}
+      <div class="mb-3">
+        {% if selected_issue.image %}
+          <div class="mb-2">
+            <img
+              id="issue-image-preview"
+              src="{{ selected_issue.image.url }}"
+              alt="Current issue image"
+              class="img-thumbnail"
+              style="max-height:10rem; max-width:100%; object-fit:contain;"
+            >
+          </div>
+        {% else %}
+          <div class="mb-2" id="issue-image-preview-wrap" style="display:none;">
+            <img
+              id="issue-image-preview"
+              src=""
+              alt="Image preview"
+              class="img-thumbnail"
+              style="max-height:10rem; max-width:100%; object-fit:contain;"
+            >
+          </div>
+        {% endif %}
+        {{ issue_form.image|as_crispy_field }}
       </div>
-    </div>
-
-    {% if selected_issue %}
-      <div id="issue-reviews-panel">
-        {% include "backend/issue_builder/_issue_reviews_panel.html" %}
-      </div>
-    {% else %}
-      <div class="alert alert-info">Save the issue draft first, then add reviews and articles.</div>
-    {% endif %}
+      <button type="submit" class="btn btn-primary">Save issue draft</button>
+    </form>
   </div>
 </div>
-{% endblock content %}
 
-{% block inline_javascript %}
-{{ block.super }}
+{% if not selected_issue %}
+  <div class="alert alert-info">Save the issue draft first, then use the tabs above to proceed.</div>
+{% else %}
+  <div id="planka-panel" class="mb-4">
+    {% include "backend/issue_builder/_planka_setup_card.html" %}
+  </div>
+  {% include "backend/issue_builder/_issue_coordinators_panel.html" %}
+{% endif %}
+{% if is_htmx %}
+<div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>
+{% endif %}
+</div>
+</div>
+
 <script>
-  window.addEventListener('DOMContentLoaded', function () {
-    const toggleButton = document.getElementById('toggle-recent-issues');
-    const sidebar = document.getElementById('recent-issues-sidebar');
-    const draftColumn = document.getElementById('issue-draft-column');
-
-    if (!toggleButton || !sidebar || !draftColumn) {
-      return;
-    }
-
-    const updateState = () => {
-      const isVisible = !sidebar.classList.contains('d-none');
-      toggleButton.setAttribute('aria-expanded', String(isVisible));
-      toggleButton.textContent = isVisible ? 'Hide recent issues' : 'Show recent issues';
-
-      if (isVisible) {
-        draftColumn.classList.add('col-md-8', 'col-lg-9');
-      } else {
-        draftColumn.classList.remove('col-md-8', 'col-lg-9');
-      }
+(function () {
+  const fileInput = document.querySelector('input[type="file"][name="image"]');
+  if (!fileInput) return;
+  fileInput.addEventListener('change', function () {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      let img = document.getElementById('issue-image-preview');
+      if (!img) return;
+      img.src = e.target.result;
+      const wrap = document.getElementById('issue-image-preview-wrap');
+      if (wrap) wrap.style.display = '';
     };
-
-    toggleButton.addEventListener('click', function () {
-      sidebar.classList.toggle('d-none');
-      updateState();
-    });
-
-    updateState();
+    reader.readAsDataURL(file);
   });
+})();
 </script>
-{% endblock inline_javascript %}
+{% endblock content %}

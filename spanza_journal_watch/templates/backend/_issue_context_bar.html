@@ -1,0 +1,97 @@
+{% with cur=request.resolver_match.url_name %}
+<div class="issue-context-bar">
+  <div class="container col-xl-10 offset-xl-1 col-12 px-3">
+
+    <div class="d-flex align-items-center justify-content-between gap-2 py-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
+        <span class="issue-context-label">Issue</span>
+        {% if session_selected_issue %}
+          <a
+            href="{% url 'backend:issue_builder' %}?issue={{ session_selected_issue.pk }}"
+            class="issue-context-name fw-semibold text-decoration-none text-truncate"
+          >{{ session_selected_issue.name }}</a>
+          {% if session_selected_issue.active %}
+            <span class="badge text-bg-success">Live</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Draft</span>
+          {% endif %}
+        {% else %}
+          <span class="text-muted fst-italic small">No issue selected</span>
+        {% endif %}
+      </div>
+      <button
+        class="btn btn-sm btn-primary flex-shrink-0"
+        type="button"
+        onclick="(bootstrap.Offcanvas.getInstance(document.getElementById('global-issues-sidebar')) || new bootstrap.Offcanvas(document.getElementById('global-issues-sidebar'))).show()"
+        aria-controls="global-issues-sidebar"
+      >Issues &#9656;</button>
+    </div>
+
+    {% if session_selected_issue %}
+    <nav class="issue-workflow-tabs mb-0" aria-label="Editorial workflow steps">
+
+      {% if not is_coordinator_only %}
+      <a
+        href="{% url 'backend:issue_builder' %}?issue={{ session_selected_issue.pk }}"
+        class="workflow-tab{% if cur == 'issue_builder' %} is-active{% endif %}"
+        {% if cur == 'issue_builder' %}aria-current="step"{% endif %}
+      >Setup</a>
+      {% endif %}
+
+      <a
+        href="{% url 'backend:article_intake' %}?issue={{ session_selected_issue.pk }}"
+        class="workflow-tab{% if cur == 'article_intake' %} is-active{% endif %}"
+        {% if cur == 'article_intake' %}aria-current="step"{% endif %}
+      >Articles</a>
+
+      <a
+        href="{% url 'backend:issue_reviewers' %}?issue={{ session_selected_issue.pk }}"
+        class="workflow-tab{% if cur == 'issue_reviewers' %} is-active{% endif %}"
+        {% if cur == 'issue_reviewers' %}aria-current="step"{% endif %}
+      >Reviewers</a>
+
+      {% if perms.submissions.chief_editor %}
+        <a
+          href="{% url 'backend:issue_planka_import' %}?issue={{ session_selected_issue.pk }}"
+          class="workflow-tab{% if cur == 'issue_planka_import' %} is-active{% endif %}"
+          {% if cur == 'issue_planka_import' %}aria-current="step"{% endif %}
+        >Pull Reviews</a>
+      {% else %}
+        <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">Pull Reviews <span class="workflow-tab-lock" aria-hidden="true">🔒</span></span>
+      {% endif %}
+
+      {% if perms.submissions.chief_editor %}
+        <a
+          href="{% url 'backend:issue_reviews_edit' %}?issue={{ session_selected_issue.pk }}"
+          class="workflow-tab{% if cur == 'issue_reviews_edit' %} is-active{% endif %}"
+          {% if cur == 'issue_reviews_edit' %}aria-current="step"{% endif %}
+        >Edit Reviews</a>
+      {% else %}
+        <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">Edit Reviews <span class="workflow-tab-lock" aria-hidden="true">🔒</span></span>
+      {% endif %}
+
+      {% if perms.submissions.chief_editor %}
+        <a
+          href="{% url 'backend:issue_publish' %}?issue={{ session_selected_issue.pk }}"
+          class="workflow-tab{% if cur == 'issue_publish' %} is-active{% elif session_selected_issue.active %} is-done{% endif %}"
+          {% if cur == 'issue_publish' %}aria-current="step"{% endif %}
+        >{% if session_selected_issue.active %}Published{% else %}Publish{% endif %}</a>
+      {% else %}
+        <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">Publish <span class="workflow-tab-lock" aria-hidden="true">🔒</span></span>
+      {% endif %}
+
+      {% if perms.submissions.chief_editor %}
+        <a
+          href="{% url 'backend:newsletter_release_list' %}?issue={{ session_selected_issue.pk }}"
+          class="workflow-tab{% if cur == 'newsletter_release_list' or cur == 'create_newsletter' or cur == 'edit_newsletter' or cur == 'final_newsletter' or cur == 'send_final_newsletter' or cur == 'send_test_newsletter' %} is-active{% endif %}"
+        >Newsletter</a>
+      {% else %}
+        <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">Newsletter <span class="workflow-tab-lock" aria-hidden="true">🔒</span></span>
+      {% endif %}
+
+    </nav>
+    {% endif %}
+
+  </div>
+</div>
+{% endwith %}

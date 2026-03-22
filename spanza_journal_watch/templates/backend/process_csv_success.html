@@ -2,6 +2,21 @@
     <button class="btn btn-outline-primary disabled">Submit CSV for processing</button>
 </div>
 
+{% if summary %}
+<div class="alert alert-info">
+    <div><strong>Email column:</strong> {{ summary.email_column }}</div>
+    <div><strong>Rows parsed:</strong> {{ summary.rows_parsed }}</div>
+    <div><strong>Added:</strong> {{ summary.records_added }}</div>
+    <div><strong>Skipped:</strong> {{ summary.records_skipped }}</div>
+    <hr class="my-2">
+    <div class="small">
+        Invalid email values: {{ summary.invalid_email_count }} ·
+        Duplicates in file: {{ summary.duplicate_in_file_count }} ·
+        Already subscribed: {{ summary.already_subscribed_count }}
+    </div>
+</div>
+{% endif %}
+
 {% include "fragments/messages.html" %}
 
 <script defer>

@@ -1,0 +1,40 @@
+<div class="d-flex justify-content-end mb-3">
+  <a
+    class="btn btn-sm btn-primary"
+    href="{% url "backend:issue_builder" %}"
+    hx-get="{% url "backend:issue_builder" %}"
+    hx-target="#issue-builder-page"
+    hx-select="#issue-builder-page"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+    data-bs-dismiss="offcanvas"
+  >
+    Create new
+  </a>
+</div>
+
+<ul class="list-group list-group-flush">
+  {% for issue in issues %}
+    <li class="list-group-item d-flex justify-content-between align-items-center {% if selected_issue and selected_issue.pk == issue.pk %}active{% endif %}">
+      <a
+        class="{% if selected_issue and selected_issue.pk == issue.pk %}text-white{% endif %}"
+        data-issue-link="1"
+        href="{% url "backend:issue_builder" %}?issue={{ issue.pk }}"
+        hx-get="{% url "backend:issue_builder" %}?issue={{ issue.pk }}"
+        hx-target="#issue-builder-content"
+        hx-select="#issue-builder-content"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+      >
+        {{ issue.name }}
+      </a>
+      {% if issue.active %}
+        <span class="badge {% if selected_issue and selected_issue.pk == issue.pk %}text-bg-light text-success{% else %}text-bg-success{% endif %}">Live</span>
+      {% else %}
+        <span class="badge {% if selected_issue and selected_issue.pk == issue.pk %}text-bg-light text-secondary{% else %}text-bg-secondary{% endif %}">Draft</span>
+      {% endif %}
+    </li>
+  {% empty %}
+    <li class="list-group-item text-muted">No issues yet</li>
+  {% endfor %}
+</ul>

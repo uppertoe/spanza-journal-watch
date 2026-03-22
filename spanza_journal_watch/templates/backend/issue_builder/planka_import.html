@@ -1,0 +1,33 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div id="planka-sync-page">
+<div id="planka-sync-content">
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Planka Sync</h1>
+</div>
+<p class="text-muted">Link an issue to Planka and sync cards from the Publish ready list.</p>
+
+<div class="row g-4 align-items-start">
+  <div class="col-12" id="planka-main-column">
+    {% if selected_issue %}
+      {% if planka_binding %}
+        {% include "backend/issue_builder/_planka_project_context_card.html" %}
+      {% endif %}
+
+      <div id="planka-panel">
+        {% include "backend/issue_builder/_planka_panel.html" %}
+      </div>
+    {% else %}
+      <div class="alert alert-info mb-0">Select an issue to use Planka sync.</div>
+    {% endif %}
+  </div>
+</div>
+{% if is_htmx %}
+<div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>
+{% endif %}
+</div>
+
+</div>
+{% endblock content %}

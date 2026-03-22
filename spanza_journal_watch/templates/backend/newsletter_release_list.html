@@ -1,32 +1,226 @@
 {% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
 
 {% block content %}
-<h1>Newsletter release</h1>
-<p class="text-muted">Select a newsletter to send a test email and, once tested, publish to subscribers.</p>
+<div id="newsletter-release-page">
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Newsletter</h1>
+</div>
+<p class="text-muted">Compose, test, and send the newsletter for this issue.</p>
 
-<p>
-  <a class="btn btn-primary" href="{% url "backend:create_newsletter" %}">Create newsletter</a>
-</p>
+{% if not selected_issue %}
+  <div class="alert alert-info">Select an issue to manage its newsletter.</div>
+{% else %}
 
-<div class="list-group">
-  {% for newsletter in newsletters %}
-    <a class="list-group-item list-group-item-action" href="{% url "backend:final_newsletter" newsletter.send_token %}">
-      <div class="d-flex w-100 justify-content-between align-items-center">
-        <h5 class="mb-1">{{ newsletter }}</h5>
-        <div>
-          {% if newsletter.is_sent %}
-            <span class="badge text-bg-success">Sent</span>
-          {% elif newsletter.is_test_sent %}
-            <span class="badge text-bg-primary">Tested</span>
-          {% else %}
-            <span class="badge text-bg-secondary">Draft</span>
-          {% endif %}
+{# ── Edit form ─────────────────────────────────────────────────────── #}
+{% if edit_form %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Newsletter content</span>
+    <div class="d-flex gap-2 align-items-center">
+      {% if newsletter.is_sent %}
+        <span class="badge text-bg-success">Sent</span>
+      {% elif newsletter.is_test_sent %}
+        <span class="badge text-bg-primary">Tested</span>
+      {% else %}
+        <span class="badge text-bg-secondary">Draft</span>
+      {% endif %}
+      {% if newsletter.ready_to_send %}
+        <span class="badge text-bg-success">Ready to send</span>
+      {% else %}
+        <span class="badge text-bg-warning text-dark">Incomplete</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ edit_form.subject|as_crispy_field }}
+      {{ edit_form.content_heading|as_crispy_field }}
+      {{ edit_form.content|as_crispy_field }}
+      {{ edit_form.non_featured_review_count|as_crispy_field }}
+
+      <fieldset class="border rounded p-3 mb-3">
+        <legend class="float-none w-auto px-2 small fw-semibold">Header image</legend>
+
+        {% if newsletter_header_image_url %}
+          <div class="mb-3">
+            <p class="text-muted small mb-1">Current header image:</p>
+            <img src="{{ newsletter_header_image_url }}"
+                 alt="Current header image"
+                 class="img-thumbnail"
+                 style="max-height: 8rem; max-width: 100%; object-fit: contain;">
+          </div>
+        {% elif newsletter.header_image and newsletter.header_image.name %}
+          <div class="mb-3 text-muted small">
+            <em>Header image set but file not available in this environment.</em>
+          </div>
+        {% endif %}
+
+        {% if issue_for_preview %}
+          <div class="mb-3">
+            <p class="text-muted small mb-1">Issue cover image (will be converted to greyscale):</p>
+            <img src="{{ issue_for_preview.image.url }}"
+                 alt="Issue cover image"
+                 class="img-thumbnail"
+                 style="max-height: 8rem; max-width: 100%; object-fit: contain;">
+          </div>
+        {% endif %}
+
+        {{ edit_form.use_issue_image|as_crispy_field }}
+        <div class="mt-2">{{ edit_form.header_image|as_crispy_field }}</div>
+      </fieldset>
+
+      <button type="submit" class="btn btn-primary">Save newsletter</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{# ── Send test ─────────────────────────────────────────────────────── #}
+{% if newsletter and not newsletter.is_sent or newsletter.resend_enabled %}
+<div class="card mb-4">
+  <div class="card-header">Send test email</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">Send a test to verify layout before publishing to subscribers.</p>
+    <form method="post" action="{% url "backend:send_test_newsletter" newsletter.send_token %}">
+      {% csrf_token %}
+      {{ test_form|crispy }}
+      <button type="submit" class="btn btn-outline-primary">Send test email</button>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4 border-danger">
+  <div class="card-header text-danger">Publish to subscriber list</div>
+  <div class="card-body">
+    {% if newsletter.is_sent and not newsletter.resend_enabled %}
+      <p class="text-muted small mb-3">This newsletter has already been sent. Enable a one-time resend below.</p>
+      <form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.send_token %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger">Enable one resend</button>
+      </form>
+    {% elif newsletter.is_test_sent %}
+      <p class="text-muted small mb-3">Send this newsletter to all subscribers. This cannot be undone.</p>
+      <a href="{% url "backend:send_final_newsletter" newsletter.send_token %}" class="btn btn-danger"
+        onclick="return confirm('Send this newsletter to all subscribers?')">
+        Send newsletter
+      </a>
+    {% else %}
+      <p class="text-muted mb-0">Send a test email first. Only tested newsletters can be published.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Stats ─────────────────────────────────────────────────────────── #}
+{% if newsletter.is_sent and newsletter_stats %}
+<div class="card mb-4">
+  <div class="card-header">Stats</div>
+  <div class="card-body">
+
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <h6 class="text-muted mb-1 small">Emails sent</h6>
+            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.emails_sent }}</p>
+          </div>
         </div>
       </div>
-      <small class="text-body-secondary">Ready to send: {{ newsletter.ready_to_send|yesno:"Yes,No" }}</small>
-    </a>
-  {% empty %}
-    <div class="list-group-item text-muted">No newsletters available.</div>
-  {% endfor %}
+      <div class="col-6 col-md-3">
+        <div class="card h-100 border-primary-subtle">
+          <div class="card-body py-3">
+            <h6 class="text-muted mb-1 small">Open rate (raw)</h6>
+            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.open_rate }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100 border-success-subtle">
+          <div class="card-body py-3">
+            <h6 class="text-muted mb-1 small">Click-through (raw)</h6>
+            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.click_through_rate }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <h6 class="text-muted mb-1 small">Human open rate</h6>
+            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.human_open_rate }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <h6 class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Raw event totals</h6>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Opens (distinct)</div>
+        <div class="fs-5">{{ newsletter_stats.opens }} <span class="text-muted small">({{ newsletter_stats.total_opens }} total)</span></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Clicks (distinct)</div>
+        <div class="fs-5">{{ newsletter_stats.clicks }} <span class="text-muted small">({{ newsletter_stats.total_clicks }} total)</span></div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <h6 class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Human activity (automation filtered)</h6>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Human opens</div>
+        <div class="fs-5">{{ newsletter_stats.human_opens }} <span class="text-muted small">({{ newsletter_stats.total_human_opens }} total)</span></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Human open rate</div>
+        <div class="fs-5">{{ newsletter_stats.human_open_rate }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Human clicks</div>
+        <div class="fs-5">{{ newsletter_stats.human_clicks }} <span class="text-muted small">({{ newsletter_stats.total_human_clicks }} total)</span></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Human CTR</div>
+        <div class="fs-5">{{ newsletter_stats.human_click_through_rate }}</div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12">
+        <h6 class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Automation filter impact</h6>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Automated opens</div>
+        <div class="fs-5">{{ newsletter_stats.automated_opens }} <span class="text-muted small">({{ newsletter_stats.automated_open_share }})</span></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Automated clicks</div>
+        <div class="fs-5">{{ newsletter_stats.automated_clicks }} <span class="text-muted small">({{ newsletter_stats.automated_click_share }})</span></div>
+      </div>
+    </div>
+
+    {% if not newsletter.resend_enabled %}
+    <div class="mt-4 pt-3 border-top">
+      <form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.send_token %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Enable one resend</button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% if is_htmx %}
+<div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>
+{% endif %}
 </div>
 {% endblock content %}

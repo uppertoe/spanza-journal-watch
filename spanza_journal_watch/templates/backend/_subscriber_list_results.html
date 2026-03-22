@@ -1,0 +1,33 @@
+<div id="subscriber-list-results">
+  <div class="small text-muted mb-2">{{ subscriber_total }} subscribers matched</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Subscribed</th>
+          <th>Bounced</th>
+          <th>Complained</th>
+          <th>Source</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for subscriber in subscribers %}
+        <tr>
+          <td>{{ subscriber.email }}</td>
+          <td>{% if subscriber.subscribed %}<span class="badge text-bg-success">Yes</span>{% else %}<span class="badge text-bg-secondary">No</span>{% endif %}</td>
+          <td>{% if subscriber.bounced %}<span class="badge text-bg-danger">Yes</span>{% else %}<span class="badge text-bg-light">No</span>{% endif %}</td>
+          <td>{% if subscriber.complained %}<span class="badge text-bg-warning">Yes</span>{% else %}<span class="badge text-bg-light">No</span>{% endif %}</td>
+          <td>{% if subscriber.from_csv %}{{ subscriber.from_csv.name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td class="text-muted small">{{ subscriber.modified|date:"Y-m-d H:i" }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" class="text-muted">No subscribers found for current filters.</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

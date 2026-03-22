@@ -1,0 +1,15 @@
+{% include "fragments/messages.html" %}
+<div id="article-intake-task-status" class="d-none" hx-swap-oob="outerHTML"></div>
+{% if batch_task_running %}
+	<div id="article-intake-push-task-status" class="alert alert-info py-2 mb-3" hx-swap-oob="outerHTML" hx-get="{% url "backend:article_intake_task_status" batch.pk %}?channel=push" hx-trigger="every 500ms" hx-target="this" hx-swap="outerHTML">
+		<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+		<span>{{ batch.task_note|default:"Background task running..." }}</span>
+	</div>
+{% elif batch_task_done %}
+	<div id="article-intake-push-task-status" class="{% if batch.task_state == 'error' %}alert alert-warning{% else %}alert alert-success{% endif %} py-2 mb-3" hx-swap-oob="outerHTML">
+		{{ batch.task_note }}
+	</div>
+{% else %}
+	<div id="article-intake-push-task-status" class="d-none" hx-swap-oob="outerHTML"></div>
+{% endif %}
+{% include "backend/_article_intake_results.html" %}

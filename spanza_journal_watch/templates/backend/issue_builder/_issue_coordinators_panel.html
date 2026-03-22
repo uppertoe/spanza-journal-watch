@@ -1,0 +1,270 @@
+<div id="issue-coordinators-panel" class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Add coordinators to issue</span>
+    <span class="badge text-bg-secondary">{{ issue_coordinators|length }} total</span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Add regional coordinators who will manage this issue. They will receive an invite link valid for {{ issue_invite_ttl_days }} days, and on acceptance will get access to the editorial backend and Planka board.
+    </p>
+
+    {% if not planka_binding %}
+      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+        <span>No Planka board is linked to this issue. Set one up before inviting coordinators.</span>
+        <a class="btn btn-sm btn-warning ms-auto" href="{{ request.path }}#planka-panel">Set up Planka</a>
+      </div>
+    {% else %}
+
+    {# Step 1: Add coordinators #}
+    <form
+      id="coordinator-bulk-form"
+      hx-post="{% url "backend:issue_add_contributor" selected_issue.pk %}"
+      hx-target="#issue-coordinators-panel"
+      hx-swap="outerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="role" value="coordinator">
+      <input type="hidden" name="panel_role" value="coordinator">
+
+      <div id="coordinator-rows">
+        <!-- Row template (index 0) -->
+        <div class="coordinator-row row g-2 align-items-center mb-2" data-index="0">
+          <div class="col-12 col-md-4">
+            <input type="text" name="name_0" class="form-control" placeholder="Dr Jane Smith" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <input type="email" name="email_0" class="form-control" placeholder="coordinator@example.com" required>
+          </div>
+          <div class="col-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm remove-coordinator-row-btn" disabled>&times;</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-2 mb-4">
+        <button type="button" id="add-coordinator-row" class="btn btn-outline-secondary btn-sm">+ Add another</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add coordinators to issue</button>
+      </div>
+    </form>
+    {% endif %}
+
+    {% if planka_binding and not issue_coordinators %}
+      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+        <span>No coordinators have been added yet. Add coordinators above and send them an invite.</span>
+      </div>
+    {% endif %}
+
+    <hr class="my-3">
+
+    {# Step 2: Coordinator table with bulk invite sending #}
+    <form
+      id="send-coordinator-invites-form"
+      hx-post="{% url "backend:issue_send_contributor_invites" selected_issue.pk %}"
+      hx-target="#issue-coordinators-panel"
+      hx-swap="outerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="panel_role" value="coordinator">
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:2rem">
+                <input type="checkbox" id="coordinator-select-all-table" class="form-check-input">
+              </th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Planka</th>
+              <th>Last invited</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for contributor in issue_coordinators %}
+              <tr>
+                <td>
+                  {% if contributor.status != "active" and contributor.status != "revoked" %}
+                    <input
+                      type="checkbox"
+                      name="contributor_ids"
+                      value="{{ contributor.pk }}"
+                      class="form-check-input coordinator-table-cb"
+                    >
+                  {% endif %}
+                </td>
+                <td>{{ contributor.name|default:"—" }}</td>
+                <td>{{ contributor.email }}</td>
+                <td>
+                  {% if contributor.status == "active" %}
+                    <span class="badge text-bg-success">Active</span>
+                  {% elif contributor.status == "revoked" %}
+                    <span class="badge text-bg-secondary">Revoked</span>
+                  {% elif contributor.status == "expired" %}
+                    <span class="badge text-bg-warning">Expired</span>
+                  {% elif contributor.status == "invited" %}
+                    <span class="badge text-bg-info">Invited</span>
+                  {% else %}
+                    <span class="badge text-bg-light text-dark border">Pending</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if contributor.planka_sync_state == "ok" %}
+                    <span class="badge text-bg-success" title="Board member">&#10003;</span>
+                  {% elif contributor.planka_sync_state == "error" %}
+                    <span class="badge text-bg-danger" title="{{ contributor.planka_last_error }}">Error</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if contributor.invited_at %}
+                    <span title="{{ contributor.invited_at }}">{{ contributor.invited_at|timesince }} ago</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if contributor.planka_sync_state == "error" %}
+                  <button
+                    type="button"
+                    class="btn btn-outline-warning btn-sm"
+                    hx-post="{% url "backend:issue_sync_contributor_planka" selected_issue.pk contributor.pk %}"
+                    hx-target="#issue-coordinators-panel"
+                    hx-swap="outerHTML"
+                  >
+                    Sync Planka
+                  </button>
+                  {% endif %}
+                  {% if contributor.status != "revoked" %}
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    hx-post="{% url "backend:issue_resend_contributor_invite" selected_issue.pk contributor.pk %}"
+                    hx-target="#issue-coordinators-panel"
+                    hx-swap="outerHTML"
+                    hx-confirm="Resend invite to {{ contributor.email }}?"
+                  >
+                    Resend
+                  </button>
+                  {% endif %}
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm"
+                    hx-post="{% url "backend:issue_revoke_contributor" selected_issue.pk contributor.pk %}"
+                    hx-target="#issue-coordinators-panel"
+                    hx-swap="outerHTML"
+                    hx-confirm="Revoke coordinator access for {{ contributor.email }}?"
+                  >
+                    Revoke
+                  </button>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-muted">No coordinators added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-2">
+        <button
+          type="button"
+          class="btn btn-outline-primary btn-sm"
+          id="invite-all-coordinators-btn"
+        >Invite all</button>
+        <button
+          type="submit"
+          class="btn btn-primary btn-sm"
+          id="send-coordinator-invites-btn"
+          disabled
+        >Invite selected</button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const rowsContainer = document.getElementById('coordinator-rows');
+  const addBtn = document.getElementById('add-coordinator-row');
+
+  if (rowsContainer && addBtn) {
+    function updateRemoveBtns() {
+      const rows = rowsContainer.querySelectorAll('.coordinator-row');
+      rows.forEach(row => {
+        row.querySelector('.remove-coordinator-row-btn').disabled = rows.length === 1;
+      });
+    }
+
+    addBtn.addEventListener('click', function () {
+      const rows = rowsContainer.querySelectorAll('.coordinator-row');
+      const idx = rows.length;
+      const tpl = rows[0].cloneNode(true);
+      tpl.dataset.index = idx;
+      tpl.querySelector('input[type="text"]').name = `name_${idx}`;
+      tpl.querySelector('input[type="text"]').value = '';
+      tpl.querySelector('input[type="email"]').name = `email_${idx}`;
+      tpl.querySelector('input[type="email"]').value = '';
+      tpl.querySelector('.remove-coordinator-row-btn').disabled = false;
+      rowsContainer.appendChild(tpl);
+      updateRemoveBtns();
+    });
+
+    rowsContainer.addEventListener('click', function (e) {
+      if (!e.target.classList.contains('remove-coordinator-row-btn')) return;
+      const rows = rowsContainer.querySelectorAll('.coordinator-row');
+      if (rows.length === 1) return;
+      e.target.closest('.coordinator-row').remove();
+      rowsContainer.querySelectorAll('.coordinator-row').forEach(function (row, i) {
+        row.dataset.index = i;
+        row.querySelector('input[type="text"]').name = `name_${i}`;
+        row.querySelector('input[type="email"]').name = `email_${i}`;
+      });
+      updateRemoveBtns();
+    });
+  }
+
+  const selectAllCb = document.getElementById('coordinator-select-all-table');
+  const sendBtn = document.getElementById('send-coordinator-invites-btn');
+
+  function updateSendBtn() {
+    if (!sendBtn) return;
+    const anyChecked = document.querySelectorAll('.coordinator-table-cb:checked').length > 0;
+    sendBtn.disabled = !anyChecked;
+  }
+
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function () {
+      document.querySelectorAll('.coordinator-table-cb').forEach(cb => {
+        cb.checked = selectAllCb.checked;
+      });
+      updateSendBtn();
+    });
+  }
+
+  document.querySelectorAll('.coordinator-table-cb').forEach(cb => {
+    cb.addEventListener('change', function () {
+      updateSendBtn();
+      if (!this.checked && selectAllCb) selectAllCb.checked = false;
+    });
+  });
+
+  updateSendBtn();
+
+  const inviteAllBtn = document.getElementById('invite-all-coordinators-btn');
+  if (inviteAllBtn) {
+    inviteAllBtn.addEventListener('click', function () {
+      const checkboxes = document.querySelectorAll('.coordinator-table-cb');
+      checkboxes.forEach(cb => { cb.checked = true; });
+      updateSendBtn();
+      const form = document.getElementById('send-coordinator-invites-form');
+      if (form) htmx.trigger(form, 'submit');
+    });
+  }
+})();
+</script>

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Issue Invitation{% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+
+{% block content %}
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+
+                {% if status == "accepted" %}
+                    <p class="text-uppercase text-secondary fw-semibold mb-2">Invitation</p>
+                    <h1 class="h3 mb-3">Access confirmed</h1>
+                    {% if issue %}
+                        <p class="text-body-secondary mb-4">You now have access to <strong>{{ issue.name }}</strong>.</p>
+                    {% else %}
+                        <p class="text-body-secondary mb-4">{{ status_message }}</p>
+                    {% endif %}
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        {% if is_coordinator %}
+                            <a class="btn btn-primary" href="{% url 'backend:backend_go' %}">Open backend</a>
+                        {% endif %}
+                        {% if planka_base_url %}
+                            <a class="btn {% if is_coordinator %}btn-outline-secondary{% else %}btn-primary{% endif %}" href="{{ planka_base_url }}" rel="noopener noreferrer">Open Planka</a>
+                        {% elif not is_coordinator %}
+                            <a class="btn btn-primary" href="/">Go to home</a>
+                        {% endif %}
+                    </div>
+
+                {% elif status == "unauthenticated" %}
+                    <p class="text-uppercase text-secondary fw-semibold mb-2">Invitation</p>
+                    <h1 class="h3 mb-3">{% if account_exists %}Sign in to accept{% else %}Create an account to accept{% endif %}</h1>
+                    <p class="text-body-secondary mb-1">This invitation was sent to:</p>
+                    <p class="fw-semibold mb-4">{{ invited_email }}</p>
+                    {% if account_exists %}
+                        <p class="text-body-secondary mb-4 small">Sign in with that address to continue.</p>
+                        <a class="btn btn-primary" href="{{ login_url }}">Sign in</a>
+                    {% else %}
+                        <p class="text-body-secondary mb-4 small">Create an account with that address to continue.</p>
+                        <a class="btn btn-primary" href="{{ signup_url }}">Create account</a>
+                    {% endif %}
+
+                {% elif status == "email_mismatch" %}
+                    <div class="mb-3">
+                        <img src="{% static 'images/errors/exclamation-octagon.svg' %}" alt="" width="72" height="72">
+                    </div>
+                    <p class="text-uppercase text-secondary fw-semibold mb-2">Wrong account</p>
+                    <h1 class="h3 mb-3">Sign in with the invited email</h1>
+                    <p class="text-body-secondary mb-4">{{ status_message }}</p>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <a class="btn btn-primary" href="{% url 'account_login' %}?next={{ request.path }}">Sign in with another account</a>
+                    </div>
+
+                {% elif status == "expired" %}
+                    <div class="mb-3">
+                        <img src="{% static 'images/errors/exclamation-octagon.svg' %}" alt="" width="72" height="72">
+                    </div>
+                    <p class="text-uppercase text-secondary fw-semibold mb-2">Invite expired</p>
+                    <h1 class="h3 mb-3">This invite has expired</h1>
+                    <p class="text-body-secondary mb-4">Please ask for a new invite link.</p>
+
+                {% else %}
+                    <div class="mb-3">
+                        <img src="{% static 'images/errors/emoji-dizzy.svg' %}" alt="" width="72" height="72">
+                    </div>
+                    <p class="text-uppercase text-secondary fw-semibold mb-2">Invalid invite</p>
+                    <h1 class="h3 mb-3">Invite not found</h1>
+                    <p class="text-body-secondary mb-4">{{ status_message }}</p>
+
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

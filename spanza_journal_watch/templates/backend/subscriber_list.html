@@ -1,0 +1,59 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<h1>Mailing List</h1>
+<p class="text-muted">Search and filter subscribers by status (subscribed, bounced, complained).</p>
+
+<form
+  id="subscriber-filter-form"
+  class="row g-2 mb-3"
+  method="get"
+  action="{% url "backend:subscriber_list" %}"
+  hx-get="{% url "backend:subscriber_list" %}"
+  hx-target="#subscriber-list-results"
+  hx-swap="outerHTML"
+>
+  <div class="col-md-4">
+    <input
+      type="text"
+      name="q"
+      class="form-control"
+      placeholder="Search email or upload name"
+      value="{{ subscriber_filters.q }}"
+      hx-trigger="input changed delay:300ms, search"
+      hx-get="{% url "backend:subscriber_list" %}"
+      hx-target="#subscriber-list-results"
+      hx-include="#subscriber-filter-form"
+      hx-swap="outerHTML"
+    >
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="subscribed">
+      <option value="">Subscribed: any</option>
+      <option value="true" {% if subscriber_filters.subscribed == "true" %}selected{% endif %}>Subscribed</option>
+      <option value="false" {% if subscriber_filters.subscribed == "false" %}selected{% endif %}>Unsubscribed</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="bounced">
+      <option value="">Bounced: any</option>
+      <option value="true" {% if subscriber_filters.bounced == "true" %}selected{% endif %}>Bounced</option>
+      <option value="false" {% if subscriber_filters.bounced == "false" %}selected{% endif %}>Not bounced</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="complained">
+      <option value="">Complained: any</option>
+      <option value="true" {% if subscriber_filters.complained == "true" %}selected{% endif %}>Complained</option>
+      <option value="false" {% if subscriber_filters.complained == "false" %}selected{% endif %}>Not complained</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <button type="submit" class="btn btn-outline-primary w-100">Apply filters</button>
+  </div>
+</form>
+
+<div id="subscriber-list-results">
+  {% include "backend/_subscriber_list_results.html" %}
+</div>
+{% endblock content %}

@@ -1,0 +1,151 @@
+<div class="card mb-3" id="planka-project-context-card">
+  <div class="card-header">Planka board context</div>
+  <div class="card-body">
+    {% if planka_context_status %}
+      <div class="alert alert-{{ planka_context_status_level|default:'info' }} py-2">
+        {{ planka_context_status }}
+      </div>
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-start gap-3">
+      <h4 class="mb-1">{{ planka_binding.project_name }}</h4>
+      <button
+        class="btn btn-sm btn-outline-secondary"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#planka-project-name-controls"
+        aria-expanded="false"
+        aria-controls="planka-project-name-controls"
+      >
+        Edit project name
+      </button>
+    </div>
+
+    <div class="collapse mt-3" id="planka-project-name-controls">
+      <form
+        method="post"
+        action="{% url "backend:planka_update_project_name" selected_issue.pk %}"
+        hx-post="{% url "backend:planka_update_project_name" selected_issue.pk %}"
+        hx-target="#planka-project-context-card"
+        hx-swap="outerHTML"
+      >
+        {% csrf_token %}
+        <div class="row g-2 align-items-end">
+          <div class="col-md-8">
+            <label class="form-label mb-1" for="id_context_project_name">Project name</label>
+            <input
+              class="form-control"
+              id="id_context_project_name"
+              name="project_name"
+              type="text"
+              maxlength="128"
+              value="{{ planka_project_name_form.project_name.value|default:planka_binding.project_name }}"
+              required
+            />
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-primary w-100">Save name</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    {% if planka_binding.background_asset %}
+      <img src="{{ planka_binding.background_asset.image.url }}" alt="Current project background" class="img-fluid rounded border mt-3" style="max-height: 180px; object-fit: cover;" />
+      <div class="small text-muted mt-1">Background: {{ planka_binding.background_asset.name }}</div>
+    {% else %}
+      <div class="small text-muted mt-3">No background image configured.</div>
+    {% endif %}
+
+    <button
+      class="btn btn-sm btn-outline-secondary mt-3"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#planka-existing-bg-controls"
+      aria-expanded="false"
+      aria-controls="planka-existing-bg-controls"
+    >
+      Change background image
+    </button>
+
+    <div class="collapse mt-3" id="planka-existing-bg-controls">
+      <form
+        method="post"
+        enctype="multipart/form-data"
+        hx-encoding="multipart/form-data"
+        action="{% url "backend:planka_update_project_background" selected_issue.pk %}"
+        hx-post="{% url "backend:planka_update_project_background" selected_issue.pk %}"
+        hx-target="#planka-project-context-card"
+        hx-swap="outerHTML"
+      >
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="id_existing_background_asset">Background image</label>
+            <select class="form-select" name="background_asset" id="id_existing_background_asset">
+              <option value="">Keep current background</option>
+              {% for asset in planka_background_assets %}
+                <option value="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}" {% if planka_background_form.background_asset.value|stringformat:"s" == asset.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ asset.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="id_existing_background_upload">Upload new image</label>
+            <input class="form-control" type="file" name="background_upload" id="id_existing_background_upload" accept="image/*" />
+            <div class="form-text">Converted to WebP (max 1920×1080).</div>
+          </div>
+          <div class="col-12">
+            <div id="planka-existing-bg-preview-wrap" class="d-none">
+              <div class="small text-muted mb-1">New background preview</div>
+              <img id="planka-existing-bg-preview" src="" alt="New background preview" class="img-fluid rounded border" style="max-height: 160px; object-fit: cover;" />
+            </div>
+          </div>
+          <div class="col-md-3 ms-md-auto">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const select = document.getElementById("id_existing_background_asset");
+    const upload = document.getElementById("id_existing_background_upload");
+    const preview = document.getElementById("planka-existing-bg-preview");
+    const wrap = document.getElementById("planka-existing-bg-preview-wrap");
+    if (!select || !upload || !preview || !wrap) return;
+
+    const show = (url) => {
+      if (!url) {
+        preview.src = "";
+        wrap.classList.add("d-none");
+        return;
+      }
+      preview.src = url;
+      wrap.classList.remove("d-none");
+    };
+
+    select.addEventListener("change", () => {
+      const option = select.options[select.selectedIndex];
+      const url = option ? option.getAttribute("data-preview-url") : "";
+      if (url) upload.value = "";
+      show(url || "");
+    });
+
+    upload.addEventListener("change", () => {
+      const file = upload.files && upload.files[0];
+      if (!file) {
+        show("");
+        return;
+      }
+      select.value = "";
+      const reader = new FileReader();
+      reader.onload = (event) => show(event.target?.result || "");
+      reader.readAsDataURL(file);
+    });
+  })();
+</script>

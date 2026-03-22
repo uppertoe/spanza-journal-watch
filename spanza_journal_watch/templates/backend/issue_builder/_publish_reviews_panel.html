@@ -1,0 +1,87 @@
+<div id="publish-reviews-panel">
+{% if selected_issue %}
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Reviews</span>
+      <div class="d-flex gap-2 align-items-center">
+        {% if selected_issue.active %}
+          <span class="badge text-bg-success">Issue live</span>
+        {% else %}
+          <span class="badge text-bg-secondary">Issue draft</span>
+        {% endif %}
+        <form method="post" action="{% url "backend:publish_issue_bundle" selected_issue.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-success btn-sm"
+            onclick="return confirm('Publish this issue and all reviews?')">
+            Publish all
+          </button>
+        </form>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      {% if review_readiness %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="min-width:20rem">Review</th>
+                <th>Author</th>
+                <th>Readiness</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in review_readiness %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ item.review.article.get_title }}</div>
+                    {% if item.review.article.get_subtitle %}
+                      <div class="text-muted small">{{ item.review.article.get_subtitle }}</div>
+                    {% endif %}
+                    {% if item.review.is_featured %}<span class="badge text-bg-warning ms-0 mt-1">Featured</span>{% endif %}
+                  </td>
+                  <td class="text-nowrap">{{ item.review.author|default:"—" }}</td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-1">
+                      {% for ind in item.indicators %}
+                        {% if ind.ok %}
+                          <span class="badge text-bg-success">{{ ind.label }} ✓</span>
+                        {% else %}
+                          <span class="badge text-bg-danger">{{ ind.label }} ✗</span>
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td class="text-nowrap">
+                    {% if item.review.active %}
+                      <span class="badge text-bg-success">Live</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">Draft</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end text-nowrap">
+                    <form method="post"
+                      action="{% url "backend:toggle_review_active" item.review.pk %}"
+                      hx-post="{% url "backend:toggle_review_active" item.review.pk %}"
+                      hx-target="#publish-reviews-panel"
+                      hx-swap="outerHTML"
+                    >
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm {% if item.review.active %}btn-outline-secondary{% else %}btn-outline-success{% endif %}">
+                        {% if item.review.active %}Unpublish{% else %}Publish{% endif %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3 text-muted">No reviews added yet. Add reviews on the Edit Reviews tab.</div>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+</div>

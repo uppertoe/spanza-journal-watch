@@ -1,0 +1,74 @@
+# General
+# ------------------------------------------------------------------------------
+DJANGO_SETTINGS_MODULE=config.settings.production
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(64))"
+DJANGO_SECRET_KEY=change-me-generate-a-strong-random-key
+# Obfuscate the Django admin URL
+DJANGO_ADMIN_URL=change-me-random-path/
+DJANGO_ALLOWED_HOSTS=[".yourdomain.com"]
+
+# Security
+# ------------------------------------------------------------------------------
+# Set to True if Django is handling TLS directly; set False if TLS is terminated
+# upstream by a reverse proxy (nginx, AWS ALB, Caddy, etc.)
+DJANGO_SECURE_SSL_REDIRECT=False
+
+# Email
+# ------------------------------------------------------------------------------
+DJANGO_SERVER_EMAIL="Journal Watch <noreply@yourdomain.com>"
+DJANGO_DEFAULT_FROM_EMAIL="Journal Watch <noreply@yourdomain.com>"
+
+# Anymail (Amazon SES)
+# ------------------------------------------------------------------------------
+# Signing secret configured in the SES webhook/SNS subscription
+WEBHOOK_SECRET=change-me-ses-webhook-signing-secret
+DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX=email
+
+# AWS
+# ------------------------------------------------------------------------------
+DJANGO_AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+DJANGO_AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+DJANGO_AWS_STORAGE_BUCKET_NAME=your-bucket-name
+DJANGO_AWS_S3_REGION_NAME=ap-southeast-2
+DJANGO_AWS_DEFAULT_REGION=ap-southeast-2
+
+# django-allauth
+# ------------------------------------------------------------------------------
+DJANGO_ACCOUNT_ALLOW_REGISTRATION=True
+
+# Gunicorn
+# ------------------------------------------------------------------------------
+WEB_CONCURRENCY=3
+
+# Sentry (optional — leave blank to disable)
+# ------------------------------------------------------------------------------
+SENTRY_DSN=
+SENTRY_TRACES_SAMPLE_RATE=0.1
+SENTRY_PROFILES_SAMPLE_RATE=0.1
+
+# Redis
+# ------------------------------------------------------------------------------
+REDIS_URL=redis://redis:6379/0
+
+# Flower (Celery monitor)
+# ------------------------------------------------------------------------------
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(24))"
+CELERY_FLOWER_USER=change-me-flower-user
+CELERY_FLOWER_PASSWORD=change-me-flower-password
+
+# Planka integration
+# ------------------------------------------------------------------------------
+# Public URL where Planka is reachable (used for links in the Django UI)
+PLANKA_EXTERNAL_URL=https://planka.yourdomain.com
+# Must match DEFAULT_ADMIN_EMAIL in .envs/.production/.planka
+PLANKA_ADMIN_EMAIL=admin@yourdomain.com
+# Direct connection to Planka's Postgres — used only by setup_planka_api_key management command
+PLANKA_DB_URL=postgresql://postgres@planka_postgres/planka
+
+# OIDC (Django as OAuth2/OIDC provider for Planka)
+# ------------------------------------------------------------------------------
+# Base64-encoded RSA private key. Generate with:
+#   openssl genrsa 4096 | base64 -w 0
+OIDC_RSA_PRIVATE_KEY=
+# Issuer URL — must be publicly reachable by Planka
+OIDC_ISS_ENDPOINT=https://yourdomain.com/o

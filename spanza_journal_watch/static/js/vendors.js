@@ -1,3 +1,5 @@
 import '@popperjs/core';
-import 'bootstrap';
+import * as bootstrap from 'bootstrap';
 import 'htmx.org';
+
+window.bootstrap = bootstrap;

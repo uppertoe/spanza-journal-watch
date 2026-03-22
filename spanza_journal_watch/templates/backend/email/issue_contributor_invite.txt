@@ -1,0 +1,10 @@
+Hello,
+
+You have been invited to contribute to the issue "{{ issue.name }}" on Journal Watch.
+
+Accept your invitation:
+{{ accept_url }}
+
+This invite link expires on {{ expires_at|date:"j M Y, H:i T" }}.
+
+If you did not expect this invitation, you can ignore this email.

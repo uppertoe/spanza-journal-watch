@@ -1,0 +1,198 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Watched Journals</h1>
+  <a class="btn btn-outline-secondary" href="{% url "backend:article_intake" %}">Back to Article Intake</a>
+</div>
+<p class="text-muted mb-3">Add journals to watch in PubMed. Retrieval uses ISSN where provided, otherwise the journal name in a PubMed journal query.</p>
+
+<div class="card mb-3">
+  <div class="card-header">Find journal from NIH catalog</div>
+  <div class="card-body">
+    <div class="row g-2 align-items-start">
+      <div class="col-12 col-lg-8">
+        <label class="form-label" for="journal-search-query">Journal name</label>
+        <input type="text" id="journal-search-query" class="form-control" placeholder="e.g. Anesthesiology" />
+        <div class="form-text">Search NIH/NLM catalog and apply the result to the form below.</div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label d-none d-lg-block">&nbsp;</label>
+        <button type="button" id="journal-search-button" class="btn btn-outline-primary w-100 mt-lg-0 mt-1" data-search-url="{% url "backend:watched_journal_search" %}">Search journals</button>
+      </div>
+    </div>
+    <div id="journal-search-status" class="small text-muted mt-2"></div>
+    <div id="journal-search-results" class="list-group mt-2"></div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">Add watched journal</div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12">{{ watched_journal_form.name|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.issn_print|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.issn_electronic|as_crispy_field }}</div>
+      <div class="col-12">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-12"><button type="submit" class="btn btn-primary">Add watched journal</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Current watched journals</div>
+  <div class="card-body">
+    {% if watched_journals %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>ISSN</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for watched in watched_journals %}
+              <tr>
+                <td>{{ watched.name }}</td>
+                <td>
+                  {% if watched.issn_print %}<div>Print: {{ watched.issn_print }}</div>{% endif %}
+                  {% if watched.issn_electronic %}<div>Electronic: {{ watched.issn_electronic }}</div>{% endif %}
+                  {% if not watched.issn_print and not watched.issn_electronic %}-{% endif %}
+                </td>
+                <td>
+                  {% if watched.active %}
+                    <span class="badge text-bg-success">Active</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Inactive</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{% url "backend:watched_journal_toggle_active" watched.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Toggle active</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-info mb-0">No watched journals yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block inline_javascript %}
+  {{ block.super }}
+  <script>
+    (function () {
+      const queryInput = document.getElementById("journal-search-query");
+      const searchButton = document.getElementById("journal-search-button");
+      const status = document.getElementById("journal-search-status");
+      const resultsContainer = document.getElementById("journal-search-results");
+
+      const nameInput = document.getElementById("id_name");
+      const printIssnInput = document.getElementById("id_issn_print");
+      const electronicIssnInput = document.getElementById("id_issn_electronic");
+
+      if (!queryInput || !searchButton || !resultsContainer || !nameInput || !printIssnInput || !electronicIssnInput) {
+        return;
+      }
+
+      function setStatus(message, isError) {
+        status.textContent = message || "";
+        status.className = isError ? "small text-danger mt-2" : "small text-muted mt-2";
+      }
+
+      function applyJournal(result) {
+        nameInput.value = result.name || "";
+        printIssnInput.value = result.issn_print || "";
+        electronicIssnInput.value = result.issn_electronic || "";
+        setStatus("Journal details copied into the form.", false);
+      }
+
+      function renderResults(results) {
+        resultsContainer.innerHTML = "";
+
+        if (!results.length) {
+          setStatus("No journals found.", false);
+          return;
+        }
+
+        setStatus(`Found ${results.length} journal${results.length > 1 ? "s" : ""}.`, false);
+        const q = (queryInput.value || "").trim().toLowerCase();
+        results.sort((a, b) => {
+          const aName = (a.name || "").toLowerCase();
+          const bName = (b.name || "").toLowerCase();
+          if (aName === q && bName !== q) return -1;
+          if (bName === q && aName !== q) return 1;
+          const aStarts = aName.startsWith(q);
+          const bStarts = bName.startsWith(q);
+          if (aStarts && !bStarts) return -1;
+          if (bStarts && !aStarts) return 1;
+          return aName.localeCompare(bName);
+        });
+        results.forEach((result) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "list-group-item list-group-item-action";
+          const name = result.name || "Unknown";
+          const medline = result.medline_ta ? ` (${result.medline_ta})` : "";
+          const printIssn = result.issn_print ? `Print ISSN: ${result.issn_print}` : "Print ISSN: -";
+          const eIssn = result.issn_electronic ? `Electronic ISSN: ${result.issn_electronic}` : "Electronic ISSN: -";
+          button.textContent = `${name}${medline} · ${printIssn} · ${eIssn}`;
+          button.addEventListener("click", function () {
+            applyJournal(result);
+          });
+          resultsContainer.appendChild(button);
+        });
+      }
+
+      async function searchJournals() {
+        const q = (queryInput.value || "").trim();
+        resultsContainer.innerHTML = "";
+        if (q.length < 3) {
+          setStatus("Enter at least 3 characters.", true);
+          return;
+        }
+
+        const endpoint = searchButton.dataset.searchUrl;
+        setStatus("Searching...", false);
+
+        try {
+          const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`, {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin",
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            setStatus("Search failed.", true);
+            return;
+          }
+          if (payload.error) {
+            setStatus(payload.error, true);
+            return;
+          }
+          renderResults(payload.results || []);
+        } catch (error) {
+          setStatus("Search failed. Please try again.", true);
+        }
+      }
+
+      searchButton.addEventListener("click", searchJournals);
+      queryInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          searchJournals();
+        }
+      });
+    })();
+  </script>
+{% endblock inline_javascript %}

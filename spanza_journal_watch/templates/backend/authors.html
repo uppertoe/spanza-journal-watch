@@ -1,0 +1,109 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url "backend:backend_settings" %}" class="text-muted small text-decoration-none">← Settings</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Authors</h1>
+</div>
+<p class="text-muted">Reviewer author profiles. Setting an email address here lets the system automatically link contributors when they accept an invite.</p>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        {% if editing %}Edit author{% else %}Add author{% endif %}
+      </div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data"
+              action="{% if editing %}{% url "backend:author_edit" editing.pk %}{% else %}{% url "backend:authors_list" %}{% endif %}">
+          {% csrf_token %}
+          {{ form|crispy }}
+          <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn btn-primary">
+              {% if editing %}Save changes{% else %}Add author{% endif %}
+            </button>
+            {% if editing %}
+              <a href="{% url "backend:authors_list" %}" class="btn btn-outline-secondary">Cancel</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Authors</span>
+      </div>
+      <div class="card-body border-bottom pb-3">
+        <form method="get" class="d-flex gap-2">
+          <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search by name or email…" style="max-width:280px">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
+          {% if q %}<a href="{% url "backend:authors_list" %}" class="btn btn-sm btn-outline-secondary">Clear</a>{% endif %}
+        </form>
+      </div>
+      <div class="card-body p-0">
+        {% if authors %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Affiliations</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for author in authors %}
+                  <tr {% if editing and editing.pk == author.pk %}class="table-primary"{% endif %}>
+                    <td>
+                      {{ author.title }} {{ author.name }}
+                      {% if author.anonymous %}<span class="badge text-bg-secondary ms-1">Anonymous</span>{% endif %}
+                    </td>
+                    <td>
+                      {% if author.email %}
+                        <span class="text-muted small font-monospace">{{ author.email }}</span>
+                      {% else %}
+                        <span class="text-warning small">No email</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% for hs in author.health_services.all %}
+                        <span class="badge text-bg-light text-dark border">{{ hs.name }}</span>
+                      {% empty %}
+                        <span class="text-muted small">—</span>
+                      {% endfor %}
+                    </td>
+                    <td>
+                      <a href="{% url "backend:author_edit" author.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if authors.has_other_pages %}
+            <div class="p-3 d-flex gap-2 align-items-center">
+              {% if authors.has_previous %}
+                <a href="?q={{ q }}&page={{ authors.previous_page_number }}" class="btn btn-sm btn-outline-secondary">&laquo; Previous</a>
+              {% endif %}
+              <span class="text-muted small">Page {{ authors.number }} of {{ authors.paginator.num_pages }}</span>
+              {% if authors.has_next %}
+                <a href="?q={{ q }}&page={{ authors.next_page_number }}" class="btn btn-sm btn-outline-secondary">Next &raquo;</a>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="p-3 text-muted">No authors found{% if q %} matching "{{ q }}"{% endif %}.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

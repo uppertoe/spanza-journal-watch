@@ -1,0 +1,10 @@
+<div
+  id="setup-result-{{ command }}"
+  class="alert {% if success %}alert-success{% else %}alert-danger{% endif %} mb-0 mt-3"
+  role="alert"
+>
+  <div class="fw-semibold mb-2">
+    {% if success %}Command completed successfully{% else %}Command failed{% endif %}
+  </div>
+  <pre class="mb-0 small" style="white-space:pre-wrap; word-break:break-word;">{{ output }}</pre>
+</div>

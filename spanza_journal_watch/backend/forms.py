@@ -1,15 +1,17 @@
 import csv
 import datetime
 import io
+from pathlib import Path
 
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils.safestring import mark_safe
 
 from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
-from ..submissions.models import Article, Author, Issue, Journal, Review
-from .models import InboundEmail, SubscriberCSV
+from ..submissions.models import Article, Author, HealthService, Issue, Journal, Review
+from .models import InboundEmail, IssueContributor, PlankaBoardBackgroundAsset, SubscriberCSV, WatchedJournal
 
 
 def csv_size(file):
@@ -19,10 +21,86 @@ def csv_size(file):
 
 
 DELIMITERS = [",", ";", "\t", " "]
+EMAIL_HEADER_CANDIDATES = {"email", "email address", "e-mail", "e-mail address", "mail"}
+
+
+class PreviewTable:
+    def __init__(self, fieldnames, rows):
+        self.fieldnames = fieldnames
+        self._rows = rows
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+def _normalize_cell(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _looks_like_email_header(value):
+    normalized = (value or "").strip().lower()
+    return normalized in EMAIL_HEADER_CANDIDATES
+
+
+def _build_preview_from_rows(rows, user_header=None):
+    if not rows:
+        return {"preview": PreviewTable(["Column 1"], []), "has_header": False}
+
+    first_row = rows[0]
+    guessed_header = any(_looks_like_email_header(value) for value in first_row) and all(
+        "@" not in (value or "") for value in first_row
+    )
+
+    has_header = guessed_header if user_header is None else bool(user_header)
+
+    max_cols = max(len(row) for row in rows) if rows else 1
+    padded_rows = [row + [""] * (max_cols - len(row)) for row in rows]
+
+    if has_header:
+        fieldnames = [value or f"Column {idx + 1}" for idx, value in enumerate(padded_rows[0])]
+        data_rows = padded_rows[1:]
+    else:
+        fieldnames = [f"Column {idx + 1}" for idx in range(max_cols)]
+        data_rows = padded_rows
+
+    dict_rows = [dict(zip(fieldnames, row, strict=False)) for row in data_rows]
+    return {"preview": PreviewTable(fieldnames, dict_rows), "has_header": has_header}
+
+
+def _peek_xlsx(file, user_header=None):
+    try:
+        from openpyxl import load_workbook
+    except Exception as error:
+        raise ValidationError({"file": f"XLSX support requires openpyxl: {error}"})
+
+    try:
+        file.seek(0)
+        workbook = load_workbook(filename=file, read_only=True, data_only=True)
+    except Exception as error:
+        raise ValidationError({"file": f"Not a valid XLSX file: {error}"})
+
+    worksheet = workbook.active
+    rows = []
+    for raw_row in worksheet.iter_rows(min_row=1, max_row=25, values_only=True):
+        row = [_normalize_cell(value) for value in raw_row]
+        while row and row[-1] == "":
+            row.pop()
+        if not row:
+            continue
+        rows.append(row)
+
+    return _build_preview_from_rows(rows, user_header=user_header)
 
 
 def peek_csv(file, user_header=None):
+    filename = Path(getattr(file, "name", "")).suffix.lower()
+    if filename == ".xlsx":
+        return _peek_xlsx(file, user_header=user_header)
+
     try:
+        file.seek(0)
         decoded_file = file.read(1024).decode("UTF-8-SIG")
     except UnicodeDecodeError as error:
         print(f"Error handling uploaded CSV: {error}")
@@ -57,9 +135,13 @@ def peek_csv(file, user_header=None):
         fieldnames = None  # Allow DictReader to use the first row as fieldnames
 
     io_string = io.StringIO(decoded_file)
-    preview = csv.DictReader(io_string, fieldnames=fieldnames, dialect=dialect)
+    preview_rows = list(csv.DictReader(io_string, fieldnames=fieldnames, dialect=dialect))
+    file.seek(0)
 
-    return {"preview": preview, "has_header": has_header}
+    return {
+        "preview": PreviewTable(preview_rows[0].keys() if preview_rows else fieldnames or [], preview_rows),
+        "has_header": has_header,
+    }
 
 
 class SubscriberCSVForm(forms.ModelForm):
@@ -95,7 +177,35 @@ class NewsletterTestSendForm(forms.Form):
         return self.cleaned_data["email"].lower().strip()
 
 
+class NewsletterEditForm(forms.ModelForm):
+    use_issue_image = forms.BooleanField(
+        required=False,
+        label="Use issue cover image",
+        help_text=(
+            "Copy the issue's cover image and convert it to greyscale for the newsletter header. "
+            "If you also upload a custom image below, the uploaded file takes precedence."
+        ),
+    )
+
+    class Meta:
+        model = Newsletter
+        fields = ["subject", "content_heading", "content", "non_featured_review_count", "header_image"]
+        labels = {
+            "content_heading": "Introductory sentence",
+            "content": "Email body",
+        }
+
+
 class NewsletterCreateForm(forms.ModelForm):
+    use_issue_image = forms.BooleanField(
+        required=False,
+        label="Use issue cover image",
+        help_text=(
+            "Copy the issue's cover image and convert it to greyscale for the newsletter header. "
+            "If you also upload a custom image below, the uploaded file takes precedence."
+        ),
+    )
+
     class Meta:
         model = Newsletter
         fields = [
@@ -103,6 +213,7 @@ class NewsletterCreateForm(forms.ModelForm):
             "issue",
             "content_heading",
             "content",
+            "use_issue_image",
             "header_image",
             "non_featured_review_count",
             "ready_to_send",
@@ -188,7 +299,58 @@ class ArticleForm(forms.ModelForm):
 class ReviewForm(forms.ModelForm):
     class Meta:
         model = Review
-        fields = ["author", "body", "publish_date", "is_featured", "feature_image"]
+        fields = ["author", "body", "is_featured", "feature_image"]
+
+
+_MONTHS = [
+    (1, "January"),
+    (2, "February"),
+    (3, "March"),
+    (4, "April"),
+    (5, "May"),
+    (6, "June"),
+    (7, "July"),
+    (8, "August"),
+    (9, "September"),
+    (10, "October"),
+    (11, "November"),
+    (12, "December"),
+]
+
+
+class MonthYearWidget(forms.MultiWidget):
+    def __init__(self, attrs=None):
+        current_year = datetime.date.today().year
+        year_choices = [(y, str(y)) for y in range(current_year - 2, current_year + 6)]
+        widgets = [
+            forms.Select(choices=[(None, "Month")] + _MONTHS),
+            forms.Select(choices=[(None, "Year")] + year_choices),
+        ]
+        super().__init__(widgets, attrs)
+
+    def decompress(self, value):
+        if value:
+            return [value.month, value.year]
+        return [None, None]
+
+
+class MonthYearField(forms.MultiValueField):
+    widget = MonthYearWidget
+
+    def __init__(self, *args, **kwargs):
+        fields = (
+            forms.IntegerField(min_value=1, max_value=12, required=False),
+            forms.IntegerField(min_value=2000, max_value=2100, required=False),
+        )
+        kwargs.setdefault("require_all_fields", False)
+        super().__init__(fields=fields, *args, **kwargs)
+
+    def compress(self, data_list):
+        month = data_list[0] if data_list and len(data_list) > 0 else None
+        year = data_list[1] if data_list and len(data_list) > 1 else None
+        if month and year:
+            return datetime.date(int(year), int(month), 1)
+        return None
 
 
 class IssueForm(forms.ModelForm):
@@ -198,16 +360,22 @@ class IssueForm(forms.ModelForm):
 
 
 class IssueBuilderIssueForm(forms.ModelForm):
-    date = forms.DateField(
+    date = MonthYearField(
         required=False,
-        input_formats=["%Y-%m", "%Y-%m-%d"],
-        widget=forms.DateInput(attrs={"type": "month"}),
-        help_text="Select issue month (saved as first day of month).",
+        label="Issue month",
+        help_text="Select the month and year of this issue.",
+    )
+    image = forms.ImageField(
+        required=False,
+        help_text=mark_safe(
+            "Cover image for this issue. Need inspiration? Try"
+            ' <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a>.'
+        ),
     )
 
     class Meta:
         model = Issue
-        fields = ["name", "date", "body"]
+        fields = ["name", "date", "body", "image"]
 
     def clean_date(self):
         value = self.cleaned_data.get("date")
@@ -246,11 +414,13 @@ class IssueBuilderReviewForm(forms.Form):
     article_tags_string = forms.CharField(required=False)
 
     author_mode = forms.ChoiceField(choices=AUTHOR_MODE_CHOICES, initial=AUTHOR_MODE_EXISTING, required=False)
-    author = forms.ModelChoiceField(queryset=Author.objects.order_by("name"), required=False)
+    author = forms.ModelChoiceField(
+        queryset=Author.objects.prefetch_related("health_services").order_by("name"),
+        required=False,
+    )
     new_author_title = forms.CharField(required=False, initial="Dr")
     new_author_name = forms.CharField(required=False)
-    body = forms.CharField(widget=forms.Textarea(attrs={"rows": 6}), required=True)
-    publish_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    body = forms.CharField(widget=forms.Textarea(attrs={"rows": 20, "style": "resize:vertical;"}), required=True)
     is_featured = forms.BooleanField(required=False)
     feature_image = forms.ImageField(required=False)
 
@@ -265,7 +435,6 @@ class IssueBuilderReviewForm(forms.Form):
             self.fields["author_mode"].initial = self.AUTHOR_MODE_EXISTING
             self.fields["author"].initial = review.author
             self.fields["body"].initial = review.body
-            self.fields["publish_date"].initial = review.publish_date
             self.fields["is_featured"].initial = review.is_featured
 
     @property
@@ -337,7 +506,6 @@ class IssueBuilderReviewForm(forms.Form):
         review.article = article
         review.author = author
         review.body = self.cleaned_data["body"]
-        review.publish_date = self.cleaned_data.get("publish_date")
         review.is_featured = self.cleaned_data.get("is_featured", False)
         if self.cleaned_data.get("feature_image"):
             review.feature_image = self.cleaned_data["feature_image"]
@@ -345,3 +513,179 @@ class IssueBuilderReviewForm(forms.Form):
 
         self.issue.reviews.add(review)
         return review
+
+
+class IssueContributorInviteForm(forms.Form):
+    name = forms.CharField(max_length=255, help_text="Reviewer's display name.")
+    email = forms.EmailField(help_text="Invite link will be sent to this address.")
+    role = forms.ChoiceField(choices=IssueContributor.Role.choices, initial=IssueContributor.Role.REVIEWER)
+
+    def clean_email(self):
+        return (self.cleaned_data["email"] or "").strip().lower()
+
+
+class PlankaProjectSetupForm(forms.Form):
+    project_name = forms.CharField(max_length=128)
+    background_asset = forms.ModelChoiceField(
+        queryset=PlankaBoardBackgroundAsset.objects.none(),
+        required=False,
+        empty_label="No background image",
+        help_text="Choose a previously uploaded background image.",
+    )
+    background_upload = forms.ImageField(
+        required=False,
+        help_text="Or upload a new image (will be converted to WebP, max 1920×1080).",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["background_asset"].queryset = PlankaBoardBackgroundAsset.objects.order_by("name")
+
+    def clean_project_name(self):
+        return self.cleaned_data["project_name"].strip()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        background_asset = cleaned_data.get("background_asset")
+        background_upload = cleaned_data.get("background_upload")
+
+        if background_asset and background_upload:
+            self.add_error("background_upload", "Choose either an existing image or upload a new one, not both.")
+
+        return cleaned_data
+
+
+class PlankaProjectBackgroundForm(forms.Form):
+    background_asset = forms.ModelChoiceField(
+        queryset=PlankaBoardBackgroundAsset.objects.none(),
+        required=False,
+        empty_label="Keep current background",
+        help_text="Choose a previously uploaded background image.",
+    )
+    background_upload = forms.ImageField(
+        required=False,
+        help_text="Or upload a new image (will be converted to WebP, max 1920×1080).",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["background_asset"].queryset = PlankaBoardBackgroundAsset.objects.order_by("name")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        background_asset = cleaned_data.get("background_asset")
+        background_upload = cleaned_data.get("background_upload")
+
+        if background_asset and background_upload:
+            self.add_error("background_upload", "Choose either an existing image or upload a new one, not both.")
+
+        return cleaned_data
+
+
+class PlankaProjectNameForm(forms.Form):
+    project_name = forms.CharField(max_length=128)
+
+    def clean_project_name(self):
+        return (self.cleaned_data.get("project_name") or "").strip()
+
+
+class PubmedApiKeyForm(forms.Form):
+    api_key = forms.CharField(
+        required=True,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Create an NCBI API key and paste it here.",
+    )
+
+    def clean_api_key(self):
+        value = (self.cleaned_data.get("api_key") or "").strip()
+        if not value:
+            raise ValidationError("API key is required.")
+        return value
+
+
+class ArticleIntakeFetchForm(forms.Form):
+    issue = forms.ModelChoiceField(queryset=Issue.objects.order_by("-date", "-pk"), required=False)
+    watched_journals = forms.ModelMultipleChoiceField(
+        queryset=WatchedJournal.objects.filter(active=True).order_by("name"),
+        required=True,
+        widget=forms.CheckboxSelectMultiple(),
+    )
+    from_month = forms.DateField(
+        input_formats=["%Y-%m", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m", attrs={"type": "month"}),
+        help_text="Select year and month.",
+    )
+    to_month = forms.DateField(
+        input_formats=["%Y-%m", "%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m", attrs={"type": "month"}),
+        help_text="Select year and month.",
+    )
+
+    def clean_from_month(self):
+        value = self.cleaned_data.get("from_month")
+        return value.replace(day=1) if value else value
+
+    def clean_to_month(self):
+        value = self.cleaned_data.get("to_month")
+        return value.replace(day=1) if value else value
+
+    def clean(self):
+        cleaned_data = super().clean()
+        from_month = cleaned_data.get("from_month")
+        to_month = cleaned_data.get("to_month")
+        if from_month and to_month and from_month > to_month:
+            self.add_error("to_month", "End month must be after or equal to start month.")
+
+        if from_month and to_month:
+            month_span = (to_month.year - from_month.year) * 12 + (to_month.month - from_month.month) + 1
+            if month_span > 12:
+                self.add_error("to_month", "Date range cannot exceed 12 months.")
+        return cleaned_data
+
+
+class ArticleIntakeAssignIssueForm(forms.Form):
+    issue = forms.ModelChoiceField(queryset=Issue.objects.order_by("-date", "-pk"), required=False)
+
+
+class WatchedJournalForm(forms.ModelForm):
+    class Meta:
+        model = WatchedJournal
+        fields = ["name", "issn_print", "issn_electronic", "active"]
+
+    def clean_name(self):
+        return (self.cleaned_data.get("name") or "").strip()
+
+    def clean_issn_print(self):
+        return (self.cleaned_data.get("issn_print") or "").strip()
+
+    def clean_issn_electronic(self):
+        return (self.cleaned_data.get("issn_electronic") or "").strip()
+
+
+class HealthServiceForm(forms.ModelForm):
+    class Meta:
+        model = HealthService
+        fields = ["name", "url", "logo", "logo_authorised"]
+        labels = {
+            "logo_authorised": "Logo use authorised",
+        }
+        help_texts = {
+            "logo_authorised": "Tick if you have permission to display this organisation's logo.",
+        }
+
+    def clean_name(self):
+        return (self.cleaned_data.get("name") or "").strip()
+
+
+class AuthorForm(forms.ModelForm):
+    class Meta:
+        model = Author
+        fields = ["title", "name", "email", "health_services", "anonymous"]
+        help_texts = {
+            "email": "Used to auto-link this author to invited contributors.",
+            "health_services": "Hold Ctrl/Cmd to select multiple.",
+        }
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower() or None
+        return email

@@ -1,0 +1,405 @@
+{% load crispy_forms_tags %}
+
+<div
+  class="card"
+  id="planka-sync-panel"
+  data-planka-disconnected="{% if planka_disconnected %}true{% else %}false{% endif %}"
+  {% if selected_issue and planka_binding %}data-planka-refresh-url="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}"{% endif %}
+>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Planka integration</span>
+    {% if planka_binding %}
+      <span class="text-muted small">{{ planka_binding.project_name }}</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if planka_panel_status %}
+      <div class="alert alert-{{ planka_panel_status_level|default:'info' }} py-2">
+        {{ planka_panel_status }}
+      </div>
+    {% endif %}
+
+    {% if not planka_credential %}
+      <div class="alert alert-light border">
+        No DB-backed Planka API key found yet. Use the credential form above on this page first.
+      </div>
+    {% endif %}
+
+    {% if not planka_binding %}
+      <p class="text-muted">
+        Link this issue to a new Planka project. This creates:
+        <strong>Reviews</strong> board (Articles, Candidates, Under review, Publish ready)
+        and <strong>Instructions</strong> board (Reviewers, Editors, Administrators) prefilled from local markdown templates.
+      </p>
+      <form
+        method="post"
+        enctype="multipart/form-data"
+        hx-encoding="multipart/form-data"
+        hx-post="{% url "backend:planka_setup_issue_project" selected_issue.pk %}"
+        hx-target="#planka-sync-panel"
+        hx-swap="outerHTML"
+      >
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            {{ planka_setup_form.project_name|as_crispy_field }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="id_background_asset">Background image (optional)</label>
+            <select class="form-select" name="background_asset" id="id_background_asset">
+              <option value="">No background image</option>
+              {% for asset in planka_background_assets %}
+                <option value="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}" {% if planka_setup_form.background_asset.value|stringformat:"s" == asset.pk|stringformat:"s" %}selected{% endif %}>
+                  {{ asset.name }}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Choose from uploaded assets or upload a new image below.</div>
+          </div>
+          <div class="col-12">
+            {{ planka_setup_form.background_upload|as_crispy_field }}
+          </div>
+          <div class="col-12">
+            <div id="planka-bg-preview-wrap" class="d-none">
+              <div class="small text-muted mb-1">Background preview</div>
+              <img id="planka-bg-preview" src="" alt="Selected background preview" class="img-fluid rounded border" style="max-height: 220px; object-fit: cover;" />
+            </div>
+          </div>
+          {% if planka_background_assets %}
+            <div class="col-12">
+              <div class="small text-muted mb-1">Available uploaded backgrounds</div>
+              <div class="d-flex flex-wrap gap-2">
+                {% for asset in planka_background_assets %}
+                  <button
+                    type="button"
+                    class="btn btn-light border p-1 js-bg-pick"
+                    data-asset-id="{{ asset.pk }}"
+                    data-preview-url="{{ asset.image.url }}"
+                    title="{{ asset.name }}"
+                  >
+                    <img src="{{ asset.image.url }}" alt="{{ asset.name }}" style="width: 84px; height: 56px; object-fit: cover;" class="rounded" />
+                  </button>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          <div class="col-md-4 ms-md-auto">
+            <button type="submit" class="btn btn-primary w-100">Create + link project</button>
+          </div>
+        </div>
+      </form>
+      <script>
+        (() => {
+          const select = document.getElementById("id_background_asset");
+          const upload = document.getElementById("id_background_upload");
+          const preview = document.getElementById("planka-bg-preview");
+          const previewWrap = document.getElementById("planka-bg-preview-wrap");
+          if (!select || !upload || !preview || !previewWrap) return;
+
+          const showPreview = (url) => {
+            if (!url) {
+              preview.src = "";
+              previewWrap.classList.add("d-none");
+              return;
+            }
+            preview.src = url;
+            previewWrap.classList.remove("d-none");
+          };
+
+          const updateFromSelect = () => {
+            const opt = select.options[select.selectedIndex];
+            const url = opt ? opt.getAttribute("data-preview-url") : "";
+            if (url) {
+              upload.value = "";
+            }
+            showPreview(url || "");
+          };
+
+          select.addEventListener("change", updateFromSelect);
+
+          upload.addEventListener("change", () => {
+            const file = upload.files && upload.files[0];
+            if (!file) {
+              updateFromSelect();
+              return;
+            }
+            select.value = "";
+            const reader = new FileReader();
+            reader.onload = (event) => showPreview(event.target?.result || "");
+            reader.readAsDataURL(file);
+          });
+
+          document.querySelectorAll(".js-bg-pick").forEach((button) => {
+            button.addEventListener("click", () => {
+              const id = button.getAttribute("data-asset-id");
+              const url = button.getAttribute("data-preview-url") || "";
+              if (id) {
+                select.value = id;
+                upload.value = "";
+              }
+              showPreview(url);
+            });
+          });
+
+          updateFromSelect();
+        })();
+      </script>
+    {% else %}
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <ul class="nav nav-tabs mb-2">
+            <li class="nav-item">
+              <a
+                class="nav-link {% if planka_card_scope != 'all' %}active{% endif %}"
+                href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&scope=publish"
+                hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope=publish"
+                hx-target="#planka-sync-panel"
+                hx-swap="outerHTML"
+              >
+                Publish bucket
+                <span class="badge text-bg-secondary ms-1">{{ planka_scope_counts.publish|default:0 }}</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a
+                class="nav-link {% if planka_card_scope == 'all' %}active{% endif %}"
+                href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&scope=all"
+                hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope=all"
+                hx-target="#planka-sync-panel"
+                hx-swap="outerHTML"
+              >
+                All cards
+                <span class="badge text-bg-secondary ms-1">{{ planka_scope_counts.all|default:0 }}</span>
+              </a>
+            </li>
+          </ul>
+          {% if planka_publish_summary %}
+            <div class="text-muted small mt-1">
+              Cards shown: {{ planka_publish_summary.total }} total ·
+              {{ planka_publish_summary.valid }} ready ·
+              {{ planka_publish_summary.missing }} missing required fields ·
+              {{ planka_publish_summary.already_imported }} imported/protected
+            </div>
+          {% endif %}
+        </div>
+        <a
+          class="btn btn-outline-secondary btn-sm"
+          href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}&scope={{ planka_card_scope|default:'publish' }}&refresh=1"
+          hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope={{ planka_card_scope|default:'publish' }}"
+          hx-target="#planka-sync-panel"
+          hx-swap="outerHTML"
+        >
+          Refresh cards
+        </a>
+      </div>
+
+      {% if planka_board_missing %}
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span>Linked Reviews board is missing in Planka. Recreate and remap the board for this issue.</span>
+          <form
+            method="post"
+            action="{% url "backend:planka_recreate_issue_board" selected_issue.pk %}"
+            hx-post="{% url "backend:planka_recreate_issue_board" selected_issue.pk %}"
+            hx-target="#planka-sync-panel"
+            hx-swap="outerHTML"
+          >
+            {% csrf_token %}
+            <input type="hidden" name="card_scope" value="{{ planka_card_scope|default:'publish' }}">
+            <button type="submit" class="btn btn-sm btn-warning">Recreate Reviews board</button>
+          </form>
+        </div>
+      {% endif %}
+
+      {% if planka_publish_cards %}
+        <form
+          method="post"
+          action="{% url "backend:planka_import_publish_cards_bulk" selected_issue.pk %}"
+          hx-post="{% url "backend:planka_import_publish_cards_bulk" selected_issue.pk %}"
+          hx-target="#planka-sync-panel"
+          hx-swap="outerHTML"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="card_scope" value="{{ planka_card_scope|default:'publish' }}">
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th style="width: 2rem;"><input type="checkbox" class="form-check-input" id="planka-check-all"></th>
+                  <th>Card</th>
+                  <th>List</th>
+                  <th>Article URL</th>
+                  <th>Sync readiness</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for card in planka_publish_cards %}
+                  <tr>
+                    <td>
+                      <input class="form-check-input planka-card-check" type="checkbox" name="card_ids" value="{{ card.id }}" {% if card.has_associated_review %}disabled{% endif %}>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ card.name }}</div>
+                      <div class="text-muted small">Card ID: {{ card.id }}</div>
+                    </td>
+                    <td>
+                      <span class="badge text-bg-light border">{{ card.list_name }}</span>
+                      {% if card.list_type == 'trash' %}
+                        <span class="badge text-bg-warning ms-1">Trash</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if card.schema.article_url %}
+                        <a href="{{ card.schema.article_url }}" target="_blank" rel="noopener noreferrer">{{ card.schema.article_url|truncatechars:80 }}</a>
+                      {% else %}
+                        <span class="text-muted">(missing)</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if card.has_associated_review %}
+                        <span class="badge text-bg-secondary">Review exists (protected)</span>
+                        {% if card.associated_review_id %}
+                          <div class="small text-muted">Review ID: {{ card.associated_review_id }}</div>
+                        {% endif %}
+                      {% endif %}
+                      {% if card.is_valid %}
+                        <span class="badge text-bg-success">Valid</span>
+                      {% else %}
+                        <span class="badge text-bg-danger">Missing required fields</span>
+                        <div class="small text-danger mt-1">{{ card.missing_required|join:", " }}</div>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <div class="d-flex justify-content-end gap-2 align-items-center">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary js-planka-desc"
+                          data-card-name="{{ card.name }}"
+                          data-card-description="{{ card.description|default:'' }}"
+                          data-bs-toggle="modal"
+                          data-bs-target="#planka-card-description-modal"
+                        >
+                          View card body
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary"
+                          hx-get="{% url 'backend:planka_card_revisions' selected_issue.pk card.id %}"
+                          hx-target="#planka-card-revisions-modal-body"
+                          hx-swap="innerHTML"
+                          hx-on::after-request="document.getElementById('planka-card-revisions-modal').querySelector('[data-card-name]').textContent = '{{ card.name|escapejs }}'"
+                          data-bs-toggle="modal"
+                          data-bs-target="#planka-card-revisions-modal"
+                        >
+                          History
+                        </button>
+                        {% if card.has_associated_review %}
+                          <span class="badge text-bg-secondary">Protected</span>
+                        {% else %}
+                          <span class="small text-muted">Select row to import</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="submit" name="selection_mode" value="selected" class="btn btn-primary">Create reviews from selected</button>
+            <button type="submit" name="selection_mode" value="publish_bucket" class="btn btn-outline-primary">Create reviews from Publish bucket</button>
+          </div>
+        </form>
+
+        <div class="modal fade" id="planka-card-description-modal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="planka-card-description-title">Card body</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body" id="planka-card-description-body" style="white-space: pre-wrap;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal fade" id="planka-card-revisions-modal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">
+                  Description history — <span data-card-name=""></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body" id="planka-card-revisions-modal-body">
+                <div class="text-muted small">Loading…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-light border mb-0">No cards loaded yet. Click <strong>Refresh cards</strong>.</div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  (() => {
+    const panel = document.getElementById("planka-sync-panel");
+    if (!panel) return;
+
+    const isDisconnected = panel.getAttribute("data-planka-disconnected") === "true";
+    const refreshUrl = panel.getAttribute("data-planka-refresh-url") || "";
+    const retryKey = "plankaReconnectAttempt";
+
+    if (!isDisconnected || !refreshUrl) {
+      window.sessionStorage.removeItem(retryKey);
+      return;
+    }
+
+    const attempt = Number(window.sessionStorage.getItem(retryKey) || "0");
+    const delayMs = Math.min(30000, Math.max(1000, Math.pow(2, attempt) * 1000));
+    window.sessionStorage.setItem(retryKey, String(attempt + 1));
+
+    window.setTimeout(() => {
+      if (window.htmx) {
+        window.htmx.ajax("GET", refreshUrl, {
+          target: "#planka-sync-panel",
+          swap: "outerHTML",
+        });
+      }
+    }, delayMs);
+  })();
+
+  (() => {
+    const panel = document.getElementById("planka-sync-panel");
+    if (!panel) return;
+
+    const checkAll = panel.querySelector("#planka-check-all");
+    const cardChecks = panel.querySelectorAll(".planka-card-check");
+    if (checkAll) {
+      checkAll.addEventListener("change", () => {
+        cardChecks.forEach((checkbox) => {
+          if (!checkbox.disabled) checkbox.checked = checkAll.checked;
+        });
+      });
+    }
+
+    const title = document.getElementById("planka-card-description-title");
+    const body = document.getElementById("planka-card-description-body");
+    panel.querySelectorAll(".js-planka-desc").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (title) {
+          title.textContent = button.getAttribute("data-card-name") || "Card description";
+        }
+        if (body) {
+          body.textContent = button.getAttribute("data-card-description") || "(No description)";
+        }
+      });
+    });
+  })();
+</script>

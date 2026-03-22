@@ -1,0 +1,9 @@
+Hello{% if contributor.name %} {{ contributor.name }}{% endif %},
+
+Thank you for agreeing to review for "{{ issue.name }}" on Journal Watch. Your access is now active.
+
+{% if planka_url %}You can access the review board here:
+{{ planka_url }}
+
+{% endif %}If you have any questions, please contact the issue coordinator.
+

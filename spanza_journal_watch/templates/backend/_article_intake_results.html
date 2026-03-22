@@ -1,0 +1,382 @@
+<div class="card">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span>Retrieved articles (select then stage)</span>
+    <small class="text-muted">{{ result_total }} shown · {{ selected_total }} staged · {{ pushed_total }} pushed</small>
+  </div>
+  <div class="card-body">
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <a
+          class="nav-link {% if not filter_journal %}active{% endif %}"
+          href="#"
+          hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal=&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}"
+          hx-target="#article-intake-results"
+          hx-swap="innerHTML"
+        >All journals ({{ all_journals_count }})</a>
+      </li>
+      {% for tab in watched_journal_tabs %}
+        <li class="nav-item">
+          <a
+            class="nav-link {% if filter_journal == tab.journal.pk|stringformat:'s' %}active{% endif %}"
+            href="#"
+            hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal={{ tab.journal.pk }}&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}"
+            hx-target="#article-intake-results"
+            hx-swap="innerHTML"
+          >{{ tab.journal.name }} ({{ tab.count }})</a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <form
+      class="row g-2 mb-3"
+      hx-get="{% url "backend:article_intake_results" batch.pk %}"
+      hx-target="#article-intake-results"
+      hx-swap="innerHTML"
+      hx-trigger="keyup changed delay:300ms from:input[name='q'], change from:select, change from:.intake-filter-checkbox"
+    >
+      <div class="col-12 col-md-5">
+        <input type="text" name="q" value="{{ filter_query }}" class="form-control" placeholder="Filter by keyword, title, DOI, PMID">
+      </div>
+      <input type="hidden" name="journal" value="{{ filter_journal }}">
+      <div class="col-12 col-md-4">
+        <select name="filter_selected" class="form-select">
+          <option value="" {% if not filter_selected %}selected{% endif %}>All</option>
+          <option value="true" {% if filter_selected == "true" %}selected{% endif %}>Selected</option>
+          <option value="false" {% if filter_selected == "false" %}selected{% endif %}>Not selected</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <div class="d-flex flex-wrap gap-3 small">
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="paediatric_only" value="1" id="filter-paediatric" {% if filter_paediatric_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-paediatric">Paediatric (MeSH)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="review_only" value="1" id="filter-review" {% if filter_review_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-review">Review papers</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="trial_only" value="1" id="filter-trial" {% if filter_trial_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-trial">Clinical trials</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="pain_only" value="1" id="filter-pain" {% if filter_pain_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-pain">Pain medicine</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="icu_only" value="1" id="filter-icu" {% if filter_icu_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-icu">Intensive care medicine</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="cardiac_only" value="1" id="filter-cardiac" {% if filter_cardiac_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-cardiac">Cardiac anaesthesia</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input intake-filter-checkbox" type="checkbox" name="neonatal_only" value="1" id="filter-neonatal" {% if filter_neonatal_only %}checked{% endif %}>
+            <label class="form-check-label" for="filter-neonatal">Neonatal anaesthesia</label>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="d-flex gap-2 mb-3">
+      <form
+        id="stage-checked-form"
+        hx-post="{% url "backend:article_intake_bulk_selection" batch.pk %}"
+        hx-target="#article-intake-results"
+        hx-swap="innerHTML"
+        hx-sync="#article-intake-results:queue all"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="bulk_action" value="select_all">
+        <input type="hidden" name="q" value="{{ filter_query }}">
+        <input type="hidden" name="journal" value="{{ filter_journal }}">
+        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        <button type="submit" class="btn btn-sm btn-outline-primary">Stage all (filtered)</button>
+      </form>
+      <form
+        hx-post="{% url "backend:article_intake_bulk_selection" batch.pk %}"
+        hx-target="#article-intake-results"
+        hx-swap="innerHTML"
+        hx-sync="#article-intake-results:queue all"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="bulk_action" value="select_none">
+        <input type="hidden" name="q" value="{{ filter_query }}">
+        <input type="hidden" name="journal" value="{{ filter_journal }}">
+        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Unstage all (filtered)</button>
+      </form>
+    </div>
+
+    {% if result_rows %}
+      <form
+        id="intake-select-visible-form"
+        hx-post="{% url "backend:article_intake_bulk_selection" batch.pk %}"
+        hx-target="#article-intake-results"
+        hx-swap="innerHTML"
+        hx-sync="#article-intake-results:queue all"
+        class="d-none"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="bulk_action" value="stage_checked">
+        <input type="hidden" name="q" value="{{ filter_query }}">
+        <input type="hidden" name="journal" value="{{ filter_journal }}">
+        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+        <input type="hidden" name="page" value="{{ page_obj.number }}">
+        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        {% for row in result_rows %}
+          <input type="hidden" name="row_ids" value="{{ row.pk }}">
+        {% endfor %}
+      </form>
+
+      <form
+        id="intake-unselect-visible-form"
+        hx-post="{% url "backend:article_intake_bulk_selection" batch.pk %}"
+        hx-target="#article-intake-results"
+        hx-swap="innerHTML"
+        hx-sync="#article-intake-results:queue all"
+        class="d-none"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="bulk_action" value="unstage_checked">
+        <input type="hidden" name="q" value="{{ filter_query }}">
+        <input type="hidden" name="journal" value="{{ filter_journal }}">
+        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+        <input type="hidden" name="page" value="{{ page_obj.number }}">
+        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        {% for row in result_rows %}
+          <input type="hidden" name="row_ids" value="{{ row.pk }}">
+        {% endfor %}
+      </form>
+
+      <form id="intake-toggle-context">
+        {% csrf_token %}
+        <input type="hidden" name="q" value="{{ filter_query }}">
+        <input type="hidden" name="journal" value="{{ filter_journal }}">
+        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+        <input type="hidden" name="page" value="{{ page_obj.number }}">
+        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+      </form>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th class="align-top"><input type="checkbox" class="form-check-input" {% if all_visible_selected %}checked{% endif %} onchange="if (this.checked) { document.getElementById('intake-select-visible-form').requestSubmit(); } else { document.getElementById('intake-unselect-visible-form').requestSubmit(); }"></th>
+              <th>Article</th>
+              <th>Journal</th>
+              <th>Pub date</th>
+              <th>DOI / PMID</th>
+              <th>Stage status</th>
+              <th>Link</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in result_rows %}
+              <tr{% if highlighted_pmid and row.article.pmid == highlighted_pmid %} class="article-intake-highlight"{% endif %}>
+                <td class="align-top">
+                  <input
+                    class="form-check-input intake-row-check"
+                    type="checkbox"
+                    name="row_ids"
+                    value="{{ row.pk }}"
+                    {% if row.is_selected %}checked{% endif %}
+                    hx-post="{% url "backend:article_intake_toggle_selection" batch.pk row.pk %}"
+                    hx-target="#article-intake-results"
+                    hx-swap="innerHTML"
+                    hx-trigger="change"
+                    hx-sync="#article-intake-results:queue all"
+                    hx-include="#intake-toggle-context"
+                    hx-vals='js:{selected: this.checked ? "1" : "0"}'
+                  >
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ row.article.title|default:"(Untitled)" }}</div>
+                  {% if row.article.abstract %}
+                    <button
+                      class="btn btn-link btn-sm p-0 text-decoration-none"
+                      type="button"
+                      data-abstract-toggle="1"
+                      data-bs-target="#abstract-{{ row.pk }}"
+                      aria-expanded="false"
+                      aria-controls="abstract-{{ row.pk }}"
+                    >
+                      View abstract
+                    </button>
+                    <div class="collapse mt-1" id="abstract-{{ row.pk }}">
+                      <div class="small text-muted border rounded p-2" style="white-space: pre-line;">{{ row.article.abstract|truncatechars:900 }}</div>
+                    </div>
+                  {% endif %}
+                </td>
+                <td>{{ row.watched_journal.name|default:row.article.source_journal_name|default:"-" }}</td>
+                <td>{% if row.article.publication_date %}{{ row.article.publication_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+                <td>
+                  {% if row.article.doi %}<div>DOI: {{ row.article.doi }}</div>{% endif %}
+                  <div class="text-muted small">PMID: {{ row.article.pmid }}</div>
+                </td>
+                <td>
+                  {% if row.is_selected %}<span class="badge text-bg-success">Staged</span>{% else %}<span class="text-muted small">Not staged</span>{% endif %}
+                </td>
+                <td>
+                  {% if row.article.article_url %}
+                    <a href="{{ row.article.article_url }}" target="_blank" rel="noopener noreferrer">Open</a>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <nav aria-label="Article intake pagination" class="mt-3">
+        <ul class="pagination pagination-sm mb-0">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="#"
+                  hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal={{ filter_journal }}&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}&page={{ page_obj.previous_page_number }}"
+                 hx-target="#article-intake-results"
+                 hx-swap="innerHTML">Previous</a>
+            </li>
+          {% endif %}
+          <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="#"
+                  hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal={{ filter_journal }}&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}&page={{ page_obj.next_page_number }}"
+                 hx-target="#article-intake-results"
+                 hx-swap="innerHTML">Next</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% else %}
+      <div class="alert alert-light border mb-0">No articles match current filters.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span>Staging queue (ready to push)</span>
+    <small class="text-muted">{{ selected_total }} staged · {{ pushed_total }} pushed</small>
+  </div>
+  <div class="card-body">
+    {% if staged_rows %}
+      <form
+        hx-post="{% url "backend:article_intake_bulk_selection" batch.pk %}"
+        hx-target="#article-intake-results"
+        hx-swap="innerHTML"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="bulk_action" value="unstage_checked">
+        <input type="hidden" name="q" value="{{ filter_query }}">
+        <input type="hidden" name="journal" value="{{ filter_journal }}">
+        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+        <input type="hidden" name="page" value="{{ page_obj.number }}">
+        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2">
+            <thead>
+              <tr>
+                <th><input type="checkbox" class="form-check-input" onclick="document.querySelectorAll('.staged-row-check').forEach(cb => cb.checked = this.checked)"></th>
+                <th>Article</th>
+                <th>Journal</th>
+                <th>Planka status</th>
+                <th>Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in staged_rows %}
+                <tr>
+                  <td><input class="form-check-input staged-row-check" type="checkbox" name="row_ids" value="{{ row.pk }}"></td>
+                  <td>{{ row.article.title|default:"(Untitled)" }}</td>
+                  <td>{{ row.watched_journal.name|default:row.article.source_journal_name|default:"-" }}</td>
+                  <td>
+                    {% with status_text=row.planka_push_error|default:''|lower %}
+                      {% if row.planka_card_id %}
+                        {% if "moved from candidates" in status_text %}
+                          <div class="badge text-bg-warning">Moved from Candidates</div>
+                        {% else %}
+                          <div class="badge text-bg-success">Pushed</div>
+                        {% endif %}
+                        <div class="small text-muted">Card {{ row.planka_card_id }}</div>
+                        {% if row.planka_card_url %}
+                          <a class="small" href="{{ row.planka_card_url }}" target="_blank" rel="noopener noreferrer">Open card</a>
+                        {% endif %}
+                        {% if row.planka_push_error and "moved from candidates" in status_text %}
+                          <div class="small text-muted">{{ row.planka_push_error|truncatechars:100 }}</div>
+                        {% endif %}
+                      {% elif row.planka_push_error %}
+                        {% if "missing in planka" in status_text or "previous card missing" in status_text or "deleted/archived" in status_text %}
+                          <div class="badge text-bg-warning">Missing in Planka</div>
+                          <div class="small text-muted">Will be recreated on next push while staged.</div>
+                        {% else %}
+                          <div class="badge text-bg-warning">Push error</div>
+                        {% endif %}
+                        <div class="small text-muted">{{ row.planka_push_error|truncatechars:100 }}</div>
+                      {% else %}
+                        <span class="text-muted small">Not pushed</span>
+                      {% endif %}
+                    {% endwith %}
+                  </td>
+                  <td>
+                    {% if row.article.article_url %}
+                      <a href="{{ row.article.article_url }}" target="_blank" rel="noopener noreferrer">Open</a>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">Unstage checked</button>
+          <button type="submit" name="remove_from_planka" value="1" class="btn btn-sm btn-outline-danger">Unstage + remove from Planka (Candidates only)</button>
+        </div>
+      </form>
+    {% else %}
+      <div class="alert alert-light border mb-0">No staged articles yet.</div>
+    {% endif %}
+  </div>
+</div>

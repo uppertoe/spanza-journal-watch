@@ -1,0 +1,39 @@
+{% load crispy_forms_tags %}
+
+<div id="issue-reviews-panel" class="issue-review-editor-page">
+  <div class="card mb-4 border-primary-subtle">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>{% if is_edit %}Edit review{% else %}Add review{% endif %}</span>
+      <button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        hx-get="{% url "backend:issue_reviews_edit" %}?issue={{ selected_issue.pk }}"
+        hx-select="#issue-reviews-panel"
+        hx-target="#issue-reviews-panel"
+        hx-swap="outerHTML"
+      >
+        ← Back to reviews list
+      </button>
+    </div>
+    <div class="card-body">
+      {% include "backend/issue_builder/_review_form.html" with review_form=review_form selected_issue=selected_issue form_action=form_action is_edit=is_edit %}
+    </div>
+  </div>
+</div>
+
+<style>
+  .issue-review-editor-page {
+    animation: issueReviewSlideIn 200ms ease-out;
+  }
+
+  @keyframes issueReviewSlideIn {
+    from {
+      transform: translateX(12px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+</style>

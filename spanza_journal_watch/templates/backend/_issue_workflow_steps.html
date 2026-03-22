@@ -1,0 +1,190 @@
+{% comment %}
+Issue workflow tab bar.
+Requires: selected_issue in context (from session context processor or view).
+Uses request.resolver_match.url_name to mark the active tab.
+Uses perms.submissions.chief_editor to lock chief-editor steps.
+{% endcomment %}
+{% if selected_issue %}
+{% with cur=request.resolver_match.url_name %}
+
+<nav class="issue-workflow-tabs mb-0" aria-label="Editorial workflow steps">
+
+  {# Step 1 — Setup #}
+  <a
+    href="{% url 'backend:issue_builder' %}?issue={{ selected_issue.pk }}"
+    class="workflow-tab{% if cur == 'issue_builder' %} is-active{% endif %}"
+    {% if cur == 'issue_builder' %}aria-current="step"{% endif %}
+    hx-get="{% url 'backend:issue_builder' %}?issue={{ selected_issue.pk }}"
+    hx-target="#backend-main-content"
+    hx-select="#backend-main-content"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+  >Setup</a>
+
+  {# Step 2 — Articles #}
+  <a
+    href="{% url 'backend:article_intake' %}?issue={{ selected_issue.pk }}"
+    class="workflow-tab{% if cur == 'article_intake' %} is-active{% endif %}"
+    {% if cur == 'article_intake' %}aria-current="step"{% endif %}
+    hx-get="{% url 'backend:article_intake' %}?issue={{ selected_issue.pk }}"
+    hx-target="#backend-main-content"
+    hx-select="#backend-main-content"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+  >Articles</a>
+
+  {# Step 3 — Reviewers #}
+  <a
+    href="{% url 'backend:issue_reviewers' %}?issue={{ selected_issue.pk }}"
+    class="workflow-tab{% if cur == 'issue_reviewers' %} is-active{% endif %}"
+    {% if cur == 'issue_reviewers' %}aria-current="step"{% endif %}
+    hx-get="{% url 'backend:issue_reviewers' %}?issue={{ selected_issue.pk }}"
+    hx-target="#backend-main-content"
+    hx-select="#backend-main-content"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+  >
+    Reviewers
+    {% if issue_contributors %}<span class="workflow-tab-badge">{{ issue_contributors|length }}</span>{% endif %}
+  </a>
+
+  {# Step 4 — Pull Reviews (chief editor only) #}
+  {% if perms.submissions.chief_editor %}
+    <a
+      href="{% url 'backend:issue_planka_import' %}?issue={{ selected_issue.pk }}"
+      class="workflow-tab{% if cur == 'issue_planka_import' %} is-active{% endif %}"
+      {% if cur == 'issue_planka_import' %}aria-current="step"{% endif %}
+      hx-get="{% url 'backend:issue_planka_import' %}?issue={{ selected_issue.pk }}"
+      hx-target="#backend-main-content"
+      hx-select="#backend-main-content"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >Pull Reviews</a>
+  {% else %}
+    <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">
+      Pull Reviews <span class="workflow-tab-lock" aria-hidden="true">🔒</span>
+    </span>
+  {% endif %}
+
+  {# Step 5 — Edit Reviews (chief editor only) #}
+  {% if perms.submissions.chief_editor %}
+    <a
+      href="{% url 'backend:issue_reviews_edit' %}?issue={{ selected_issue.pk }}"
+      class="workflow-tab{% if cur == 'issue_reviews_edit' %} is-active{% endif %}"
+      {% if cur == 'issue_reviews_edit' %}aria-current="step"{% endif %}
+      hx-get="{% url 'backend:issue_reviews_edit' %}?issue={{ selected_issue.pk }}"
+      hx-target="#backend-main-content"
+      hx-select="#backend-main-content"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >Edit Reviews</a>
+  {% else %}
+    <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">
+      Edit Reviews <span class="workflow-tab-lock" aria-hidden="true">🔒</span>
+    </span>
+  {% endif %}
+
+  {# Step 6 — Publish (chief editor only) #}
+  {% if perms.submissions.chief_editor %}
+    <a
+      href="{% url 'backend:issue_publish' %}?issue={{ selected_issue.pk }}"
+      class="workflow-tab{% if cur == 'issue_publish' %} is-active{% endif %}{% if selected_issue.active and cur != 'issue_publish' %} is-done{% endif %}"
+      {% if cur == 'issue_publish' %}aria-current="step"{% endif %}
+      hx-get="{% url 'backend:issue_publish' %}?issue={{ selected_issue.pk }}"
+      hx-target="#backend-main-content"
+      hx-select="#backend-main-content"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >{% if selected_issue.active %}Published{% else %}Publish{% endif %}</a>
+  {% else %}
+    <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">
+      Publish <span class="workflow-tab-lock" aria-hidden="true">🔒</span>
+    </span>
+  {% endif %}
+
+  {# Step 7 — Newsletter (chief editor only) #}
+  {% if perms.submissions.chief_editor %}
+    <a
+      href="{% url 'backend:newsletter_release_list' %}?issue={{ selected_issue.pk }}"
+      class="workflow-tab{% if cur == 'newsletter_release_list' %} is-active{% endif %}"
+      {% if cur == 'newsletter_release_list' %}aria-current="step"{% endif %}
+      hx-get="{% url 'backend:newsletter_release_list' %}?issue={{ selected_issue.pk }}"
+      hx-target="#backend-main-content"
+      hx-select="#backend-main-content"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+    >Newsletter</a>
+  {% else %}
+    <span class="workflow-tab is-locked" aria-disabled="true" title="Chief editor only">
+      Newsletter <span class="workflow-tab-lock" aria-hidden="true">🔒</span>
+    </span>
+  {% endif %}
+
+</nav>
+
+{% endwith %}
+{% endif %}
+
+<style>
+  .issue-workflow-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 2px solid var(--bs-border-color);
+    gap: 0;
+    margin-bottom: 1rem;
+  }
+  .issue-workflow-tabs::-webkit-scrollbar { display: none; }
+
+  .workflow-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: var(--bs-secondary-color);
+    font-size: 0.875rem;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 100ms, border-color 100ms;
+    background: none;
+    user-select: none;
+  }
+  a.workflow-tab:hover {
+    color: var(--bs-body-color);
+    border-bottom-color: var(--bs-border-color);
+    text-decoration: none;
+  }
+  .workflow-tab.is-active {
+    color: var(--bs-primary);
+    border-bottom-color: var(--bs-primary);
+    font-weight: 600;
+  }
+  .workflow-tab.is-done:not(.is-active) {
+    color: var(--bs-success);
+  }
+  .workflow-tab.is-locked {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .workflow-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--bs-primary);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0 0.2rem;
+  }
+  .workflow-tab-lock {
+    font-size: 0.65rem;
+    opacity: 0.8;
+  }
+</style>

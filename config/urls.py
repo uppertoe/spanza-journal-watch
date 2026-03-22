@@ -7,8 +7,10 @@ from django.views import defaults as default_views
 from django.views.generic.base import TemplateView
 from markdownx import urls as markdownx
 
+from spanza_journal_watch.backend import views as backend_views
 from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
 from spanza_journal_watch.layout.views import HomepageView
+from spanza_journal_watch.users.views import invite_aware_login_view, invite_aware_signup_view
 
 sitemaps = {
     "reviews": ReviewSitemap,
@@ -26,13 +28,19 @@ urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
     # User management
     path("users/", include("spanza_journal_watch.users.urls", namespace="users")),
+    # Invite-aware login/signup must come before the allauth include so they shadow the defaults
+    path("accounts/login/", invite_aware_login_view, name="account_login"),
+    path("accounts/signup/", invite_aware_signup_view, name="account_signup"),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
     path("", include("spanza_journal_watch.submissions.urls")),
     path("", include("spanza_journal_watch.layout.urls")),
     path("newsletter/", include("spanza_journal_watch.newsletter.urls")),
     path("analytics/", include("spanza_journal_watch.analytics.urls")),
-    path("backend/", include("spanza_journal_watch.backend.urls")),
+    path("editorial/", include("spanza_journal_watch.backend.urls")),
+    path("invites/issue/<str:token>/", backend_views.issue_invite_accept, name="issue_invite_accept"),
+    # OAuth2 / OIDC provider (Django acts as IdP for Planka)
+    path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
     path("markdownx/", include(markdownx)),

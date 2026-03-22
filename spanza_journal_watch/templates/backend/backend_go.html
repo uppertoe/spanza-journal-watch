@@ -1,0 +1,44 @@
+{% extends "account/base.html" %}
+
+{% block head_title %}Where to?{% endblock %}
+
+{% block inner %}
+<h5 class="mb-1">Welcome back{% if request.user.name %}, {{ request.user.name }}{% endif %}</h5>
+<p class="text-muted small mb-4">Where would you like to go?</p>
+
+<div class="d-grid gap-2">
+  <a class="btn btn-primary" href="{% url 'backend:dashboard' %}">
+    Editorial backend
+    <span class="d-block small fw-normal opacity-75">Manage issues, reviews and newsletter</span>
+  </a>
+
+  {% if planka_url %}
+  <a class="btn btn-outline-secondary" href="{{ planka_url }}" rel="noopener noreferrer">
+    Planka
+    <span class="d-block small fw-normal opacity-75">Review board and task management</span>
+  </a>
+  {% endif %}
+</div>
+
+{% if assigned_issues %}
+<hr class="my-4">
+<p class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Your assigned issues</p>
+<div class="list-group list-group-flush">
+  {% for contrib in assigned_issues %}
+  <a class="list-group-item list-group-item-action px-0 py-2 d-flex justify-content-between align-items-center"
+     href="{% url 'backend:issue_builder' %}?issue={{ contrib.issue.pk }}">
+    <span>{{ contrib.issue.name }}</span>
+    {% if contrib.issue.active %}
+      <span class="badge text-bg-success">Live</span>
+    {% else %}
+      <span class="badge text-bg-secondary">Draft</span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="mt-4 text-center">
+  <a class="small text-muted" href="{% url 'account_logout' %}">Sign out</a>
+</div>
+{% endblock %}

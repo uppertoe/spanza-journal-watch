@@ -1,0 +1,22 @@
+{% load mjml %}
+{% mjml %}
+<mjml>
+  <mj-body background-color="#f6f7fb">
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="20px" font-weight="700">Thank you for agreeing to review</mj-text>
+        <mj-text>
+          {% if contributor.name %}Hello {{ contributor.name }},<br><br>{% endif %}
+          Thank you for agreeing to review for <strong>{{ issue.name }}</strong> on Journal Watch. Your access is now active.
+        </mj-text>
+        {% if planka_url %}
+        <mj-button href="{{ planka_url }}" background-color="#0d6efd">Open review board</mj-button>
+        {% endif %}
+        <mj-text font-size="12px" color="#777777">
+          If you have any questions, please contact the issue coordinator.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+{% endmjml %}

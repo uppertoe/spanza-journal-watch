@@ -85,6 +85,7 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+    "oauth2_provider",
     "django_celery_beat",
     "webpack_loader",
     "view_breadcrumbs",
@@ -115,6 +116,7 @@ MIGRATION_MODULES = {"sites": "spanza_journal_watch.contrib.sites.migrations"}
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
+    "oauth2_provider.backends.OAuth2Backend",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#auth-user-model
 AUTH_USER_MODEL = "users.User"
@@ -156,6 +158,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "spanza_journal_watch.backend.middleware.HtmxMessagesMiddleware",
 ]
 
 # STATIC
@@ -203,6 +206,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "spanza_journal_watch.users.context_processors.allauth_settings",
                 "spanza_journal_watch.utils.context_processors.content_cache_version",
+                "spanza_journal_watch.backend.context_processors.selected_issue",
             ],
             "builtins": [
                 "spanza_journal_watch.submissions.templatetags.wrapchars",  # Add your app's templatetags module here
@@ -256,6 +260,30 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", defa
 # ISSUE BUILDER
 # ------------------------------------------------------------------------------
 ISSUE_BUILDER_MAX_FEATURED_REVIEWS = env.int("ISSUE_BUILDER_MAX_FEATURED_REVIEWS", default=2)
+ISSUE_CONTRIBUTOR_INVITE_TTL_DAYS = env.int("ISSUE_CONTRIBUTOR_INVITE_TTL_DAYS", default=180)
+
+# PLANKA
+# ------------------------------------------------------------------------------
+PLANKA_BASE_URL = env("PLANKA_BASE_URL", default="")
+PLANKA_API_KEY = env("PLANKA_API_KEY", default="")
+PLANKA_ACCESS_TOKEN = env("PLANKA_ACCESS_TOKEN", default="")
+PLANKA_TIMEOUT_SECONDS = env.int("PLANKA_TIMEOUT_SECONDS", default=15)
+PLANKA_CREDENTIAL_ENCRYPTION_KEY = env("PLANKA_CREDENTIAL_ENCRYPTION_KEY", default="")
+# Admin email used by setup_planka_api_key management command.
+# Must match DEFAULT_ADMIN_EMAIL in the Planka container env.
+PLANKA_ADMIN_EMAIL = env("PLANKA_ADMIN_EMAIL", default="")
+# Base URL that Planka can reach Django at (used when registering webhooks).
+# In dev this is typically http://django:8000; in prod it's your public domain.
+PLANKA_CALLBACK_BASE_URL = env("PLANKA_CALLBACK_BASE_URL", default="")
+# Shared secret verified on incoming webhook requests from Planka.
+PLANKA_WEBHOOK_SECRET = env("PLANKA_WEBHOOK_SECRET", default="")
+# Direct connection to Planka's own Postgres, used only by setup_planka_api_key.
+PLANKA_DB_URL = env("PLANKA_DB_URL", default="")
+
+# PUBMED
+# ------------------------------------------------------------------------------
+PUBMED_TIMEOUT_SECONDS = env.int("PUBMED_TIMEOUT_SECONDS", default=20)
+PUBMED_CREDENTIAL_ENCRYPTION_KEY = env("PUBMED_CREDENTIAL_ENCRYPTION_KEY", default="")
 
 # ADMIN
 # ------------------------------------------------------------------------------
@@ -312,11 +340,9 @@ CELERY_TASK_SERIALIZER = "json"
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-result_serializer
 CELERY_RESULT_SERIALIZER = "json"
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#task-time-limit
-# TODO: set to whatever value is adequate in your circumstances
-CELERY_TASK_TIME_LIMIT = 5 * 60
+CELERY_TASK_TIME_LIMIT = 10 * 60  # 10 min hard kill (covers long PubMed fetches)
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#task-soft-time-limit
-# TODO: set to whatever value is adequate in your circumstances
-CELERY_TASK_SOFT_TIME_LIMIT = 60
+CELERY_TASK_SOFT_TIME_LIMIT = 8 * 60  # 8 min soft limit — task can clean up gracefully
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#beat-scheduler
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker-send-task-events
@@ -325,7 +351,7 @@ CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_TASK_SEND_SENT_EVENT = True
 # django-allauth
 # ------------------------------------------------------------------------------
-ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
+ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", False)
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_LOGIN_METHODS = {"email"}
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
@@ -333,7 +359,9 @@ ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+# "optional": users can log in without verifying — appropriate for an invite-based internal tool
+# where the invite link already proves email ownership.
+ACCOUNT_EMAIL_VERIFICATION = "optional"
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_ADAPTER = "spanza_journal_watch.users.adapters.AccountAdapter"
 # https://django-allauth.readthedocs.io/en/latest/forms.html
@@ -342,6 +370,29 @@ ACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSignupForm"}
 SOCIALACCOUNT_ADAPTER = "spanza_journal_watch.users.adapters.SocialAccountAdapter"
 # https://django-allauth.readthedocs.io/en/latest/forms.html
 SOCIALACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSocialSignupForm"}
+
+# django-oauth-toolkit — Django acts as the OIDC provider for Planka
+# ------------------------------------------------------------------------------
+import base64  # noqa: E402
+
+_oidc_key_b64 = env("OIDC_RSA_PRIVATE_KEY", default="")
+
+_oidc_iss_endpoint = env("OIDC_ISS_ENDPOINT", default="")
+
+OAUTH2_PROVIDER = {
+    "OIDC_ENABLED": True,
+    "OIDC_RSA_PRIVATE_KEY": base64.b64decode(_oidc_key_b64).decode() if _oidc_key_b64 else "",
+    "OIDC_ISS_ENDPOINT": _oidc_iss_endpoint or None,
+    "OAUTH2_VALIDATOR_CLASS": "spanza_journal_watch.backend.oidc_validator.OIDCValidator",
+    "SCOPES": {
+        "openid": "OpenID Connect scope",
+        "email": "Email address",
+        "profile": "Profile information",
+    },
+    "PKCE_REQUIRED": False,
+}
+
+PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
 
 
 # django-webpack-loader

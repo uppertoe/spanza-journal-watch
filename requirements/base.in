@@ -3,6 +3,7 @@
 python-slugify
 Pillow>=11.0
 argon2-cffi
+cryptography
 whitenoise
 redis
 hiredis
@@ -18,6 +19,8 @@ django>=6.0,<7.0
 django-environ
 django-model-utils
 django-allauth
+django-oauth-toolkit[oidc]
+PyJWT
 django-crispy-forms
 crispy-bootstrap5
 django-redis
@@ -25,3 +28,4 @@ django-webpack-loader
 django-view-breadcrumbs
 django-request-logging
 django-markdownx
+openpyxl
