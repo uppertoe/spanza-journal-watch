@@ -1,10 +1,49 @@
-{% extends "backend/backend_base.html"%}
-{% block title %}{% block head_title %}{% endblock head_title %}{% endblock title %}
-
-{% block content %}
-<div class="row">
-  <div class="col-md-6 offset-md-3">
-    {% block inner %}{% endblock %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block head_title %}{% endblock %} — SPANZA Journal Watch</title>
+  {% load render_bundle from webpack_loader %}
+  {% render_bundle 'vendors' 'css' %}
+  {% render_bundle 'project' 'css' %}
+  <style>
+    html, body { height: 100%; }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: var(--bs-body-bg);
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 26rem;
+      padding: 1rem;
+    }
+    .auth-logo {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--bs-secondary-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div class="text-center mb-4">
+      <div class="auth-logo mb-1">SPANZA</div>
+      <div class="fs-5 fw-semibold">Journal Watch</div>
+    </div>
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        {% block inner %}{% endblock %}
+      </div>
+    </div>
   </div>
-</div>
-{% endblock %}
+  {% render_bundle 'vendors' 'js' attrs='defer' %}
+  {% render_bundle 'project' 'js' attrs='defer' %}
+</body>
+</html>

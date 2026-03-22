@@ -84,3 +84,17 @@ class PubmedBatchArticleAdmin(admin.ModelAdmin):
     list_display = ("batch", "article", "issue", "watched_journal", "is_selected", "modified")
     list_filter = ("is_selected", "watched_journal")
     search_fields = ("article__pmid", "article__doi", "article__title", "issue__name")
+
+
+@admin.register(models.IssueContributor)
+class IssueContributorAdmin(admin.ModelAdmin):
+    list_display = ("issue", "email", "role", "status", "user", "invited_at", "accepted_at", "modified")
+    list_filter = ("role", "status")
+    search_fields = ("issue__name", "email", "user__email")
+
+
+@admin.register(models.IssueContributorInvite)
+class IssueContributorInviteAdmin(admin.ModelAdmin):
+    list_display = ("contributor", "expires_at", "consumed_at", "created_by", "sent_at", "modified")
+    list_filter = ("consumed_at",)
+    search_fields = ("contributor__email", "contributor__issue__name")

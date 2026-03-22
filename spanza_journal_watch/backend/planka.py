@@ -122,6 +122,10 @@ class PlankaClient:
             raise PlankaAPIError("Planka API did not return an API key.")
         return api_key
 
+    def get_project(self, project_id):
+        payload = self._request("GET", f"/projects/{project_id}")
+        return payload.get("item", {})
+
     def create_project(self, name):
         payload = self._request("POST", "/projects", json={"type": "private", "name": name})
         return payload["item"]
@@ -258,6 +262,151 @@ class PlankaClient:
         payload = self._request("GET", f"/cards/{card_id}")
         return payload.get("item", {})
 
+    def get_card_members(self, card_id):
+        """Return (memberships, users_by_id) for a card.
+
+        memberships  — list of cardMembership dicts {userId, cardId, ...}
+        users_by_id  — dict mapping userId → user dict (email, name, etc.)
+
+        Note: the card endpoint only includes users referenced by certain card
+        fields (e.g. creatorUserId), not necessarily card members.  If any
+        member userId is absent from included.users we fall back to list_users().
+        """
+        payload = self._request("GET", f"/cards/{card_id}")
+        included = payload.get("included") or {}
+        memberships = included.get("cardMemberships") or []
+        users = included.get("users") or []
+        users_by_id = {str(u.get("id") or ""): u for u in users if u.get("id")}
+
+        member_ids = {str(m.get("userId") or "") for m in memberships if m.get("userId")}
+        missing = member_ids - set(users_by_id)
+        if missing:
+            for u in self.list_users():
+                uid = str(u.get("id") or "")
+                if uid in missing:
+                    users_by_id[uid] = u
+
+        return memberships, users_by_id
+
+    def get_card_description_editor_ids(self, card_id):
+        """Return user IDs who edited the card description, most-recent first."""
+        payload = self._request("GET", f"/cards/{card_id}/actions")
+        actions = payload.get("items") or []
+        editor_ids = []
+        for action in actions:
+            if action.get("type") != "updateCard":
+                continue
+            data = action.get("data") or {}
+            card_data = data.get("card") or {}
+            if "description" not in card_data:
+                continue
+            uid = str(action.get("userId") or "").strip()
+            if uid and uid not in editor_ids:
+                editor_ids.append(uid)
+        return editor_ids
+
     def delete_card(self, card_id):
         self._request("DELETE", f"/cards/{card_id}")
+        return True
+
+    # User management
+
+    def list_users(self):
+        payload = self._request("GET", "/users")
+        return payload.get("items", [])
+
+    def find_user_by_email(self, email):
+        email = (email or "").strip().lower()
+        for user in self.list_users():
+            if (user.get("email") or "").strip().lower() == email:
+                return user
+        return None
+
+    def create_user(self, email, name):
+        import re
+        import secrets
+
+        raw_prefix = email.split("@")[0].lower()
+        username = re.sub(r"[^a-z0-9_-]", "_", raw_prefix).strip("_-") or "user"
+        username = username[:48]
+
+        payload = self._request(
+            "POST",
+            "/users",
+            json={
+                "email": email,
+                "name": name,
+                "password": secrets.token_urlsafe(32),
+                "username": username,
+                "role": "boardUser",
+            },
+        )
+        return payload.get("item", {})
+
+    def update_user(self, user_id, name):
+        payload = self._request("PATCH", f"/users/{user_id}", json={"name": name})
+        return payload.get("item", {})
+
+    def set_user_role(self, user_id, role):
+        """Set Planka global role: 'admin' or 'boardUser'."""
+        payload = self._request("PATCH", f"/users/{user_id}", json={"role": role})
+        return payload.get("item", {})
+
+    # Board membership
+
+    def add_board_member(self, board_id, user_id, role="editor"):
+        payload = self._request(
+            "POST",
+            f"/boards/{board_id}/board-memberships",
+            json={"userId": user_id, "role": role},
+        )
+        return payload.get("item", {})
+
+    def remove_board_member(self, membership_id):
+        self._request("DELETE", f"/board-memberships/{membership_id}")
+        return True
+
+    def find_board_membership(self, board_id, user_id):
+        """Return the board membership dict for user_id, or None."""
+        try:
+            payload = self._request("GET", f"/boards/{board_id}")
+        except PlankaAPIError as error:
+            if "404" in str(error):
+                return None
+            raise
+        for m in (payload.get("included") or {}).get("boardMemberships", []):
+            if str(m.get("userId")) == str(user_id):
+                return m
+        return None
+
+    # Webhooks
+
+    def list_webhooks(self):
+        payload = self._request("GET", "/webhooks")
+        return payload.get("items") or []
+
+    def create_webhook(self, url, *, name="Journal Watch", events=None, access_token=None):
+        """
+        Register a global webhook. Planka webhooks are not board-scoped via the API.
+        ``events`` is a list of event names; defaults to cardUpdate/cardCreate/cardDelete.
+        ``access_token`` is sent by Planka as Authorization: Bearer <token> on each delivery.
+        Returns the webhook item dict.
+        Note: events is sent as a comma-separated string as required by the Planka API.
+        """
+        if events is None:
+            events = ["cardUpdate", "cardCreate", "cardDelete"]
+        body = {"name": name, "url": url, "events": ",".join(events)}
+        if access_token:
+            body["accessToken"] = access_token
+        payload = self._request("POST", "/webhooks", json=body)
+        return payload.get("item", {})
+
+    def delete_webhook(self, webhook_id):
+        """Delete a webhook by its Planka ID. Silently ignores 404."""
+        try:
+            self._request("DELETE", f"/webhooks/{webhook_id}")
+        except PlankaAPIError as exc:
+            if "404" in str(exc):
+                return False
+            raise
         return True

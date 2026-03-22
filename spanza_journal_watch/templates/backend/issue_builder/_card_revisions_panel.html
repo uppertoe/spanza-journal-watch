@@ -1,0 +1,165 @@
+{% if current_fetch_error %}
+  <div class="alert alert-warning py-2 small mb-3">Could not fetch current card from Planka: {{ current_fetch_error }}</div>
+{% endif %}
+
+{% if current_description is not None %}
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <span class="fw-semibold small">Current version (live in Planka)</span>
+      <span class="badge text-bg-primary">Current</span>
+    </div>
+    <pre id="current-version-body" class="p-2 border rounded bg-light small mb-0" style="white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto;">{% if current_description %}{{ current_description }}{% else %}<span class="text-muted fst-italic">(empty)</span>{% endif %}</pre>
+  </div>
+  <hr class="my-3">
+{% endif %}
+
+{% if not revisions %}
+  <p class="text-muted mb-0">No revisions recorded yet.</p>
+{% else %}
+  <p class="text-muted small mb-3">
+    Up to 100 revisions are kept. Click <strong>View</strong> to expand the description,
+    or <strong>Restore</strong> to write that version back to Planka.
+  </p>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>When</th>
+          <th>By</th>
+          <th>Source</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rev in revisions %}
+          <tr id="rev-row-{{ rev.pk }}">
+            <td class="text-muted small">{{ forloop.counter }}</td>
+            <td>
+              <span title="{{ rev.created|date:'Y-m-d H:i:s' }}">
+                {{ rev.created|timesince }} ago
+              </span>
+            </td>
+            <td>
+              {% if rev.actor_name %}
+                {{ rev.actor_name }}
+                {% if rev.actor_email %}
+                  <div class="text-muted small">{{ rev.actor_email }}</div>
+                {% endif %}
+              {% elif rev.actor_email %}
+                {{ rev.actor_email }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if rev.source == "snapshot" %}
+                <span class="badge text-bg-secondary">Snapshot</span>
+              {% else %}
+                <span class="badge text-bg-info">Webhook</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="d-flex gap-2 justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary js-rev-view"
+                  data-rev-id="{{ rev.pk }}"
+                >
+                  View
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-warning js-rev-restore"
+                  data-restore-url="{% url 'backend:planka_card_revision_restore' issue.pk rev.pk %}"
+                  data-rev-id="{{ rev.pk }}"
+                >
+                  Restore
+                </button>
+              </div>
+            </td>
+          </tr>
+          {# Expandable content row — hidden by default #}
+          <tr id="rev-diff-{{ rev.pk }}" class="d-none">
+            <td colspan="5">
+              <pre class="p-2 border rounded bg-light small mb-0" style="white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;">{% if rev.description %}{{ rev.description }}{% else %}<span class="text-muted fst-italic">(empty)</span>{% endif %}</pre>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <input type="hidden" id="rev-csrf-token" value="{{ csrf_token }}">
+  <a
+    id="rev-reload-link"
+    href="#"
+    hx-get="{% url 'backend:planka_card_revisions' issue.pk card_id %}"
+    hx-target="#planka-card-revisions-modal-body"
+    hx-swap="innerHTML"
+    style="display:none"
+    aria-hidden="true"
+  ></a>
+
+  <script>
+  (function () {
+    const body = document.getElementById('planka-card-revisions-modal-body');
+    if (!body) return;
+    const csrfToken = document.getElementById('rev-csrf-token').value;
+
+    // View / collapse toggle
+    body.querySelectorAll('.js-rev-view').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const diffRow = document.getElementById('rev-diff-' + btn.dataset.revId);
+        if (!diffRow) return;
+        const isShown = !diffRow.classList.contains('d-none');
+        diffRow.classList.toggle('d-none', isShown);
+        btn.textContent = isShown ? 'View' : 'Hide';
+      });
+    });
+
+    // Restore button
+    body.querySelectorAll('.js-rev-restore').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!confirm('Restore this description to Planka? This will overwrite the current card description.')) return;
+
+        const url = btn.dataset.restoreUrl;
+        btn.disabled = true;
+        btn.textContent = 'Restoring…';
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken,
+          },
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function (data) {
+            if (data.ok) {
+              const reloadLink = document.getElementById('rev-reload-link');
+              if (reloadLink) {
+                reloadLink.click();
+              } else {
+                btn.textContent = 'Restored';
+                btn.classList.replace('btn-outline-warning', 'btn-success');
+              }
+            } else {
+              btn.textContent = 'Error';
+              btn.disabled = false;
+              alert('Restore failed: ' + (data.error || 'Unknown error'));
+            }
+          })
+          .catch(function (err) {
+            btn.textContent = 'Error';
+            btn.disabled = false;
+            alert('Restore failed: ' + err.message);
+          });
+      });
+    });
+  })();
+  </script>
+{% endif %}

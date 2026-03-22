@@ -1,40 +1,50 @@
 import datetime
 import hashlib
+import hmac
 import io
 import json
+import logging
 import re
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
-from django.core.exceptions import MultipleObjectsReturned
+from django.core.exceptions import MultipleObjectsReturned, PermissionDenied
 from django.core.files.base import ContentFile
+from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from PIL import Image, UnidentifiedImageError
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Article, Author, HealthService, Issue, Journal, Review
 from spanza_journal_watch.utils.cache import bump_content_cache_version
 
 from .forms import (
     ArticleIntakeAssignIssueForm,
     ArticleIntakeFetchForm,
+    AuthorForm,
     HeaderForm,
+    HealthServiceForm,
     IssueBuilderIssueForm,
     IssueBuilderReviewForm,
+    IssueContributorInviteForm,
     NewsletterCreateForm,
+    NewsletterEditForm,
     NewsletterTestSendForm,
-    PlankaApiKeyForm,
     PlankaProjectBackgroundForm,
     PlankaProjectNameForm,
     PlankaProjectSetupForm,
@@ -45,8 +55,11 @@ from .forms import (
 )
 from .models import (
     BackendPreference,
+    IssueContributor,
+    IssueContributorInvite,
     PlankaBoardBackgroundAsset,
     PlankaCardImport,
+    PlankaCardRevision,
     PlankaIntegrationCredential,
     PlankaIssueBinding,
     PubmedArticle,
@@ -59,6 +72,8 @@ from .models import (
 from .planka import PlankaAPIError, PlankaClient
 from .pubmed import PubmedAPIError, PubmedClient
 from .tasks import process_subscriber_csv, run_pubmed_batch_import_task, run_pubmed_batch_push_task
+
+logger = logging.getLogger(__name__)
 
 PLANKA_LIST_ORDER = [
     "candidates",
@@ -112,6 +127,22 @@ PLANKA_JOURNAL_LABEL_COLORS = [
 ]
 
 PLANKA_REVIEW_SEPARATOR_MARKER = "< --- Please write your review below this line --- >"
+
+PLANKA_REVIEW_INSTRUCTIONS = """\
+**Before you begin:**
+
+- **Subscribe** to this card (watch icon) so you receive notifications about updates and comments.
+- Move the card to the **In Progress** list when you start your review.
+- Move the card to the **Publish** list when your review is ready to submit.
+
+A suggested review structure is provided below — feel free to use any format you prefer.
+
+**Please do not edit the text of other reviewers.** Instead, use the **Comments** section at the \
+bottom of this card to share feedback or ask questions.
+
+If you lose work or accidentally overwrite content, contact your regional coordinator — \
+previous versions of this card can be restored.\
+"""
 
 PLANKA_REVIEW_SCAFFOLD = """## Review summary
 
@@ -306,9 +337,110 @@ def process_csv(request, save_token):
 
 
 @login_required
-@permission_required("backend.manage_subscriber_csv", raise_exception=True)  # Prevents login loop
+def backend_go(request):
+    """
+    Role-aware destination chooser. Shown after login for staff/editorial users.
+    - Reviewers (no backend perms) → redirect straight to Planka.
+    - Chief editors / regional coordinators → show Backend + Planka choice.
+    """
+    planka_url = getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", "")
+    has_backend = request.user.has_perm("submissions.chief_editor") or request.user.has_perm(
+        "submissions.regional_coordinator"
+    )
+
+    if not has_backend:
+        # Pure reviewer — send straight to Planka
+        if planka_url:
+            return redirect(planka_url)
+        return redirect("/")
+
+    # Collect the user's assigned issues (as coordinator) for context
+    assigned_issues = []
+    if request.user.has_perm("submissions.regional_coordinator") and not request.user.has_perm(
+        "submissions.chief_editor"
+    ):
+        assigned_issues = list(
+            IssueContributor.objects.filter(
+                user=request.user,
+                role=IssueContributor.Role.COORDINATOR,
+                status=IssueContributor.Status.ACTIVE,
+            )
+            .select_related("issue")
+            .order_by("-issue__modified")
+        )
+
+    return render(
+        request,
+        "backend/backend_go.html",
+        {
+            "planka_url": planka_url,
+            "is_chief_editor": request.user.has_perm("submissions.chief_editor"),
+            "assigned_issues": assigned_issues,
+        },
+    )
+
+
+@login_required
 def dashboard(request):
-    return render(request, "backend/dashboard.html")
+    from spanza_journal_watch.layout.models import Homepage
+
+    is_coordinator_only = request.user.has_perm("submissions.regional_coordinator") and not request.user.has_perm(
+        "submissions.chief_editor"
+    )
+    if not is_coordinator_only and not request.user.has_perm("backend.manage_subscriber_csv"):
+        raise PermissionDenied
+
+    if is_coordinator_only:
+        assigned = list(
+            IssueContributor.objects.filter(
+                user=request.user,
+                role=IssueContributor.Role.COORDINATOR,
+                status=IssueContributor.Status.ACTIVE,
+            )
+            .select_related("issue")
+            .order_by("-issue__modified")
+        )
+        planka_url = getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", "")
+        return render(
+            request,
+            "backend/dashboard_coordinator.html",
+            {
+                "assigned_contributors": assigned,
+                "planka_url": planka_url,
+            },
+        )
+
+    current_homepage = Homepage.get_current_homepage()
+    current_issue = Issue.objects.order_by("-modified").first()
+    current_issue_review_count = current_issue.reviews.count() if current_issue else 0
+    latest_newsletter = Newsletter.objects.select_related("issue").order_by("-pk").first()
+    last_csv_upload = SubscriberCSV.objects.filter(confirmed=True).order_by("-pk").first()
+
+    # Planka status — lightweight check, no live API call
+    planka_credential = _get_planka_integration_credential()
+    planka_api_key_ok = bool(planka_credential and planka_credential.get_api_key())
+    planka_connection_error = (planka_credential.last_error or "") if planka_credential else ""
+    try:
+        from oauth2_provider.models import Application as OAuthApplication
+
+        planka_oidc_ok = OAuthApplication.objects.filter(client_id__startswith="planka").exists()
+    except Exception:
+        planka_oidc_ok = False
+
+    return render(
+        request,
+        "backend/dashboard.html",
+        {
+            "current_homepage": current_homepage,
+            "current_issue": current_issue,
+            "current_issue_review_count": current_issue_review_count,
+            "latest_newsletter": latest_newsletter,
+            "last_csv_upload": last_csv_upload,
+            "planka_api_key_ok": planka_api_key_ok,
+            "planka_connection_error": planka_connection_error,
+            "planka_oidc_ok": planka_oidc_ok,
+        },
+    )
 
 
 @login_required
@@ -733,6 +865,22 @@ def _article_intake_results_context(batch, params):
     }
 
 
+def _enrich_find_articles(articles, batch_article_map):
+    """Merge PubMed search results with batch staging state."""
+    enriched = []
+    for art in articles:
+        pmid = art.get("pmid", "")
+        info = batch_article_map.get(pmid)
+        enriched.append(
+            {
+                **art,
+                "in_batch": info is not None,
+                "is_selected": info["is_selected"] if info else False,
+            }
+        )
+    return enriched
+
+
 def _render_article_intake_results_response(request, batch, params, *, message_target="global"):
     context = _article_intake_results_context(batch, params)
     context["batch_task_running"] = batch.task_state in {
@@ -846,6 +994,8 @@ def _decode_planka_escaped_text(value):
 
     decoded = re.sub(r"\\u([0-9a-fA-F]{4})", _replace_unicode, text)
     decoded = decoded.replace("\\n", "\n").replace("\\r", "\r")
+    # Planka's markdown renderer escapes angle brackets and other special chars
+    decoded = decoded.replace("\\<", "<").replace("\\>", ">")
     return decoded
 
 
@@ -870,7 +1020,7 @@ def _parse_planka_card_metadata(description_text):
 
     url_match = re.search(r"(?mi)^Article URL:\s*(.+?)\s*$", header_text)
     if url_match:
-        metadata["article_url"] = url_match.group(1).strip()
+        metadata["article_url"] = url_match.group(1).strip().strip("<>")
 
     publication_match = re.search(r"(?mi)^Publication date:\s*([0-9]{4})(?:-[0-9]{2}(?:-[0-9]{2})?)?\s*$", header_text)
     if publication_match:
@@ -1136,6 +1286,8 @@ def _build_pubmed_planka_card(row):
         lines.append(abstract)
 
     lines.append("")
+    lines.extend(PLANKA_REVIEW_INSTRUCTIONS.splitlines())
+    lines.append("")
     lines.append("---")
     lines.append(PLANKA_REVIEW_SEPARATOR_MARKER)
     lines.append("")
@@ -1149,10 +1301,9 @@ def _build_pubmed_planka_card(row):
 def article_intake(request):
     credential = _get_pubmed_integration_credential()
     current_month = timezone.now().date().replace(day=1)
-    requested_issue_id = (request.GET.get("issue") or request.POST.get("issue") or "").strip()
-    requested_issue = Issue.objects.filter(pk=requested_issue_id).first() if requested_issue_id.isdigit() else None
+    selected_issue = _resolve_and_persist_issue(request)
+    _check_coordinator_issue_access(request, selected_issue)
     active_issue = Issue.objects.filter(active=True).order_by("-date", "-pk").first()
-    selected_issue = requested_issue or active_issue
     issue_anchor_date = (selected_issue.date if selected_issue and selected_issue.date else current_month).replace(
         day=1
     )
@@ -1270,7 +1421,7 @@ def article_intake(request):
 
     context = {
         "pubmed_credential": credential,
-        "pubmed_api_key_form": PubmedApiKeyForm(),
+        "planka_credential": _get_planka_integration_credential(),
         "fetch_form": fetch_form,
         "assign_issue_form": assign_issue_form,
         "batch": batch,
@@ -1297,12 +1448,8 @@ def article_intake(request):
             PubmedImportBatch.TASK_STATE_SUCCESS,
             PubmedImportBatch.TASK_STATE_ERROR,
         }
-        context["show_stage2_task_status"] = (context["batch_task_running"] or context["batch_task_done"]) and (
-            batch.task_action != "push"
-        )
-        context["show_push_task_status"] = (context["batch_task_running"] or context["batch_task_done"]) and (
-            batch.task_action == "push"
-        )
+        context["show_stage2_task_status"] = context["batch_task_running"] and (batch.task_action != "push")
+        context["show_push_task_status"] = context["batch_task_running"] and (batch.task_action == "push")
         context.update(_article_intake_results_context(batch, request.GET))
 
     return render(request, "backend/article_intake.html", context)
@@ -1337,6 +1484,8 @@ def pubmed_save_api_key(request):
         credential.save()
         messages.error(request, f"Could not validate PubMed API key: {safe_error}")
 
+    if request.POST.get("next") == "settings":
+        return redirect(reverse("backend:backend_settings"))
     return redirect(reverse("backend:article_intake"))
 
 
@@ -1346,6 +1495,158 @@ def article_intake_results(request, batch_id):
     batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
     context = _article_intake_results_context(batch, request.GET)
     return render(request, "backend/_article_intake_results.html", context)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def article_intake_find_article(request, batch_id):
+    """HTMX GET: search PubMed by free text and return a results partial."""
+    batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
+    query = (request.GET.get("q") or "").strip()
+
+    articles = []
+    error = None
+
+    if query:
+        try:
+            articles = _build_pubmed_client().find_articles(query, retmax=8)
+        except PubmedAPIError as exc:
+            error = _safe_planka_error(exc)
+
+    batch_article_map = {
+        ba.article.pmid: {"item_id": ba.pk, "is_selected": ba.is_selected}
+        for ba in batch.batch_articles.select_related("article")
+    }
+    enriched = _enrich_find_articles(articles, batch_article_map)
+
+    return render(
+        request,
+        "backend/_article_intake_find_article.html",
+        {
+            "batch": batch,
+            "query": query,
+            "articles": enriched,
+            "error": error,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def article_intake_add_article(request, batch_id):
+    """POST: toggle staging of a specific article (add if new, stage/unstage if existing)."""
+    from django.template.loader import render_to_string
+
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
+    pmid = (request.POST.get("pmid") or "").strip()
+    query = (request.POST.get("q") or "").strip()
+
+    if not pmid:
+        messages.error(request, "No PMID provided.")
+        return _render_article_intake_results_response(request, batch, request.POST)
+
+    # Check if article is already in the batch — if so, toggle staging without re-fetching
+    existing_link = (
+        PubmedBatchArticle.objects.filter(batch=batch, article__pmid=pmid).select_related("article").first()
+    )
+
+    if existing_link:
+        article = existing_link.article
+        new_selected = not existing_link.is_selected
+        existing_link.is_selected = new_selected
+        existing_link.save(update_fields=["is_selected", "modified"])
+        if new_selected:
+            messages.success(request, f"\u201c{article.title}\u201d added to staging.")
+        else:
+            messages.info(request, f"\u201c{article.title}\u201d removed from staging.")
+    else:
+        try:
+            payloads = _build_pubmed_client().fetch_articles([pmid])
+        except PubmedAPIError as exc:
+            messages.error(request, f"PubMed lookup failed: {_safe_planka_error(exc)}")
+            return _render_article_intake_results_response(request, batch, request.POST)
+
+        if not payloads:
+            messages.error(request, f"No article found for PMID {pmid}.")
+            return _render_article_intake_results_response(request, batch, request.POST)
+
+        payload = payloads[0]
+        doi = (payload.get("doi") or "").strip().lower() or None
+
+        article = None
+        if doi:
+            article = PubmedArticle.objects.filter(doi=doi).first()
+        if not article:
+            article = PubmedArticle.objects.filter(pmid=pmid).first()
+
+        if not article:
+            article = PubmedArticle.objects.create(
+                pmid=pmid,
+                doi=doi,
+                title=payload.get("title") or "",
+                abstract=payload.get("abstract") or "",
+                source_journal_name=payload.get("source_journal_name") or "",
+                publication_date=payload.get("publication_date"),
+                publication_month=payload.get("publication_month"),
+                article_url=payload.get("article_url") or "",
+                pubmed_url=payload.get("pubmed_url") or "",
+                metadata_json=payload.get("metadata_json") or {},
+            )
+        else:
+            _fill_missing_article_metadata(article, payload)
+
+        PubmedBatchArticle.objects.create(batch=batch, article=article, issue=batch.issue, is_selected=True)
+        messages.success(request, f"\u201c{article.title}\u201d added to staging.")
+        new_selected = True
+
+    batch.result_count = batch.batch_articles.count()
+    batch.selected_count = batch.batch_articles.filter(is_selected=True).count()
+    batch.save(update_fields=["result_count", "selected_count", "modified"])
+
+    highlighted_pmid = pmid if new_selected else None
+
+    # Build results table HTML
+    results_context = _article_intake_results_context(batch, request.POST)
+    results_context["highlighted_pmid"] = highlighted_pmid
+    results_context["batch_task_running"] = False
+    results_context["batch_task_done"] = False
+    results_html = render_to_string(
+        "backend/_article_intake_results_with_messages.html", results_context, request=request
+    )
+
+    if not query or request.headers.get("HX-Request") != "true":
+        from django.http import HttpResponse as _HttpResponse
+
+        return _HttpResponse(results_html)
+
+    # OOB: re-run the search so the find panel reflects the new staging state
+    try:
+        find_articles_raw = _build_pubmed_client().find_articles(query, retmax=8)
+    except PubmedAPIError:
+        find_articles_raw = []
+
+    batch_article_map = {
+        ba.article.pmid: {"item_id": ba.pk, "is_selected": ba.is_selected}
+        for ba in batch.batch_articles.select_related("article")
+    }
+    find_html = render_to_string(
+        "backend/_article_intake_find_article.html",
+        {
+            "batch": batch,
+            "query": query,
+            "articles": _enrich_find_articles(find_articles_raw, batch_article_map),
+            "error": None,
+        },
+        request=request,
+    )
+    oob_html = f'<div id="find-article-results" hx-swap-oob="innerHTML">{find_html}</div>'
+
+    from django.http import HttpResponse as _HttpResponse
+
+    return _HttpResponse(results_html + oob_html)
 
 
 @login_required
@@ -1930,6 +2231,10 @@ def article_intake_task_status(request, batch_id):
         "poll_url": poll_url,
     }
     if is_done:
+        if batch.task_state == PubmedImportBatch.TASK_STATE_ERROR:
+            messages.error(request, batch.task_note)
+        else:
+            messages.success(request, batch.task_note)
         context.update(_article_intake_results_context(batch, request.GET))
 
     return render(request, "backend/_article_intake_task_status.html", context)
@@ -1945,6 +2250,8 @@ def watched_journals(request):
         if form.is_valid():
             watched = form.save()
             messages.success(request, f"Watched journal added: {watched.name}")
+            if request.POST.get("next") == "settings":
+                return redirect(reverse("backend:backend_settings"))
             return redirect(reverse("backend:watched_journals"))
         messages.error(request, "Could not save watched journal. Please check the form.")
 
@@ -1984,14 +2291,139 @@ def watched_journal_toggle_active(request, watched_journal_id):
     watched.active = not watched.active
     watched.save(update_fields=["active", "modified"])
     messages.success(request, f"{watched.name}: {'active' if watched.active else 'inactive'}")
+    if request.POST.get("next") == "settings":
+        return redirect(reverse("backend:backend_settings"))
     return redirect(reverse("backend:watched_journals"))
+
+
+def _copy_issue_image_to_newsletter(newsletter, issue):
+    """Copy issue.image into newsletter.header_image, triggering greyscale processing."""
+    import logging as _logging
+    import os as _os
+
+    from django.core.files.base import ContentFile as _ContentFile
+
+    if not (issue and issue.image and issue.image.name):
+        return False
+    try:
+        issue.image.open("rb")
+        content = issue.image.read()
+        issue.image.close()
+        filename = _os.path.basename(issue.image.name)
+        newsletter.header_image_processed = False
+        newsletter.save(update_fields=["header_image_processed"])
+        newsletter.header_image.save(filename, _ContentFile(content), save=True)
+        return True
+    except (OSError, ValueError) as exc:
+        _logging.getLogger(__name__).warning("Could not copy issue image to newsletter: %s", exc)
+        return False
+
+
+def _newsletter_ready_to_send(newsletter):
+    return bool(
+        newsletter.content_heading and newsletter.content and newsletter.header_image and newsletter.header_image.name
+    )
+
+
+def _newsletter_stats(newsletter):
+    from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
+
+    opens_qs = NewsletterOpen.objects.filter(newsletter=newsletter)
+    clicks_qs = NewsletterClick.objects.filter(newsletter=newsletter)
+    total_opens = opens_qs.values("subscriber").count()
+    opens = opens_qs.values("subscriber").distinct().count()
+    total_clicks = clicks_qs.values("subscriber").count()
+    clicks = clicks_qs.values("subscriber").distinct().count()
+    human_opens_qs = opens_qs.filter(automated=False)
+    human_clicks_qs = clicks_qs.filter(automated=False)
+    total_human_opens = human_opens_qs.values("subscriber").count()
+    human_opens = human_opens_qs.values("subscriber").distinct().count()
+    total_human_clicks = human_clicks_qs.values("subscriber").count()
+    human_clicks = human_clicks_qs.values("subscriber").distinct().count()
+    automated_opens = max(total_opens - total_human_opens, 0)
+    automated_clicks = max(total_clicks - total_human_clicks, 0)
+    return {
+        "emails_sent": newsletter.emails_sent,
+        "opens": opens,
+        "total_opens": total_opens,
+        "clicks": clicks,
+        "total_clicks": total_clicks,
+        "human_opens": human_opens,
+        "total_human_opens": total_human_opens,
+        "human_clicks": human_clicks,
+        "total_human_clicks": total_human_clicks,
+        "automated_opens": automated_opens,
+        "automated_clicks": automated_clicks,
+        "automated_open_share": f"{round(automated_opens / total_opens * 100)}%" if total_opens else "0%",
+        "automated_click_share": f"{round(automated_clicks / total_clicks * 100)}%" if total_clicks else "0%",
+        "open_rate": f"{round(opens / newsletter.emails_sent * 100)}%" if newsletter.emails_sent else "—",
+        "human_open_rate": f"{round(human_opens / newsletter.emails_sent * 100)}%" if newsletter.emails_sent else "—",
+        "click_through_rate": f"{round(clicks / opens * 100)}%" if opens else "—",
+        "human_click_through_rate": f"{round(human_clicks / human_opens * 100)}%" if human_opens else "—",
+    }
 
 
 @login_required
 @permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
 def newsletter_release_list(request):
-    newsletters = Newsletter.objects.order_by("-send_date", "-pk")
-    context = {"newsletters": newsletters}
+    selected_issue = _resolve_and_persist_issue(request)
+    newsletter = None
+    edit_form = None
+
+    if selected_issue:
+        newsletter = Newsletter.objects.filter(issue=selected_issue).order_by("-pk").first()
+        if not newsletter:
+            newsletter = Newsletter.objects.create(
+                issue=selected_issue,
+                subject=f"Journal Watch \u2014 {selected_issue.name}",
+                content=selected_issue.body or "",
+            )
+
+        if request.method == "POST":
+            edit_form = NewsletterEditForm(request.POST, request.FILES, instance=newsletter)
+            if edit_form.is_valid():
+                new_image_uploaded = bool(request.FILES.get("header_image"))
+                use_issue_image = edit_form.cleaned_data.get("use_issue_image")
+                if new_image_uploaded:
+                    edit_form.instance.header_image_processed = False
+                newsletter = edit_form.save(commit=False)
+                newsletter.ready_to_send = _newsletter_ready_to_send(newsletter)
+                newsletter.save()
+                if use_issue_image and not new_image_uploaded:
+                    _copy_issue_image_to_newsletter(newsletter, selected_issue)
+                    newsletter.refresh_from_db()
+                    newsletter.ready_to_send = _newsletter_ready_to_send(newsletter)
+                    newsletter.save(update_fields=["ready_to_send"])
+                messages.success(request, "Newsletter saved.")
+                return redirect(f"{reverse('backend:newsletter_release_list')}?issue={selected_issue.pk}")
+        else:
+            edit_form = NewsletterEditForm(instance=newsletter)
+
+    newsletter_stats = _newsletter_stats(newsletter) if (newsletter and newsletter.is_sent) else None
+
+    newsletter_header_image_url = None
+    if newsletter and newsletter.header_image and newsletter.header_image.name:
+        try:
+            url = newsletter.header_image.url
+            # In local dev, skip images whose files don't exist to avoid 404s
+            if settings.DEBUG and not newsletter.header_image.storage.exists(newsletter.header_image.name):
+                pass
+            else:
+                newsletter_header_image_url = url
+        except Exception:
+            pass
+
+    context = {
+        "selected_issue": selected_issue,
+        "newsletter": newsletter,
+        "newsletter_stats": newsletter_stats,
+        "edit_form": edit_form,
+        "test_form": NewsletterTestSendForm(),
+        "issue_for_preview": selected_issue
+        if (selected_issue and selected_issue.image and selected_issue.image.name)
+        else None,
+        "newsletter_header_image_url": newsletter_header_image_url,
+    }
     return render(request, "backend/newsletter_release_list.html", context)
 
 
@@ -2002,12 +2434,26 @@ def create_newsletter(request):
         form = NewsletterCreateForm(request.POST, request.FILES)
         if form.is_valid():
             newsletter = form.save()
+            # If no custom image uploaded but "use issue image" is checked, copy issue.image
+            if form.cleaned_data.get("use_issue_image") and not newsletter.header_image:
+                _copy_issue_image_to_newsletter(newsletter, newsletter.issue)
             messages.success(request, f"Newsletter {newsletter} created.")
-            return redirect(reverse("backend:final_newsletter", kwargs={"send_token": newsletter.send_token}))
+            return redirect(reverse("backend:newsletter_release_list") + f"?issue={newsletter.issue_id}")
     else:
-        form = NewsletterCreateForm()
+        selected_issue = _resolve_and_persist_issue(request, fallback_latest=False)
+        initial = (
+            {"issue": selected_issue, "use_issue_image": bool(selected_issue and selected_issue.image)}
+            if selected_issue
+            else {}
+        )
+        form = NewsletterCreateForm(initial=initial)
 
-    context = {"form": form}
+    # Pass pre-selected issue image for the preview (only meaningful on initial GET)
+    issue_for_preview = None
+    if request.method == "GET":
+        if selected_issue and selected_issue.image:
+            issue_for_preview = selected_issue
+    context = {"form": form, "issue_for_preview": issue_for_preview}
     return render(request, "backend/create_newsletter.html", context)
 
 
@@ -2250,6 +2696,51 @@ def _is_planka_card_archived(card):
     return False
 
 
+def _is_coordinator_only(user):
+    """Return True if the user is a regional coordinator without chief-editor privileges."""
+    return user.has_perm("submissions.regional_coordinator") and not user.has_perm("submissions.chief_editor")
+
+
+def _check_coordinator_issue_access(request, issue):
+    """Raise PermissionDenied if a coordinator-only user is not assigned to this issue."""
+    if _is_coordinator_only(request.user):
+        if issue is None:
+            raise PermissionDenied
+        if not IssueContributor.objects.filter(
+            user=request.user,
+            issue=issue,
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.ACTIVE,
+        ).exists():
+            raise PermissionDenied
+
+
+def _resolve_and_persist_issue(request, *, fallback_latest=True):
+    """Resolve the selected issue, persisting the choice to the session.
+
+    Priority: ?issue= param in GET/POST > session > most-recently-modified issue.
+    """
+    issue_id = (request.GET.get("issue") or request.POST.get("issue") or "").strip()
+    if issue_id.isdigit():
+        issue = Issue.objects.filter(pk=issue_id).first()
+        if issue:
+            request.session["selected_issue_id"] = issue.pk
+            return issue
+
+    session_id = request.session.get("selected_issue_id")
+    if session_id:
+        issue = Issue.objects.filter(pk=session_id).first()
+        if issue:
+            return issue
+
+    if fallback_latest:
+        issue = Issue.objects.order_by("-modified", "-pk").first()
+        if issue:
+            request.session["selected_issue_id"] = issue.pk
+        return issue
+    return None
+
+
 def _get_planka_integration_credential():
     return PlankaIntegrationCredential.get_solo()
 
@@ -2267,6 +2758,168 @@ def _build_planka_client():
         )
 
     return client
+
+
+def _build_planka_webhook_url():
+    """Return the absolute URL Planka should POST card-update events to."""
+    base = (getattr(settings, "PLANKA_CALLBACK_BASE_URL", "") or "").rstrip("/")
+    path = reverse("backend:planka_card_update_webhook")
+    return f"{base}{path}"
+
+
+def _register_planka_webhook(client, binding):
+    """
+    Ensure a global Planka webhook exists for our callback URL.
+    Planka webhooks are not board-scoped, so one webhook covers all boards.
+    If one already exists pointing to our URL, reuses it.
+    Saves webhook_id on the binding and takes an initial board snapshot.
+    Logs but does not raise on failure.
+    """
+    callback_url = _build_planka_webhook_url()
+    if not callback_url.startswith("http"):
+        logger.warning("PLANKA_CALLBACK_BASE_URL is not set; skipping webhook registration.")
+        return
+
+    # Check if a webhook for our URL already exists (created for a previous binding).
+    try:
+        existing = client.list_webhooks()
+        for wh in existing:
+            if wh.get("url") == callback_url:
+                webhook_id = str(wh.get("id") or "")
+                binding.webhook_id = webhook_id
+                binding.save(update_fields=["webhook_id", "modified"])
+                _take_board_description_snapshot(client, binding)
+                return
+    except PlankaAPIError as exc:
+        logger.warning("Could not list Planka webhooks: %s", exc)
+
+    secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip() or None
+    try:
+        webhook = client.create_webhook(
+            callback_url,
+            events=["cardUpdate", "cardCreate", "cardDelete"],
+            access_token=secret,
+        )
+        binding.webhook_id = str(webhook.get("id") or "")
+        binding.save(update_fields=["webhook_id", "modified"])
+        _take_board_description_snapshot(client, binding)
+    except PlankaAPIError as exc:
+        logger.warning("Could not register Planka webhook: %s", exc)
+
+
+def _take_board_description_snapshot(client, binding):
+    """
+    Fetch all cards on the Reviews board and record an initial description
+    snapshot for each. Skips cards with no description or no change.
+    """
+    try:
+        _board_item, included = client.get_board(binding.board_id)
+    except PlankaAPIError as exc:
+        logger.warning("Could not fetch board %s for snapshot: %s", binding.board_id, exc)
+        return
+
+    included = included or {}
+    cards = included.get("cards") or []
+    lists_by_id = {lst["id"]: lst for lst in (included.get("lists") or [])}
+
+    for card in cards:
+        card_id = str(card.get("id") or "")
+        if not card_id:
+            continue
+        description = card.get("description") or ""
+        list_id = str(card.get("listId") or "")
+        list_obj = lists_by_id.get(list_id, {})
+        list_type = list_obj.get("type") or "active"
+        if list_type == "trash":
+            continue
+        PlankaCardRevision.record(
+            binding=binding,
+            card_id=card_id,
+            card_name=card.get("name") or "",
+            board_id=binding.board_id,
+            description=description,
+            source="snapshot",
+        )
+
+
+def _sync_contributor_to_planka(contributor):
+    """
+    Ensure the contributor has a Planka user account and is a member of the
+    issue's Planka board. Updates and saves the planka_* fields on the contributor.
+    Returns (success: bool, error_message: str).
+    """
+    try:
+        binding = PlankaIssueBinding.objects.filter(issue=contributor.issue).first()
+        if not binding:
+            return False, "No Planka board is linked to this issue."
+
+        client = _build_planka_client()
+
+        planka_user = client.find_user_by_email(contributor.email)
+
+        desired_name = (contributor.name or "").strip() or contributor.email
+        if not planka_user:
+            planka_user = client.create_user(contributor.email, desired_name)
+        elif (planka_user.get("name") or "").strip() != desired_name:
+            try:
+                client.update_user(str(planka_user["id"]), desired_name)
+            except PlankaAPIError:
+                pass  # Best-effort: OIDC will sync the name on next Planka login
+
+        # If a Django user already exists for this email, ensure user.name is
+        # set so the OIDC token carries the correct name when they log into Planka.
+        User = get_user_model()
+        django_user = User.objects.filter(email__iexact=contributor.email).first()
+        if django_user and not (getattr(django_user, "name", "") or "").strip():
+            django_user.name = desired_name
+            django_user.save(update_fields=["name"])
+
+        planka_user_id = str(planka_user["id"])
+
+        # Remove stale memberships before (re-)adding
+        for stale_id in [contributor.planka_membership_id, contributor.planka_instructions_membership_id]:
+            if stale_id:
+                try:
+                    client.remove_board_member(stale_id)
+                except PlankaAPIError:
+                    pass
+
+        # Reviews board — editor so the contributor can edit cards
+        membership = client.add_board_member(binding.board_id, planka_user_id, role="editor")
+        membership_id = str(membership.get("id", ""))
+
+        # Instructions board — coordinators get editor access; others get read-only viewer
+        instructions_membership_id = ""
+        if binding.instructions_board_id:
+            instructions_role = "editor" if contributor.role == IssueContributor.Role.COORDINATOR else "viewer"
+            instr_membership = client.add_board_member(
+                binding.instructions_board_id, planka_user_id, role=instructions_role
+            )
+            instructions_membership_id = str(instr_membership.get("id", ""))
+
+        contributor.planka_user_id = planka_user_id
+        contributor.planka_membership_id = membership_id
+        contributor.planka_instructions_membership_id = instructions_membership_id
+        contributor.planka_sync_state = IssueContributor.PlankaSyncState.OK
+        contributor.planka_last_error = ""
+        contributor.save(
+            update_fields=[
+                "planka_user_id",
+                "planka_membership_id",
+                "planka_instructions_membership_id",
+                "planka_sync_state",
+                "planka_last_error",
+                "modified",
+            ]
+        )
+        return True, ""
+
+    except PlankaAPIError as error:
+        error_msg = _safe_planka_error(error)
+        contributor.planka_sync_state = IssueContributor.PlankaSyncState.ERROR
+        contributor.planka_last_error = error_msg
+        contributor.save(update_fields=["planka_sync_state", "planka_last_error", "modified"])
+        return False, error_msg
 
 
 def _extract_board_cards(binding):
@@ -2408,6 +3061,103 @@ def _render_planka_project_context_card(request, issue, card_status=None, card_s
     return render(request, "backend/issue_builder/_planka_project_context_card.html", context)
 
 
+def _issue_invite_ttl_days():
+    return int(getattr(settings, "ISSUE_CONTRIBUTOR_INVITE_TTL_DAYS", 180))
+
+
+def _build_issue_invite_url(request, raw_token):
+    return request.build_absolute_uri(reverse("issue_invite_accept", kwargs={"token": raw_token}))
+
+
+def _create_issue_contributor_invite(contributor, created_by):
+    now = timezone.now()
+    expires_at = now + datetime.timedelta(days=_issue_invite_ttl_days())
+    raw_token = IssueContributorInvite.generate_raw_token()
+    token_hash = IssueContributorInvite.hash_token(raw_token)
+
+    IssueContributorInvite.objects.filter(
+        contributor=contributor,
+        consumed_at__isnull=True,
+        expires_at__gt=now,
+    ).update(consumed_at=now)
+
+    invite = IssueContributorInvite.objects.create(
+        contributor=contributor,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        created_by=created_by,
+    )
+    return invite, raw_token
+
+
+def _send_issue_invite_email(request, invite, raw_token):
+    contributor = invite.contributor
+    issue = contributor.issue
+    accept_url = _build_issue_invite_url(request, raw_token)
+    context = {
+        "issue": issue,
+        "contributor": contributor,
+        "accept_url": accept_url,
+        "expires_at": invite.expires_at,
+    }
+
+    subject = f"Invitation to contribute to {issue.name}"
+    text_body = render_to_string("backend/email/issue_contributor_invite.txt", context)
+    html_body = render_to_string("backend/email/issue_contributor_invite.html", context)
+
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=None,
+        to=[contributor.email],
+    )
+    message.attach_alternative(html_body, "text/html")
+    message.send()
+
+    invite.sent_at = timezone.now()
+    invite.save(update_fields=["sent_at", "modified"])
+
+
+def _send_issue_welcome_email(request, contributor):
+    issue = contributor.issue
+    planka_url = getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", "")
+    context = {
+        "issue": issue,
+        "contributor": contributor,
+        "planka_url": planka_url,
+    }
+    subject = f"Thank you for agreeing to review for {issue.name}"
+    text_body = render_to_string("backend/email/issue_contributor_welcome.txt", context)
+    html_body = render_to_string("backend/email/issue_contributor_welcome.html", context)
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=None,
+        to=[contributor.email],
+    )
+    message.attach_alternative(html_body, "text/html")
+    message.send()
+
+
+def _render_issue_contributors_panel(request, issue, invite_form=None, role="reviewer"):
+    context = _issue_builder_base_context(issue=issue)
+    if invite_form is not None:
+        context["issue_contributor_invite_form"] = invite_form
+    if role == IssueContributor.Role.COORDINATOR:
+        return render(request, "backend/issue_builder/_issue_coordinators_panel.html", context)
+    return render(request, "backend/issue_builder/_issue_contributors_panel.html", context)
+
+
+def _panel_role_from_request(request, contributor=None):
+    """Determine which panel to re-render: check POST data, then fall back to contributor's role."""
+    role = request.POST.get("panel_role", "")
+    if role in (IssueContributor.Role.COORDINATOR, IssueContributor.Role.REVIEWER):
+        return role
+    if contributor is not None:
+        return contributor.role
+    return IssueContributor.Role.REVIEWER
+
+
 def _issue_builder_base_context(
     issue=None,
     review_form=None,
@@ -2417,7 +3167,6 @@ def _issue_builder_base_context(
     planka_publish_summary=None,
     planka_panel_status=None,
     planka_panel_status_level="info",
-    planka_api_key_form=None,
     planka_background_form=None,
     planka_project_name_form=None,
     planka_context_status=None,
@@ -2426,6 +3175,7 @@ def _issue_builder_base_context(
     planka_card_scope="publish",
     planka_scope_counts=None,
     planka_board_missing=False,
+    issue_contributor_invite_form=None,
 ):
     issue_qs = Issue.objects.prefetch_related("reviews__article", "reviews__author").order_by("-modified")
     credential = _get_planka_integration_credential()
@@ -2436,7 +3186,6 @@ def _issue_builder_base_context(
         "issue_form": IssueBuilderIssueForm(instance=issue) if issue else IssueBuilderIssueForm(),
         "max_featured_reviews": int(getattr(settings, "ISSUE_BUILDER_MAX_FEATURED_REVIEWS", 2)),
         "planka_credential": credential,
-        "planka_api_key_form": planka_api_key_form or PlankaApiKeyForm(),
         "planka_binding": None,
         "planka_setup_form": PlankaProjectSetupForm(),
         "planka_background_form": planka_background_form or PlankaProjectBackgroundForm(),
@@ -2452,6 +3201,12 @@ def _issue_builder_base_context(
         "planka_board_missing": planka_board_missing,
         "planka_context_status": planka_context_status,
         "planka_context_status_level": planka_context_status_level,
+        "issue_contributors": [],
+        "issue_coordinators": [],
+        "issue_reviewers": [],
+        "issue_contributor_invite_form": issue_contributor_invite_form or IssueContributorInviteForm(),
+        "issue_invite_ttl_days": _issue_invite_ttl_days(),
+        "all_health_services": list(HealthService.objects.order_by("name").values_list("name", flat=True)),
     }
 
     if issue:
@@ -2475,7 +3230,10 @@ def _issue_builder_base_context(
         if context["planka_publish_summary"] is None:
             context["planka_publish_summary"] = _build_planka_publish_summary(context["planka_publish_cards"])
 
-        context["planka_api_key_form"].fields["issue_id"].initial = issue.pk
+        all_contributors = IssueContributor.objects.filter(issue=issue).select_related("user", "invited_by", "author")
+        context["issue_contributors"] = all_contributors
+        context["issue_coordinators"] = [c for c in all_contributors if c.role == IssueContributor.Role.COORDINATOR]
+        context["issue_reviewers"] = [c for c in all_contributors if c.role == IssueContributor.Role.REVIEWER]
 
     return context
 
@@ -2488,6 +3246,24 @@ def _render_issue_panel(request, issue, review_form=None, form_action=None, is_e
         is_edit=is_edit,
     )
     return render(request, "backend/issue_builder/_issue_reviews_panel.html", context)
+
+
+def _get_issue_review_readiness(issue):
+    if not issue:
+        return []
+    reviews = issue.reviews.select_related("author", "article").all()
+    result = []
+    for review in reviews:
+        indicators = [
+            {"label": "Body", "ok": bool((review.body or "").strip()), "required": True},
+            {"label": "Author", "ok": review.author is not None, "required": True},
+            {"label": "Article title", "ok": bool(review.article.get_title()), "required": True},
+        ]
+        if review.is_featured:
+            indicators.append({"label": "Feature image", "ok": bool(review.feature_image), "required": True})
+        is_ready = all(i["ok"] for i in indicators if i["required"])
+        result.append({"review": review, "indicators": indicators, "is_ready": is_ready})
+    return result
 
 
 def _validate_issue_publish(issue):
@@ -2519,18 +3295,108 @@ def _validate_issue_publish(issue):
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
 def issue_builder(request):
-    issue_id = request.GET.get("issue")
-    issue = get_object_or_404(Issue, pk=issue_id) if issue_id else Issue.objects.order_by("-modified", "-pk").first()
+    if _is_coordinator_only(request.user):
+        # Coordinators do not access the setup step; redirect to the reviewers page.
+        issue_id = (request.GET.get("issue") or request.POST.get("issue") or "").strip()
+        target = reverse("backend:issue_reviewers")
+        if issue_id.isdigit():
+            target += f"?issue={issue_id}"
+        return redirect(target)
 
+    issue = _resolve_and_persist_issue(request)
     context = _issue_builder_base_context(issue=issue)
     return render(request, "backend/issue_builder/issue_builder.html", context)
 
 
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_reviewers(request):
+    issue = _resolve_and_persist_issue(request)
+    _check_coordinator_issue_access(request, issue)
+    context = _issue_builder_base_context(issue=issue)
+    return render(request, "backend/issue_builder/issue_reviewers.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def issue_reviews_edit(request):
+    issue = _resolve_and_persist_issue(request)
+    context = _issue_builder_base_context(issue=issue)
+    return render(request, "backend/issue_builder/issue_reviews_edit.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def issue_publish(request):
+    from spanza_journal_watch.layout.models import Homepage
+
+    issue = _resolve_and_persist_issue(request)
+    current_homepage = Homepage.get_current_homepage()
+    context = _issue_builder_base_context(issue=issue)
+    context["current_homepage"] = current_homepage
+    context["review_readiness"] = _get_issue_review_readiness(issue)
+    return render(request, "backend/issue_builder/issue_publish.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def issue_set_homepage(request):
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST only")
+    from spanza_journal_watch.layout.models import Homepage
+
+    issue = _resolve_and_persist_issue(request)
+    if not issue:
+        messages.error(request, "No issue selected.")
+        return redirect(reverse("backend:issue_publish"))
+    Homepage.objects.update(publication_ready=False)
+    homepage, _ = Homepage.objects.get_or_create(issue=issue)
+    homepage.publication_ready = True
+    homepage.save()
+    Homepage.publish_homepage(homepage)
+    messages.success(request, f'"{issue.name}" is now set as the homepage.')
+    return redirect(f"{reverse('backend:issue_publish')}?issue={issue.pk}")
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def toggle_review_active(request, review_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST only")
+
+    from spanza_journal_watch.layout.models import Homepage
+
+    review = get_object_or_404(Review, pk=review_id)
+    issue = review.issues.first()
+
+    review.active = not review.active
+    review.save(update_fields=["active"])
+
+    if review.active:
+        if not review.article.active:
+            review.article.active = True
+            review.article.save(update_fields=["active", "modified"])
+        if issue and not issue.active:
+            issue.active = True
+            issue.save(update_fields=["active", "modified"])
+    else:
+        if issue:
+            any_active = issue.reviews.filter(active=True).exists()
+            if not any_active:
+                issue.active = False
+                issue.save(update_fields=["active", "modified"])
+
+    current_homepage = Homepage.get_current_homepage()
+    context = _issue_builder_base_context(issue=issue)
+    context["current_homepage"] = current_homepage
+    context["review_readiness"] = _get_issue_review_readiness(issue)
+    return render(request, "backend/issue_builder/_publish_reviews_panel.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
 def issue_planka_import(request):
-    issue_id = request.GET.get("issue")
-    issue = get_object_or_404(Issue, pk=issue_id) if issue_id else Issue.objects.order_by("-modified", "-pk").first()
+    issue = _resolve_and_persist_issue(request)
 
     context = _issue_builder_base_context(issue=issue)
     binding = context.get("planka_binding")
@@ -2581,62 +3447,279 @@ def issue_planka_import(request):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
-def planka_save_api_key(request):
-    if request.method != "POST":
-        return HttpResponseBadRequest("Bad Request - POST only")
+@permission_required("submissions.chief_editor", raise_exception=True)
+def backend_settings(request):
+    from oauth2_provider.models import Application as OAuthApplication
 
-    form = PlankaApiKeyForm(request.POST)
-    issue_id = (request.POST.get("issue_id") or "").strip()
-    issue = get_object_or_404(Issue, pk=issue_id) if issue_id else None
+    pubmed_credential = _get_pubmed_integration_credential()
+    planka_credential = _get_planka_integration_credential()
+    watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
+    planka_oidc_app = OAuthApplication.objects.filter(client_id="planka-local").first()
 
-    if not form.is_valid():
-        messages.error(request, "Please provide a valid Planka API key.")
-        context = _issue_builder_base_context(
-            issue=issue,
-            planka_api_key_form=form,
-        )
-        return render(request, "backend/issue_builder/planka_import.html", context)
+    # Test live Planka connection and check chief editor's Planka role.
+    planka_connected = False
+    planka_connection_user = None
+    planka_connection_error = None
+    chief_editor_planka_user = None
+    if planka_credential and planka_credential.get_api_key():
+        try:
+            client = PlankaClient(api_key=planka_credential.get_api_key(), access_token="")
+            planka_connection_user = client.get_current_user()
+            planka_connected = True
+            if planka_credential.last_error:
+                planka_credential.last_error = ""
+                planka_credential.save(update_fields=["last_error", "modified"])
+            # Look up the chief editor's own Planka account.
+            chief_editor_planka_user = client.find_user_by_email(request.user.email)
+        except PlankaAPIError as exc:
+            planka_connection_error = _safe_planka_error(exc)
+            if planka_credential.last_error != planka_connection_error:
+                planka_credential.last_error = planka_connection_error
+                planka_credential.save(update_fields=["last_error", "modified"])
 
-    api_key = form.cleaned_data["api_key"]
+    context = {
+        "pubmed_credential": pubmed_credential,
+        "pubmed_api_key_form": PubmedApiKeyForm(),
+        "planka_credential": planka_credential,
+        "planka_oidc_app": planka_oidc_app,
+        "planka_connected": planka_connected,
+        "planka_connection_user": planka_connection_user,
+        "planka_connection_error": planka_connection_error,
+        "chief_editor_planka_user": chief_editor_planka_user,
+        "watched_journal_form": WatchedJournalForm(),
+        "watched_journals": watched_items,
+    }
+    return render(request, "backend/settings.html", context)
+
+
+def _run_management_command(command_name, **kwargs):
+    """Run a management command, capture its stdout/stderr, return (success, output)."""
+    import io as _io
+
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    buf = _io.StringIO()
     try:
-        validation_client = PlankaClient(api_key=api_key, access_token="")
-        validation_client.get_current_user()
+        call_command(command_name, stdout=buf, stderr=buf, no_color=True, **kwargs)
+        return True, buf.getvalue()
+    except CommandError as exc:
+        output = buf.getvalue()
+        if output:
+            return False, f"{output}\n{exc}"
+        return False, str(exc)
+    except Exception as exc:
+        return False, f"Unexpected error: {exc}"
 
-        credential = _get_planka_integration_credential() or PlankaIntegrationCredential(singleton=1)
-        credential.auth_mode = PlankaIntegrationCredential.AuthMode.API_KEY
-        credential.set_api_key(api_key)
-        credential.api_key_prefix = api_key.split("_", 1)[0] if "_" in api_key else ""
-        credential.configured_by = request.user
-        credential.last_validated_at = timezone.now()
-        credential.last_error = ""
-        credential.save()
-    except PlankaAPIError as error:
-        safe_error = _safe_planka_error(error)
-        credential = _get_planka_integration_credential()
-        if credential:
-            credential.last_error = safe_error
-            credential.save(update_fields=["last_error", "modified"])
 
-        messages.error(request, f"Could not validate Planka API key: {safe_error}")
-        context = _issue_builder_base_context(
-            issue=issue,
-            planka_api_key_form=form,
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def planka_run_setup_oidc(request):
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+
+        return HttpResponseNotAllowed(["POST"])
+    success, output = _run_management_command("setup_planka_oidc")
+    return render(
+        request,
+        "backend/_setup_command_result.html",
+        {
+            "success": success,
+            "output": output,
+            "command": "setup_planka_oidc",
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def planka_run_setup_api_key(request):
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+
+        return HttpResponseNotAllowed(["POST"])
+    success, output = _run_management_command("setup_planka_api_key")
+    return render(
+        request,
+        "backend/_setup_command_result.html",
+        {
+            "success": success,
+            "output": output,
+            "command": "setup_planka_api_key",
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def planka_promote_chief_editor(request):
+    """Promote the requesting chief editor's Planka account to the admin role."""
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        client = _build_planka_client()
+        planka_user = client.find_user_by_email(request.user.email)
+        if not planka_user:
+            return render(
+                request,
+                "backend/_setup_command_result.html",
+                {
+                    "success": False,
+                    "output": (
+                        f"No Planka account found for {request.user.email}.\n"
+                        "Log into Planka via SSO first, then return here to promote your account."
+                    ),
+                    "command": "planka_promote_chief_editor",
+                },
+            )
+        if planka_user.get("role") == "admin":
+            return render(
+                request,
+                "backend/_setup_command_result.html",
+                {
+                    "success": True,
+                    "output": f"Account {request.user.email} is already a Planka admin.",
+                    "command": "planka_promote_chief_editor",
+                },
+            )
+        client.set_user_role(str(planka_user["id"]), "admin")
+        return render(
+            request,
+            "backend/_setup_command_result.html",
+            {
+                "success": True,
+                "output": f"Promoted {request.user.email} to Planka admin.",
+                "command": "planka_promote_chief_editor",
+            },
         )
-        return render(request, "backend/issue_builder/planka_import.html", context)
+    except PlankaAPIError as exc:
+        return render(
+            request,
+            "backend/_setup_command_result.html",
+            {
+                "success": False,
+                "output": f"Planka API error: {_safe_planka_error(exc)}",
+                "command": "planka_promote_chief_editor",
+            },
+        )
 
-    messages.success(request, "Planka API key saved successfully.")
-    redirect_url = reverse("backend:issue_planka_import")
-    if issue:
-        redirect_url = f"{redirect_url}?issue={issue.pk}"
-    return redirect(redirect_url)
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def affiliations_list(request):
+    if request.method == "POST":
+        form = HealthServiceForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Affiliation added.")
+            return redirect(reverse("backend:affiliations_list"))
+    else:
+        form = HealthServiceForm()
+
+    affiliations = HealthService.objects.order_by("name")
+    return render(
+        request,
+        "backend/affiliations.html",
+        {
+            "affiliations": affiliations,
+            "form": form,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def affiliation_edit(request, affiliation_id):
+    affiliation = get_object_or_404(HealthService, pk=affiliation_id)
+    if request.method == "POST":
+        form = HealthServiceForm(request.POST, request.FILES, instance=affiliation)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Affiliation updated.")
+            return redirect(reverse("backend:affiliations_list"))
+    else:
+        form = HealthServiceForm(instance=affiliation)
+
+    affiliations = HealthService.objects.order_by("name")
+    return render(
+        request,
+        "backend/affiliations.html",
+        {
+            "affiliations": affiliations,
+            "form": form,
+            "editing": affiliation,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def authors_list(request):
+    q = request.GET.get("q", "").strip()
+    if request.method == "POST":
+        form = AuthorForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Author added.")
+            return redirect(reverse("backend:authors_list"))
+    else:
+        form = AuthorForm()
+
+    authors_qs = Author.objects.prefetch_related("health_services").order_by("name")
+    if q:
+        authors_qs = authors_qs.filter(Q(name__icontains=q) | Q(email__icontains=q))
+
+    paginator = Paginator(authors_qs, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "backend/authors.html",
+        {
+            "authors": page_obj,
+            "form": form,
+            "q": q,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def author_edit(request, author_id):
+    author = get_object_or_404(Author, pk=author_id)
+    if request.method == "POST":
+        form = AuthorForm(request.POST, request.FILES, instance=author)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Author updated.")
+            return redirect(reverse("backend:authors_list"))
+    else:
+        form = AuthorForm(instance=author)
+
+    return render(
+        request,
+        "backend/authors.html",
+        {
+            "authors": Author.objects.prefetch_related("health_services").order_by("name"),
+            "form": form,
+            "editing": author,
+            "q": "",
+        },
+    )
 
 
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
 def save_issue_draft(request, issue_id=None):
+    # Creating a new issue requires chief_editor; updating an existing one requires
+    # only manage_issue_builder (already enforced by the decorator above).
+    if issue_id is None and not request.user.has_perm("submissions.chief_editor"):
+        raise PermissionDenied
     issue = get_object_or_404(Issue, pk=issue_id) if issue_id else None
-    form = IssueBuilderIssueForm(request.POST, instance=issue)
+    _check_coordinator_issue_access(request, issue)
+    form = IssueBuilderIssueForm(request.POST, request.FILES, instance=issue)
 
     if form.is_valid():
         issue = form.save(commit=False)
@@ -2646,7 +3729,9 @@ def save_issue_draft(request, issue_id=None):
         messages.success(request, "Issue draft saved.")
         return_url = f"{reverse('backend:issue_builder')}?issue={issue.pk}"
         if request.headers.get("HX-Request") == "true":
-            response = _render_issue_panel(request, issue)
+            from django.http import HttpResponse as _HttpResponse
+
+            response = _HttpResponse()
             response["HX-Redirect"] = return_url
             return response
         return redirect(return_url)
@@ -2657,7 +3742,7 @@ def save_issue_draft(request, issue_id=None):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def new_review_form(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     form = IssueBuilderReviewForm(issue=issue)
@@ -2674,7 +3759,7 @@ def new_review_form(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def add_issue_review(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     form = IssueBuilderReviewForm(request.POST, request.FILES, issue=issue)
@@ -2688,7 +3773,7 @@ def add_issue_review(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def edit_issue_review_form(request, issue_id, review_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     review = get_object_or_404(issue.reviews, pk=review_id)
@@ -2710,7 +3795,7 @@ def edit_issue_review_form(request, issue_id, review_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def update_issue_review(request, issue_id, review_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     review = get_object_or_404(issue.reviews, pk=review_id)
@@ -2731,7 +3816,7 @@ def update_issue_review(request, issue_id, review_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def remove_issue_review(request, issue_id, review_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     review = get_object_or_404(issue.reviews, pk=review_id)
@@ -2743,6 +3828,440 @@ def remove_issue_review(request, issue_id, review_id):
 
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
+def contributor_author_lookup(request):
+    """JSON: look up an existing Author by email, returning name and affiliations."""
+    from django.http import JsonResponse
+
+    email = (request.GET.get("email") or "").strip().lower()
+    if not email:
+        return JsonResponse({"found": False})
+    author = Author.objects.prefetch_related("health_services").filter(email__iexact=email).first()
+    if not author:
+        return JsonResponse({"found": False})
+    affiliations = [{"id": hs.pk, "name": hs.name} for hs in author.health_services.all()]
+    return JsonResponse(
+        {
+            "found": True,
+            "name": author.name or "",
+            "affiliations": affiliations,
+            "has_affiliations": bool(affiliations),
+        }
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_add_contributor(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+
+    # Collect rows: name_0/email_0, name_1/email_1, ...
+    role = request.POST.get("role", "")
+    rows = []
+    i = 0
+    while True:
+        name = request.POST.get(f"name_{i}", "").strip()
+        email = request.POST.get(f"email_{i}", "").strip()
+        if not name and not email:
+            break
+        rows.append((i, name, email))
+        i += 1
+
+    panel_role = _panel_role_from_request(request)
+
+    if not rows:
+        messages.error(request, "Please provide at least one name and email.")
+        return _render_issue_contributors_panel(request, issue, role=panel_role)
+
+    for idx, name, email in rows:
+        if not name or not email:
+            messages.warning(request, f"Row {idx + 1}: name and email are both required — skipped.")
+            continue
+
+        affiliation_names = [n.strip() for n in request.POST.getlist(f"affiliation_{idx}") if n.strip()]
+
+        contributor, created = IssueContributor.objects.get_or_create(
+            issue=issue,
+            email=email,
+            defaults={
+                "name": name,
+                "role": role,
+                "status": IssueContributor.Status.PENDING,
+                "accepted_at": None,
+                "revoked_at": None,
+                "planka_sync_state": IssueContributor.PlankaSyncState.PENDING,
+                "planka_last_error": "",
+            },
+        )
+
+        if not created:
+            contributor.name = name
+            contributor.role = role
+            if contributor.status not in (
+                IssueContributor.Status.ACTIVE,
+                IssueContributor.Status.INVITED,
+            ):
+                contributor.status = IssueContributor.Status.PENDING
+            contributor.planka_sync_state = IssueContributor.PlankaSyncState.PENDING
+            contributor.planka_last_error = ""
+            contributor.save(
+                update_fields=[
+                    "name",
+                    "role",
+                    "status",
+                    "planka_sync_state",
+                    "planka_last_error",
+                    "modified",
+                ]
+            )
+
+        # Link to existing Author by email, or create one if affiliation is provided.
+        if not contributor.author:
+            existing_author = Author.objects.prefetch_related("health_services").filter(email__iexact=email).first()
+            if existing_author:
+                contributor.author = existing_author
+                contributor.save(update_fields=["author", "modified"])
+            elif affiliation_names:
+                new_author = Author.objects.create(name=name, email=email)
+                contributor.author = new_author
+                contributor.save(update_fields=["author", "modified"])
+
+        # Add any submitted affiliations to the Author (never removes existing ones).
+        if affiliation_names and contributor.author:
+            for affiliation_name in affiliation_names:
+                hs, _ = HealthService.objects.get_or_create(name=affiliation_name)
+                contributor.author.health_services.add(hs)
+
+        planka_ok, planka_error = _sync_contributor_to_planka(contributor)
+        if not planka_ok:
+            messages.warning(request, f"Planka board access could not be set up for {email}: {planka_error}")
+
+        if created:
+            messages.success(request, f"Added {email}.")
+        else:
+            messages.success(request, f"Updated {email}.")
+
+    return _render_issue_contributors_panel(request, issue, role=panel_role)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_send_contributor_invites(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+    contributor_ids = request.POST.getlist("contributor_ids")
+    panel_role = _panel_role_from_request(request)
+
+    if not contributor_ids:
+        messages.error(request, "No contributors selected.")
+        return _render_issue_contributors_panel(request, issue, role=panel_role)
+
+    contributors = IssueContributor.objects.filter(
+        issue=issue,
+        pk__in=contributor_ids,
+    ).exclude(status=IssueContributor.Status.REVOKED)
+
+    now = timezone.now()
+    for contributor in contributors:
+        contributor.status = IssueContributor.Status.INVITED
+        contributor.invited_by = request.user
+        contributor.invited_at = now
+        contributor.save(update_fields=["status", "invited_by", "invited_at", "modified"])
+
+        invite, raw_token = _create_issue_contributor_invite(contributor, request.user)
+        try:
+            _send_issue_invite_email(request, invite, raw_token)
+            messages.success(request, f"Invite sent to {contributor.email}.")
+        except Exception as error:
+            messages.error(request, f"Could not send invite to {contributor.email}: {error}")
+
+    return _render_issue_contributors_panel(request, issue, role=panel_role)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_resend_contributor_invite(request, issue_id, contributor_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+    contributor = get_object_or_404(IssueContributor, pk=contributor_id, issue=issue)
+
+    contributor.status = IssueContributor.Status.INVITED
+    contributor.invited_by = request.user
+    contributor.invited_at = timezone.now()
+    contributor.revoked_at = None
+    contributor.planka_sync_state = IssueContributor.PlankaSyncState.PENDING
+    contributor.planka_last_error = ""
+    contributor.save(
+        update_fields=[
+            "status",
+            "invited_by",
+            "invited_at",
+            "revoked_at",
+            "planka_sync_state",
+            "planka_last_error",
+            "modified",
+        ]
+    )
+
+    planka_ok, planka_error = _sync_contributor_to_planka(contributor)
+    if not planka_ok:
+        messages.warning(request, f"Planka board access could not be set up: {planka_error}")
+
+    invite, raw_token = _create_issue_contributor_invite(contributor, request.user)
+    try:
+        _send_issue_invite_email(request, invite, raw_token)
+        messages.success(request, f"Invite resent to {contributor.email}.")
+    except Exception as error:
+        messages.error(request, f"Could not resend invite email: {error}")
+
+    return _render_issue_contributors_panel(request, issue, role=contributor.role)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_sync_contributor_planka(request, issue_id, contributor_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+    contributor = get_object_or_404(IssueContributor, pk=contributor_id, issue=issue)
+
+    ok, error = _sync_contributor_to_planka(contributor)
+    if ok:
+        messages.success(request, f"Planka access synced for {contributor.email}.")
+    else:
+        messages.warning(request, f"Planka sync failed: {error}")
+
+    return _render_issue_contributors_panel(request, issue, role=contributor.role)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def issue_revoke_contributor(request, issue_id, contributor_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+    contributor = get_object_or_404(IssueContributor, pk=contributor_id, issue=issue)
+    now = timezone.now()
+
+    if contributor.planka_user_id:
+        try:
+            client = _build_planka_client()
+            binding = PlankaIssueBinding.objects.filter(issue=issue).first()
+
+            # If membership IDs aren't stored, look them up via the API
+            if binding and not contributor.planka_membership_id:
+                found = client.find_board_membership(binding.board_id, contributor.planka_user_id)
+                if found:
+                    contributor.planka_membership_id = str(found.get("id", ""))
+
+            if binding and binding.instructions_board_id and not contributor.planka_instructions_membership_id:
+                found = client.find_board_membership(binding.instructions_board_id, contributor.planka_user_id)
+                if found:
+                    contributor.planka_instructions_membership_id = str(found.get("id", ""))
+
+            for membership_id in [contributor.planka_membership_id, contributor.planka_instructions_membership_id]:
+                if membership_id:
+                    client.remove_board_member(membership_id)
+            contributor.planka_membership_id = ""
+            contributor.planka_instructions_membership_id = ""
+            contributor.planka_sync_state = IssueContributor.PlankaSyncState.OK
+        except PlankaAPIError as error:
+            contributor.planka_sync_state = IssueContributor.PlankaSyncState.ERROR
+            contributor.planka_last_error = _safe_planka_error(error)
+            messages.warning(request, f"Could not remove Planka access: {contributor.planka_last_error}")
+
+    contributor.status = IssueContributor.Status.REVOKED
+    contributor.revoked_at = now
+    contributor.save(
+        update_fields=[
+            "status",
+            "revoked_at",
+            "planka_membership_id",
+            "planka_instructions_membership_id",
+            "planka_sync_state",
+            "planka_last_error",
+            "modified",
+        ]
+    )
+
+    IssueContributorInvite.objects.filter(
+        contributor=contributor,
+        consumed_at__isnull=True,
+        expires_at__gt=now,
+    ).update(consumed_at=now)
+
+    messages.success(request, f"Access revoked for {contributor.email}.")
+    return _render_issue_contributors_panel(request, issue, role=contributor.role)
+
+
+def issue_invite_accept(request, token):
+    token_hash = IssueContributorInvite.hash_token(token)
+    invite = (
+        IssueContributorInvite.objects.select_related("contributor", "contributor__issue", "contributor__user")
+        .filter(token_hash=token_hash)
+        .first()
+    )
+
+    context = {
+        "invite": invite,
+        "status": "invalid",
+        "status_message": "This invite link is invalid.",
+    }
+    if not invite:
+        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+    contributor = invite.contributor
+    now = timezone.now()
+
+    if contributor.status == IssueContributor.Status.REVOKED:
+        context["status_message"] = "This invite has been revoked."
+        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+    if invite.expires_at <= now:
+        context["status"] = "expired"
+        context["status_message"] = "This invite has expired. Please ask for a new invite link."
+        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+    if not request.user.is_authenticated:
+        User = get_user_model()
+        account_exists = User.objects.filter(email=contributor.email).exists()
+        invite_path = request.get_full_path()
+        # Store token + email in session:
+        # - token: lets AccountAdapter.is_open_for_signup validate the invite
+        # - email: lets InviteAwareLoginView/SignupView pre-fill & lock the email field
+        request.session["_pending_invite_token"] = token
+        request.session["pending_invite_email"] = contributor.email
+        context["status"] = "unauthenticated"
+        context["invited_email"] = contributor.email
+        context["account_exists"] = account_exists
+        context["login_url"] = f"{reverse('account_login')}?next={invite_path}"
+        context["signup_url"] = f"{reverse('account_signup')}?next={invite_path}"
+        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+    expected_email = (contributor.email or "").strip().lower()
+    user_email = (request.user.email or "").strip().lower()
+
+    if expected_email != user_email:
+        from django.contrib.auth import logout as auth_logout
+
+        auth_logout(request)
+        messages.info(
+            request,
+            f"You've been signed out. Please sign in or create an account"
+            f" with {contributor.email} to accept this invite.",
+        )
+        return redirect(request.get_full_path())
+
+    if (
+        invite.consumed_at
+        and contributor.user_id == request.user.pk
+        and contributor.status == IssueContributor.Status.ACTIVE
+    ):
+        context["status"] = "accepted"
+        context["status_message"] = "Invite already accepted. You already have access."
+        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+    with transaction.atomic():
+        contributor.user = request.user
+        contributor.status = IssueContributor.Status.ACTIVE
+        contributor.accepted_at = now
+        contributor.revoked_at = None
+        contributor.save(update_fields=["user", "status", "accepted_at", "revoked_at", "modified"])
+
+        invite.consumed_at = now
+        invite.save(update_fields=["consumed_at", "modified"])
+
+        # Auto-link Author profile by email if not already linked.
+        if not contributor.author_id:
+            from spanza_journal_watch.submissions.models import Author as AuthorModel
+
+            matched_author = AuthorModel.objects.filter(email=contributor.email).first()
+            if matched_author:
+                contributor.author = matched_author
+                contributor.save(update_fields=["author", "modified"])
+
+        # Populate the user's display name from the invite if not already set,
+        # so that OIDC name claims (used by Planka SSO) reflect their real name.
+        contributor_name = (contributor.name or "").strip()
+        if contributor_name and not (getattr(request.user, "name", "") or "").strip():
+            request.user.name = contributor_name
+            request.user.save(update_fields=["name"])
+
+        # Coordinators get backend access (regional_coordinator + manage_issue_builder permissions + is_staff)
+        if contributor.role == IssueContributor.Role.COORDINATOR:
+            import logging
+
+            from django.contrib.auth.models import Permission as DjangoPerm
+
+            logger = logging.getLogger(__name__)
+            perms_to_grant = [
+                ("submissions", "regional_coordinator"),
+                ("submissions", "manage_issue_builder"),
+            ]
+            granted_count = 0
+            for app_label, codename in perms_to_grant:
+                try:
+                    perm = DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename)
+                    request.user.user_permissions.add(perm)
+                    granted_count += 1
+                except DjangoPerm.DoesNotExist:
+                    logger.warning(
+                        "Permission %s.%s not found when accepting coordinator invite — "
+                        "run migrations to create it.",
+                        app_label,
+                        codename,
+                    )
+            # Clear Django's per-request permission cache so subsequent has_perm() calls
+            # in this same request see the newly granted permissions.
+            for attr in ("_perm_cache", "_user_perm_cache"):
+                request.user.__dict__.pop(attr, None)
+            if granted_count and not request.user.is_staff:
+                request.user.is_staff = True
+                request.user.save(update_fields=["is_staff"])
+
+    # Mark the user's email as verified — the invite link is proof of email ownership.
+    from allauth.account.models import EmailAddress
+
+    EmailAddress.objects.update_or_create(
+        user=request.user,
+        email=request.user.email,
+        defaults={"verified": True, "primary": True},
+    )
+    # Clear pending invite session keys now that the invite is consumed.
+    request.session.pop("_pending_invite_token", None)
+    request.session.pop("pending_invite_email", None)
+
+    _sync_contributor_to_planka(contributor)
+
+    try:
+        _send_issue_welcome_email(request, contributor)
+    except Exception:
+        pass  # Welcome email is best-effort; don't block acceptance
+
+    planka_base_url = getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", "")
+    context["status"] = "accepted"
+    context["status_message"] = "Invite accepted. Your access is now active."
+    context["issue"] = contributor.issue
+    context["planka_base_url"] = planka_base_url
+    context["is_coordinator"] = contributor.role == IssueContributor.Role.COORDINATOR
+    return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
 def publish_issue_bundle(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     errors = _validate_issue_publish(issue)
@@ -2750,7 +4269,7 @@ def publish_issue_bundle(request, issue_id):
     if errors:
         for error in errors:
             messages.error(request, error)
-        return _render_issue_panel(request, issue)
+        return redirect(f"{reverse('backend:issue_publish')}?issue={issue.pk}")
 
     with transaction.atomic():
         issue.active = True
@@ -2768,11 +4287,86 @@ def publish_issue_bundle(request, issue_id):
         transaction.on_commit(bump_content_cache_version)
 
     messages.success(request, "Issue, reviews, and articles are now live.")
-    return _render_issue_panel(request, issue)
+    return redirect(f"{reverse('backend:issue_publish')}?issue={issue.pk}")
+
+
+def _provision_planka_project(client, project_name, background_asset=None):
+    """
+    Create a Planka project, Reviews board, Instructions board (with lists and
+    instruction cards), and optional background image.
+
+    Returns a dict with keys: project, board, instructions_board,
+    list_mapping, instruction_list_mapping.
+    """
+    project = client.create_project(project_name)
+
+    if background_asset:
+        with background_asset.image.open("rb") as image_file:
+            background_image = client.upload_project_background_image(
+                project["id"],
+                image_file,
+                filename=Path(background_asset.image.name).name,
+                content_type="image/webp",
+            )
+        background_image_id = background_image.get("id")
+        if background_image_id:
+            client.update_project_background(
+                project["id"],
+                background_type="image",
+                background_image_id=background_image_id,
+            )
+
+    board = client.create_board(project["id"], name="Reviews")
+    instructions_board = client.create_board(project["id"], name="Instructions", position=2 * 65536)
+
+    list_mapping = {}
+    for index, key in enumerate(PLANKA_LIST_ORDER, start=1):
+        list_obj = client.create_list(
+            board_id=board["id"],
+            name=PLANKA_LIST_LABELS[key],
+            position=index * 65536,
+            list_type="active",
+        )
+        list_color = PLANKA_LIST_COLORS.get(key)
+        if list_color:
+            client.update_list(list_obj["id"], color=list_color)
+        list_mapping[key] = list_obj["id"]
+
+    instruction_cards = _load_instruction_cards_by_bucket()
+    instruction_list_mapping = {}
+    for index, key in enumerate(PLANKA_INSTRUCTIONS_LIST_ORDER, start=1):
+        list_obj = client.create_list(
+            board_id=instructions_board["id"],
+            name=PLANKA_INSTRUCTIONS_LIST_LABELS[key],
+            position=index * 65536,
+            list_type="active",
+        )
+        list_color = PLANKA_INSTRUCTIONS_LIST_COLORS.get(key)
+        if list_color:
+            client.update_list(list_obj["id"], color=list_color)
+        instruction_list_mapping[key] = list_obj["id"]
+
+        cards_for_list = instruction_cards.get(key, [])
+        for card_index, card in enumerate(cards_for_list, start=1):
+            client.create_card(
+                list_id=list_obj["id"],
+                name=card["title"],
+                description=card["body"],
+                position=card_index * 65536,
+                card_type="story",
+            )
+
+    return {
+        "project": project,
+        "board": board,
+        "instructions_board": instructions_board,
+        "list_mapping": list_mapping,
+        "instruction_list_mapping": instruction_list_mapping,
+    }
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_setup_issue_project(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
@@ -2805,67 +4399,9 @@ def planka_setup_issue_project(request, issue_id):
             panel_status=str(error),
             panel_status_level="danger",
         )
-    instruction_cards = _load_instruction_cards_by_bucket()
-
     try:
         client = _build_planka_client()
-        project = client.create_project(project_name)
-
-        if background_asset:
-            with background_asset.image.open("rb") as image_file:
-                background_image = client.upload_project_background_image(
-                    project["id"],
-                    image_file,
-                    filename=Path(background_asset.image.name).name,
-                    content_type="image/webp",
-                )
-            background_image_id = background_image.get("id")
-            if background_image_id:
-                client.update_project_background(
-                    project["id"],
-                    background_type="image",
-                    background_image_id=background_image_id,
-                )
-
-        board = client.create_board(project["id"], name="Reviews")
-        instructions_board = client.create_board(project["id"], name="Instructions", position=2 * 65536)
-
-        list_mapping = {}
-        for index, key in enumerate(PLANKA_LIST_ORDER, start=1):
-            list_obj = client.create_list(
-                board_id=board["id"],
-                name=PLANKA_LIST_LABELS[key],
-                position=index * 65536,
-                list_type="active",
-            )
-            list_color = PLANKA_LIST_COLORS.get(key)
-            if list_color:
-                client.update_list(list_obj["id"], color=list_color)
-            list_mapping[key] = list_obj["id"]
-
-        instruction_list_mapping = {}
-        for index, key in enumerate(PLANKA_INSTRUCTIONS_LIST_ORDER, start=1):
-            list_obj = client.create_list(
-                board_id=instructions_board["id"],
-                name=PLANKA_INSTRUCTIONS_LIST_LABELS[key],
-                position=index * 65536,
-                list_type="active",
-            )
-            list_color = PLANKA_INSTRUCTIONS_LIST_COLORS.get(key)
-            if list_color:
-                client.update_list(list_obj["id"], color=list_color)
-            instruction_list_mapping[key] = list_obj["id"]
-
-            cards_for_list = instruction_cards.get(key, [])
-            for card_index, card in enumerate(cards_for_list, start=1):
-                client.create_card(
-                    list_id=list_obj["id"],
-                    name=card["title"],
-                    description=card["body"],
-                    position=card_index * 65536,
-                    card_type="story",
-                )
-
+        result = _provision_planka_project(client, project_name, background_asset=background_asset)
     except (KeyError, PlankaAPIError) as error:
         return _render_planka_panel(
             request,
@@ -2874,7 +4410,13 @@ def planka_setup_issue_project(request, issue_id):
             panel_status_level="danger",
         )
 
-    PlankaIssueBinding.objects.create(
+    project = result["project"]
+    board = result["board"]
+    instructions_board = result["instructions_board"]
+    list_mapping = result["list_mapping"]
+    instruction_list_mapping = result["instruction_list_mapping"]
+
+    new_binding = PlankaIssueBinding.objects.create(
         issue=issue,
         project_id=project["id"],
         project_name=project_name,
@@ -2888,6 +4430,14 @@ def planka_setup_issue_project(request, issue_id):
         custom_field_group_id=None,
         background_asset=background_asset,
     )
+    _register_planka_webhook(client, new_binding)
+
+    if request.POST.get("from_setup_page"):
+        from django.http import HttpResponse as _HttpResponse
+
+        response = _HttpResponse()
+        response["HX-Redirect"] = f"{reverse('backend:issue_builder')}?issue={issue.pk}"
+        return response
 
     return _render_planka_panel(
         request,
@@ -2898,7 +4448,7 @@ def planka_setup_issue_project(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_recreate_issue_board(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
@@ -2911,25 +4461,83 @@ def planka_recreate_issue_board(request, issue_id):
 
     try:
         client = _build_planka_client()
-        board = client.create_board(binding.project_id, name=(binding.board_name or "Reviews"))
 
-        list_mapping = {}
-        for index, key in enumerate(PLANKA_LIST_ORDER, start=1):
-            list_obj = client.create_list(
-                board_id=board["id"],
-                name=PLANKA_LIST_LABELS[key],
-                position=index * 65536,
-                list_type="active",
+        # Check whether the project still exists. A 404 means the whole project
+        # is gone, so we do a full rebuild instead of just recreating the board.
+        project_gone = False
+        try:
+            client.get_project(binding.project_id)
+        except PlankaAPIError as probe_error:
+            if _is_planka_board_not_found_error(probe_error):
+                project_gone = True
+            else:
+                raise
+
+        if project_gone:
+            # Full rebuild: new project + Reviews board + Instructions board
+            result = _provision_planka_project(
+                client,
+                binding.project_name or issue.name,
+                background_asset=binding.background_asset,
             )
-            list_color = PLANKA_LIST_COLORS.get(key)
-            if list_color:
-                client.update_list(list_obj["id"], color=list_color)
-            list_mapping[key] = list_obj["id"]
+            binding.project_id = result["project"]["id"]
+            binding.project_name = result["project"].get("name") or binding.project_name
+            binding.board_id = result["board"]["id"]
+            binding.board_name = result["board"].get("name") or "Reviews"
+            binding.instructions_board_id = result["instructions_board"]["id"]
+            binding.instructions_board_name = result["instructions_board"].get("name") or "Instructions"
+            binding.lists = result["list_mapping"]
+            binding.instructions_lists = result["instruction_list_mapping"]
+            binding.save(
+                update_fields=[
+                    "project_id",
+                    "project_name",
+                    "board_id",
+                    "board_name",
+                    "instructions_board_id",
+                    "instructions_board_name",
+                    "lists",
+                    "instructions_lists",
+                    "modified",
+                ]
+            )
+            _register_planka_webhook(client, binding)
+            status_msg = "Planka project, Reviews board, and Instructions board recreated from scratch."
+        else:
+            # Project exists — recreate only the Reviews board
+            board = client.create_board(binding.project_id, name=(binding.board_name or "Reviews"))
+            list_mapping = {}
+            for index, key in enumerate(PLANKA_LIST_ORDER, start=1):
+                list_obj = client.create_list(
+                    board_id=board["id"],
+                    name=PLANKA_LIST_LABELS[key],
+                    position=index * 65536,
+                    list_type="active",
+                )
+                list_color = PLANKA_LIST_COLORS.get(key)
+                if list_color:
+                    client.update_list(list_obj["id"], color=list_color)
+                list_mapping[key] = list_obj["id"]
 
-        binding.board_id = board["id"]
-        binding.board_name = board.get("name") or "Reviews"
-        binding.lists = list_mapping
-        binding.save(update_fields=["board_id", "board_name", "lists", "modified"])
+            binding.board_id = board["id"]
+            binding.board_name = board.get("name") or "Reviews"
+            binding.lists = list_mapping
+            binding.save(update_fields=["board_id", "board_name", "lists", "modified"])
+            _register_planka_webhook(client, binding)
+            status_msg = "Reviews board recreated and remapped for this issue."
+
+        # Re-sync all contributors (invited + active) so they have access to the new board.
+        contributors_to_sync = IssueContributor.objects.filter(
+            issue=issue,
+            status__in=[IssueContributor.Status.INVITED, IssueContributor.Status.ACTIVE],
+        )
+        sync_errors = []
+        for contributor in contributors_to_sync:
+            ok, err = _sync_contributor_to_planka(contributor)
+            if not ok:
+                sync_errors.append(f"{contributor.email}: {err}")
+        if sync_errors:
+            status_msg += f" Warning: {len(sync_errors)} contributor(s) could not be synced."
 
         board_cards = _extract_board_cards(binding)
         scoped_cards = _filter_board_cards_by_scope(board_cards, card_scope)
@@ -2937,7 +4545,7 @@ def planka_recreate_issue_board(request, issue_id):
             request,
             issue,
             publish_cards=scoped_cards,
-            panel_status="Reviews board recreated and remapped for this issue.",
+            panel_status=status_msg,
             panel_status_level="success",
             planka_card_scope=card_scope,
             planka_scope_counts=_build_planka_scope_counts(board_cards),
@@ -2963,7 +4571,7 @@ def planka_recreate_issue_board(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_update_project_name(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
@@ -3017,7 +4625,7 @@ def planka_update_project_name(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_update_project_background(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
@@ -3109,7 +4717,7 @@ def planka_update_project_background(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_refresh_publish_cards(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
@@ -3215,22 +4823,91 @@ def _sync_planka_card_into_issue(*, request, issue, binding, selected):
         active=False,
     )
 
-    author_name = (schema.get("author_name") or "").strip()
+    # --- Resolve reviewer (review.author) ---
+    # Primary:  card member(s) — the user(s) assigned to the card.
+    # Fallback: the most-recent user who edited the card description (via actions).
+    # In both cases we match the Planka user's email against IssueContributors for
+    # this issue, since contributors have a linked Author profile.
     author = None
-    if author_name:
-        author_matches = Author.objects.filter(name=author_name)
-        if author_matches.count() == 1:
-            author = author_matches.first()
-        elif author_matches.count() == 0:
-            author = Author.objects.create(
-                title=(schema.get("author_title") or "Dr").strip() or "Dr",
-                name=author_name,
-            )
-        else:
+
+    client = _build_planka_client()
+    try:
+        memberships, member_users_by_id = client.get_card_members(card_id)
+    except Exception:
+        memberships, member_users_by_id = [], {}
+
+    def _resolve_author_from_planka_user_ids(user_ids, users_by_id):
+        """Try to match a list of Planka user IDs to an Author.
+
+        Resolution order per user:
+          1. Author with matching email field.
+          2. IssueContributor for this issue with that email who already has an
+             Author linked — use that Author.
+          3. IssueContributor for this issue with that email — create an Author
+             from the contributor's name and link it.
+        Returns the first Author resolved, or None.
+        """
+        if len(user_ids) > 1:
+            emails = [(users_by_id.get(uid) or {}).get("email", "") for uid in user_ids if uid]
             messages.warning(
                 request,
-                "Multiple matching authors found. Author was not auto-selected.",
+                f"Multiple Planka card members found ({', '.join(e for e in emails if e)}). "
+                "The first contributor match was used.",
             )
+        for uid in user_ids:
+            user_obj = users_by_id.get(str(uid) or "") or {}
+            email = (user_obj.get("email") or "").strip().lower()
+            if not email:
+                continue
+
+            # 1. Author record with this email.
+            author_by_email = Author.objects.filter(email__iexact=email).first()
+            if author_by_email:
+                return author_by_email
+
+            # 2 & 3. Match via IssueContributor for this issue.
+            contributor = issue.contributors.select_related("author").filter(email__iexact=email).first()
+            if contributor:
+                if contributor.author:
+                    return contributor.author
+                # Create an Author from the contributor's name and link it.
+                new_author = Author.objects.create(
+                    name=contributor.name or user_obj.get("name") or email,
+                    email=email,
+                )
+                contributor.author = new_author
+                contributor.save(update_fields=["author", "modified"])
+                return new_author
+
+        return None
+
+    member_user_ids = [str(m.get("userId") or "") for m in memberships if m.get("userId")]
+    if member_user_ids:
+        author = _resolve_author_from_planka_user_ids(member_user_ids, member_users_by_id)
+
+    if author is None and member_user_ids:
+        # Member found in Planka but not matched to a contributor — warn.
+        emails = [(member_users_by_id.get(uid) or {}).get("email", uid) for uid in member_user_ids]
+        messages.warning(
+            request,
+            f"Card member(s) ({', '.join(emails)}) could not be matched to a contributor "
+            "for this issue. Reviewer was not set.",
+        )
+
+    if author is None and not member_user_ids:
+        # No card member — try the most-recent description editor via actions.
+        try:
+            editor_ids = client.get_card_description_editor_ids(card_id)
+        except Exception:
+            editor_ids = []
+        if editor_ids:
+            # We only have user IDs here; fetch users to get emails.
+            try:
+                all_users = client.list_users()
+                editor_users_by_id = {str(u.get("id") or ""): u for u in all_users if u.get("id")}
+            except Exception:
+                editor_users_by_id = {}
+            author = _resolve_author_from_planka_user_ids(editor_ids, editor_users_by_id)
 
     parsed_description_review_body, used_separator = _extract_planka_review_body(selected.get("description"))
     incoming_review_body = parsed_description_review_body or (schema.get("review_body_markdown") or "").strip()
@@ -3288,7 +4965,7 @@ def _sync_planka_card_into_issue(*, request, issue, binding, selected):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_import_publish_cards_bulk(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
@@ -3376,7 +5053,7 @@ def planka_import_publish_cards_bulk(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_import_publish_card(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
@@ -3470,3 +5147,128 @@ def planka_import_publish_card(request, issue_id):
             panel_status=f"Sync failed: {_safe_planka_error(error)}",
             panel_status_level="danger",
         )
+
+
+# ── Planka webhook receiver ────────────────────────────────────────────────────
+
+
+@csrf_exempt
+@require_POST
+def planka_card_update_webhook(request):
+    """
+    Receives cardUpdate / cardCreate / cardDelete events from Planka.
+    Planka payload: { event, data: { item, included }, prevData: { item }, user }
+    Auth: if PLANKA_WEBHOOK_SECRET is set, verifies Authorization: Bearer <secret>.
+    """
+    secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip()
+    if secret:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.removeprefix("Bearer ").strip()
+        if not hmac.compare_digest(token, secret):
+            return JsonResponse({"detail": "Forbidden"}, status=403)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"detail": "Bad JSON"}, status=400)
+
+    event = payload.get("event") or ""
+    data = payload.get("data") or {}
+    item = data.get("item") or {}
+    prev_item = (payload.get("prevData") or {}).get("item") or {}
+
+    card_id = str(item.get("id") or "")
+    board_id = str(item.get("boardId") or "")
+    if not card_id or not board_id:
+        return JsonResponse({"ok": True})
+
+    # Only record on description changes for cardUpdate; always snapshot for create.
+    if event == "cardUpdate":
+        new_desc = item.get("description") or ""
+        old_desc = prev_item.get("description") or ""
+        if new_desc == old_desc:
+            return JsonResponse({"ok": True})
+        description = new_desc
+    elif event == "cardCreate":
+        description = item.get("description") or ""
+    else:
+        return JsonResponse({"ok": True})
+
+    binding = PlankaIssueBinding.objects.filter(board_id=board_id).first()
+    if not binding:
+        return JsonResponse({"ok": True})
+
+    actor = payload.get("user") or {}
+    actor_email = (actor.get("email") or "").strip()
+    actor_name = f"{actor.get('firstName') or ''} {actor.get('lastName') or ''}".strip()
+
+    PlankaCardRevision.record(
+        binding=binding,
+        card_id=card_id,
+        card_name=item.get("name") or "",
+        board_id=board_id,
+        description=description,
+        actor_email=actor_email,
+        actor_name=actor_name,
+        source="webhook",
+    )
+
+    return JsonResponse({"ok": True})
+
+
+# ── Planka card revision history ───────────────────────────────────────────────
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_card_revisions(request, issue_id, card_id):
+    """Return an HTML partial listing revisions for a given card."""
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+    revisions = list(PlankaCardRevision.objects.filter(binding=binding, card_id=card_id).order_by("-created")[:100])
+
+    # Fetch the current live description from Planka.
+    current_description = None
+    current_card_name = None
+    current_fetch_error = None
+    try:
+        client = _build_planka_client()
+        card = client.get_card(card_id)
+        current_description = card.get("description") or ""
+        current_card_name = card.get("name") or ""
+    except PlankaAPIError as exc:
+        current_fetch_error = _safe_planka_error(exc)
+
+    return render(
+        request,
+        "backend/issue_builder/_card_revisions_panel.html",
+        {
+            "issue": issue,
+            "binding": binding,
+            "card_id": card_id,
+            "revisions": revisions,
+            "current_description": current_description,
+            "current_card_name": current_card_name,
+            "current_fetch_error": current_fetch_error,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def planka_card_revision_restore(request, issue_id, revision_id):
+    """Restore a card description to the state saved in the given revision."""
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+    revision = get_object_or_404(PlankaCardRevision, pk=revision_id, binding=binding)
+
+    try:
+        client = _build_planka_client()
+        client._request("PATCH", f"/cards/{revision.card_id}", json={"description": revision.description})
+    except PlankaAPIError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=502)
+
+    return JsonResponse({"ok": True})

@@ -1,10 +1,12 @@
 import base64
 import hashlib
+import secrets
 import uuid
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.utils.html import escape, strip_tags
 
 from spanza_journal_watch.utils.modelmethods import name_csv
@@ -27,7 +29,7 @@ class SubscriberCSV(models.Model):
         permissions = [
             ("manage_subscriber_csv", "Can create and edit CSV subscriber lists"),
             ("send_newsletters", "Can send out newsletters to all subscribers"),
-            ("view_newesletter_stats", "Can view newsletter open and click statistics"),
+            ("view_newsletter_stats", "Can view newsletter open and click statistics"),
         ]
         verbose_name = "Subscriber list CSV"
 
@@ -192,6 +194,7 @@ class PlankaIssueBinding(TimeStampedModel):
         null=True,
         related_name="issue_bindings",
     )
+    webhook_id = models.CharField(max_length=64, blank=True)
 
     class Meta:
         verbose_name = "Planka Issue Binding"
@@ -254,6 +257,183 @@ class PlankaCardImport(TimeStampedModel):
 
     def __str__(self):
         return f"{self.card_name} ({self.card_id})"
+
+
+class PlankaCardRevision(models.Model):
+    """
+    Snapshot of a Planka card description, recorded via webhook on each change.
+    Capped at 100 revisions per card (oldest deleted on insert).
+    """
+
+    REVISION_CAP = 100
+
+    binding = models.ForeignKey(
+        PlankaIssueBinding,
+        on_delete=models.CASCADE,
+        related_name="card_revisions",
+    )
+    card_id = models.CharField(max_length=64, db_index=True)
+    card_name = models.CharField(max_length=1024, blank=True)
+    board_id = models.CharField(max_length=64, blank=True)
+    description = models.TextField(blank=True)
+    description_hash = models.CharField(max_length=64, blank=True)
+    actor_email = models.EmailField(blank=True)
+    actor_name = models.CharField(max_length=255, blank=True)
+    source = models.CharField(
+        max_length=16,
+        choices=[("webhook", "Webhook"), ("snapshot", "Initial snapshot")],
+        default="webhook",
+    )
+    created = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created",)
+        verbose_name = "Planka Card Revision"
+        verbose_name_plural = "Planka Card Revisions"
+        indexes = [
+            models.Index(fields=["card_id", "-created"]),
+        ]
+
+    @classmethod
+    def record(
+        cls, binding, card_id, card_name, board_id, description, actor_email="", actor_name="", source="webhook"
+    ):
+        """
+        Save a new revision, skipping if description hash is identical to the most recent.
+        Enforces the cap by deleting the oldest beyond REVISION_CAP.
+        Returns (revision, created) tuple.
+        """
+        description_hash = hashlib.sha256((description or "").encode("utf-8")).hexdigest()
+
+        # Deduplicate: skip if last revision is identical
+        last = cls.objects.filter(card_id=card_id).order_by("-created").first()
+        if last and last.description_hash == description_hash:
+            return last, False
+
+        revision = cls.objects.create(
+            binding=binding,
+            card_id=card_id,
+            card_name=card_name,
+            board_id=board_id,
+            description=description or "",
+            description_hash=description_hash,
+            actor_email=actor_email,
+            actor_name=actor_name,
+            source=source,
+        )
+
+        # Enforce cap: delete oldest beyond limit
+        ids_to_keep = list(
+            cls.objects.filter(card_id=card_id).order_by("-created").values_list("pk", flat=True)[: cls.REVISION_CAP]
+        )
+        cls.objects.filter(card_id=card_id).exclude(pk__in=ids_to_keep).delete()
+
+        return revision, True
+
+    def __str__(self):
+        return f"{self.card_name} @ {self.created:%Y-%m-%d %H:%M}"
+
+
+class IssueContributor(TimeStampedModel):
+    class Role(models.TextChoices):
+        COORDINATOR = "coordinator", "Coordinator"
+        REVIEWER = "reviewer", "Reviewer"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        INVITED = "invited", "Invited"
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+        EXPIRED = "expired", "Expired"
+
+    class PlankaSyncState(models.TextChoices):
+        PENDING = "pending", "Pending"
+        OK = "ok", "OK"
+        ERROR = "error", "Error"
+
+    issue = models.ForeignKey("submissions.Issue", on_delete=models.CASCADE, related_name="contributors")
+    email = models.EmailField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="issue_contributor_memberships",
+    )
+    role = models.CharField(max_length=24, choices=Role.choices, default=Role.REVIEWER)
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.INVITED)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="issue_contributor_invites_sent",
+    )
+    invited_at = models.DateTimeField(blank=True, null=True)
+    accepted_at = models.DateTimeField(blank=True, null=True)
+    revoked_at = models.DateTimeField(blank=True, null=True)
+
+    name = models.CharField(max_length=255, blank=True)
+    author = models.ForeignKey(
+        "submissions.Author",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="contributor_memberships",
+        help_text="Linked Author profile (auto-matched by email on invite acceptance)",
+    )
+    planka_user_id = models.CharField(max_length=64, blank=True)
+    planka_membership_id = models.CharField(max_length=64, blank=True)
+    planka_instructions_membership_id = models.CharField(max_length=64, blank=True)
+    planka_sync_state = models.CharField(
+        max_length=24, choices=PlankaSyncState.choices, default=PlankaSyncState.PENDING
+    )
+    planka_last_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("email", "pk")
+        constraints = [
+            models.UniqueConstraint(fields=["issue", "email"], name="uniq_issue_contributor_email"),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.email = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.issue}: {self.email} ({self.get_role_display()})"
+
+
+class IssueContributorInvite(TimeStampedModel):
+    contributor = models.ForeignKey(IssueContributor, on_delete=models.CASCADE, related_name="invites")
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="created_issue_contributor_invites",
+    )
+    sent_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ("-created",)
+
+    @staticmethod
+    def generate_raw_token():
+        return secrets.token_urlsafe(32)
+
+    @staticmethod
+    def hash_token(raw_token):
+        return hashlib.sha256((raw_token or "").encode("utf-8")).hexdigest()
+
+    def is_active(self):
+        return not self.consumed_at and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"Invite for {self.contributor.email} ({self.contributor.issue})"
 
 
 class PubmedIntegrationCredential(TimeStampedModel):

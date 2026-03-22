@@ -219,6 +219,9 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# Authelia (replaced by Authentik — kept for reference only)
+compose/local/authelia/
+
 
 ### SublimeText template
 # Cache files for Sublime Text

@@ -206,7 +206,7 @@
           </thead>
           <tbody>
             {% for row in result_rows %}
-              <tr>
+              <tr{% if highlighted_pmid and row.article.pmid == highlighted_pmid %} class="article-intake-highlight"{% endif %}>
                 <td class="align-top">
                   <input
                     class="form-check-input intake-row-check"

@@ -127,6 +127,18 @@
         }
 
         setStatus(`Found ${results.length} journal${results.length > 1 ? "s" : ""}.`, false);
+        const q = (queryInput.value || "").trim().toLowerCase();
+        results.sort((a, b) => {
+          const aName = (a.name || "").toLowerCase();
+          const bName = (b.name || "").toLowerCase();
+          if (aName === q && bName !== q) return -1;
+          if (bName === q && aName !== q) return 1;
+          const aStarts = aName.startsWith(q);
+          const bStarts = bName.startsWith(q);
+          if (aStarts && !bStarts) return -1;
+          if (bStarts && !aStarts) return 1;
+          return aName.localeCompare(bName);
+        });
         results.forEach((result) => {
           const button = document.createElement("button");
           button.type = "button";

@@ -1,0 +1,71 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div id="issue-publish-page">
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Publish</h1>
+</div>
+<p class="text-muted">Review readiness, publish individual reviews, and set the homepage.</p>
+
+{% if selected_issue %}
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Issue details</span>
+    {% if selected_issue.active %}
+      <span class="badge text-bg-success">Published</span>
+    {% else %}
+      <span class="badge text-bg-secondary">Draft</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <h5 class="mb-1">{{ selected_issue.name }}</h5>
+    {% if selected_issue.date %}<p class="text-muted small mb-2">{{ selected_issue.date|date:"F Y" }}</p>{% endif %}
+    {% if selected_issue.body %}
+      <div class="border rounded p-3 small" style="background:var(--bs-tertiary-bg); white-space:pre-wrap; max-height:12rem; overflow-y:auto;">{{ selected_issue.body }}</div>
+    {% else %}
+      <p class="text-muted small mb-0">No issue body text set.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% include "backend/issue_builder/_publish_reviews_panel.html" %}
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Homepage</span>
+    {% if current_homepage and current_homepage.issue == selected_issue %}
+      <span class="badge text-bg-success">Current homepage</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if current_homepage %}
+      <p class="text-muted mb-3">
+        Current homepage: <strong>{{ current_homepage.issue.name }}</strong>
+        {% if current_homepage.issue.date %}({{ current_homepage.issue.date|date:"F Y" }}){% endif %}
+      </p>
+    {% else %}
+      <p class="text-muted mb-3">No homepage is currently set.</p>
+    {% endif %}
+    {% if current_homepage and current_homepage.issue == selected_issue %}
+      <p class="text-success mb-0">&#10003; This issue is the current homepage.</p>
+    {% else %}
+      <form method="post" action="{% url "backend:issue_set_homepage" %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary"
+          onclick="return confirm('Set {{ selected_issue.name }} as the homepage?')">
+          Set {{ selected_issue.name }} as homepage
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+  <div class="alert alert-info">Select an issue to publish.</div>
+{% endif %}
+{% if is_htmx %}
+<div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>
+{% endif %}
+</div>
+{% endblock content %}

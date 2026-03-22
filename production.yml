@@ -3,6 +3,7 @@ volumes:
   production_postgres_data_backups: {}
   production_traefik: {}
   access_logs: {} # Add a new volume definition for the logs
+  production_planka_postgres_data: {}
 
 services:
   django: &django
@@ -20,6 +21,8 @@ services:
     env_file:
       - ./.envs/.production/.django
       - ./.envs/.production/.postgres
+    environment:
+      PLANKA_BASE_URL: http://planka:1337
     command: /start
 
   postgres:
@@ -84,3 +87,35 @@ services:
     ports:
       - '28101:28101'
     command: ['--mjml.validationLevel=strict']
+
+  planka:
+    image: ghcr.io/plankanban/planka:2.0.3
+    container_name: spanza_journal_watch_production_planka
+    profiles: ['planka']
+    restart: unless-stopped
+    depends_on:
+      planka_postgres:
+        condition: service_healthy
+    volumes:
+      # No data volume — attachments stored in S3 (see .envs/.production/.planka)
+      - ./compose/planka/custom:/app/terms/custom:ro
+    env_file:
+      - ./.envs/.production/.planka
+    ports:
+      - '3001:1337'
+
+  planka_postgres:
+    image: postgres:16-alpine
+    container_name: spanza_journal_watch_production_planka_postgres
+    profiles: ['planka']
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: planka
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - production_planka_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d planka']
+      interval: 10s
+      timeout: 5s
+      retries: 5

@@ -107,6 +107,12 @@ django==6.0.3
     #   django-view-breadcrumbs
 django-allauth==65.15.0
     # via -r requirements/base.in
+django-oauth-toolkit==3.2.0
+    # via -r requirements/base.in
+jwcrypto==1.5.6
+    # via django-oauth-toolkit
+oauthlib==3.3.1
+    # via django-oauth-toolkit
 django-celery-beat==2.9.0
     # via -r requirements/base.in
 django-coverage-plugin==3.2.0
@@ -267,6 +273,10 @@ pycodestyle==2.14.0
     # via flake8
 pycparser==3.0
     # via cffi
+pyjwt==2.10.1
+    # via
+    #   -r requirements/base.in
+    #   django-allauth
 pyflakes==3.4.0
     # via flake8
 pygments==2.19.2

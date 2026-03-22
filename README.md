@@ -106,6 +106,45 @@ Please check [cookiecutter-django Docker documentation](http://cookiecutter-djan
 
 With MailHog running, to view messages that are sent by your application, open your browser and go to `http://127.0.0.1:8025`
 
+### Authelia (local)
+
+Authelia has been added as an optional local profile using the Docker deployment approach from the official docs.
+
+Start it with:
+
+```bash
+docker compose -f local.yml --profile authelia up -d authelia
+```
+
+Then open:
+
+- `http://localhost:9091`
+
+Local test users (password for both is `authelia`):
+
+- `reviewer`
+- `coordinator`
+
+Authelia local config files:
+
+- `compose/local/authelia/config/configuration.yml`
+- `compose/local/authelia/config/users_database.yml`
+- `compose/local/authelia/secrets/*`
+
+OIDC clients are preconfigured for local shared login:
+
+- Django callback: `http://localhost:8000/accounts/oidc/authelia/login/callback/`
+- Planka callback: `http://localhost:3001/oidc-callback`
+
+To run a local end-to-end auth smoke test:
+
+1. Start app stack with Planka + Authelia profiles.
+2. Open Django login page (`/accounts/login/`) and choose **Authelia**.
+3. Confirm successful return to Django with the authenticated user session.
+4. Open Planka (`http://localhost:3001`), use **Log in with SSO**, and confirm successful login.
+
+These are development-only defaults and should be replaced before any non-local usage.
+
 ### Sentry
 
 Sentry is an error logging aggregator service. You can sign up for a free account at <https://sentry.io/signup/?code=cookiecutter> or download and host it yourself.

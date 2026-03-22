@@ -140,15 +140,23 @@
     <div class="container">
       <header class="border-bottom lh-1 py-3">
         <div class="row align-items-center">
-          {% if request.session.subscribed %}
-            <div class="col-sm-4 d-flex order-3 order-sm-3 justify-content-center justify-content-sm-end align-items-center" id="subscribe-container">
-                <a class="btn btn-outline-success btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribed!</a>
+          <div class="col-sm-4 d-flex order-3 order-sm-3 justify-content-center justify-content-sm-end align-items-center gap-2">
+            <div id="subscribe-container">
+              {% if request.session.subscribed %}
+                <a class="btn btn-outline-warning btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML transition:true">Subscribed!</a>
+              {% else %}
+                <a class="btn btn-outline-warning btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML transition:true">Subscribe</a>
+              {% endif %}
             </div>
-            {% else %}
-            <div class="col-sm-4 d-flex order-3 order-sm-3 justify-content-center justify-content-sm-end align-items-center" id="subscribe-container">
-                <a class="btn btn-outline-secondary btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="innerHTML transition:true">Subscribe</a>
+            <div class="btn-group btn-group-sm" role="group">
+              {% if request.user.is_authenticated %}
+                <a class="btn btn-outline-secondary" href="{% url 'backend:backend_go' %}">Editor</a>
+                <a class="btn btn-outline-secondary" href="{% url 'account_logout' %}">Logout</a>
+              {% else %}
+                <a class="btn btn-outline-secondary" href="{% url 'backend:backend_go' %}">Login</a>
+              {% endif %}
             </div>
-          {% endif %}
+          </div>
           <div class="col-sm-4 order-2 order-sm-2 pb-2 pb-sm-0 text-center">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
           </div>

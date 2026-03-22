@@ -5,6 +5,7 @@ from . import views
 app_name = "backend"
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("go/", views.backend_go, name="backend_go"),
     path("articles/watched-journals", views.watched_journals, name="watched_journals"),
     path("articles/watched-journals/search", views.watched_journal_search, name="watched_journal_search"),
     path(
@@ -15,6 +16,12 @@ urlpatterns = [
     path("articles/intake", views.article_intake, name="article_intake"),
     path("articles/intake/pubmed-api-key", views.pubmed_save_api_key, name="pubmed_save_api_key"),
     path("articles/intake/<int:batch_id>/results", views.article_intake_results, name="article_intake_results"),
+    path("articles/intake/<int:batch_id>/find", views.article_intake_find_article, name="article_intake_find_article"),
+    path(
+        "articles/intake/<int:batch_id>/add-article",
+        views.article_intake_add_article,
+        name="article_intake_add_article",
+    ),
     path(
         "articles/intake/<int:batch_id>/select/<int:item_id>",
         views.article_intake_toggle_selection,
@@ -50,9 +57,14 @@ urlpatterns = [
         views.article_intake_task_status,
         name="article_intake_task_status",
     ),
+    path("settings", views.backend_settings, name="backend_settings"),
     path("issues/builder", views.issue_builder, name="issue_builder"),
+    path("issues/reviewers", views.issue_reviewers, name="issue_reviewers"),
+    path("issues/reviews", views.issue_reviews_edit, name="issue_reviews_edit"),
+    path("issues/publish", views.issue_publish, name="issue_publish"),
+    path("issues/set-homepage", views.issue_set_homepage, name="issue_set_homepage"),
+    path("issues/reviews/<int:review_id>/toggle", views.toggle_review_active, name="toggle_review_active"),
     path("issues/planka", views.issue_planka_import, name="issue_planka_import"),
-    path("issues/planka/api-key", views.planka_save_api_key, name="planka_save_api_key"),
     path("issues/builder/save", views.save_issue_draft, name="save_issue_draft"),
     path("issues/builder/<int:issue_id>/save", views.save_issue_draft, name="update_issue_draft"),
     path("issues/builder/<int:issue_id>/reviews/new", views.new_review_form, name="new_issue_review_form"),
@@ -71,6 +83,31 @@ urlpatterns = [
         "issues/builder/<int:issue_id>/reviews/<int:review_id>/remove",
         views.remove_issue_review,
         name="remove_issue_review",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/contributors/add",
+        views.issue_add_contributor,
+        name="issue_add_contributor",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/contributors/send-invites",
+        views.issue_send_contributor_invites,
+        name="issue_send_contributor_invites",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/contributors/<int:contributor_id>/resend",
+        views.issue_resend_contributor_invite,
+        name="issue_resend_contributor_invite",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/contributors/<int:contributor_id>/revoke",
+        views.issue_revoke_contributor,
+        name="issue_revoke_contributor",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/contributors/<int:contributor_id>/sync-planka",
+        views.issue_sync_contributor_planka,
+        name="issue_sync_contributor_planka",
     ),
     path("issues/builder/<int:issue_id>/publish", views.publish_issue_bundle, name="publish_issue_bundle"),
     path(
@@ -124,4 +161,31 @@ urlpatterns = [
     path("newsletter/send/confirm/<str:send_token>", views.send_final_newsletter, name="send_final_newsletter"),
     path("newsletter/stats", views.newsletter_stats_list, name="newsletter_stats_list"),
     path("newsletter/stats/<int:pk>", views.newsletter_stats_detail, name="newsletter_stats_detail"),
+    path("settings/run/planka-oidc", views.planka_run_setup_oidc, name="planka_run_setup_oidc"),
+    path("settings/run/planka-api-key", views.planka_run_setup_api_key, name="planka_run_setup_api_key"),
+    path(
+        "settings/run/planka-promote-chief-editor",
+        views.planka_promote_chief_editor,
+        name="planka_promote_chief_editor",
+    ),
+    path("contributors/author-lookup", views.contributor_author_lookup, name="contributor_author_lookup"),
+    path("affiliations", views.affiliations_list, name="affiliations_list"),
+    path("affiliations/<int:affiliation_id>/edit", views.affiliation_edit, name="affiliation_edit"),
+    path("authors", views.authors_list, name="authors_list"),
+    path("authors/<int:author_id>/edit", views.author_edit, name="author_edit"),
+    path(
+        "webhooks/planka/card-update",
+        views.planka_card_update_webhook,
+        name="planka_card_update_webhook",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/planka/cards/<str:card_id>/revisions",
+        views.planka_card_revisions,
+        name="planka_card_revisions",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/planka/revisions/<int:revision_id>/restore",
+        views.planka_card_revision_restore,
+        name="planka_card_revision_restore",
+    ),
 ]

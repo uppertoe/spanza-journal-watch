@@ -138,6 +138,10 @@ psycopg2==2.9.11
     # via -r requirements/production.in
 pycparser==3.0
     # via cffi
+pyjwt==2.10.1
+    # via
+    #   -r requirements/base.in
+    #   django-allauth
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0

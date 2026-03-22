@@ -4,12 +4,9 @@
     <span>{{ batch.task_note|default:"Background task running..." }}</span>
   </div>
 {% else %}
-  <div id="{{ container_id|default:'article-intake-task-status' }}" class="{% if is_done and batch.task_state == 'error' %}alert alert-warning{% elif is_done %}alert alert-success{% else %}d-none{% endif %} py-2 mb-3">
-    {% if is_done %}
-      {{ batch.task_note }}
-    {% endif %}
-  </div>
+  <div id="{{ container_id|default:'article-intake-task-status' }}" class="d-none"></div>
   {% if is_done %}
+    {% include "fragments/messages.html" %}
     <div id="article-intake-results" hx-swap-oob="true">
       {% include "backend/_article_intake_results.html" %}
     </div>

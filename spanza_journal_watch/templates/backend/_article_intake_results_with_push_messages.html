@@ -1,11 +1,4 @@
-<div id="article-intake-push-messages" class="mb-3" hx-swap-oob="outerHTML">
-  {% for message in messages %}
-    <div class="alert alert-dismissible {{ message.tags }} mb-2">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-</div>
+{% include "fragments/messages.html" %}
 <div id="article-intake-task-status" class="d-none" hx-swap-oob="outerHTML"></div>
 {% if batch_task_running %}
 	<div id="article-intake-push-task-status" class="alert alert-info py-2 mb-3" hx-swap-oob="outerHTML" hx-get="{% url "backend:article_intake_task_status" batch.pk %}?channel=push" hx-trigger="every 500ms" hx-target="this" hx-swap="outerHTML">

@@ -1,0 +1,5 @@
+We received a password reset request for {{ email }}, but no account with that address exists on Journal Watch.
+
+If you have an account, try a different email address. Access to Journal Watch is by invitation only — if you believe you should have an account, please contact the editorial team.
+
+If you did not request this you can safely ignore this email.

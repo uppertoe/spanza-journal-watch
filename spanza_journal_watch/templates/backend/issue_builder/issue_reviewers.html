@@ -1,0 +1,20 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div id="issue-reviewers-page">
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Reviewers</h1>
+</div>
+<p class="text-muted">Add reviewers to this issue, send invite links, and monitor their status.</p>
+
+{% if selected_issue %}
+  {% include "backend/issue_builder/_issue_contributors_panel.html" %}
+{% else %}
+  <div class="alert alert-info">Select an issue to manage reviewers.</div>
+{% endif %}
+{% if is_htmx %}
+<div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>
+{% endif %}
+</div>
+{% endblock content %}

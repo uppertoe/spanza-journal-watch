@@ -7,6 +7,7 @@ from django.contrib.sites.models import Site
 from django.core import mail
 from django.db import models
 from django.template.loader import render_to_string
+from django.templatetags.static import static
 from django.urls import reverse
 
 from spanza_journal_watch.analytics.utils import click_tracker
@@ -15,11 +16,6 @@ from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
 from spanza_journal_watch.utils.functions import get_domain_url
 from spanza_journal_watch.utils.modelmethods import name_image
-
-EMAIL_ASSET_UP_CHEVRON_URL = "/media/uploads/elementimage/up-chevron-image.png"
-EMAIL_ASSET_DOWN_CHEVRON_URL = "/media/uploads/elementimage/down-chevron-image.png"
-EMAIL_ASSET_LOGO_URL = "/media/uploads/elementimage/logo-image.png"
-EMAIL_ASSET_HEADING_URL = "/media/uploads/elementimage/heading-image.png"
 
 
 class Subscriber(models.Model):
@@ -42,10 +38,10 @@ class Subscriber(models.Model):
         context = {
             "domain": domain,
             "image_domain": image_domain,
-            "email_up_chevron_url": EMAIL_ASSET_UP_CHEVRON_URL,
-            "email_down_chevron_url": EMAIL_ASSET_DOWN_CHEVRON_URL,
-            "email_logo_url": EMAIL_ASSET_LOGO_URL,
-            "email_heading_url": EMAIL_ASSET_HEADING_URL,
+            "email_up_chevron_url": f"{domain}{static('images/email/chevron-up.png')}",
+            "email_down_chevron_url": f"{domain}{static('images/email/chevron-down.png')}",
+            "email_logo_url": f"{domain}{static('images/email/logo.png')}",
+            "email_heading_url": f"{domain}{static('images/email/heading.png')}",
             "subscriber": self,
             "tracker": click_tracker(self.email),
         }
@@ -175,12 +171,8 @@ class Newsletter(models.Model):
 
     # Assemble emails
     def get_email_context(self):
-        # Images are provided with full path in production
         domain = Newsletter.get_domain()
-        if settings.DEBUG:
-            image_domain = domain
-        else:
-            image_domain = ""
+        image_domain = domain if settings.DEBUG else ""
 
         context = {
             "newsletter": self,
@@ -188,10 +180,10 @@ class Newsletter(models.Model):
             "non_featured_reviews": self.get_non_featured_reviews(count=self.non_featured_review_count),
             "domain": domain,
             "image_domain": image_domain,
-            "email_up_chevron_url": EMAIL_ASSET_UP_CHEVRON_URL,
-            "email_down_chevron_url": EMAIL_ASSET_DOWN_CHEVRON_URL,
-            "email_logo_url": EMAIL_ASSET_LOGO_URL,
-            "email_heading_url": EMAIL_ASSET_HEADING_URL,
+            "email_up_chevron_url": f"{domain}{static('images/email/chevron-up.png')}",
+            "email_down_chevron_url": f"{domain}{static('images/email/chevron-down.png')}",
+            "email_logo_url": f"{domain}{static('images/email/logo.png')}",
+            "email_heading_url": f"{domain}{static('images/email/heading.png')}",
         }
         return context
 

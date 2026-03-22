@@ -60,6 +60,12 @@ django==6.0.3
     #   django-view-breadcrumbs
 django-allauth==65.15.0
     # via -r requirements/base.in
+django-oauth-toolkit==3.2.0
+    # via -r requirements/base.in
+jwcrypto==1.5.6
+    # via django-oauth-toolkit
+oauthlib==3.3.1
+    # via django-oauth-toolkit
 django-celery-beat==2.9.0
     # via -r requirements/base.in
 django-crispy-forms==2.6
@@ -112,6 +118,10 @@ prompt-toolkit==3.0.52
     # via click-repl
 pycparser==3.0
     # via cffi
+pyjwt==2.10.1
+    # via
+    #   -r requirements/base.in
+    #   django-allauth
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0

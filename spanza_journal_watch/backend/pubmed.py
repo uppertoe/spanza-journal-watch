@@ -98,6 +98,48 @@ class PubmedClient:
         end = datetime.date(to_month.year, to_month.month, end_day)
         return start, end
 
+    def find_articles(self, query, retmax=10):
+        """Free-text PubMed search without date constraints.
+
+        Accepts a PMID (integer string), DOI (with or without https://doi.org/ prefix),
+        or any free-text search term (e.g. article title fragment).
+        Returns a list of parsed article dicts, same shape as fetch_articles().
+        """
+        term = (query or "").strip()
+        if not term:
+            return []
+
+        # Strip common DOI URL prefixes
+        for prefix in ("https://doi.org/", "http://doi.org/", "doi.org/", "doi:"):
+            if term.lower().startswith(prefix):
+                term = term[len(prefix) :]  # noqa: E203
+                break
+
+        # Bare PMID — fetch directly, skip esearch
+        if term.isdigit():
+            return self.fetch_articles([term])
+
+        # DOI — use [aid] field tag for precision
+        if term.lower().startswith("10."):
+            search_term = f"{term.lower()}[aid]"
+        else:
+            search_term = term
+
+        data = self._request_json(
+            "esearch.fcgi",
+            {
+                "db": "pubmed",
+                "retmode": "json",
+                "retmax": retmax,
+                "term": search_term,
+                "sort": "relevance",
+            },
+        )
+        pmids = data.get("esearchresult", {}).get("idlist", []) or []
+        if not pmids:
+            return []
+        return self.fetch_articles(pmids)
+
     def search_pmids(self, term, from_month, to_month, retmax=1000):
         start, end = self.month_to_bounds(from_month, to_month)
         data = self._request_json(

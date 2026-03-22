@@ -7,7 +7,7 @@
       <button
         type="button"
         class="btn btn-outline-secondary btn-sm"
-        hx-get="{% url "backend:issue_builder" %}?issue={{ selected_issue.pk }}"
+        hx-get="{% url "backend:issue_reviews_edit" %}?issue={{ selected_issue.pk }}"
         hx-select="#issue-reviews-panel"
         hx-target="#issue-reviews-panel"
         hx-swap="outerHTML"

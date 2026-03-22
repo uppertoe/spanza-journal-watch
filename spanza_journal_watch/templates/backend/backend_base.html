@@ -16,9 +16,14 @@
     {% block css %}
     {% render_bundle 'project' 'css' %}
     <style>
+      .backend-sticky-header {
+        position: sticky;
+        top: 0;
+        z-index: 1030;
+      }
       .backend-htmx-spinner {
         position: fixed;
-        top: 0.75rem;
+        bottom: 0.75rem;
         right: 0.75rem;
         z-index: 1080;
         display: inline-flex;
@@ -41,6 +46,86 @@
         opacity: 1;
         visibility: visible;
       }
+      .issue-context-bar {
+        background: color-mix(in srgb, var(--bs-primary) 5%, var(--bs-body-bg));
+        border-top: 2px solid var(--bs-primary);
+        border-bottom: 1px solid color-mix(in srgb, var(--bs-primary) 20%, var(--bs-border-color));
+        font-size: 0.8125rem;
+      }
+      .issue-context-label {
+        color: var(--bs-secondary-color);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .issue-context-name {
+        color: var(--bs-body-color);
+        max-width: 20ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .issue-context-name:hover { color: var(--bs-primary); }
+      /* Workflow tabs */
+      .issue-workflow-tabs {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        gap: 0;
+      }
+      .issue-workflow-tabs::-webkit-scrollbar { display: none; }
+      .workflow-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.5rem 1rem;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        color: var(--bs-secondary-color);
+        font-size: 0.875rem;
+        text-decoration: none;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: color 100ms, border-color 100ms;
+        background: none;
+        user-select: none;
+      }
+      a.workflow-tab:hover {
+        color: var(--bs-body-color);
+        border-bottom-color: var(--bs-border-color);
+        text-decoration: none;
+      }
+      .workflow-tab.is-active {
+        color: var(--bs-primary);
+        border-bottom-color: var(--bs-primary);
+        font-weight: 600;
+      }
+      .workflow-tab.is-done:not(.is-active) { color: var(--bs-success); }
+      .workflow-tab.is-locked {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .workflow-tab-lock { font-size: 0.65rem; opacity: 0.8; }
+      /* Global issues offcanvas */
+      .global-issues-offcanvas {
+        top: 0;
+        bottom: 0;
+        height: 100%;
+        width: min(320px, calc(100vw - 2rem));
+      }
+      .global-issues-offcanvas .offcanvas-body {
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+      }
+      .global-issues-offcanvas .issues-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        scrollbar-gutter: stable both-edges;
+      }
     </style>
     {% endblock %}
     {% block javascript %}
@@ -53,15 +138,31 @@
   </head>
 
   <body>
+    <!-- Configure HTMX to send the CSRF token on all requests -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        document.body.addEventListener("htmx:configRequest", function (e) {
+          e.detail.headers["X-CSRFToken"] = "{{ csrf_token }}";
+        });
+      });
+    </script>
     <div id="backend-htmx-spinner" class="backend-htmx-spinner htmx-indicator" aria-live="polite" aria-atomic="true">
       <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       <span class="small">Loading</span>
     </div>
 
-    <!-- Container for HTMX messages -->
-    {% include "fragments/messages.html" %}
-    <!-- /container -->
-
+    <!-- Sticky header: navbar + issue context bar travel together -->
+    <div class="backend-sticky-header">
+    <!-- HTMX messages sit inside the sticky header so they push the navbar down -->
+    <!-- This div must always exist in the DOM so OOB swaps can target it -->
+    <div id="oob-message">
+      {% for message in messages %}
+        <div class="alert alert-dismissible {{ message.tags }} mb-0 rounded-0" style="border-left: none; border-right: none;">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg bg-body-tertiary">
         <div class="container-fluid">
@@ -78,24 +179,23 @@
                 <a class="nav-link{% if current == 'dashboard' %} active{% endif %}" href="{% url "backend:dashboard" %}">Dashboard</a>
               </li>
 
-              <li class="nav-item dropdown">
+              {% if perms.submissions.manage_issue_builder %}
+              <li class="nav-item">
                 <a
-                  class="nav-link dropdown-toggle{% if current == 'watched_journals' or current == 'watched_journal_search' or current == 'watched_journal_toggle_active' or current == 'article_intake' or current == 'pubmed_save_api_key' or current == 'article_intake_results' or current == 'article_intake_toggle_selection' or current == 'article_intake_bulk_selection' or current == 'article_intake_assign_issue' or current == 'article_intake_refresh_batch' or current == 'article_intake_push_to_planka' or current == 'issue_builder' or current == 'save_issue_draft' or current == 'update_issue_draft' or current == 'new_issue_review_form' or current == 'add_issue_review' or current == 'edit_issue_review_form' or current == 'update_issue_review' or current == 'remove_issue_review' or current == 'publish_issue_bundle' or current == 'issue_planka_import' or current == 'planka_save_api_key' or current == 'planka_setup_issue_project' or current == 'planka_refresh_publish_cards' or current == 'planka_import_publish_card' or current == 'planka_update_project_background' or current == 'planka_update_project_name' %} active{% endif %}"
-                  href="#"
-                  role="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
+                  class="nav-link{% if current in 'watched_journals watched_journal_search watched_journal_toggle_active article_intake pubmed_save_api_key article_intake_results article_intake_toggle_selection article_intake_bulk_selection article_intake_assign_issue article_intake_refresh_batch article_intake_push_to_planka issue_builder save_issue_draft update_issue_draft new_issue_review_form add_issue_review edit_issue_review_form update_issue_review remove_issue_review issue_add_contributor issue_send_contributor_invites issue_resend_contributor_invite issue_revoke_contributor issue_sync_contributor_planka publish_issue_bundle issue_planka_import planka_setup_issue_project planka_refresh_publish_cards planka_import_publish_card planka_update_project_background planka_update_project_name issue_reviewers issue_reviews_edit issue_publish issue_set_homepage' %} active{% endif %}"
+                  href="{% url "backend:issue_builder" %}"
                 >
-                  Editorial
+                  Issues
                 </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="{% url "backend:watched_journals" %}">Watched Journals</a></li>
-                  <li><a class="dropdown-item" href="{% url "backend:article_intake" %}">Article Intake</a></li>
-                  <li><a class="dropdown-item" href="{% url "backend:issue_builder" %}">Issue Builder</a></li>
-                  <li><a class="dropdown-item" href="{% url "backend:issue_planka_import" %}">Planka Sync</a></li>
-                </ul>
               </li>
+              {% endif %}
+              {% if perms.submissions.chief_editor %}
+              <li class="nav-item">
+                <a class="nav-link{% if current == 'backend_settings' %} active{% endif %}" href="{% url "backend:backend_settings" %}">Settings</a>
+              </li>
+              {% endif %}
 
+              {% if perms.backend.manage_subscriber_csv %}
               <li class="nav-item dropdown">
                 <a
                   class="nav-link dropdown-toggle{% if current == 'upload_subscribers' or current == 'edit_csv_header' or current == 'process_csv' or current == 'subscriber_list' %} active{% endif %}"
@@ -111,22 +211,8 @@
                   <li><a class="dropdown-item" href="{% url "backend:subscriber_list" %}">Mailing List</a></li>
                 </ul>
               </li>
+              {% endif %}
 
-              <li class="nav-item dropdown">
-                <a
-                  class="nav-link dropdown-toggle{% if current == 'newsletter_release_list' or current == 'create_newsletter' or current == 'final_newsletter' or current == 'send_test_newsletter' or current == 'enable_newsletter_resend' or current == 'send_final_newsletter' or current == 'newsletter_stats_list' or current == 'newsletter_stats_detail' %} active{% endif %}"
-                  href="#"
-                  role="button"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                >
-                  Newsletter
-                </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="{% url "backend:newsletter_release_list" %}">Release</a></li>
-                  <li><a class="dropdown-item" href="{% url "backend:newsletter_stats_list" %}">Statistics</a></li>
-                </ul>
-              </li>
               {% endwith %}
               {% endif %}
               <li class="nav-item">
@@ -138,16 +224,92 @@
               </li>
               {% endif %}
             </ul>
+            {% if planka_url and request.user.is_staff %}
+            <a class="btn btn-outline-secondary btn-sm ms-auto" href="{{ planka_url }}" rel="noopener noreferrer">Open Planka</a>
+            {% endif %}
           </div>
         </div>
       </nav>
 
+    {% with cur=request.resolver_match.url_name %}
+    {% if cur == 'article_intake' %}{% url 'backend:article_intake' as issue_nav_base %}
+    {% elif cur == 'issue_planka_import' %}{% url 'backend:issue_planka_import' as issue_nav_base %}
+    {% elif cur == 'newsletter_release_list' or cur == 'create_newsletter' or cur == 'final_newsletter' or cur == 'send_final_newsletter' or cur == 'send_test_newsletter' or cur == 'newsletter_stats_list' or cur == 'newsletter_stats_detail' %}{% url 'backend:newsletter_release_list' as issue_nav_base %}
+    {% elif cur == 'issue_reviewers' %}{% url 'backend:issue_reviewers' as issue_nav_base %}
+    {% elif cur == 'issue_reviews_edit' %}{% url 'backend:issue_reviews_edit' as issue_nav_base %}
+    {% elif cur == 'issue_publish' %}{% url 'backend:issue_publish' as issue_nav_base %}
+    {% else %}{% url 'backend:issue_builder' as issue_nav_base %}{% endif %}
+
+    {% if is_issue_page %}<div id="issue-context-bar">{% include "backend/_issue_context_bar.html" %}</div>{% else %}<div id="issue-context-bar"></div>{% endif %}
+    </div>{# /backend-sticky-header #}
+
     <!-- Main container -->
-    <main class="container p-3 col-xl-10 offset-xl-1 col-12" hx-indicator="#backend-htmx-spinner">
+    <main id="backend-main-content" class="container p-3 col-xl-10 offset-xl-1 col-12" hx-indicator="#backend-htmx-spinner">
         {% block content %}{% endblock content %}
+        {% if is_htmx and is_issue_page %}
+        <div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>
+        {% endif %}
     </main>
 
     {% block inline_javascript %}{% endblock inline_javascript %}
+
+    {# Global issue selector offcanvas — available on all backend pages #}
+    <div
+      class="offcanvas offcanvas-end global-issues-offcanvas"
+      tabindex="-1"
+      id="global-issues-sidebar"
+      aria-labelledby="global-issues-sidebar-label"
+    >
+      <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="global-issues-sidebar-label">Issues</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      {% if not is_coordinator_only %}
+      <div class="p-3 border-bottom">
+        <a class="btn btn-sm btn-primary w-100" href="{% url 'backend:issue_builder' %}">+ New issue</a>
+      </div>
+      {% endif %}
+      <div class="issues-list">
+        <ul class="list-group list-group-flush">
+          {% for issue in issues_for_sidebar %}
+            <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2{% if session_selected_issue and session_selected_issue.pk == issue.pk %} active{% endif %}">
+              <a
+                class="text-decoration-none flex-grow-1 me-2{% if session_selected_issue and session_selected_issue.pk == issue.pk %} text-white{% endif %}"
+                href="{{ issue_nav_base }}?issue={{ issue.pk }}"
+                hx-get="{{ issue_nav_base }}?issue={{ issue.pk }}"
+                hx-target="#backend-main-content"
+                hx-select="#backend-main-content"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                data-issue-id="{{ issue.pk }}"
+              >{{ issue.name }}</a>
+              {% if issue.active %}
+                <span class="badge{% if session_selected_issue and session_selected_issue.pk == issue.pk %} text-bg-light text-success{% else %} text-bg-success{% endif %}">Live</span>
+              {% else %}
+                <span class="badge{% if session_selected_issue and session_selected_issue.pk == issue.pk %} text-bg-light text-secondary{% else %} text-bg-secondary{% endif %}">Draft</span>
+              {% endif %}
+            </li>
+          {% empty %}
+            <li class="list-group-item text-muted px-3 py-2">No issues yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endwith %}
+
+    <script>
+      document.body.addEventListener("htmx:afterSettle", function () {
+        const params = new URLSearchParams(window.location.search);
+        const currentIssueId = params.get("issue");
+        document.querySelectorAll("#global-issues-sidebar .list-group-item").forEach(function (li) {
+          const link = li.querySelector("[data-issue-id]");
+          if (!link) return;
+          const isActive = currentIssueId && String(link.dataset.issueId) === String(currentIssueId);
+          li.classList.toggle("active", isActive);
+          link.classList.toggle("text-white", isActive);
+        });
+      });
+    </script>
 
   </body>
 

@@ -19,6 +19,8 @@ django>=6.0,<7.0
 django-environ
 django-model-utils
 django-allauth
+django-oauth-toolkit[oidc]
+PyJWT
 django-crispy-forms
 crispy-bootstrap5
 django-redis

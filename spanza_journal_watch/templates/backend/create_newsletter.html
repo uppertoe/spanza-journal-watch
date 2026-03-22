@@ -7,7 +7,33 @@
 
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
-  {{ form|crispy }}
+  {{ form.subject|as_crispy_field }}
+  {{ form.issue|as_crispy_field }}
+  {{ form.content_heading|as_crispy_field }}
+  {{ form.content|as_crispy_field }}
+
+  <div class="card mb-3">
+    <div class="card-header">Header image</div>
+    <div class="card-body">
+      {% if issue_for_preview %}
+        <div class="mb-3">
+          <p class="text-muted small mb-1">Issue cover image (will be converted to greyscale):</p>
+          <img src="{{ issue_for_preview.image.url }}"
+               alt="Issue cover image"
+               class="img-thumbnail"
+               style="max-height: 10rem; max-width: 100%; object-fit: contain;">
+        </div>
+      {% endif %}
+      {{ form.use_issue_image|as_crispy_field }}
+      <div class="mt-2">
+        {{ form.header_image|as_crispy_field }}
+      </div>
+    </div>
+  </div>
+
+  {{ form.non_featured_review_count|as_crispy_field }}
+  {{ form.ready_to_send|as_crispy_field }}
+
   <button type="submit" class="btn btn-primary">Create newsletter</button>
   <a href="{% url "backend:newsletter_release_list" %}" class="btn btn-outline-secondary">Cancel</a>
 </form>

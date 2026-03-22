@@ -55,6 +55,9 @@ class HealthService(models.Model):
 class Author(TimeStampedModel):
     title = models.CharField(max_length=255, default="Dr")
     name = models.CharField(max_length=255, blank=False, null=False)
+    email = models.EmailField(
+        blank=True, null=True, unique=True, help_text="Email used to match this author to invited contributors"
+    )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     anonymous = models.BooleanField(default=False)
     health_services = models.ManyToManyField(HealthService, blank=True, related_name="authors")
@@ -346,12 +349,15 @@ class Issue(TimeStampedModel):
     date = models.DateField(null=True, blank=True)
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     body = models.TextField()
+    image = models.ImageField(upload_to="issues/", blank=True, null=True)
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
     active = models.BooleanField(default=False)
 
     class Meta:
         permissions = [
             ("manage_issue_builder", "Can create and publish issue bundles in backend issue builder"),
+            ("chief_editor", "Can edit reviews, publish issues, and access chief editor functions"),
+            ("regional_coordinator", "Can edit assigned issues and reviews; cannot publish or manage newsletter"),
         ]
 
     def get_card_features(self):
@@ -394,6 +400,8 @@ class Issue(TimeStampedModel):
         return header.feature_article if header else None
 
     def get_issue_image(self):
+        if self.image:
+            return self.image
         feature_article = self.get_header_feature_article()
         if feature_article and feature_article.image:
             return feature_article.image

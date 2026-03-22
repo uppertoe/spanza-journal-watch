@@ -1,0 +1,58 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Edit newsletter</h1>
+  {% if newsletter.is_sent %}
+    <span class="badge text-bg-success">Sent</span>
+  {% elif newsletter.is_test_sent %}
+    <span class="badge text-bg-primary">Tested</span>
+  {% else %}
+    <span class="badge text-bg-secondary">Draft</span>
+  {% endif %}
+</div>
+<p class="text-muted">{{ newsletter.subject }}</p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.subject|as_crispy_field }}
+  {{ form.issue|as_crispy_field }}
+  {{ form.content_heading|as_crispy_field }}
+  {{ form.content|as_crispy_field }}
+
+  <div class="card mb-3">
+    <div class="card-header">Header image</div>
+    <div class="card-body">
+      {% if newsletter.header_image %}
+        <div class="mb-3">
+          <p class="text-muted small mb-1">Current header image:</p>
+          <img src="{{ newsletter.header_image.url }}"
+               alt="Current header image"
+               class="img-thumbnail"
+               style="max-height: 10rem; max-width: 100%; object-fit: contain;">
+        </div>
+      {% endif %}
+      {% if issue_for_preview and issue_for_preview.image != newsletter.header_image %}
+        <div class="mb-3">
+          <p class="text-muted small mb-1">Issue cover image (will be converted to greyscale):</p>
+          <img src="{{ issue_for_preview.image.url }}"
+               alt="Issue cover image"
+               class="img-thumbnail"
+               style="max-height: 10rem; max-width: 100%; object-fit: contain;">
+        </div>
+      {% endif %}
+      {{ form.use_issue_image|as_crispy_field }}
+      <div class="mt-2">
+        {{ form.header_image|as_crispy_field }}
+      </div>
+    </div>
+  </div>
+
+  {{ form.non_featured_review_count|as_crispy_field }}
+  {{ form.ready_to_send|as_crispy_field }}
+
+  <button type="submit" class="btn btn-primary">Save changes</button>
+  <a href="{% url "backend:newsletter_release_list" %}?issue={{ newsletter.issue_id }}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+{% endblock content %}

@@ -1,0 +1,429 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="mb-0">Settings</h1>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>PubMed API key</span>
+    {% if pubmed_credential and pubmed_credential.get_api_key %}
+      <span class="badge text-bg-success">Configured</span>
+    {% else %}
+      <span class="badge text-bg-warning">Not configured</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      {% if pubmed_credential and pubmed_credential.get_api_key %}
+        Key: {{ pubmed_credential.get_masked_api_key }} · Last validated: {{ pubmed_credential.last_validated_at|default:"Never" }}
+      {% else %}
+        NCBI API key is optional but recommended for higher request rate limits.
+      {% endif %}
+    </p>
+    {% if pubmed_credential and pubmed_credential.last_error %}
+      <div class="alert alert-warning py-2 mb-3">Last PubMed error: {{ pubmed_credential.last_error }}</div>
+    {% endif %}
+    <form method="post" action="{% url "backend:pubmed_save_api_key" %}" class="row g-3">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="settings">
+      <div class="col-12 col-md-9">{{ pubmed_api_key_form.api_key|as_crispy_field }}</div>
+      <div class="col-12 col-md-3 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Save key</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Planka integration setup ───────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">Planka integration setup</div>
+  <div class="card-body">
+    <p class="text-muted small mb-4">
+      Run these once during initial deployment. Both commands are idempotent and safe to re-run.
+    </p>
+
+    {# Step 1 — OIDC #}
+    <div class="d-flex align-items-start gap-3 mb-4">
+      <div class="flex-shrink-0 mt-1">
+        {% if planka_oidc_app %}
+          <span class="badge text-bg-success">Done</span>
+        {% else %}
+          <span class="badge text-bg-secondary">Pending</span>
+        {% endif %}
+      </div>
+      <div class="flex-grow-1">
+        <div class="fw-semibold mb-1">1. Register OIDC application</div>
+        <p class="text-muted small mb-2">
+          Creates the OAuth2/OIDC application in Django so Planka can use it as a login provider.
+          {% if planka_oidc_app %}
+            Registered as <code>{{ planka_oidc_app.client_id }}</code>.
+          {% endif %}
+        </p>
+        <div class="d-inline-flex align-items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            hx-post="{% url "backend:planka_run_setup_oidc" %}"
+            hx-target="#oidc-setup-result"
+            hx-swap="innerHTML"
+            hx-include="[name=csrfmiddlewaretoken]"
+            hx-indicator="#oidc-setup-spinner"
+          >
+            Run setup_planka_oidc
+          </button>
+          <span id="oidc-setup-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
+        </div>
+        <div id="oidc-setup-result"></div>
+      </div>
+    </div>
+
+    <hr class="my-3">
+
+    {# Step 2 — API key #}
+    <div class="d-flex align-items-start gap-3">
+      <div class="flex-shrink-0 mt-1">
+        {% if planka_credential and planka_credential.get_api_key %}
+          <span class="badge text-bg-success">Done</span>
+        {% else %}
+          <span class="badge text-bg-secondary">Pending</span>
+        {% endif %}
+      </div>
+      <div class="flex-grow-1">
+        <div class="fw-semibold mb-1">2. Generate API key</div>
+        <p class="text-muted small mb-2">
+          Writes an API key directly to Planka's database — works regardless of
+          <code>OIDC_ENFORCED</code> and requires no browser login.
+          Also marks the admin account's terms as accepted.
+          The key appears in Planka's profile settings (prefix only, as normal).
+          {% if planka_credential and planka_credential.get_api_key %}
+            Key: <code>{{ planka_credential.get_masked_api_key }}</code>
+            · Last validated: {{ planka_credential.last_validated_at|default:"Never" }}.
+          {% endif %}
+        </p>
+        <p class="text-muted small mb-2">
+          <strong>Note:</strong> if the key is regenerated in Planka's profile settings it will
+          no longer match. Re-run this command to resync.
+        </p>
+        {% if planka_credential and planka_credential.last_error %}
+          <div class="alert alert-warning py-2 small mb-2">Last error: {{ planka_credential.last_error }}</div>
+        {% endif %}
+        <div class="d-inline-flex align-items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            hx-post="{% url "backend:planka_run_setup_api_key" %}"
+            hx-target="#api-key-setup-result"
+            hx-swap="innerHTML"
+            hx-include="[name=csrfmiddlewaretoken]"
+            hx-indicator="#api-key-setup-spinner"
+          >
+            Run setup_planka_api_key
+          </button>
+          <span id="api-key-setup-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
+        </div>
+        <div id="api-key-setup-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# CSRF token for HTMX POSTs above — outside a <form> so we include it explicitly #}
+<form id="csrf-holder" style="display:none">{% csrf_token %}</form>
+
+{# ── Planka connection status ────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Planka connection</span>
+    {% if planka_connected %}
+      <span class="badge text-bg-success">Connected</span>
+    {% elif planka_credential and planka_credential.get_api_key %}
+      <span class="badge text-bg-danger">Error</span>
+    {% else %}
+      <span class="badge text-bg-secondary">Not configured</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if planka_connected %}
+      <div class="d-flex align-items-center gap-2 text-success mb-1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+        <span class="fw-semibold">Connected to Planka</span>
+      </div>
+      <p class="text-muted small mb-0">
+        Authenticated as <strong>{{ planka_connection_user.name }}</strong>
+        &lt;{{ planka_connection_user.email }}&gt;
+        · role: {{ planka_connection_user.role }}
+        · key: <code>{{ planka_credential.get_masked_api_key }}</code>
+      </p>
+    {% elif planka_connection_error %}
+      <div class="d-flex align-items-center gap-2 text-danger mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+        <span class="fw-semibold">Connection failed</span>
+      </div>
+      <p class="text-muted small mb-2">{{ planka_connection_error }}</p>
+      <p class="text-muted small mb-0">Re-run <strong>Generate API key</strong> in the setup section above to issue a new key.</p>
+    {% else %}
+      <p class="text-muted small mb-0">No API key configured. Use the setup section above to generate one.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Chief editor Planka account ─────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Your Planka account</span>
+    {% if chief_editor_planka_user %}
+      {% if chief_editor_planka_user.role == "admin" %}
+        <span class="badge text-bg-success">Admin</span>
+      {% else %}
+        <span class="badge text-bg-warning">Board user</span>
+      {% endif %}
+    {% elif planka_connected %}
+      <span class="badge text-bg-secondary">Not found</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if not planka_connected %}
+      <p class="text-muted small mb-0">Planka is not connected. Set up the API key above first.</p>
+    {% elif chief_editor_planka_user %}
+      <p class="text-muted small mb-2">
+        Logged in as <strong>{{ chief_editor_planka_user.name }}</strong>
+        &lt;{{ chief_editor_planka_user.email }}&gt;
+        · Planka role: <strong>{{ chief_editor_planka_user.role }}</strong>
+      </p>
+      {% if chief_editor_planka_user.role != "admin" %}
+        <p class="text-muted small mb-3">
+          As chief editor you should have Planka admin access. Click below to promote your account.
+        </p>
+        <div class="d-inline-flex align-items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-warning"
+            hx-post="{% url "backend:planka_promote_chief_editor" %}"
+            hx-target="#chief-editor-promote-result"
+            hx-swap="innerHTML"
+            hx-include="[name=csrfmiddlewaretoken]"
+            hx-indicator="#chief-editor-promote-spinner"
+          >
+            Promote to Planka admin
+          </button>
+          <span id="chief-editor-promote-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
+        </div>
+      {% else %}
+        <p class="text-muted small mb-3">
+          Your account has full Planka admin access. If you ever lose admin access (e.g. after OIDC
+          re-provisioning), click below to restore it.
+        </p>
+        <div class="d-inline-flex align-items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            hx-post="{% url "backend:planka_promote_chief_editor" %}"
+            hx-target="#chief-editor-promote-result"
+            hx-swap="innerHTML"
+            hx-include="[name=csrfmiddlewaretoken]"
+            hx-indicator="#chief-editor-promote-spinner"
+          >
+            Re-confirm Planka admin
+          </button>
+          <span id="chief-editor-promote-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
+        </div>
+      {% endif %}
+      <div id="chief-editor-promote-result"></div>
+    {% else %}
+      <p class="text-muted small mb-3">
+        No Planka account found for <strong>{{ request.user.email }}</strong>.
+        Log into Planka via SSO at least once, then return here to promote your account to admin.
+      </p>
+      <div class="d-inline-flex align-items-center gap-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          hx-post="{% url "backend:planka_promote_chief_editor" %}"
+          hx-target="#chief-editor-promote-result"
+          hx-swap="innerHTML"
+          hx-include="[name=csrfmiddlewaretoken]"
+          hx-indicator="#chief-editor-promote-spinner"
+          disabled
+        >
+          Promote to Planka admin
+        </button>
+        <span id="chief-editor-promote-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
+      </div>
+      <div id="chief-editor-promote-result"></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Watched journals</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">Journals watched for monthly article fetches in PubMed. Add journals here, then fetch articles on the Articles page.</p>
+
+    <div class="row g-2 align-items-start mb-4">
+      <div class="col-12 col-lg-8">
+        <label class="form-label" for="journal-search-query">Find journal from NIH catalog</label>
+        <input type="text" id="journal-search-query" class="form-control" placeholder="e.g. Anesthesiology" />
+        <div class="form-text">Search and apply result to the form below.</div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label d-none d-lg-block">&nbsp;</label>
+        <button type="button" id="journal-search-button" class="btn btn-outline-primary w-100 mt-lg-0 mt-1" data-search-url="{% url "backend:watched_journal_search" %}">Search journals</button>
+      </div>
+      <div class="col-12">
+        <div id="journal-search-status" class="small text-muted"></div>
+        <div id="journal-search-results" class="list-group mt-1"></div>
+      </div>
+    </div>
+
+    <form method="post" action="{% url "backend:watched_journals" %}" class="row g-3 mb-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="settings">
+      <div class="col-12">{{ watched_journal_form.name|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.issn_print|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.issn_electronic|as_crispy_field }}</div>
+      <div class="col-12">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-12"><button type="submit" class="btn btn-primary">Add watched journal</button></div>
+    </form>
+
+    {% if watched_journals %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>ISSN</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for watched in watched_journals %}
+              <tr>
+                <td>{{ watched.name }}</td>
+                <td>
+                  {% if watched.issn_print %}<div>Print: {{ watched.issn_print }}</div>{% endif %}
+                  {% if watched.issn_electronic %}<div>Electronic: {{ watched.issn_electronic }}</div>{% endif %}
+                  {% if not watched.issn_print and not watched.issn_electronic %}-{% endif %}
+                </td>
+                <td>
+                  {% if watched.active %}
+                    <span class="badge text-bg-success">Active</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Inactive</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{% url "backend:watched_journal_toggle_active" watched.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="settings">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Toggle active</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-info mb-0">No watched journals yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Authors &amp; affiliations</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">Manage reviewer author profiles and the health service organisations they are affiliated with.</p>
+    <div class="d-flex gap-2">
+      <a href="{% url "backend:authors_list" %}" class="btn btn-outline-primary">Manage authors</a>
+      <a href="{% url "backend:affiliations_list" %}" class="btn btn-outline-secondary">Manage affiliations</a>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block inline_javascript %}
+{{ block.super }}
+<script>
+  (function () {
+    const queryInput = document.getElementById("journal-search-query");
+    const searchButton = document.getElementById("journal-search-button");
+    const status = document.getElementById("journal-search-status");
+    const resultsContainer = document.getElementById("journal-search-results");
+    const nameInput = document.getElementById("id_name");
+    const printIssnInput = document.getElementById("id_issn_print");
+    const electronicIssnInput = document.getElementById("id_issn_electronic");
+
+    if (!queryInput || !searchButton || !resultsContainer || !nameInput || !printIssnInput || !electronicIssnInput) return;
+
+    function setStatus(message, isError) {
+      status.textContent = message || "";
+      status.className = isError ? "small text-danger" : "small text-muted";
+    }
+
+    function applyJournal(result) {
+      nameInput.value = result.name || "";
+      printIssnInput.value = result.issn_print || "";
+      electronicIssnInput.value = result.issn_electronic || "";
+      setStatus("Journal details copied into the form.", false);
+      resultsContainer.innerHTML = "";
+    }
+
+    function renderResults(results) {
+      resultsContainer.innerHTML = "";
+      if (!results.length) { setStatus("No journals found.", false); return; }
+      setStatus(`Found ${results.length} journal${results.length > 1 ? "s" : ""}.`, false);
+      const q = (queryInput.value || "").trim().toLowerCase();
+      results.sort((a, b) => {
+        const aName = (a.name || "").toLowerCase();
+        const bName = (b.name || "").toLowerCase();
+        if (aName === q && bName !== q) return -1;
+        if (bName === q && aName !== q) return 1;
+        const aStarts = aName.startsWith(q);
+        const bStarts = bName.startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (bStarts && !aStarts) return 1;
+        return aName.localeCompare(bName);
+      });
+      results.forEach((result) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "list-group-item list-group-item-action";
+        const name = result.name || "Unknown";
+        const medline = result.medline_ta ? ` (${result.medline_ta})` : "";
+        const printIssn = result.issn_print ? `Print ISSN: ${result.issn_print}` : "Print ISSN: -";
+        const eIssn = result.issn_electronic ? `Electronic ISSN: ${result.issn_electronic}` : "Electronic ISSN: -";
+        button.textContent = `${name}${medline} · ${printIssn} · ${eIssn}`;
+        button.addEventListener("click", () => applyJournal(result));
+        resultsContainer.appendChild(button);
+      });
+    }
+
+    async function searchJournals() {
+      const q = (queryInput.value || "").trim();
+      resultsContainer.innerHTML = "";
+      if (q.length < 3) { setStatus("Enter at least 3 characters.", true); return; }
+      const endpoint = searchButton.dataset.searchUrl;
+      setStatus("Searching...", false);
+      try {
+        const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.error) { setStatus(payload.error || "Search failed.", true); return; }
+        renderResults(payload.results || []);
+      } catch (e) {
+        setStatus("Search failed. Please try again.", true);
+      }
+    }
+
+    searchButton.addEventListener("click", searchJournals);
+    queryInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); searchJournals(); } });
+  })();
+</script>
+{% endblock inline_javascript %}

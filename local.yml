@@ -2,6 +2,7 @@ volumes:
   spanza_journal_watch_local_postgres_data: {}
   spanza_journal_watch_local_postgres_data_backups: {}
   spanza_journal_watch_local_planka_data: {}
+  spanza_journal_watch_local_planka_postgres_data: {}
 
 services:
   django: &django
@@ -22,6 +23,9 @@ services:
       - ./.envs/.local/.postgres
     environment:
       PLANKA_BASE_URL: http://planka:1337
+      # Must match DEFAULT_ADMIN_EMAIL in the planka service below
+      PLANKA_ADMIN_EMAIL: demo@demo.demo
+      PLANKA_DB_URL: postgresql://postgres@planka_postgres/planka
     ports:
       - '8000:8000'
     command: /start
@@ -140,6 +144,7 @@ services:
         condition: service_healthy
     volumes:
       - spanza_journal_watch_local_planka_data:/app/data
+      - ./compose/planka/custom:/app/terms/custom:ro
     ports:
       - '3001:1337'
     environment:
@@ -147,10 +152,27 @@ services:
       DATABASE_URL: postgresql://postgres@planka_postgres/planka
       SECRET_KEY: notsecretkey
       SWAGGER_EXPOSED: 'true'
+      # Django acts as the OIDC provider — run `manage.py setup_planka_oidc` to register the application
+      # localhost:8000 is reachable from the browser; extra_hosts below makes it reachable from inside the container too
+      OIDC_ISSUER: http://localhost:8000/o
+      OIDC_CLIENT_ID: planka-local
+      OIDC_CLIENT_SECRET: planka-local-oidc-secret-changeme
+      OIDC_USE_DEFAULT_RESPONSE_MODE: 'true'
+      OIDC_SCOPES: openid email profile
+      OIDC_EMAIL_ATTRIBUTE: email
+      OIDC_NAME_ATTRIBUTE: name
+      OIDC_IGNORE_USERNAME: 'true'
+      OIDC_IGNORE_ROLES: 'true'
+      # Enable AFTER running setup_planka_api_key from the backend settings UI.
+      # That command initialises the instance (admin REST login) — only then will
+      # OIDC_ENFORCED work correctly. Uncomment and restart Planka to enforce SSO.
+      # OIDC_ENFORCED: 'true'
       DEFAULT_ADMIN_EMAIL: demo@demo.demo
       DEFAULT_ADMIN_PASSWORD: demo
       DEFAULT_ADMIN_NAME: Demo Demo
       DEFAULT_ADMIN_USERNAME: demo
+    extra_hosts:
+      - 'localhost:host-gateway'
 
   planka_postgres:
     image: postgres:16-alpine
@@ -160,6 +182,8 @@ services:
     environment:
       POSTGRES_DB: planka
       POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - spanza_journal_watch_local_planka_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d planka']
       interval: 10s

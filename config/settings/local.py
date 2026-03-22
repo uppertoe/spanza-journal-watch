@@ -11,7 +11,7 @@ SECRET_KEY = env(
     default="13xrrMgNdiXkeMbaF2rb0Oo4j4ujKMEVXJe7wJQVw7yCeD3lhhqljtDtoQkoXGqO",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1", "django"]
 
 # CACHES
 # ------------------------------------------------------------------------------
@@ -76,5 +76,12 @@ CELERY_TASK_EAGER_PROPAGATES = True
 # django-webpack-loader
 # ------------------------------------------------------------------------------
 WEBPACK_LOADER["DEFAULT"]["CACHE"] = not DEBUG  # noqa: F405
+# django-oauth-toolkit: allow http origins for local OIDC CORS (dev only)
+# ------------------------------------------------------------------------------
+OAUTH2_PROVIDER = {
+    **OAUTH2_PROVIDER,  # noqa: F405
+    "ALLOWED_SCHEMES": ["http", "https"],
+}
+
 # Your stuff...
 # ------------------------------------------------------------------------------

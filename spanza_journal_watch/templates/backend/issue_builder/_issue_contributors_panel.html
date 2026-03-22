@@ -1,0 +1,416 @@
+{% load crispy_forms_tags %}
+
+<div id="issue-contributors-panel" class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Reviewers</span>
+    <span class="badge text-bg-secondary">{{ issue_reviewers|length }} total</span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Add reviewers below, then select them and send invites as a separate step. Invite links are valid for {{ issue_invite_ttl_days }} days.
+    </p>
+
+    {% if not planka_binding %}
+      {% if not is_coordinator_only %}
+      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+        <span>No Planka board is linked to this issue. Set one up before inviting contributors.</span>
+        <a
+          class="btn btn-sm btn-warning ms-auto"
+          href="{{ request.path }}#planka-panel"
+        >Set up Planka</a>
+      </div>
+      {% endif %}
+    {% else %}
+
+    {# Datalist for affiliation autocomplete — shared across all rows #}
+    <datalist id="affiliation-options">
+      {% for hs_name in all_health_services %}
+        <option value="{{ hs_name }}">
+      {% endfor %}
+    </datalist>
+
+    {# Step 1: Add contributors #}
+    <form
+      id="contributor-bulk-form"
+      hx-post="{% url "backend:issue_add_contributor" selected_issue.pk %}"
+      hx-target="#issue-contributors-panel"
+      hx-swap="outerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="role" value="reviewer">
+      <input type="hidden" name="panel_role" value="reviewer">
+
+      <div class="row g-1 mb-1 d-none d-md-flex">
+        <div class="col-md-3"><label class="form-label mb-0 small text-muted">Name</label></div>
+        <div class="col-md-4"><label class="form-label mb-0 small text-muted">Email</label></div>
+        <div class="col-md-4">
+          <label class="form-label mb-0 small text-muted">
+            Affiliation
+            <a href="{% url "backend:affiliations_list" %}" target="_blank" class="ms-1" title="Manage affiliations">&#8599;</a>
+          </label>
+        </div>
+      </div>
+
+      <div id="contributor-rows">
+        <!-- Row template (index 0) -->
+        <div class="contributor-row row g-2 align-items-start mb-2" data-index="0">
+          <div class="col-12 col-md-3">
+            <input type="text" name="name_0" class="form-control contributor-name" placeholder="Dr Jane Smith" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <input type="email" name="email_0" class="form-control contributor-email" placeholder="author@example.com" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="contributor-affiliation-container">
+              {# Tags for existing (locked) and newly added (removable) affiliations #}
+              <div class="contributor-affiliation-tags d-flex flex-wrap gap-1 mb-1"></div>
+              {# Text input for adding a new affiliation #}
+              <input
+                type="text"
+                list="affiliation-options"
+                class="form-control form-control-sm contributor-affiliation-input"
+                placeholder="Type to add affiliation…"
+                autocomplete="off"
+              >
+              <div class="affiliation-hint form-text text-muted d-none"></div>
+            </div>
+          </div>
+          <div class="col-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm remove-row-btn" disabled>&times;</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-2 mb-4">
+        <button type="button" id="add-contributor-row" class="btn btn-outline-secondary btn-sm">+ Add another</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add Reviewers</button>
+      </div>
+    </form>
+    {% endif %}
+
+    <hr class="my-3">
+
+    {# Step 2: Contributor table with bulk invite sending #}
+    <form
+      id="send-invites-form"
+      hx-post="{% url "backend:issue_send_contributor_invites" selected_issue.pk %}"
+      hx-target="#issue-contributors-panel"
+      hx-swap="outerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="panel_role" value="reviewer">
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:2rem">
+                <input type="checkbox" id="contributor-select-all-table" class="form-check-input">
+              </th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Author</th>
+              <th>Planka</th>
+              <th>Last invited</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for contributor in issue_reviewers %}
+              <tr>
+                <td>
+                  {% if contributor.status != "active" and contributor.status != "revoked" %}
+                    <input
+                      type="checkbox"
+                      name="contributor_ids"
+                      value="{{ contributor.pk }}"
+                      class="form-check-input contributor-table-cb"
+                    >
+                  {% endif %}
+                </td>
+                <td>{{ contributor.name|default:"—" }}</td>
+                <td>{{ contributor.email }}</td>
+                <td>{{ contributor.get_role_display }}</td>
+                <td>
+                  {% if contributor.status == "active" %}
+                    <span class="badge text-bg-success">Active</span>
+                  {% elif contributor.status == "revoked" %}
+                    <span class="badge text-bg-secondary">Revoked</span>
+                  {% elif contributor.status == "expired" %}
+                    <span class="badge text-bg-warning">Expired</span>
+                  {% elif contributor.status == "invited" %}
+                    <span class="badge text-bg-info">Invited</span>
+                  {% else %}
+                    <span class="badge text-bg-light text-dark border">Pending</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if contributor.author %}
+                    <span class="badge text-bg-success" title="{{ contributor.author }}">Linked</span>
+                  {% else %}
+                    <span class="badge text-bg-light text-dark border" title="No author profile matched">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if contributor.planka_sync_state == "ok" %}
+                    <span class="badge text-bg-success" title="Board member">&#10003;</span>
+                  {% elif contributor.planka_sync_state == "error" %}
+                    <span class="badge text-bg-danger" title="{{ contributor.planka_last_error }}">Error</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if contributor.invited_at %}
+                    <span title="{{ contributor.invited_at }}">{{ contributor.invited_at|timesince }} ago</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if contributor.planka_sync_state == "error" %}
+                  <button
+                    type="button"
+                    class="btn btn-outline-warning btn-sm"
+                    hx-post="{% url "backend:issue_sync_contributor_planka" selected_issue.pk contributor.pk %}"
+                    hx-target="#issue-contributors-panel"
+                    hx-swap="outerHTML"
+                  >
+                    Sync Planka
+                  </button>
+                  {% endif %}
+                  {% if contributor.status != "revoked" %}
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    hx-post="{% url "backend:issue_resend_contributor_invite" selected_issue.pk contributor.pk %}"
+                    hx-target="#issue-contributors-panel"
+                    hx-swap="outerHTML"
+                    hx-confirm="Resend invite to {{ contributor.email }}?"
+                  >
+                    Resend
+                  </button>
+                  {% endif %}
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm"
+                    hx-post="{% url "backend:issue_revoke_contributor" selected_issue.pk contributor.pk %}"
+                    hx-target="#issue-contributors-panel"
+                    hx-swap="outerHTML"
+                    hx-confirm="Revoke contributor access for {{ contributor.email }}?"
+                  >
+                    Revoke
+                  </button>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="9" class="text-muted">No reviewers added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-end mt-2">
+        <button
+          type="submit"
+          class="btn btn-primary btn-sm"
+          id="send-invites-btn"
+          disabled
+        >Send invites to selected</button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const LOOKUP_URL = '{% url "backend:contributor_author_lookup" %}';
+
+  // ── Affiliation tag helpers ───────────────────────────────────────────────
+
+  function getTagsEl(row) { return row.querySelector('.contributor-affiliation-tags'); }
+
+  function currentAffiliationNames(row) {
+    return Array.from(row.querySelectorAll('.contributor-affiliation-hidden')).map(h => h.value);
+  }
+
+  function addAffiliationTag(row, name, locked) {
+    if (currentAffiliationNames(row).includes(name)) return; // no duplicates
+
+    const tagsEl = getTagsEl(row);
+    const idx = row.dataset.index;
+
+    // Hidden input submitted with the form.
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.className = 'contributor-affiliation-hidden';
+    hidden.name = `affiliation_${idx}`;
+    hidden.value = name;
+    row.querySelector('.contributor-affiliation-container').appendChild(hidden);
+
+    // Visible badge.
+    const badge = document.createElement('span');
+    badge.className = `badge d-inline-flex align-items-center gap-1 py-1 px-2 ${locked ? 'text-bg-secondary' : 'text-bg-primary'}`;
+    badge.dataset.affiliationName = name;
+    badge.textContent = name;
+
+    if (!locked) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-close btn-close-white ms-1';
+      btn.style.fontSize = '0.55em';
+      btn.setAttribute('aria-label', 'Remove');
+      btn.addEventListener('click', function () {
+        badge.remove();
+        hidden.remove();
+      });
+      badge.appendChild(btn);
+    }
+
+    tagsEl.appendChild(badge);
+  }
+
+  function clearAffiliations(row) {
+    row.querySelectorAll('.contributor-affiliation-hidden').forEach(h => h.remove());
+    getTagsEl(row).innerHTML = '';
+  }
+
+  // ── Email lookup ──────────────────────────────────────────────────────────
+
+  function attachEmailLookup(row) {
+    const emailInput = row.querySelector('.contributor-email');
+    const nameInput = row.querySelector('.contributor-name');
+    const affiliationInput = row.querySelector('.contributor-affiliation-input');
+    const affiliationHint = row.querySelector('.affiliation-hint');
+    if (!emailInput) return;
+
+    emailInput.addEventListener('blur', function () {
+      const email = emailInput.value.trim();
+      if (!email || !email.includes('@')) return;
+
+      fetch(`${LOOKUP_URL}?email=${encodeURIComponent(email)}`)
+        .then(r => r.json())
+        .then(function (data) {
+          if (!data.found) return;
+
+          if (nameInput && !nameInput.value.trim()) {
+            nameInput.value = data.name || '';
+          }
+
+          if (data.has_affiliations) {
+            // Show existing affiliations as locked tags; user can still add more.
+            clearAffiliations(row);
+            data.affiliations.forEach(a => addAffiliationTag(row, a.name, true));
+            affiliationInput.placeholder = 'Add another affiliation…';
+            if (affiliationHint) {
+              affiliationHint.textContent = 'Existing affiliations shown above — add more if needed.';
+              affiliationHint.classList.remove('d-none');
+            }
+          } else {
+            if (affiliationHint) affiliationHint.classList.add('d-none');
+          }
+        })
+        .catch(() => {});
+    });
+
+    // Add a new affiliation tag when the user picks/types one.
+    affiliationInput && affiliationInput.addEventListener('change', function () {
+      const val = affiliationInput.value.trim();
+      if (val) {
+        addAffiliationTag(row, val, false);
+        affiliationInput.value = '';
+      }
+    });
+  }
+
+  // ── Row management ────────────────────────────────────────────────────────
+
+  function reindexRows() {
+    rowsContainer.querySelectorAll('.contributor-row').forEach(function (row, i) {
+      row.dataset.index = i;
+      row.querySelector('.contributor-name').name = `name_${i}`;
+      row.querySelector('.contributor-email').name = `email_${i}`;
+      row.querySelectorAll('.contributor-affiliation-hidden').forEach(h => {
+        h.name = `affiliation_${i}`;
+      });
+    });
+  }
+
+  const rowsContainer = document.getElementById('contributor-rows');
+  const addBtn = document.getElementById('add-contributor-row');
+
+  if (rowsContainer && addBtn) {
+    function updateRemoveButtons() {
+      const rows = rowsContainer.querySelectorAll('.contributor-row');
+      rows.forEach(row => {
+        row.querySelector('.remove-row-btn').disabled = rows.length === 1;
+      });
+    }
+
+    attachEmailLookup(rowsContainer.querySelector('.contributor-row'));
+
+    addBtn.addEventListener('click', function () {
+      const rows = rowsContainer.querySelectorAll('.contributor-row');
+      const idx = rows.length;
+      const tpl = rows[0].cloneNode(true);
+      tpl.dataset.index = idx;
+      tpl.querySelector('.contributor-name').name = `name_${idx}`;
+      tpl.querySelector('.contributor-name').value = '';
+      tpl.querySelector('.contributor-email').name = `email_${idx}`;
+      tpl.querySelector('.contributor-email').value = '';
+      // Clear affiliations on cloned row.
+      tpl.querySelectorAll('.contributor-affiliation-hidden').forEach(h => h.remove());
+      getTagsEl(tpl).innerHTML = '';
+      const clonedInput = tpl.querySelector('.contributor-affiliation-input');
+      if (clonedInput) { clonedInput.value = ''; clonedInput.placeholder = 'Type to add affiliation…'; }
+      const clonedHint = tpl.querySelector('.affiliation-hint');
+      if (clonedHint) { clonedHint.textContent = ''; clonedHint.classList.add('d-none'); }
+      tpl.querySelector('.remove-row-btn').disabled = false;
+      rowsContainer.appendChild(tpl);
+      attachEmailLookup(tpl);
+      updateRemoveButtons();
+    });
+
+    rowsContainer.addEventListener('click', function (e) {
+      if (!e.target.classList.contains('remove-row-btn')) return;
+      if (rowsContainer.querySelectorAll('.contributor-row').length === 1) return;
+      e.target.closest('.contributor-row').remove();
+      reindexRows();
+      updateRemoveButtons();
+    });
+  }
+
+  // Step 2: send-invites table checkboxes
+  const selectAllCb = document.getElementById('contributor-select-all-table');
+  const sendBtn = document.getElementById('send-invites-btn');
+
+  function updateSendBtn() {
+    if (!sendBtn) return;
+    const anyChecked = document.querySelectorAll('.contributor-table-cb:checked').length > 0;
+    sendBtn.disabled = !anyChecked;
+  }
+
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function () {
+      document.querySelectorAll('.contributor-table-cb').forEach(cb => {
+        cb.checked = selectAllCb.checked;
+      });
+      updateSendBtn();
+    });
+  }
+
+  document.querySelectorAll('.contributor-table-cb').forEach(cb => {
+    cb.addEventListener('change', function () {
+      updateSendBtn();
+      if (!this.checked && selectAllCb) selectAllCb.checked = false;
+    });
+  });
+
+  updateSendBtn();
+})();
+</script>

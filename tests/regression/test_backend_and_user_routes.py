@@ -8,7 +8,6 @@ from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpe
 from spanza_journal_watch.backend.models import (
     BackendPreference,
     PlankaCardImport,
-    PlankaIntegrationCredential,
     PlankaIssueBinding,
     PubmedBatchArticle,
     PubmedImportBatch,
@@ -658,84 +657,6 @@ class TestIssueBuilderPlankaIntegration:
 
         binding.refresh_from_db()
         assert binding.project_name == "New Project Name"
-
-    def test_planka_save_manual_api_key(self, route_client, regression_baseline, monkeypatch):
-        user = User.objects.filter(is_superuser=False).order_by("pk").first()
-        assert user is not None
-
-        permission = Permission.objects.get(codename="manage_issue_builder")
-        user.user_permissions.add(permission)
-        route_client.force_login(user)
-
-        issue = Issue.objects.create(name="Planka Manual Key Issue", body="Issue body")
-
-        class FakeValidationClient:
-            def get_current_user(self):
-                return {"id": "manual-user"}
-
-        monkeypatch.setattr("spanza_journal_watch.backend.views.PlankaClient", lambda **kwargs: FakeValidationClient())
-
-        response = route_client.post(
-            reverse("backend:planka_save_api_key"),
-            data={
-                "api_key": "pkmanual_verysecretvalue",
-                "issue_id": issue.pk,
-            },
-        )
-
-        assert response.status_code == 302
-        assert reverse("backend:issue_planka_import") in response.headers.get("Location", "")
-
-        credential = PlankaIntegrationCredential.objects.get()
-        assert credential.auth_mode == "api_key"
-        assert credential.api_key != "pkmanual_verysecretvalue"
-        assert credential.get_api_key() == "pkmanual_verysecretvalue"
-        assert credential.api_key_prefix == "pkmanual"
-        assert credential.configured_by_id == user.pk
-        assert credential.last_validated_at is not None
-
-    def test_planka_save_manual_api_key_does_not_overwrite_on_validation_failure(
-        self,
-        route_client,
-        regression_baseline,
-        monkeypatch,
-    ):
-        user = User.objects.filter(is_superuser=False).order_by("pk").first()
-        assert user is not None
-
-        permission = Permission.objects.get(codename="manage_issue_builder")
-        user.user_permissions.add(permission)
-        route_client.force_login(user)
-
-        issue = Issue.objects.create(name="Planka Manual Key Preserve", body="Issue body")
-
-        credential = PlankaIntegrationCredential(singleton=1, auth_mode="api_key")
-        credential.set_api_key("pkmanual_existingvalue")
-        credential.api_key_prefix = "pkmanual"
-        credential.configured_by = user
-        credential.save()
-
-        class FailingValidationClient:
-            def get_current_user(self):
-                raise PlankaAPIError("Planka API 401: Unauthorized")
-
-        monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.PlankaClient", lambda **kwargs: FailingValidationClient()
-        )
-
-        response = route_client.post(
-            reverse("backend:planka_save_api_key"),
-            data={
-                "api_key": "pkmanual_invalidreplacement",
-                "issue_id": issue.pk,
-            },
-        )
-
-        assert response.status_code == 200
-
-        credential.refresh_from_db()
-        assert credential.get_api_key() == "pkmanual_existingvalue"
-        assert "401" in credential.last_error
 
     def test_planka_import_publish_card_creates_review(self, route_client, regression_baseline, monkeypatch):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
