@@ -1,0 +1,8 @@
+# PostgreSQL
+# ------------------------------------------------------------------------------
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=spanza_journal_watch
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(24))"
+POSTGRES_USER=change-me-db-user
+POSTGRES_PASSWORD=change-me-strong-db-password

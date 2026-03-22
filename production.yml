@@ -86,7 +86,7 @@ services:
     restart: always
     ports:
       - '28101:28101'
-    command: ['--mjml.validationLevel=strict']
+    command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
 
   planka:
     image: ghcr.io/plankanban/planka:2.0.3
