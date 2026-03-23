@@ -148,10 +148,10 @@ at ``ops/systemd/env.example``.
      - SMTP port (default: ``587``).
    * - ``SMTP_TLS``
      - No
-     - ``on`` or ``off`` (default: ``on``).  Set to ``off`` for Mailhog.
+     - ``on`` or ``off`` (default: ``on``).  Set to ``off`` for Mailpit.
    * - ``SMTP_USER``
      - No
-     - SMTP username.  Omit for unauthenticated servers (Mailhog).
+     - SMTP username.  Omit for unauthenticated servers (Mailpit).
    * - ``SMTP_PASSWORD``
      - No
      - SMTP password.  Required when ``SMTP_USER`` is set.
@@ -180,7 +180,7 @@ container with restic, msmtp, and postgresql-client.  The backup scripts are
 bind-mounted from ``ops/backup/`` so changes on the host are reflected
 immediately without rebuilding.
 
-Notification emails are sent to **Mailhog** (no real email is dispatched),
+Notification emails are sent to **Mailpit** (no real email is dispatched),
 viewable at http://localhost:8025.
 
 The Restic repository is stored in a named Docker volume (``backup_repo``)
@@ -191,8 +191,8 @@ Starting the test environment
 
 .. code-block:: bash
 
-   # Bring up the base stack (postgres + mailhog required)
-   docker compose -f local.yml up -d postgres mailhog
+   # Bring up the base stack (postgres + mailpit required)
+   docker compose -f local.yml up -d postgres mailpit
 
    # Optional: include Planka if you want to test Planka backups
    docker compose -f local.yml --profile planka up -d planka planka_postgres
@@ -207,7 +207,7 @@ Common test commands
    # 1. Dry run — verify configuration and see what would run
    $COMPOSE /backup/backup.sh --dry-run
 
-   # 2. Full backup with repository verification (emails land in Mailhog)
+   # 2. Full backup with repository verification (emails land in Mailpit)
    $COMPOSE /backup/backup.sh --verify
 
    # 3. List snapshots

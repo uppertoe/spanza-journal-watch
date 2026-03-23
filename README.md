@@ -161,7 +161,7 @@ docker compose -f local.yml --profile planka --profile workers up
 # Django shell
 docker exec spanza_journal_watch_local_django /entrypoint python manage.py shell
 
-# Emails are caught by Mailhog at http://localhost:8025
+# Emails are caught by Mailpit at http://localhost:8025
 # Planka is at http://localhost:3001
 # Flower (Celery monitor) is at http://localhost:5555
 ```

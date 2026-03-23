@@ -15,7 +15,7 @@ services:
     depends_on:
       - postgres
       - redis
-      - mailhog
+      - mailpit
       - mjml
     volumes:
       - .:/app:z
@@ -49,9 +49,9 @@ services:
       - '9000:9000'
     command: /start-docs
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    container_name: spanza_journal_watch_local_mailhog
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: spanza_journal_watch_local_mailpit
     ports:
       - '8025:8025'
 
@@ -67,7 +67,7 @@ services:
     depends_on:
       - redis
       - postgres
-      - mailhog
+      - mailpit
       - mjml
     ports: []
     command: /start-celeryworker
@@ -80,7 +80,7 @@ services:
     depends_on:
       - redis
       - postgres
-      - mailhog
+      - mailpit
       - mjml
     ports: []
     command: /start-celerybeat
@@ -163,7 +163,7 @@ services:
   # Backup — local testing container (profile: backup)
   # ---------------------------------------------------------------------------
   # Bind-mounts ops/backup/ so script changes are reflected immediately.
-  # Mailhog catches notification emails at http://localhost:8025.
+  # Mailpit catches notification emails at http://localhost:8025.
   #
   # Usage:
   #   docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --dry-run
@@ -189,7 +189,7 @@ services:
       KEEP_DAILY: '3'
       KEEP_WEEKLY: '2'
       KEEP_MONTHLY: '1'
-      SMTP_HOST: mailhog
+      SMTP_HOST: mailpit
       SMTP_PORT: '1025'
       SMTP_TLS: 'off'
       SMTP_FROM: backup@journalwatch.local
@@ -197,7 +197,7 @@ services:
       NOTIFY_ON_SUCCESS: 'true'
     depends_on:
       - postgres
-      - mailhog
+      - mailpit
 
   planka_postgres:
     image: postgres:16-alpine
