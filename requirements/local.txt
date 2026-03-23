@@ -30,8 +30,6 @@ babel==2.18.0
     # via sphinx
 billiard==4.2.4
     # via celery
-black==26.3.1
-    # via -r requirements/local.in
 build==1.4.0
     # via pip-tools
 celery==5.6.2
@@ -51,7 +49,6 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via
-    #   black
     #   celery
     #   click-didyoumean
     #   click-plugins
@@ -76,7 +73,9 @@ crispy-bootstrap5==2026.3
 cron-descriptor==1.4.5
     # via django-celery-beat
 cryptography==46.0.3
-    # via -r requirements/base.in
+    # via
+    #   -r requirements/base.in
+    #   jwcrypto
 decorator==5.2.1
     # via
     #   ipdb
@@ -98,6 +97,7 @@ django==6.0.3
     #   django-markdownx
     #   django-mjml
     #   django-model-utils
+    #   django-oauth-toolkit
     #   django-redis
     #   django-request-logging
     #   django-stubs
@@ -107,12 +107,6 @@ django==6.0.3
     #   django-view-breadcrumbs
 django-allauth==65.15.0
     # via -r requirements/base.in
-django-oauth-toolkit==3.2.0
-    # via -r requirements/base.in
-jwcrypto==1.5.6
-    # via django-oauth-toolkit
-oauthlib==3.3.1
-    # via django-oauth-toolkit
 django-celery-beat==2.9.0
     # via -r requirements/base.in
 django-coverage-plugin==3.2.0
@@ -133,6 +127,8 @@ django-mjml==1.5
     # via -r requirements/base.in
 django-model-utils==5.0.0
     # via -r requirements/base.in
+django-oauth-toolkit[oidc]==3.2.0
+    # via -r requirements/base.in
 django-redis==6.0.0
     # via -r requirements/base.in
 django-request-logging==0.7.5
@@ -151,6 +147,8 @@ django-webpack-loader==3.2.3
     # via -r requirements/base.in
 docutils==0.22.4
     # via sphinx
+et-xmlfile==2.0.0
+    # via openpyxl
 executing==2.2.1
     # via stack-data
 factory-boy==3.3.3
@@ -161,12 +159,6 @@ filelock==3.25.2
     # via
     #   python-discovery
     #   virtualenv
-flake8==7.3.0
-    # via
-    #   -r requirements/local.in
-    #   flake8-isort
-flake8-isort==7.0.0
-    # via -r requirements/local.in
 flower==2.0.1
     # via -r requirements/base.in
 h11==0.16.0
@@ -192,13 +184,13 @@ ipython==9.11.0
 ipython-pygments-lexers==1.1.1
     # via ipython
 isort==8.0.1
-    # via
-    #   flake8-isort
-    #   pylint
+    # via pylint
 jedi==0.19.2
     # via ipython
 jinja2==3.1.6
     # via sphinx
+jwcrypto==1.5.6
+    # via django-oauth-toolkit
 kombu==5.6.2
     # via celery
 librt==0.8.1
@@ -212,20 +204,19 @@ markupsafe==3.0.3
 matplotlib-inline==0.2.1
     # via ipython
 mccabe==0.7.0
-    # via
-    #   flake8
-    #   pylint
+    # via pylint
 mypy==1.19.1
     # via -r requirements/local.in
 mypy-extensions==1.1.0
-    # via
-    #   black
-    #   mypy
+    # via mypy
 nodeenv==1.10.0
     # via pre-commit
+oauthlib==3.3.1
+    # via django-oauth-toolkit
+openpyxl==3.1.5
+    # via -r requirements/base.in
 packaging==26.0
     # via
-    #   black
     #   build
     #   kombu
     #   pytest
@@ -234,9 +225,7 @@ packaging==26.0
 parso==0.8.6
     # via jedi
 pathspec==1.0.4
-    # via
-    #   black
-    #   mypy
+    # via mypy
 pexpect==4.9.0
     # via ipython
 pillow==12.1.1
@@ -247,7 +236,6 @@ pip-tools==7.5.3
     # via -r requirements/local.in
 platformdirs==4.9.4
     # via
-    #   black
     #   pylint
     #   python-discovery
     #   virtualenv
@@ -269,22 +257,16 @@ pur==7.3.3
     # via -r requirements/local.in
 pure-eval==0.2.3
     # via stack-data
-pycodestyle==2.14.0
-    # via flake8
 pycparser==3.0
     # via cffi
-pyjwt==2.10.1
-    # via
-    #   -r requirements/base.in
-    #   django-allauth
-pyflakes==3.4.0
-    # via flake8
 pygments==2.19.2
     # via
     #   ipython
     #   ipython-pygments-lexers
     #   pytest
     #   sphinx
+pyjwt==2.10.1
+    # via -r requirements/base.in
 pylint==4.0.5
     # via
     #   pylint-celery
@@ -319,8 +301,6 @@ python-discovery==1.1.3
     # via virtualenv
 python-slugify==8.0.4
     # via -r requirements/base.in
-pytokens==0.4.1
-    # via black
 pytz==2026.1.post1
     # via flower
 pyyaml==6.0.3
@@ -330,9 +310,13 @@ redis==7.3.0
     #   -r requirements/base.in
     #   django-redis
 requests==2.32.5
-    # via sphinx
+    # via
+    #   django-oauth-toolkit
+    #   sphinx
 roman-numerals==4.1.0
     # via sphinx
+ruff==0.15.7
+    # via -r requirements/local.in
 six==1.17.0
     # via python-dateutil
 snowballstemmer==3.0.1
@@ -381,6 +365,7 @@ typing-extensions==4.15.0
     # via
     #   django-stubs
     #   django-stubs-ext
+    #   jwcrypto
     #   mypy
 tzdata==2025.3
     # via

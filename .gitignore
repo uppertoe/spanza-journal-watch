@@ -293,3 +293,5 @@ webpack-stats.json
 .fixtures
 
 backups
+
+.vscode

@@ -1,6 +1,7 @@
 """
 Module for all Form Tests.
 """
+
 from django.utils.translation import gettext_lazy as _
 
 from spanza_journal_watch.users.forms import UserAdminCreationForm

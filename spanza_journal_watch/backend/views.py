@@ -3429,9 +3429,9 @@ def issue_planka_import(request):
                 context["planka_panel_status"] = "Not connected to Planka. Retrying in background…"
                 context["planka_disconnected"] = True
             elif _is_planka_board_not_found_error(error):
-                context[
-                    "planka_panel_status"
-                ] = "Linked Reviews board was not found in Planka. You can recreate the board for this issue."
+                context["planka_panel_status"] = (
+                    "Linked Reviews board was not found in Planka. You can recreate the board for this issue."
+                )
                 context["planka_board_missing"] = True
             else:
                 context["planka_panel_status"] = f"Could not refresh Planka cards: {safe_error}"
