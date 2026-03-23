@@ -16,13 +16,14 @@ services:
         condition: service_started
       mjml:
         condition: service_started
-    env_file:
-      - ./.envs/.production/.django
-      - ./.envs/.production/.postgres
+    env_file: .env
     environment:
+      # Docker-internal addresses — do not override in .env
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_PORT: '5432'
       REDIS_URL: redis://redis:6379/0
+      PLANKA_BASE_URL: http://planka:1337
+      PLANKA_DB_URL: postgresql://postgres@planka_postgres/planka
     ports:
       - '5000:5000'
     volumes:
@@ -31,13 +32,11 @@ services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
-    env_file:
-      - ./.envs/.production/.postgres
+    env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_data_backups:/backups
-    # Expose on loopback only so the VPS backup script (running on the host,
-    # outside Docker) can connect via 127.0.0.1:5432.
+    # Exposed on loopback only so the VPS backup script can connect from the host.
     ports:
       - '127.0.0.1:5432:5432'
     healthcheck:
@@ -88,9 +87,9 @@ services:
       planka_postgres:
         condition: service_healthy
     volumes:
-      - ./compose/planka/custom:/app/terms/custom:ro
-    env_file:
-      - ./.envs/.production/.planka
+      # No data volume — attachments stored in S3 (see S3_* in .env)
+      - ./planka/custom:/app/terms/custom:ro
+    env_file: .env
     ports:
       - '3001:1337'
 
@@ -103,8 +102,8 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - planka_postgres_data:/var/lib/postgresql/data
-    # Exposed on port 5433 (host) → 5432 (container) to avoid conflict with
-    # the Django postgres on 5432.  The VPS backup script uses PLANKA_DB_PORT=5433.
+    # Exposed on port 5433 to avoid conflict with Django postgres on 5432.
+    # The VPS backup script uses PLANKA_DB_PORT=5433.
     ports:
       - '127.0.0.1:5433:5432'
     healthcheck:

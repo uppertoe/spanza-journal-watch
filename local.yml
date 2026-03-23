@@ -19,30 +19,19 @@ services:
       - mjml
     volumes:
       - .:/app:z
-    env_file:
-      - ./.envs/.local/.django
-      - ./.envs/.local/.postgres
-    environment:
-      PLANKA_BASE_URL: http://planka:1337
-      # Must match DEFAULT_ADMIN_EMAIL in the planka service below
-      PLANKA_ADMIN_EMAIL: demo@demo.demo
-      PLANKA_DB_URL: postgresql://postgres@planka_postgres/planka
+    env_file: .env.local
     ports:
       - '8000:8000'
     command: /start
 
   postgres:
-    build:
-      context: .
-      dockerfile: ./compose/production/postgres/Dockerfile
-    image: spanza_journal_watch_production_postgres
+    image: postgres:17
     container_name: spanza_journal_watch_local_postgres
     volumes:
       - spanza_journal_watch_local_postgres_data:/var/lib/postgresql/data
       - spanza_journal_watch_local_postgres_data_backups:/backups
       - ./backups:/backups
-    env_file:
-      - ./.envs/.local/.postgres
+    env_file: .env.local
 
   docs:
     image: spanza_journal_watch_local_docs
@@ -50,8 +39,7 @@ services:
     build:
       context: .
       dockerfile: ./compose/local/docs/Dockerfile
-    env_file:
-      - ./.envs/.local/.django
+    env_file: .env.local
     profiles: ['tools']
     volumes:
       - ./docs:/docs:z
@@ -145,7 +133,7 @@ services:
         condition: service_healthy
     volumes:
       - spanza_journal_watch_local_planka_data:/app/data
-      - ./compose/planka/custom:/app/terms/custom:ro
+      - ./planka/custom:/app/terms/custom:ro
     ports:
       - '3001:1337'
     environment:
@@ -153,8 +141,6 @@ services:
       DATABASE_URL: postgresql://postgres@planka_postgres/planka
       SECRET_KEY: notsecretkey
       SWAGGER_EXPOSED: 'true'
-      # Django acts as the OIDC provider — run `manage.py setup_planka_oidc` to register the application
-      # localhost:8000 is reachable from the browser; extra_hosts below makes it reachable from inside the container too
       OIDC_ISSUER: http://localhost:8000/o
       OIDC_CLIENT_ID: planka-local
       OIDC_CLIENT_SECRET: planka-local-oidc-secret-changeme
@@ -165,8 +151,6 @@ services:
       OIDC_IGNORE_USERNAME: 'true'
       OIDC_IGNORE_ROLES: 'true'
       # Enable AFTER running setup_planka_api_key from the backend settings UI.
-      # That command initialises the instance (admin REST login) — only then will
-      # OIDC_ENFORCED work correctly. Uncomment and restart Planka to enforce SSO.
       # OIDC_ENFORCED: 'true'
       DEFAULT_ADMIN_EMAIL: demo@demo.demo
       DEFAULT_ADMIN_PASSWORD: demo
@@ -178,58 +162,39 @@ services:
   # ---------------------------------------------------------------------------
   # Backup — local testing container (profile: backup)
   # ---------------------------------------------------------------------------
-  # Provides a pre-built environment (restic + msmtp + postgresql-client) with
-  # the backup scripts bind-mounted from compose/backup/.  Changes to scripts
-  # on the host are reflected immediately without rebuilding the image.
-  #
-  # Mailhog is used as the SMTP server so notification emails can be inspected
-  # at http://localhost:8025 without sending real mail.
+  # Bind-mounts ops/backup/ so script changes are reflected immediately.
+  # Mailhog catches notification emails at http://localhost:8025.
   #
   # Usage:
-  #   # Dry run — see what would happen
-  #   docker compose --profile backup run --rm backup /backup/backup.sh --dry-run
-  #
-  #   # Full backup + verify (emails appear in Mailhog)
-  #   docker compose --profile backup run --rm backup /backup/backup.sh --verify
-  #
-  #   # Test restore into a temporary database (safe — does not touch production)
-  #   docker compose --profile backup run --rm backup \
+  #   docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --dry-run
+  #   docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --verify
+  #   docker compose -f local.yml --profile backup run --rm backup \
   #     /backup/restore.sh --database django --target django_restore_test
-  #
-  #   # Interactive shell
-  #   docker compose --profile backup run --rm backup bash
   backup:
     build:
       context: .
       dockerfile: ./compose/local/backup/Dockerfile
     profiles: ['backup']
     volumes:
-      - ./compose/backup:/backup:ro # bind mount — edit scripts on host
-      - spanza_journal_watch_local_backup_repo:/restic-repo # local restic repo
+      - ./ops/backup:/backup:ro
+      - spanza_journal_watch_local_backup_repo:/restic-repo
+    env_file: .env.local
     environment:
-      # Restic — uses a local volume instead of S3
       RESTIC_REPOSITORY: /restic-repo
       RESTIC_PASSWORD: local-test-password
-      # Django postgres — same credentials as the local stack
       POSTGRES_HOST: postgres
       POSTGRES_PORT: '5432'
-      # Planka postgres — only reachable when --profile planka is also active;
-      # backup.sh skips Planka gracefully if the host is not reachable
       PLANKA_DB_HOST: planka_postgres
       PLANKA_DB_PORT: '5432'
-      # Retention — short values to keep the local repo small
       KEEP_DAILY: '3'
       KEEP_WEEKLY: '2'
       KEEP_MONTHLY: '1'
-      # Notifications via Mailhog (no auth, no TLS)
       SMTP_HOST: mailhog
       SMTP_PORT: '1025'
       SMTP_TLS: 'off'
       SMTP_FROM: backup@journalwatch.local
       ALERT_EMAIL: admin@journalwatch.local
       NOTIFY_ON_SUCCESS: 'true'
-    env_file:
-      - ./.envs/.local/.postgres # supplies POSTGRES_USER / POSTGRES_PASSWORD
     depends_on:
       - postgres
       - mailhog

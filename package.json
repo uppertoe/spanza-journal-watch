@@ -9,7 +9,6 @@
     "babel-loader": "^10.1.1",
     "bootstrap": "^5.3.8",
     "css-loader": "^7.1.4",
-    "gulp-concat": "^2.6.1",
     "htmx.org": "^2.0.8",
     "mini-css-extract-plugin": "^2.10.1",
     "node-sass-tilde-importer": "^1.0.2",

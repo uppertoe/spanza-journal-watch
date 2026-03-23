@@ -1,6 +1,0 @@
-[Unit]
-Description=this service runs /home/ec2-user/backup.sh daily
-
-[Service]
-User=ec2-user
-ExecStart=/home/ec2-user/backup.sh

@@ -1,7 +1,7 @@
 # backup.service — One-shot systemd service for Journal Watch database backups.
 #
 # Triggered by backup.timer.  Do not enable this unit directly.
-# Install with: compose/production/backup/install.sh
+# Install with: ops/systemd/install.sh
 
 [Unit]
 Description=Journal Watch — Restic database backup

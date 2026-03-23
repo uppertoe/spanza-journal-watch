@@ -6,7 +6,7 @@
 # Run as root on the VPS after cloning the repository.
 #
 # USAGE
-#   sudo bash compose/production/backup/install.sh
+#   sudo bash ops/systemd/install.sh
 #
 # WHAT IT DOES
 #   1. Installs restic, msmtp, msmtp-mta, and postgresql-client.
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 log()  { echo "[install] $*"; }
 die()  { echo "[install] ERROR: $*" >&2; exit 1; }
@@ -75,8 +75,8 @@ fi
 log "Installing scripts to /opt/backup/…"
 
 install -d /opt/backup
-install -m 750 "$REPO_ROOT/compose/backup/backup.sh"  /opt/backup/backup.sh
-install -m 750 "$REPO_ROOT/compose/backup/restore.sh" /opt/backup/restore.sh
+install -m 750 "$REPO_ROOT/ops/backup/backup.sh"  /opt/backup/backup.sh
+install -m 750 "$REPO_ROOT/ops/backup/restore.sh" /opt/backup/restore.sh
 
 log "Scripts installed."
 

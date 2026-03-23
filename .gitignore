@@ -219,8 +219,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-# Authelia (replaced by Authentik — kept for reference only)
-compose/local/authelia/
+# Claude Code local state
+.claude/
 
 
 ### SublimeText template
@@ -283,9 +283,8 @@ spanza_journal_watch/media/
 spanza_journal_watch/static/webpack_bundles/
 webpack-stats.json
 .env
-.envs/*
-!.envs/.local/
-!.envs/.production/*.example
+!.env.example
+!.env.local
 
 .keys
 *.pem

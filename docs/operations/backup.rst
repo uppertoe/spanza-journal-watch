@@ -48,7 +48,7 @@ host-side scripts can connect without entering the Docker network.
 Scripts
 -------
 
-Both scripts live in ``compose/backup/`` in the repository.
+Both scripts live in ``ops/backup/`` in the repository.
 
 ``backup.sh``
 ~~~~~~~~~~~~~
@@ -86,7 +86,7 @@ Environment variables
 
 All configuration is read from ``/etc/restic/env`` on the production host, or
 from Docker Compose environment variables when testing locally.  A template is
-at ``compose/production/backup/env.example``.
+at ``ops/systemd/env.example``.
 
 .. list-table::
    :header-rows: 1
@@ -177,7 +177,7 @@ Testing locally
 
 A dedicated Docker Compose service (``backup`` profile) provides a pre-built
 container with restic, msmtp, and postgresql-client.  The backup scripts are
-bind-mounted from ``compose/backup/`` so changes on the host are reflected
+bind-mounted from ``ops/backup/`` so changes on the host are reflected
 immediately without rebuilding.
 
 Notification emails are sent to **Mailhog** (no real email is dispatched),
@@ -251,7 +251,7 @@ Run the install script once on the VPS after cloning the repository:
 .. code-block:: bash
 
    cd /path/to/spanza_journal_watch
-   sudo bash compose/production/backup/install.sh
+   sudo bash ops/systemd/install.sh
 
 The script installs dependencies, copies scripts to ``/opt/backup/``, installs
 the systemd units, and enables the timer.  It does **not** start the backup.
@@ -260,7 +260,7 @@ After installation
 ~~~~~~~~~~~~~~~~~~
 
 1. **Fill in credentials** — edit ``/etc/restic/env`` (created from the
-   template at ``compose/production/backup/env.example``):
+   template at ``ops/systemd/env.example``):
 
    .. code-block:: bash
 
@@ -413,14 +413,14 @@ The scripts live in the repository.  To update them on the VPS after a
 .. code-block:: bash
 
    cd /path/to/spanza_journal_watch
-   sudo install -m 750 compose/backup/backup.sh  /opt/backup/backup.sh
-   sudo install -m 750 compose/backup/restore.sh /opt/backup/restore.sh
+   sudo install -m 750 ops/backup/backup.sh  /opt/backup/backup.sh
+   sudo install -m 750 ops/backup/restore.sh /opt/backup/restore.sh
 
 The systemd units only need to be reinstalled if ``backup.service`` or
 ``backup.timer`` change:
 
 .. code-block:: bash
 
-   sudo install -m 644 compose/production/backup/backup.service /etc/systemd/system/
-   sudo install -m 644 compose/production/backup/backup.timer   /etc/systemd/system/
+   sudo install -m 644 ops/systemd/backup.service /etc/systemd/system/
+   sudo install -m 644 ops/systemd/backup.timer   /etc/systemd/system/
    sudo systemctl daemon-reload

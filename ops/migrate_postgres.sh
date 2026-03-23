@@ -3,11 +3,11 @@
 # Migrate PostgreSQL data into a fresh Postgres 17 Docker volume using a .sql/.sql.gz dump.
 #
 # Default usage (production):
-#   ./scripts/migrate_postgres17_from_sql.sh ./backups/your_backup.sql
+#   ./ops/migrate_postgres.sh ./backups/your_backup.sql
 #
 # Optional flags:
-#   --compose-file <path>   (default: production.yml)
-#   --env-file <path>       (default: ./.envs/.production/.postgres)
+#   --compose-file <path>   (default: compose.prod.example.yml)
+#   --env-file <path>       (default: .env)
 #   --force                 Skip confirmation prompt
 
 set -o errexit
@@ -15,8 +15,8 @@ set -o pipefail
 set -o nounset
 
 SCRIPT_NAME="$(basename "$0")"
-COMPOSE_FILE="production.yml"
-POSTGRES_ENV_FILE="./.envs/.production/.postgres"
+COMPOSE_FILE="compose.prod.example.yml"
+POSTGRES_ENV_FILE=".env"
 FORCE="false"
 
 usage() {
@@ -26,7 +26,7 @@ Usage:
 
 Examples:
   ${SCRIPT_NAME} ./backups/postgres14_migration_20260316_072901.sql
-  ${SCRIPT_NAME} --compose-file production.yml --env-file ./.envs/.production/.postgres ./backups/prod.sql.gz
+  ${SCRIPT_NAME} --compose-file compose.prod.example.yml --env-file .env ./backups/prod.sql.gz
 
 What this does:
   1) Finds the current postgres data volume attached to the compose postgres service
