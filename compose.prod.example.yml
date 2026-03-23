@@ -80,7 +80,7 @@ services:
       - '5555:5555'
 
   planka:
-    image: ghcr.io/plankanban/planka:2.0.3
+    image: ghcr.io/plankanban/planka:2.1.0
     restart: unless-stopped
     profiles: ['planka']
     depends_on:

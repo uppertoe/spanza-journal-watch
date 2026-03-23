@@ -21,10 +21,14 @@ celery==5.6.2
     #   -r requirements/base.in
     #   django-celery-beat
     #   flower
+certifi==2026.2.25
+    # via requests
 cffi==2.0.0
     # via
     #   argon2-cffi-bindings
     #   cryptography
+charset-normalizer==3.4.6
+    # via requests
 click==8.3.1
     # via
     #   celery
@@ -41,8 +45,10 @@ crispy-bootstrap5==2026.3
     # via -r requirements/base.in
 cron-descriptor==1.4.5
     # via django-celery-beat
-cryptography==46.0.3
-    # via -r requirements/base.in
+cryptography==46.0.5
+    # via
+    #   -r requirements/base.in
+    #   jwcrypto
 django==6.0.3
     # via
     #   -r requirements/base.in
@@ -53,6 +59,7 @@ django==6.0.3
     #   django-markdownx
     #   django-mjml
     #   django-model-utils
+    #   django-oauth-toolkit
     #   django-redis
     #   django-request-logging
     #   django-timezone-field
@@ -60,12 +67,6 @@ django==6.0.3
     #   django-view-breadcrumbs
 django-allauth==65.15.0
     # via -r requirements/base.in
-django-oauth-toolkit==3.2.0
-    # via -r requirements/base.in
-jwcrypto==1.5.6
-    # via django-oauth-toolkit
-oauthlib==3.3.1
-    # via django-oauth-toolkit
 django-celery-beat==2.9.0
     # via -r requirements/base.in
 django-crispy-forms==2.6
@@ -79,6 +80,8 @@ django-markdownx==4.0.9
 django-mjml==1.5
     # via -r requirements/base.in
 django-model-utils==5.0.0
+    # via -r requirements/base.in
+django-oauth-toolkit[oidc]==3.2.0
     # via -r requirements/base.in
 django-redis==6.0.0
     # via -r requirements/base.in
@@ -96,14 +99,20 @@ et-xmlfile==2.0.0
     # via openpyxl
 flower==2.0.1
     # via -r requirements/base.in
-hiredis==3.3.0
+hiredis==3.3.1
     # via -r requirements/base.in
 humanize==4.15.0
     # via flower
+idna==3.11
+    # via requests
+jwcrypto==1.5.6
+    # via django-oauth-toolkit
 kombu==5.6.2
     # via celery
 markdown==3.10.2
     # via django-markdownx
+oauthlib==3.3.1
+    # via django-oauth-toolkit
 openpyxl==3.1.5
     # via -r requirements/base.in
 packaging==26.0
@@ -118,10 +127,8 @@ prompt-toolkit==3.0.52
     # via click-repl
 pycparser==3.0
     # via cffi
-pyjwt==2.10.1
-    # via
-    #   -r requirements/base.in
-    #   django-allauth
+pyjwt==2.12.1
+    # via -r requirements/base.in
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0
@@ -134,6 +141,8 @@ redis==7.3.0
     # via
     #   -r requirements/base.in
     #   django-redis
+requests==2.32.5
+    # via django-oauth-toolkit
 six==1.17.0
     # via python-dateutil
 sqlparse==0.5.5
@@ -142,12 +151,16 @@ text-unidecode==1.3
     # via python-slugify
 tornado==6.5.5
     # via flower
+typing-extensions==4.15.0
+    # via jwcrypto
 tzdata==2025.3
     # via
     #   django-celery-beat
     #   kombu
 tzlocal==5.3.1
     # via celery
+urllib3==2.6.3
+    # via requests
 vine==5.1.0
     # via
     #   amqp
