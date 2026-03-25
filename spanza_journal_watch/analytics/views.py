@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlparse
 
 from django.contrib.staticfiles import finders
@@ -10,13 +11,15 @@ from spanza_journal_watch.analytics.utils import is_probable_automated_event
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Review
 
+logger = logging.getLogger(__name__)
+
 
 def _get_newsletter(token):
     try:
         newsletter = Newsletter.objects.get(email_token=token)
     except Newsletter.DoesNotExist:
         newsletter = None
-        print(f"No matching newsletter with token: {token}")
+        logger.warning("No matching newsletter with token: %s", token)
     return newsletter
 
 
@@ -25,7 +28,7 @@ def _get_subscriber(email):
         subscriber = Subscriber.objects.get(email=email)
     except Subscriber.DoesNotExist:
         subscriber = None
-        print(f"No matching subscriber for email: {email}")
+        logger.warning("No matching subscriber for email: %s", email)
     return subscriber
 
 
@@ -116,7 +119,7 @@ def page_view(request, model=None, slug=None):
                     viewed_objects.append(review.id)
                     request.session[viewed_key] = viewed_objects
         except (Review.DoesNotExist, MultipleObjectsReturned) as e:
-            print(e)
+            logger.warning("Error tracking review pageview: %s", e)
 
     return HttpResponse("")
 
@@ -131,6 +134,6 @@ def track_email_click(request):
         request.session["subscriber_id"] = subscriber.pk
     except Subscriber.DoesNotExist:
         subscriber = None
-        print(f"No subscriber by this email: {email}")
+        logger.warning("No subscriber by this email: %s", email)
 
     return _get_next_url(request, next)

@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import MultipleObjectsReturned
@@ -7,6 +9,8 @@ from django.template.loader import render_to_string
 from spanza_journal_watch.analytics.utils import is_probable_automated_event
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.utils.functions import get_domain_url
+
+logger = logging.getLogger(__name__)
 
 
 class NewsletterOpen(models.Model):
@@ -89,7 +93,7 @@ class PageView(models.Model):
             subscriber = Subscriber.objects.get(id=subscriber_id)
         except (Subscriber.DoesNotExist, MultipleObjectsReturned) as e:
             subscriber = None
-            print(f"Unable to attach subscriber to pageview: {e} {subscriber_id}")
+            logger.warning("Unable to attach subscriber to pageview: %s %s", e, subscriber_id)
 
         user_agent = ""
         automated = False

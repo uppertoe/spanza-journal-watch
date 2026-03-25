@@ -9,12 +9,14 @@ pur
 pip-tools
 
 # Testing
+boto3
 mypy
 django-stubs
 pytest
 pytest-sugar
 pytest-django
 factory-boy
+moto[s3,iam,sns,sesv2]
 
 # Documentation
 sphinx

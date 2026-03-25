@@ -1,4 +1,5 @@
 import base64
+import logging
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -8,6 +9,8 @@ from django.db.models import F
 from django.template.loader import render_to_string
 
 from config.celery_app import app as celery_app
+
+logger = logging.getLogger(__name__)
 
 
 class NewsletterNotReadyToSendError(Exception):
@@ -104,7 +107,15 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
     # Send emails for this batch of subscribers
     connection = mail.get_connection()
     messages = newsletter.generate_emails(subscribers)
-    successful = connection.send_messages(messages)
+    try:
+        successful = connection.send_messages(messages)
+    except Exception:
+        logger.exception(
+            "Newsletter batch send failed for newsletter %s (%d recipients)",
+            newsletter_pk,
+            len(subscriber_pks),
+        )
+        raise
 
     if not test_email:
         newsletter_queryset.update(emails_sent=F("emails_sent") + successful)
@@ -181,7 +192,7 @@ def send_confirmation_email(self, subscriber_pk):
         subscriber = Subscriber.objects.get(pk=subscriber_pk)
         email = subscriber.generate_confirmation_email()
         email.send()
-        print(f"Sign-up email sent to {subscriber.email}")
+        logger.info("Sign-up email sent to %s", subscriber.email)
     except Subscriber.DoesNotExist as exc:
         raise self.retry(exc=exc, countdown=3 * 60)
 

@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from django.apps import apps
 from django.conf import settings
@@ -27,6 +28,8 @@ from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text
 from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
+
+logger = logging.getLogger(__name__)
 
 
 class HealthService(models.Model):
@@ -119,7 +122,7 @@ class Tag(models.Model):
 
     def delete_if_orphaned(self):
         if not self.articles.all().count():
-            print(f"Deleting unused tag {self}")
+            logger.debug("Deleting unused tag %s", self)
             self.delete()
 
 
@@ -216,7 +219,7 @@ class Article(TimeStampedModel):
                 tag = Tag(text=text)
                 tag.save()
             except Tag.MultipleObjectsReturned:
-                print(f"Warning: multiple matching tags for {tag}")
+                logger.warning("Multiple matching tags for %s", tag)
                 continue
             current_tags.append(tag)
             tag.articles.add(self)  # Will not duplicate relation, but triggers signals

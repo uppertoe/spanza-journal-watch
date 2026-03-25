@@ -1,10 +1,15 @@
-Hello,
+{% if contributor.name %}Hello {{ contributor.name }},{% else %}Hello,{% endif %}
 
-You have been invited to contribute to the issue "{{ issue.name }}" on Journal Watch.
+You have been invited to contribute to "{{ issue.name }}" on Journal Watch.
 
 Accept your invitation:
 {{ accept_url }}
 
-This invite link expires on {{ expires_at|date:"j M Y, H:i T" }}.
+This link expires on {{ expires_at|date:"j M Y" }} and can only be used with the email address it was sent to.
+{% if docs_url %}
+New to Journal Watch? The reviewer guide walks you through how the review workflow works:
+{{ docs_url }}user-guide/reviewer.html
+{% endif %}
+If you did not expect this invitation, you can safely ignore this email.
 
-If you did not expect this invitation, you can ignore this email.
+SPANZA Journal Watch — paediatric anaesthesia literature review

@@ -25,6 +25,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.views.static import serve as static_serve
 from PIL import Image, UnidentifiedImageError
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
@@ -131,9 +132,10 @@ PLANKA_REVIEW_SEPARATOR_MARKER = "< --- Please write your review below this line
 PLANKA_REVIEW_INSTRUCTIONS = """\
 **Before you begin:**
 
-- **Subscribe** to this card (watch icon) so you receive notifications about updates and comments.
-- Move the card to the **In Progress** list when you start your review.
-- Move the card to the **Publish** list when your review is ready to submit.
+- **Add yourself as a member** of this card (use the Members section inside the card) so editors \
+can see who is covering which article.
+- Move the card to **Under Review** when you start writing.
+- Move the card to **Publish Ready** when your review is complete.
 
 A suggested review structure is provided below — feel free to use any format you prefer.
 
@@ -284,7 +286,7 @@ def edit_csv_header(request, save_token):
 
         if form.is_valid():
             header = form.cleaned_data["header"]
-            print(f"here's the header: {header}")
+            logger.debug("CSV header set to: %s", header)
             subscriber_csv.header = header
             subscriber_csv.save()
 
@@ -2791,7 +2793,7 @@ def _register_planka_webhook(client, binding):
                 _take_board_description_snapshot(client, binding)
                 return
     except PlankaAPIError as exc:
-        logger.warning("Could not list Planka webhooks: %s", exc)
+        logger.error("Could not list Planka webhooks: %s", exc)
 
     secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip() or None
     try:
@@ -2804,7 +2806,7 @@ def _register_planka_webhook(client, binding):
         binding.save(update_fields=["webhook_id", "modified"])
         _take_board_description_snapshot(client, binding)
     except PlankaAPIError as exc:
-        logger.warning("Could not register Planka webhook: %s", exc)
+        logger.error("Could not register Planka webhook: %s", exc)
 
 
 def _take_board_description_snapshot(client, binding):
@@ -2815,7 +2817,7 @@ def _take_board_description_snapshot(client, binding):
     try:
         _board_item, included = client.get_board(binding.board_id)
     except PlankaAPIError as exc:
-        logger.warning("Could not fetch board %s for snapshot: %s", binding.board_id, exc)
+        logger.error("Could not fetch board %s for snapshot: %s", binding.board_id, exc)
         return
 
     included = included or {}
@@ -3099,6 +3101,7 @@ def _send_issue_invite_email(request, invite, raw_token):
         "contributor": contributor,
         "accept_url": accept_url,
         "expires_at": invite.expires_at,
+        "docs_url": request.build_absolute_uri(reverse("backend:docs")),
     }
 
     subject = f"Invitation to contribute to {issue.name}"
@@ -3125,6 +3128,7 @@ def _send_issue_welcome_email(request, contributor):
         "issue": issue,
         "contributor": contributor,
         "planka_url": planka_url,
+        "docs_url": request.build_absolute_uri(reverse("backend:docs")),
     }
     subject = f"Thank you for agreeing to review for {issue.name}"
     text_body = render_to_string("backend/email/issue_contributor_welcome.txt", context)
@@ -3769,7 +3773,16 @@ def add_issue_review(request, issue_id):
         messages.success(request, "Review added to issue draft.")
         return _render_issue_panel(request, issue)
 
-    return _render_issue_panel(request, issue, review_form=form)
+    return render(
+        request,
+        "backend/issue_builder/_issue_review_editor_page.html",
+        {
+            "selected_issue": issue,
+            "review_form": form,
+            "form_action": reverse("backend:add_issue_review", kwargs={"issue_id": issue.pk}),
+            "is_edit": False,
+        },
+    )
 
 
 @login_required
@@ -3806,12 +3819,17 @@ def update_issue_review(request, issue_id, review_id):
         messages.success(request, "Review updated.")
         return _render_issue_panel(request, issue)
 
-    return _render_issue_panel(
+    return render(
         request,
-        issue,
-        review_form=form,
-        form_action=reverse("backend:update_issue_review", kwargs={"issue_id": issue.pk, "review_id": review.pk}),
-        is_edit=True,
+        "backend/issue_builder/_issue_review_editor_page.html",
+        {
+            "selected_issue": issue,
+            "review_form": form,
+            "form_action": reverse(
+                "backend:update_issue_review", kwargs={"issue_id": issue.pk, "review_id": review.pk}
+            ),
+            "is_edit": True,
+        },
     )
 
 
@@ -4218,7 +4236,7 @@ def issue_invite_accept(request, token):
                     request.user.user_permissions.add(perm)
                     granted_count += 1
                 except DjangoPerm.DoesNotExist:
-                    logger.warning(
+                    logger.error(
                         "Permission %s.%s not found when accepting coordinator invite — "
                         "run migrations to create it.",
                         app_label,
@@ -5272,3 +5290,112 @@ def planka_card_revision_restore(request, issue_id, revision_id):
         return JsonResponse({"ok": False, "error": str(exc)}, status=502)
 
     return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Inbox
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def inbox(request):
+    from .models import EmailThread
+
+    threads = EmailThread.objects.prefetch_related("inbound_messages", "sent_messages")
+    paginator = Paginator(threads, 30)
+    page = paginator.get_page(request.GET.get("page"))
+    return render(request, "backend/inbox.html", {"page": page})
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def inbox_thread(request, thread_id):
+    from .models import EmailThread
+
+    thread = get_object_or_404(EmailThread, pk=thread_id)
+
+    inbound_msgs = list(thread.inbound_messages.order_by("sent_timestamp", "pk"))
+    sent_msgs = list(thread.sent_messages.order_by("created"))
+
+    # Interleave into a unified chronological timeline
+    timeline = sorted(
+        [{"kind": "inbound", "obj": m, "at": m.sent_timestamp or m.created} for m in inbound_msgs]
+        + [{"kind": "sent", "obj": m, "at": m.created} for m in sent_msgs],
+        key=lambda x: x["at"],
+    )
+
+    # Mark thread as read
+    if thread.has_unread:
+        thread.inbound_messages.filter(read=False).update(read=True)
+        thread.has_unread = False
+        thread.save(update_fields=["has_unread"])
+
+    return render(request, "backend/inbox_thread.html", {"thread": thread, "timeline": timeline})
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+@require_POST
+def inbox_reply(request, thread_id):
+    from email.utils import make_msgid
+
+    from django.core.mail import EmailMessage
+
+    from .models import EmailThread, SentEmail
+
+    thread = get_object_or_404(EmailThread, pk=thread_id)
+    body = request.POST.get("body", "").strip()
+    if not body:
+        messages.error(request, "Reply body cannot be empty.")
+        return redirect("backend:inbox_thread", thread_id=thread_id)
+
+    subject = thread.subject or "(no subject)"
+    if not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}"
+
+    # Generate a Message-ID we track so future replies can be threaded
+    from_domain = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").split("@")[-1].rstrip(">").strip()
+    msg_id = make_msgid(domain=from_domain or "journalwatch.org.au")
+
+    email = EmailMessage(
+        subject=subject,
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[thread.external_address],
+        headers={"Message-ID": msg_id},
+    )
+    try:
+        email.send()
+    except Exception:
+        logger.exception("Failed to send inbox reply to %s (thread %s)", thread.external_address, thread_id)
+        messages.error(request, "Failed to send reply. Please try again.")
+        return redirect("backend:inbox_thread", thread_id=thread_id)
+
+    SentEmail.objects.create(
+        thread=thread,
+        recipient=thread.external_address,
+        subject=subject,
+        body=body,
+        message_id=msg_id,
+        sent_by=request.user,
+    )
+    thread.last_message_at = timezone.now()
+    thread.save(update_fields=["last_message_at"])
+
+    messages.success(request, f"Reply sent to {thread.external_address}.")
+    return redirect("backend:inbox_thread", thread_id=thread_id)
+
+
+# Docs
+# ---------------------------------------------------------------------------
+
+_DOCS_ROOT = Path(settings.BASE_DIR) / "docs" / "_build" / "html"
+
+
+@login_required
+def serve_docs(request, path=""):
+    """Serve the built Sphinx documentation, protected by login."""
+    if not path:
+        path = "index.html"
+    return static_serve(request, path, document_root=str(_DOCS_ROOT))

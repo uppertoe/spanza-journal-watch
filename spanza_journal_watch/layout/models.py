@@ -1,4 +1,7 @@
+import logging
+
 from django.contrib.sitemaps import Sitemap
+from django.core.cache import cache
 from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
@@ -8,6 +11,8 @@ from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import HTMLShortener, get_unique_slug
 from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import PageModel, TimeStampedModel
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureArticle(TimeStampedModel):
@@ -44,37 +49,36 @@ class FeatureArticle(TimeStampedModel):
         return self.title
 
 
-class Homepage(TimeStampedModel):
-    CURRENT_HOMEPAGE = None
+HOMEPAGE_CACHE_KEY = "layout:current_homepage_pk"
 
+
+class Homepage(TimeStampedModel):
     # Fields
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
-    override_main = models.BooleanField(default=False)
     publication_ready = models.BooleanField(default=False)
 
     # Class methods
     @classmethod
     def publish_homepage(cls, homepage):
-        # Called at startup in .apps
         if homepage.publication_ready:
-            cls.CURRENT_HOMEPAGE = homepage
-            print(f"Homepage set to {homepage}")
+            cache.set(HOMEPAGE_CACHE_KEY, homepage.pk, timeout=None)
+            logger.info("Homepage set to %s", homepage)
         else:
-            print(f"{homepage} not set; publication_ready is false")
+            logger.warning("%s not set; publication_ready is false", homepage)
 
     @classmethod
     def get_current_homepage(cls):
-        if cls.CURRENT_HOMEPAGE is None:
-            latest_homepage = cls.objects.filter(publication_ready=True).order_by("-created").first()
-            if latest_homepage:
-                cls.publish_homepage(latest_homepage)
-        return cls.CURRENT_HOMEPAGE
-
-    # Instance methods
-    def get_main_feature(self):
-        if self.override_main:
-            return self.main_feature
-        return self.issue.get_main_feature()
+        pk = cache.get(HOMEPAGE_CACHE_KEY)
+        if pk is not None:
+            try:
+                return cls.objects.select_related("issue").get(pk=pk)
+            except cls.DoesNotExist:
+                cache.delete(HOMEPAGE_CACHE_KEY)
+        # Cache miss: load latest publication-ready homepage and cache it.
+        homepage = cls.objects.filter(publication_ready=True).order_by("-created").first()
+        if homepage:
+            cache.set(HOMEPAGE_CACHE_KEY, homepage.pk, timeout=None)
+        return homepage
 
     def get_card_features(self):
         card_features = Review.objects.filter(issues__homepage=self, is_featured=True, active=True).order_by("created")

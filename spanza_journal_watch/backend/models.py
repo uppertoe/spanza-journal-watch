@@ -50,7 +50,30 @@ class SubscriberCSV(models.Model):
         return self.name
 
 
+class EmailThread(models.Model):
+    """Groups inbound and outbound emails into a conversation with one external address."""
+
+    external_address = models.EmailField()
+    subject = models.CharField(max_length=255, blank=True)
+    last_message_at = models.DateTimeField()
+    has_unread = models.BooleanField(default=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-last_message_at"]
+
+    def __str__(self):
+        return f"{self.external_address} — {self.subject or '(no subject)'}"
+
+
 class InboundEmail(models.Model):
+    thread = models.ForeignKey(
+        EmailThread,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inbound_messages",
+    )
     sender = models.EmailField(null=True, blank=True)
     recipient = models.EmailField(null=True, blank=True)
     header_sender = models.CharField(max_length=255, null=True, blank=True)
@@ -61,6 +84,9 @@ class InboundEmail(models.Model):
     sent_timestamp = models.DateTimeField(null=True, blank=True)
     attachments = models.BooleanField(default=False)
     email_file = models.CharField(max_length=255, null=True, blank=True)
+    message_id = models.CharField(max_length=255, blank=True)
+    in_reply_to = models.CharField(max_length=255, blank=True)
+    read = models.BooleanField(default=False)
 
     created = models.DateTimeField(auto_now_add=True)
 
@@ -79,6 +105,29 @@ class InboundEmail(models.Model):
     def __str__(self):
         created = self.created.strftime("%m/%d/%Y, %H:%M:%S")
         return f"Email from {self.sender} - received {created}"
+
+
+class SentEmail(models.Model):
+    """Outbound reply sent by a staff member via the inbox interface."""
+
+    thread = models.ForeignKey(EmailThread, on_delete=models.CASCADE, related_name="sent_messages")
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    message_id = models.CharField(max_length=255, blank=True)
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sent_emails",
+    )
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created"]
+
+    def __str__(self):
+        return f"Reply to {self.recipient} ({self.created:%Y-%m-%d})"
 
 
 class PlankaIntegrationCredential(TimeStampedModel):

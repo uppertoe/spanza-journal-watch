@@ -1,9 +1,12 @@
 import datetime
 import json
+import logging
 from typing import TypeVar  # , Optional
 from xml.etree.ElementTree import Element
 
 from .helpers import getContent
+
+logger = logging.getLogger(__name__)
 
 
 class PubMedArticle:
@@ -98,7 +101,7 @@ class PubMedArticle:
 
         # Unable to parse the datetime
         except Exception as e:
-            print(e)
+            logger.debug("Unable to parse article datetime: %s", e)
             return None
 
     def _extractAuthors(self: object, xml_element: TypeVar("Element")) -> list:

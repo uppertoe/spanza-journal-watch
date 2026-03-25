@@ -1,9 +1,13 @@
-Hello{% if contributor.name %} {{ contributor.name }}{% endif %},
+{% if contributor.name %}Hello {{ contributor.name }},{% else %}Hello,{% endif %}
 
-Thank you for agreeing to review for "{{ issue.name }}" on Journal Watch. Your access is now active.
-
-{% if planka_url %}You can access the review board here:
+Thank you for agreeing to contribute to "{{ issue.name }}" on Journal Watch. Your access is now active.
+{% if planka_url %}
+Open the review board here:
 {{ planka_url }}
 
-{% endif %}If you have any questions, please contact the issue coordinator.
+{% endif %}{% if docs_url %}Not sure where to start? The reviewer guide explains how to claim a card, write your review, and submit it:
+{{ docs_url }}user-guide/reviewer.html
 
+{% endif %}If you have any questions, reply to this email or contact your issue coordinator.
+
+SPANZA Journal Watch — paediatric anaesthesia literature review

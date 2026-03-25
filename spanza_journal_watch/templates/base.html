@@ -10,8 +10,7 @@
     <meta name="author" content="Eamonn Upperton">
     {% block head_meta %}{% endblock head_meta %}
 
-    <link rel="icon" href="{% static 'images/logo/square-brackets.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: light)">
-    <link rel="icon" href="{% static 'images/logo/square-brackets-white.svg' %}" type="image/svg" size='any' media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="{% static 'images/logo/newsstand-icon.svg' %}" type="image/svg+xml">
     <meta name="theme-color" content="#152b3b">
 
     <!-- Google tag (gtag.js) -->
@@ -24,12 +23,10 @@
       gtag('config', 'G-W3HW0RB27V');
     </script>
 
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/site.webmanifest">
-    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-    <meta name="msapplication-TileColor" content="#00aba9">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/favicon_package/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon_package/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon_package/favicon-16x16.png' %}">
+    <link rel="manifest" href="{% static 'images/favicon_package/site.webmanifest' %}">
     <meta name="theme-color" content="#152b3b">
 
     {% block css %}

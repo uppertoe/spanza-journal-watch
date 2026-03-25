@@ -49,7 +49,7 @@ ISSUE_PAGE_URL_NAMES = frozenset(
 
 
 def selected_issue(request):
-    """Inject the session-persisted selected issue and issue list into every template context."""
+    """Inject the session-persisted selected issue, issue list, and inbox badge into every template context."""
     if not hasattr(request, "user") or not request.user.is_authenticated:
         return {}
 
@@ -75,12 +75,19 @@ def selected_issue(request):
     issue_id = request.session.get("selected_issue_id")
 
     url_name = getattr(getattr(request, "resolver_match", None), "url_name", None)
+    inbox_unread_count = 0
+    if request.user.has_perm("submissions.chief_editor"):
+        from spanza_journal_watch.backend.models import EmailThread
+
+        inbox_unread_count = EmailThread.objects.filter(has_unread=True).count()
+
     result = {
         "issues_for_sidebar": issues,
         "is_htmx": request.headers.get("HX-Request") == "true",
         "is_issue_page": url_name in ISSUE_PAGE_URL_NAMES,
         "is_coordinator_only": is_coordinator_only,
         "planka_url": planka_url,
+        "inbox_unread_count": inbox_unread_count,
     }
 
     if issue_id:

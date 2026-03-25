@@ -30,6 +30,15 @@ babel==2.18.0
     # via sphinx
 billiard==4.2.4
     # via celery
+boto3==1.42.75
+    # via
+    #   -r requirements/local.in
+    #   moto
+botocore==1.42.75
+    # via
+    #   boto3
+    #   moto
+    #   s3transfer
 build==1.4.0
     # via pip-tools
 celery==5.6.2
@@ -76,6 +85,7 @@ cryptography==46.0.3
     # via
     #   -r requirements/base.in
     #   jwcrypto
+    #   moto
 decorator==5.2.1
     # via
     #   ipdb
@@ -188,7 +198,13 @@ isort==8.0.1
 jedi==0.19.2
     # via ipython
 jinja2==3.1.6
-    # via sphinx
+    # via
+    #   moto
+    #   sphinx
+jmespath==1.1.0
+    # via
+    #   boto3
+    #   botocore
 jwcrypto==1.5.6
     # via django-oauth-toolkit
 kombu==5.6.2
@@ -205,6 +221,8 @@ matplotlib-inline==0.2.1
     # via ipython
 mccabe==0.7.0
     # via pylint
+moto[iam,s3,sesv2,sns]==5.1.22
+    # via -r requirements/local.in
 mypy==1.19.1
     # via -r requirements/local.in
 mypy-extensions==1.1.0
@@ -257,6 +275,8 @@ pur==7.3.3
     # via -r requirements/local.in
 pure-eval==0.2.3
     # via stack-data
+py-partiql-parser==0.6.3
+    # via moto
 pycparser==3.0
     # via cffi
 pygments==2.19.2
@@ -296,7 +316,10 @@ pytest-sugar==1.1.1
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0
-    # via celery
+    # via
+    #   botocore
+    #   celery
+    #   moto
 python-discovery==1.1.3
     # via virtualenv
 python-slugify==8.0.4
@@ -304,7 +327,10 @@ python-slugify==8.0.4
 pytz==2026.1.post1
     # via flower
 pyyaml==6.0.3
-    # via pre-commit
+    # via
+    #   moto
+    #   pre-commit
+    #   responses
 redis==7.3.0
     # via
     #   -r requirements/base.in
@@ -312,11 +338,17 @@ redis==7.3.0
 requests==2.32.5
     # via
     #   django-oauth-toolkit
+    #   moto
+    #   responses
     #   sphinx
+responses==0.26.0
+    # via moto
 roman-numerals==4.1.0
     # via sphinx
 ruff==0.15.7
     # via -r requirements/local.in
+s3transfer==0.16.0
+    # via boto3
 six==1.17.0
     # via python-dateutil
 snowballstemmer==3.0.1
@@ -374,7 +406,10 @@ tzdata==2025.3
 tzlocal==5.3.1
     # via celery
 urllib3==2.6.3
-    # via requests
+    # via
+    #   botocore
+    #   requests
+    #   responses
 uvicorn==0.41.0
     # via sphinx-autobuild
 vine==5.1.0
@@ -395,11 +430,15 @@ wcwidth==0.6.0
 websockets==16.0
     # via sphinx-autobuild
 werkzeug[watchdog]==3.1.6
-    # via -r requirements/local.in
+    # via
+    #   -r requirements/local.in
+    #   moto
 wheel==0.46.3
     # via pip-tools
 whitenoise==6.12.0
     # via -r requirements/base.in
+xmltodict==1.0.4
+    # via moto
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

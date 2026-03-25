@@ -295,3 +295,4 @@ webpack-stats.json
 backups
 
 .vscode
+.ruff_cache

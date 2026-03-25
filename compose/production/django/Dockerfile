@@ -1,3 +1,14 @@
+# Docs build stage — produces the static HTML served at /editorial/docs/
+FROM python:3.13-slim-bookworm AS docs-builder
+
+RUN pip install --no-cache-dir sphinx myst-parser furo
+
+WORKDIR /docs-src
+COPY ./docs /docs-src/docs
+
+RUN python -m sphinx docs/ /docs-build -q
+
+
 FROM node:22-bookworm-slim AS client-builder
 
 ARG APP_HOME=/app
@@ -90,6 +101,9 @@ RUN chmod +x /start-flower
 
 # copy application code to WORKDIR
 COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
+
+# Copy built documentation so it can be served at /editorial/docs/
+COPY --from=docs-builder --chown=django:django /docs-build ${APP_HOME}/docs/_build/html
 
 # make django owner of the WORKDIR directory as well.
 RUN mkdir -p ${APP_HOME}/access_logs \

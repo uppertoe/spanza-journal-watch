@@ -47,14 +47,12 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 # https://docs.djangoproject.com/en/dev/topics/security/#ssl-https
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-seconds
-# TODO: set this to 60 seconds first and then to 518400 once you prove the former works
-SECURE_HSTS_SECONDS = 60
+SECURE_HSTS_SECONDS = 300  # Increase to 31536000 once production is stable
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-include-subdomains
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
 # https://docs.djangoproject.com/en/dev/ref/settings/#secure-hsts-preload
 SECURE_HSTS_PRELOAD = env.bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
-# https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
-SECURE_CONTENT_TYPE_NOSNIFF = env.bool("DJANGO_SECURE_CONTENT_TYPE_NOSNIFF", default=True)
+
 
 # STORAGES
 # ------------------------------------------------------------------------------
@@ -124,7 +122,7 @@ ANYMAIL = {
     "AMAZON_SES_CLIENT_PARAMS": {"region_name": env("DJANGO_AWS_DEFAULT_REGION", default="ap-southeast-2")},
     "WEBHOOK_SECRET": env("WEBHOOK_SECRET"),
     "AMAZON_SES_MESSAGE_TAG_NAME": "Email_ID",
-    "AMAZON_SES_CONFIGURATION_SET_NAME": "TrackingConfigSet",
+    "AMAZON_SES_CONFIGURATION_SET_NAME": env("ANYMAIL_CONFIGURATION_SET_NAME", default="TrackingConfigSet"),
 }
 INBOUND_S3_OBJECT_PREFIX = env("DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX", default="")
 
@@ -137,7 +135,7 @@ INBOUND_S3_OBJECT_PREFIX = env("DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX", defaul
 
 LOGGING = {
     "version": 1,
-    "disable_existing_loggers": True,
+    "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
             "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s",
@@ -152,7 +150,7 @@ LOGGING = {
         "access_logs": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": LOG_FILE,  # Replace with the desired path and filename
+            "filename": LOG_FILE,
             "maxBytes": 10485760,  # 10MB
             "backupCount": 10,
             "formatter": "verbose",
@@ -161,17 +159,17 @@ LOGGING = {
     "root": {"level": "INFO", "handlers": ["console"]},
     "loggers": {
         "django.server": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["console"],
             "propagate": False,
         },
         "django.request": {
             "handlers": ["console", "access_logs"],
-            "level": "INFO",  # change debug level as appropiate
+            "level": "INFO",
             "propagate": False,
         },
         "django.db.backends": {
-            "level": "DEBUG",
+            "level": "WARNING",
             "handlers": ["console"],
             "propagate": False,
         },
@@ -204,6 +202,7 @@ sentry_sdk.init(
     dsn=SENTRY_DSN,
     integrations=integrations,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
+    send_default_pii=True,  # Attaches authenticated user (id, email) to Sentry events
     traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
     profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.1),
 )

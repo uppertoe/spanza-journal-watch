@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 from pathlib import Path
 
 from django import forms
@@ -8,6 +9,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
 from config.celery_app import app as celery_app
+
+logger = logging.getLogger(__name__)
 
 
 class MultipleEmailColumnsException(Exception):
@@ -238,6 +241,7 @@ def run_pubmed_batch_import_task(self, batch_id):
         batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
         batch.task_note = f"PubMed fetch failed: {_safe_planka_error(error)}"
         batch.save(update_fields=["task_state", "task_note", "modified"])
+        logger.error("PubMed import batch %s failed: %s", batch_id, error)
         return {"status": "error", "note": batch.task_note}
 
 
@@ -299,6 +303,7 @@ def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
         else:
             batch.task_note = f"Could not prepare Planka board: {safe_error}"
         batch.save(update_fields=["task_state", "task_note", "modified"])
+        logger.error("Planka push batch %s failed to prepare board: %s", batch_id, error)
         return {"status": "error", "note": batch.task_note}
 
     candidates_list_id = binding.get_list_id("candidates")

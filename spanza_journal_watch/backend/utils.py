@@ -44,11 +44,3 @@ class Journal:
         months_between = years_between * 12 + target_month_index - current_month_index
 
         return years_between, months_between
-
-
-# Create a Journal instance for BJA with the provided information
-bja_journal = Journal(name="BJA", start_volume=128, start_year=2022, start_month="january", issues_per_year=12)
-
-# Test the class with your example for October 2023
-result = bja_journal.get_issue("october", 2023)
-print(result)  # Output: Volume 131 Issue 4

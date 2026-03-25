@@ -188,4 +188,9 @@ urlpatterns = [
         views.planka_card_revision_restore,
         name="planka_card_revision_restore",
     ),
+    path("inbox/", views.inbox, name="inbox"),
+    path("inbox/<int:thread_id>/", views.inbox_thread, name="inbox_thread"),
+    path("inbox/<int:thread_id>/reply", views.inbox_reply, name="inbox_reply"),
+    path("docs/", views.serve_docs, name="docs"),
+    path("docs/<path:path>", views.serve_docs, name="docs_file"),
 ]

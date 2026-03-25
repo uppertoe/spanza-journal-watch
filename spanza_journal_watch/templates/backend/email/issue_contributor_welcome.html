@@ -2,21 +2,50 @@
 {% mjml %}
 <mjml>
   <mj-body background-color="#f6f7fb">
-    <mj-section>
+
+    <mj-section padding-bottom="0">
       <mj-column>
-        <mj-text font-size="20px" font-weight="700">Thank you for agreeing to review</mj-text>
-        <mj-text>
-          {% if contributor.name %}Hello {{ contributor.name }},<br><br>{% endif %}
-          Thank you for agreeing to review for <strong>{{ issue.name }}</strong> on Journal Watch. Your access is now active.
-        </mj-text>
-        {% if planka_url %}
-        <mj-button href="{{ planka_url }}" background-color="#0d6efd">Open review board</mj-button>
-        {% endif %}
-        <mj-text font-size="12px" color="#777777">
-          If you have any questions, please contact the issue coordinator.
+        <mj-text font-size="12px" color="#888888" align="center" letter-spacing="0.08em" font-weight="600">
+          JOURNAL WATCH
         </mj-text>
       </mj-column>
     </mj-section>
+
+    <mj-section background-color="#ffffff" border-radius="8px" padding="32px 24px">
+      <mj-column>
+        <mj-text font-size="22px" font-weight="700" color="#152b3b" padding-bottom="8px">
+          Your access is now active
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.6" padding-bottom="20px">
+          {% if contributor.name %}Hello {{ contributor.name }},<br><br>{% endif %}
+          Thank you for agreeing to contribute to <strong>{{ issue.name }}</strong>.
+          Your account is set up and you now have access to the review board.
+        </mj-text>
+        {% if planka_url %}
+        <mj-button href="{{ planka_url }}" background-color="#0d6efd" border-radius="6px" font-size="15px" padding="12px 24px">
+          Open review board
+        </mj-button>
+        {% endif %}
+        {% if docs_url %}
+        <mj-text font-size="14px" color="#444444" padding-top="20px" line-height="1.6">
+          Not sure where to start? The <a href="{{ docs_url }}user-guide/reviewer.html" style="color:#0d6efd;">reviewer guide</a>
+          explains how to claim a card, write your review, and submit it when you're done.
+        </mj-text>
+        {% endif %}
+        <mj-text font-size="13px" color="#888888" padding-top="16px">
+          If you have any questions, reply to this email or contact your issue coordinator.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding-top="16px">
+      <mj-column>
+        <mj-text font-size="12px" color="#aaaaaa" align="center">
+          SPANZA Journal Watch &mdash; paediatric anaesthesia literature review
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
   </mj-body>
 </mjml>
 {% endmjml %}

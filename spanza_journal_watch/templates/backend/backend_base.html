@@ -193,6 +193,11 @@
               <li class="nav-item">
                 <a class="nav-link{% if current == 'backend_settings' %} active{% endif %}" href="{% url "backend:backend_settings" %}">Settings</a>
               </li>
+              <li class="nav-item">
+                <a class="nav-link{% if current == 'inbox' or current == 'inbox_thread' %} active{% endif %}" href="{% url "backend:inbox" %}">
+                  Inbox{% if inbox_unread_count %} <span class="badge text-bg-danger rounded-pill" style="font-size:0.65em;">{{ inbox_unread_count }}</span>{% endif %}
+                </a>
+              </li>
               {% endif %}
 
               {% if perms.backend.manage_subscriber_csv %}
@@ -214,6 +219,11 @@
               {% endif %}
 
               {% endwith %}
+              {% endif %}
+              {% if request.user.is_staff %}
+              <li class="nav-item">
+                <a class="nav-link{% if request.resolver_match.url_name in 'docs docs_file' %} active{% endif %}" href="{% url "backend:docs" %}">Help</a>
+              </li>
               {% endif %}
               <li class="nav-item">
                 <a class="nav-link{% if request.resolver_match.url_name in 'account_logout' %} active{% endif %}" href="{% url "account_logout" %}">Log Out</a>

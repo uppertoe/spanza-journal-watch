@@ -1,6 +1,7 @@
 import csv
 import datetime
 import io
+import logging
 from pathlib import Path
 
 from django import forms
@@ -12,6 +13,8 @@ from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
 from ..submissions.models import Article, Author, HealthService, Issue, Journal, Review
 from .models import InboundEmail, IssueContributor, PlankaBoardBackgroundAsset, SubscriberCSV, WatchedJournal
+
+logger = logging.getLogger(__name__)
 
 
 def csv_size(file):
@@ -103,7 +106,7 @@ def peek_csv(file, user_header=None):
         file.seek(0)
         decoded_file = file.read(1024).decode("UTF-8-SIG")
     except UnicodeDecodeError as error:
-        print(f"Error handling uploaded CSV: {error}")
+        logger.warning("Error handling uploaded CSV: %s", error)
         raise ValidationError({"file": "Not a valid CSV file"})
 
     try:
@@ -111,7 +114,7 @@ def peek_csv(file, user_header=None):
     except csv.Error as error:
         for delimiter in DELIMITERS:
             if delimiter in decoded_file:
-                print(f"Error handling uploaded CSV: {error}")
+                logger.warning("Error handling uploaded CSV: %s", error)
                 raise ValidationError({"file": "Not a valid CSV file"})
         # No delimiter found; likely single-column file
         dialect = csv.excel
@@ -286,7 +289,6 @@ class HomepageForm(forms.ModelForm):
         model = Homepage
         fields = [
             "issue",
-            "override_main",
         ]
 
 

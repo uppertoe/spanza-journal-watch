@@ -236,6 +236,8 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = "DENY"
+# https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # EMAIL
 # ------------------------------------------------------------------------------
@@ -390,7 +392,7 @@ OAUTH2_PROVIDER = {
         "email": "Email address",
         "profile": "Profile information",
     },
-    "PKCE_REQUIRED": False,
+    "PKCE_REQUIRED": True,
 }
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
