@@ -1,10 +1,7 @@
 import '../sass/project.scss';
 
 /* Project specific Javascript goes here. */
-import '../js/htmx.js';
-
-import { Popover, Dropdown, ScrollSpy, Modal } from 'bootstrap';
-import { Popper } from 'bootstrap/dist/js/bootstrap.bundle';
+const { Popover, ScrollSpy, Modal } = window.bootstrap;
 
 const popoverTriggerList = document.querySelectorAll(
   '[data-bs-toggle="popover"]',
