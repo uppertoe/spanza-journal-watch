@@ -167,9 +167,10 @@ This user is referenced by `DJANGO_AWS_ACCESS_KEY_ID` / `DJANGO_AWS_SECRET_ACCES
 }
 ```
 
-### 2b. `jw-planka` — Planka attachments only
+### 2b. `jw-planka` — Planka bucket only
 
 This user is referenced by `PLANKA_S3_ACCESS_KEY_ID` / `PLANKA_S3_SECRET_ACCESS_KEY`.
+It should use a dedicated bucket referenced by `PLANKA_S3_BUCKET`.
 
 **Inline policy — `jw-planka-policy`:**
 ```json
@@ -177,25 +178,20 @@ This user is referenced by `PLANKA_S3_ACCESS_KEY_ID` / `PLANKA_S3_SECRET_ACCESS_
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "S3PlankAttachments",
+      "Sid": "S3PlankaBucketObjects",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
         "s3:PutObject",
         "s3:DeleteObject"
       ],
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/attachments/*"
+      "Resource": "arn:aws:s3:::YOUR-PLANKA-BUCKET/*"
     },
     {
       "Sid": "S3ListBucket",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME",
-      "Condition": {
-        "StringLike": {
-          "s3:prefix": "attachments/*"
-        }
-      }
+      "Resource": "arn:aws:s3:::YOUR-PLANKA-BUCKET"
     }
   ]
 }

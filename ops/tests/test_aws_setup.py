@@ -109,12 +109,12 @@ class TestPolicyDocuments:
     def test_planka_policy_sids(self):
         doc = planka_policy(BUCKET)
         sids = {s["Sid"] for s in doc["Statement"]}
-        assert sids == {"S3PlankAttachments", "S3ListBucket"}
+        assert sids == {"S3PlankaBucketObjects", "S3ListBucket"}
 
-    def test_planka_policy_attachments_only(self):
+    def test_planka_policy_bucket_only(self):
         doc = planka_policy(BUCKET)
-        obj = next(s for s in doc["Statement"] if s["Sid"] == "S3PlankAttachments")
-        assert obj["Resource"] == f"arn:aws:s3:::{BUCKET}/attachments/*"
+        obj = next(s for s in doc["Statement"] if s["Sid"] == "S3PlankaBucketObjects")
+        assert obj["Resource"] == f"arn:aws:s3:::{BUCKET}/*"
         # Must NOT grant SES permissions
         assert not any("ses:" in a for a in obj["Action"])
 
@@ -206,26 +206,26 @@ class TestSetupS3:
 
 class TestSetupIAM:
     def test_creates_three_users(self, iam):
-        setup_iam(iam, BUCKET)
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka")
         users = {u["UserName"] for u in iam.list_users()["Users"]}
         assert {"jw-django", "jw-planka", "jw-backup"} <= users
 
     def test_creates_three_users_with_suffix(self, iam):
-        setup_iam(iam, BUCKET, suffix="staging")
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", suffix="staging")
         users = {u["UserName"] for u in iam.list_users()["Users"]}
         assert {"jw-django-staging", "jw-planka-staging", "jw-backup-staging"} <= users
         # Must not create un-suffixed names
         assert "jw-django" not in users
 
     def test_returns_keys_for_new_users(self, iam):
-        keys = setup_iam(iam, BUCKET)
+        keys = setup_iam(iam, BUCKET, f"{BUCKET}-planka")
         assert set(keys) == {"django", "planka", "backup"}
         for name, (ak, sk) in keys.items():
             assert ak.startswith("AKIA") or len(ak) > 0
             assert len(sk) > 0
 
     def test_policies_attached(self, iam):
-        setup_iam(iam, BUCKET)
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka")
         for username, expected_policy in [
             ("jw-django", "jw-django-policy"),
             ("jw-planka", "jw-planka-policy"),
@@ -240,7 +240,7 @@ class TestSetupIAM:
             assert "Statement" in doc
 
     def test_policies_attached_with_suffix(self, iam):
-        setup_iam(iam, BUCKET, suffix="staging")
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", suffix="staging")
         for username, expected_policy in [
             ("jw-django-staging", "jw-django-staging-policy"),
             ("jw-planka-staging", "jw-planka-staging-policy"),
@@ -256,8 +256,8 @@ class TestSetupIAM:
 
     def test_idempotent_no_new_keys(self, iam):
         """Second run skips users that already have keys."""
-        setup_iam(iam, BUCKET)  # first run — creates keys
-        keys = setup_iam(iam, BUCKET)  # second run — users exist, already have keys
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka")  # first run — creates keys
+        keys = setup_iam(iam, BUCKET, f"{BUCKET}-planka")  # second run — users exist, already have keys
         # Keys should be None (skipped) for all three
         assert keys == {}
 
@@ -389,6 +389,7 @@ class TestProvision:
                 ses_v2,
                 sns,
                 BUCKET,
+                f"{BUCKET}-planka",
                 REGION,
                 DOMAIN,
                 ACCOUNT_ID,
@@ -398,6 +399,7 @@ class TestProvision:
             # S3 bucket was created
             buckets = [b["Name"] for b in s3.list_buckets()["Buckets"]]
             assert BUCKET in buckets
+            assert f"{BUCKET}-planka" in buckets
 
             # IAM users were created
             users = {u["UserName"] for u in iam.list_users()["Users"]}
@@ -426,9 +428,11 @@ class TestProvision:
             iam = boto3.client("iam", region_name=REGION)
             sns = boto3.client("sns", region_name=REGION)
 
-            provision(s3, iam, ses_v2, sns, BUCKET, REGION, DOMAIN, ACCOUNT_ID, WEBHOOK_SECRET)
+            provision(s3, iam, ses_v2, sns, BUCKET, f"{BUCKET}-planka", REGION, DOMAIN, ACCOUNT_ID, WEBHOOK_SECRET)
             # Second call — users and bucket already exist
-            keys2, _, _ = provision(s3, iam, ses_v2, sns, BUCKET, REGION, DOMAIN, ACCOUNT_ID, WEBHOOK_SECRET)
+            keys2, _, _ = provision(
+                s3, iam, ses_v2, sns, BUCKET, f"{BUCKET}-planka", REGION, DOMAIN, ACCOUNT_ID, WEBHOOK_SECRET
+            )
 
             # No new keys on second run (users already have keys)
             assert keys2 == {}
@@ -447,6 +451,7 @@ class TestProvision:
                 ses_v2,
                 sns,
                 staging_bucket,
+                f"{staging_bucket}-planka",
                 REGION,
                 "staging.journalwatch.test",
                 ACCOUNT_ID,
@@ -478,10 +483,15 @@ class TestProfileArg:
     def test_profile_defaults_to_none(self):
         args = parse_args(["--bucket", "b", "--domain", "d.com"])
         assert args.profile is None
+        assert args.planka_bucket is None
 
     def test_profile_accepted(self):
         args = parse_args(["--bucket", "b", "--domain", "d.com", "--profile", "jw-admin"])
         assert args.profile == "jw-admin"
+
+    def test_planka_bucket_accepted(self):
+        args = parse_args(["--bucket", "b", "--planka-bucket", "b-planka", "--domain", "d.com"])
+        assert args.planka_bucket == "b-planka"
 
     def test_profile_passed_to_boto3_session(self, monkeypatch):
         """boto3.Session must receive profile_name so credentials never need to be in env."""
@@ -588,6 +598,7 @@ class TestOutputHelpers:
         print_credentials(
             keys,
             BUCKET,
+            f"{BUCKET}-planka",
             REGION,
             "TrackingConfigSet-staging",
             webhook_secret=WEBHOOK_SECRET,
@@ -604,6 +615,7 @@ class TestOutputHelpers:
         assert "ANYMAIL_CONFIGURATION_SET_NAME=TrackingConfigSet-staging" in out
         assert "PLANKA_S3_ACCESS_KEY_ID=planka-ak" in out
         assert "PLANKA_S3_SECRET_ACCESS_KEY=planka-sk" in out
+        assert f"PLANKA_S3_BUCKET={BUCKET}-planka" in out
         assert f"PLANKA_S3_REGION={REGION}" in out
         assert f"RESTIC_REPOSITORY=s3:s3.amazonaws.com/{BUCKET}/backups" in out
         assert "AWS_ACCESS_KEY_ID=backup-ak" in out

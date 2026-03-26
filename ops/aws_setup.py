@@ -137,17 +137,16 @@ def planka_policy(bucket):
         "Version": "2012-10-17",
         "Statement": [
             {
-                "Sid": "S3PlankAttachments",
+                "Sid": "S3PlankaBucketObjects",
                 "Effect": "Allow",
                 "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-                "Resource": f"arn:aws:s3:::{bucket}/attachments/*",
+                "Resource": f"arn:aws:s3:::{bucket}/*",
             },
             {
                 "Sid": "S3ListBucket",
                 "Effect": "Allow",
                 "Action": "s3:ListBucket",
                 "Resource": f"arn:aws:s3:::{bucket}",
-                "Condition": {"StringLike": {"s3:prefix": "attachments/*"}},
             },
         ],
     }
@@ -194,7 +193,7 @@ def media_public_read_policy(bucket):
 # ---------------------------------------------------------------------------
 
 
-def setup_s3(s3, bucket, region):
+def setup_s3(s3, bucket, region, *, enable_media_public_read=True, enable_backup_lifecycle=True):
     section("S3 bucket")
 
     # Create bucket
@@ -223,8 +222,9 @@ def setup_s3(s3, bucket, region):
     )
     ok("Public ACLs blocked; bucket policy access allowed")
 
-    s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(media_public_read_policy(bucket)))
-    ok("Bucket policy: public read enabled for media/* only")
+    if enable_media_public_read:
+        s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(media_public_read_policy(bucket)))
+        ok("Bucket policy: public read enabled for media/* only")
 
     # Versioning
     s3.put_bucket_versioning(
@@ -248,26 +248,32 @@ def setup_s3(s3, bucket, region):
     ok("Encryption: SSE-S3 (AES-256)")
 
     # Lifecycle rules
+    rules = [
+        {
+            "ID": "expire-incomplete-multipart",
+            "Status": "Enabled",
+            "Filter": {"Prefix": ""},
+            "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7},
+        }
+    ]
+    if enable_backup_lifecycle:
+        rules.append(
+            {
+                "ID": "expire-old-backup-versions",
+                "Status": "Enabled",
+                "Filter": {"Prefix": "backups/"},
+                "NoncurrentVersionExpiration": {"NoncurrentDays": 90},
+            }
+        )
+
     s3.put_bucket_lifecycle_configuration(
         Bucket=bucket,
-        LifecycleConfiguration={
-            "Rules": [
-                {
-                    "ID": "expire-incomplete-multipart",
-                    "Status": "Enabled",
-                    "Filter": {"Prefix": ""},
-                    "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7},
-                },
-                {
-                    "ID": "expire-old-backup-versions",
-                    "Status": "Enabled",
-                    "Filter": {"Prefix": "backups/"},
-                    "NoncurrentVersionExpiration": {"NoncurrentDays": 90},
-                },
-            ]
-        },
+        LifecycleConfiguration={"Rules": rules},
     )
-    ok("Lifecycle rules: incomplete multipart (7d) + old backup versions (90d)")
+    if enable_backup_lifecycle:
+        ok("Lifecycle rules: incomplete multipart (7d) + old backup versions (90d)")
+    else:
+        ok("Lifecycle rules: incomplete multipart uploads expire after 7d")
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +315,7 @@ def create_iam_user(iam, username, policy_name, policy_doc):
     return key["AccessKeyId"], key["SecretAccessKey"]
 
 
-def setup_iam(iam, bucket, suffix=""):
+def setup_iam(iam, bucket, planka_bucket, suffix=""):
     section("IAM users")
     keys = {}
     sfx = f"-{suffix}" if suffix else ""
@@ -318,7 +324,7 @@ def setup_iam(iam, bucket, suffix=""):
     if result:
         keys["django"] = result
 
-    result = create_iam_user(iam, f"jw-planka{sfx}", f"jw-planka{sfx}-policy", planka_policy(bucket))
+    result = create_iam_user(iam, f"jw-planka{sfx}", f"jw-planka{sfx}-policy", planka_policy(planka_bucket))
     if result:
         keys["planka"] = result
 
@@ -412,7 +418,7 @@ def setup_sns(sns, ses_v2, region, account_id, domain, webhook_secret, suffix=""
 # ---------------------------------------------------------------------------
 
 
-def print_credentials(keys, bucket, region, config_set_name, webhook_secret=""):
+def print_credentials(keys, bucket, planka_bucket, region, config_set_name, webhook_secret=""):
     if not keys:
         return
 
@@ -444,6 +450,7 @@ def print_credentials(keys, bucket, region, config_set_name, webhook_secret=""):
         box(
             ".env  →  Planka S3",
             [
+                f"PLANKA_S3_BUCKET={planka_bucket}",
                 f"PLANKA_S3_ACCESS_KEY_ID={ak}",
                 f"PLANKA_S3_SECRET_ACCESS_KEY={sk}",
                 f"PLANKA_S3_REGION={region}",
@@ -538,7 +545,20 @@ def print_manual_steps(domain, region, topic_arn, webhook_secret):
 # ---------------------------------------------------------------------------
 
 
-def provision(s3, iam, ses_v2, sns, bucket, region, domain, account_id, webhook_secret, suffix="", ses_domain=None):
+def provision(
+    s3,
+    iam,
+    ses_v2,
+    sns,
+    bucket,
+    planka_bucket,
+    region,
+    domain,
+    account_id,
+    webhook_secret,
+    suffix="",
+    ses_domain=None,
+):
     """
     Run all provisioning steps and return (keys, dkim_tokens, topic_arn).
 
@@ -555,7 +575,9 @@ def provision(s3, iam, ses_v2, sns, bucket, region, domain, account_id, webhook_
     config_set_name = f"TrackingConfigSet-{suffix}" if suffix else "TrackingConfigSet"
 
     setup_s3(s3, bucket, region)
-    keys = setup_iam(iam, bucket, suffix=suffix)
+    if planka_bucket != bucket:
+        setup_s3(s3, planka_bucket, region, enable_media_public_read=False, enable_backup_lifecycle=False)
+    keys = setup_iam(iam, bucket, planka_bucket, suffix=suffix)
     dkim_tokens = setup_ses(ses_v2, ses_domain, config_set_name)
     topic_arn = setup_sns(
         sns, ses_v2, region, account_id, domain, webhook_secret, suffix=suffix, config_set_name=config_set_name
@@ -575,10 +597,10 @@ def parse_args(argv=None):
         epilog=textwrap.dedent("""
             Examples:
               # Production
-              python ops/aws_setup.py --profile jw-admin --bucket jw-prod --domain journalwatch.org.au
+              python ops/aws_setup.py --profile jw-admin --bucket jw-prod --planka-bucket jw-prod-planka --domain journalwatch.org.au
 
               # Staging — reuses the existing SES identity (journalwatch.org.au is already verified)
-              python ops/aws_setup.py --profile jw-admin --bucket jw-staging \\
+              python ops/aws_setup.py --profile jw-admin --bucket jw-staging --planka-bucket jw-staging-planka \\
                   --domain staging.journalwatch.org.au --ses-domain journalwatch.org.au \\
                   --suffix staging
 
@@ -589,6 +611,12 @@ def parse_args(argv=None):
         """),
     )
     p.add_argument("--bucket", required=True, help="S3 bucket name (will be created)")
+    p.add_argument(
+        "--planka-bucket",
+        default=None,
+        dest="planka_bucket",
+        help="Dedicated S3 bucket for Planka objects. Defaults to <bucket>-planka.",
+    )
     p.add_argument(
         "--domain", required=True, help="App domain used for the SNS webhook URL (e.g. staging.journalwatch.org.au)"
     )
@@ -623,13 +651,16 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
+    if not args.planka_bucket:
+        args.planka_bucket = f"{args.bucket}-planka"
 
     ses_domain = args.ses_domain or args.domain
     reusing_identity = ses_domain != args.domain
     config_set_name = f"TrackingConfigSet-{args.suffix}" if args.suffix else "TrackingConfigSet"
 
     print(f"\n{BOLD}Journal Watch — AWS provisioning{RESET}")
-    print(f"  Bucket:       {args.bucket}")
+    print(f"  App bucket:   {args.bucket}")
+    print(f"  Planka bucket:{' ' if len(args.planka_bucket) >= len(args.bucket) else '  '}{args.planka_bucket}")
     print(f"  App domain:   {args.domain}")
     print(f"  SES identity: {ses_domain}{' (reusing existing)' if reusing_identity else ''}")
     print(f"  Config set:   {config_set_name}")
@@ -659,6 +690,7 @@ def main(argv=None):
             ses_v2,
             sns,
             args.bucket,
+            args.planka_bucket,
             args.region,
             args.domain,
             account_id,
@@ -672,6 +704,7 @@ def main(argv=None):
     print_credentials(
         keys,
         args.bucket,
+        args.planka_bucket,
         args.region,
         config_set_name,
         webhook_secret=args.webhook_secret,

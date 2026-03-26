@@ -220,11 +220,12 @@ DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
 
 
 # =============================================================================
-# Planka — S3 attachments storage
-# Uses a SEPARATE IAM user scoped to attachments/* only.
+# Planka — S3 object storage
+# Uses a SEPARATE IAM user and a SEPARATE bucket for Planka.
 # See docs/operations/aws-setup.md for the required IAM policy.
 # =============================================================================
 
+PLANKA_S3_BUCKET=REPLACE_WITH_PLANKA_BUCKET_NAME
 PLANKA_S3_ACCESS_KEY_ID=REPLACE_WITH_PLANKA_IAM_ACCESS_KEY
 PLANKA_S3_SECRET_ACCESS_KEY=REPLACE_WITH_PLANKA_IAM_SECRET_KEY
 PLANKA_S3_REGION=${DJANGO_AWS_S3_REGION_NAME:-ap-southeast-2}
