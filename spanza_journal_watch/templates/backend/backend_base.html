@@ -1,7 +1,18 @@
 {% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}<!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
-  <head><script src="{% static 'js/color-modes.js'%}"></script>
+  <head><script>
+      (() => {
+        const storedTheme = localStorage.getItem('theme');
+        const preferredTheme = storedTheme || (
+          window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        );
+        const resolvedTheme = preferredTheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : preferredTheme;
+        document.documentElement.setAttribute('data-bs-theme', resolvedTheme);
+      })();
+    </script>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>{% block title %}Journal Watch{% endblock title %}</title>
@@ -129,6 +140,8 @@
     </style>
     {% endblock %}
     {% block javascript %}
+      <script defer src="{% static 'js/color-modes.js' %}"></script>
+
       <!-- Vendor dependencies bundled as one file -->
       {% render_bundle 'vendors' 'js' attrs='defer' %}
       <!-- place project specific Javascript in this file -->
