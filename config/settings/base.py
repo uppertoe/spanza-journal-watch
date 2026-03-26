@@ -392,7 +392,7 @@ OAUTH2_PROVIDER = {
         "email": "Email address",
         "profile": "Profile information",
     },
-    "PKCE_REQUIRED": True,
+    "PKCE_REQUIRED": False,
 }
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
