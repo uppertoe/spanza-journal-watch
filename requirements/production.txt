@@ -34,7 +34,9 @@ certifi==2026.2.25
     #   requests
     #   sentry-sdk
 cffi==2.0.0
-    # via argon2-cffi-bindings
+    # via
+    #   argon2-cffi-bindings
+    #   cryptography
 charset-normalizer==3.4.6
     # via requests
 click==8.3.1
@@ -53,6 +55,10 @@ crispy-bootstrap5==2026.3
     # via -r requirements/base.in
 cron-descriptor==1.4.5
     # via django-celery-beat
+cryptography==46.0.6
+    # via
+    #   -r requirements/base.in
+    #   jwcrypto
 django==6.0.3
     # via
     #   -r requirements/base.in
@@ -64,6 +70,7 @@ django==6.0.3
     #   django-markdownx
     #   django-mjml
     #   django-model-utils
+    #   django-oauth-toolkit
     #   django-redis
     #   django-request-logging
     #   django-storages
@@ -88,6 +95,8 @@ django-mjml==1.5
     # via -r requirements/base.in
 django-model-utils==5.0.0
     # via -r requirements/base.in
+django-oauth-toolkit[oidc]==3.2.0
+    # via -r requirements/base.in
 django-redis==6.0.0
     # via -r requirements/base.in
 django-request-logging==0.7.5
@@ -102,6 +111,8 @@ django-view-breadcrumbs==2.5.1
     # via -r requirements/base.in
 django-webpack-loader==3.2.3
     # via -r requirements/base.in
+et-xmlfile==2.0.0
+    # via openpyxl
 flower==2.0.1
     # via -r requirements/base.in
 gunicorn==25.1.0
@@ -118,10 +129,16 @@ jmespath==1.1.0
     # via
     #   boto3
     #   botocore
+jwcrypto==1.5.6
+    # via django-oauth-toolkit
 kombu==5.6.2
     # via celery
 markdown==3.10.2
     # via django-markdownx
+oauthlib==3.3.1
+    # via django-oauth-toolkit
+openpyxl==3.1.5
+    # via -r requirements/base.in
 packaging==26.0
     # via
     #   gunicorn
@@ -139,9 +156,7 @@ psycopg2==2.9.11
 pycparser==3.0
     # via cffi
 pyjwt==2.10.1
-    # via
-    #   -r requirements/base.in
-    #   django-allauth
+    # via -r requirements/base.in
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0
@@ -157,7 +172,9 @@ redis==7.3.0
     #   -r requirements/base.in
     #   django-redis
 requests==2.32.5
-    # via django-anymail
+    # via
+    #   django-anymail
+    #   django-oauth-toolkit
 s3transfer==0.16.0
     # via boto3
 sentry-sdk==2.54.0
@@ -170,6 +187,8 @@ text-unidecode==1.3
     # via python-slugify
 tornado==6.5.5
     # via flower
+typing-extensions==4.15.0
+    # via jwcrypto
 tzdata==2025.3
     # via
     #   django-celery-beat

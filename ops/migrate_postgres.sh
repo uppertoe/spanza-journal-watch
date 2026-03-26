@@ -8,6 +8,7 @@
 # Optional flags:
 #   --compose-file <path>   (default: compose.prod.example.yml)
 #   --env-file <path>       (default: .env)
+#   --service <name>        (default: postgres)
 #   --force                 Skip confirmation prompt
 
 set -o errexit
@@ -17,16 +18,19 @@ set -o nounset
 SCRIPT_NAME="$(basename "$0")"
 COMPOSE_FILE="compose.prod.example.yml"
 POSTGRES_ENV_FILE=".env"
+POSTGRES_SERVICE="postgres"
 FORCE="false"
+COMPOSE_PROJECT_DIR=""
 
 usage() {
   cat <<EOF
 Usage:
-  ${SCRIPT_NAME} [--compose-file <path>] [--env-file <path>] [--force] <dump.sql|dump.sql.gz>
+  ${SCRIPT_NAME} [--compose-file <path>] [--env-file <path>] [--service <name>] [--force] <dump.sql|dump.sql.gz>
 
 Examples:
   ${SCRIPT_NAME} ./backups/postgres14_migration_20260316_072901.sql
   ${SCRIPT_NAME} --compose-file compose.prod.example.yml --env-file .env ./backups/prod.sql.gz
+  ${SCRIPT_NAME} --compose-file apps/journalwatch/docker-compose.yml --env-file apps/journalwatch/.env --service jw_postgres ./backups/prod.sql.gz
 
 What this does:
   1) Finds the current postgres data volume attached to the compose postgres service
@@ -45,11 +49,43 @@ error() {
   printf "[%s] ERROR: %s\n" "${SCRIPT_NAME}" "$*" >&2
 }
 
+compose() {
+  docker compose -f "${COMPOSE_FILE}" --project-directory "${COMPOSE_PROJECT_DIR}" "$@"
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     error "Required command not found: $1"
     exit 1
   fi
+}
+
+extract_env_var() {
+  local key="$1"
+  local line
+  line="$(grep -E "^${key}=" "${POSTGRES_ENV_FILE}" | tail -n1 || true)"
+  line="${line#${key}=}"
+  line="${line%\"}"
+  line="${line#\"}"
+  printf "%s" "${line}"
+}
+
+dump_stream() {
+  if [[ "${SQL_FILE_ABS}" == *.sql.gz ]]; then
+    gzip -dc "${SQL_FILE_ABS}"
+  else
+    cat "${SQL_FILE_ABS}"
+  fi
+}
+
+sanitize_sql_dump() {
+  sed -E '
+    /^\\restrict\b/d
+    /^\\unrestrict\b/d
+    /^ALTER .* OWNER TO /d
+    /^GRANT .* TO /d
+    /^REVOKE .* FROM /d
+  '
 }
 
 confirm() {
@@ -78,6 +114,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --env-file)
       POSTGRES_ENV_FILE="$2"
+      shift 2
+      ;;
+    --service)
+      POSTGRES_SERVICE="$2"
       shift 2
       ;;
     --force)
@@ -124,11 +164,12 @@ if [[ ! -f "${SQL_FILE}" ]]; then
   exit 1
 fi
 
-# Load DB env vars (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
-set -a
-# shellcheck disable=SC1090
-source "${POSTGRES_ENV_FILE}"
-set +a
+COMPOSE_PROJECT_DIR="$(cd "$(dirname "${COMPOSE_FILE}")" && pwd)"
+COMPOSE_FILE="$(cd "$(dirname "${COMPOSE_FILE}")" && pwd)/$(basename "${COMPOSE_FILE}")"
+POSTGRES_ENV_FILE="$(cd "$(dirname "${POSTGRES_ENV_FILE}")" && pwd)/$(basename "${POSTGRES_ENV_FILE}")"
+
+POSTGRES_USER="$(extract_env_var POSTGRES_USER)"
+POSTGRES_DB="$(extract_env_var POSTGRES_DB)"
 
 : "${POSTGRES_USER:?POSTGRES_USER must be set in env file}"
 : "${POSTGRES_DB:?POSTGRES_DB must be set in env file}"
@@ -143,19 +184,19 @@ SQL_FILE_ABS="$(cd "$(dirname "${SQL_FILE}")" && pwd)/$(basename "${SQL_FILE}")"
 
 confirm
 
-log "Ensuring postgres service exists in compose: ${COMPOSE_FILE}"
-docker compose -f "${COMPOSE_FILE}" config --services | grep -qx postgres || {
-  error "No 'postgres' service found in ${COMPOSE_FILE}"
+log "Ensuring postgres service '${POSTGRES_SERVICE}' exists in compose: ${COMPOSE_FILE}"
+compose config --services | grep -qx "${POSTGRES_SERVICE}" || {
+  error "No '${POSTGRES_SERVICE}' service found in ${COMPOSE_FILE}"
   exit 1
 }
 
 # Make sure we have (or create) a postgres container so we can discover mounted volume.
 log "Preparing postgres container metadata"
-docker compose -f "${COMPOSE_FILE}" up -d postgres >/dev/null
+compose up -d "${POSTGRES_SERVICE}" >/dev/null
 
-POSTGRES_CONTAINER_ID="$(docker compose -f "${COMPOSE_FILE}" ps -aq postgres | head -n1)"
+POSTGRES_CONTAINER_ID="$(compose ps -aq "${POSTGRES_SERVICE}" | head -n1)"
 if [[ -z "${POSTGRES_CONTAINER_ID}" ]]; then
-  error "Could not resolve postgres container id."
+  error "Could not resolve ${POSTGRES_SERVICE} container id."
   exit 1
 fi
 
@@ -174,38 +215,36 @@ docker run --rm \
   -v "${SNAPSHOT_VOLUME}:/to" \
   alpine sh -c 'cd /from && cp -a . /to'
 
-log "Stopping dependent services (best effort)"
-docker compose -f "${COMPOSE_FILE}" stop django celeryworker celerybeat flower traefik node >/dev/null 2>&1 || true
+log "Stopping compose project (best effort)"
+compose stop >/dev/null 2>&1 || true
 
 log "Stopping/removing postgres container"
-docker compose -f "${COMPOSE_FILE}" stop postgres >/dev/null 2>&1 || true
-docker compose -f "${COMPOSE_FILE}" rm -sf postgres >/dev/null 2>&1 || true
+compose stop "${POSTGRES_SERVICE}" >/dev/null 2>&1 || true
+compose rm -sf "${POSTGRES_SERVICE}" >/dev/null 2>&1 || true
 
 log "Removing old postgres data volume: ${OLD_DATA_VOLUME}"
 docker volume rm "${OLD_DATA_VOLUME}" >/dev/null
 
 log "Starting fresh postgres (17)"
-docker compose -f "${COMPOSE_FILE}" up -d postgres >/dev/null
+compose up -d "${POSTGRES_SERVICE}" >/dev/null
 
 log "Waiting for postgres readiness"
 for _ in $(seq 1 120); do
-  if docker compose -f "${COMPOSE_FILE}" exec -T postgres pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1; then
+  if compose exec -T "${POSTGRES_SERVICE}" pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-if ! docker compose -f "${COMPOSE_FILE}" exec -T postgres pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1; then
+if ! compose exec -T "${POSTGRES_SERVICE}" pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
   error "Postgres did not become ready in time."
   exit 1
 fi
 
-log "Importing dump into Postgres 17 volume from: ${SQL_FILE_ABS}"
-if [[ "${SQL_FILE_ABS}" == *.sql.gz ]]; then
-  gzip -dc "${SQL_FILE_ABS}" | docker compose -f "${COMPOSE_FILE}" exec -T postgres psql -U "${POSTGRES_USER}" -d postgres
-else
-  cat "${SQL_FILE_ABS}" | docker compose -f "${COMPOSE_FILE}" exec -T postgres psql -U "${POSTGRES_USER}" -d postgres
-fi
+log "Importing sanitized dump into database '${POSTGRES_DB}' from: ${SQL_FILE_ABS}"
+dump_stream \
+  | sanitize_sql_dump \
+  | compose exec -T "${POSTGRES_SERVICE}" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
 
 log "Migration import complete."
 log "Safety snapshot volume retained: ${SNAPSHOT_VOLUME}"

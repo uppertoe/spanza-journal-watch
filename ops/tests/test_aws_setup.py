@@ -20,6 +20,7 @@ from ops.aws_setup import (
     create_iam_user,
     django_policy,
     main,
+    media_public_read_policy,
     parse_args,
     planka_policy,
     print_credentials,
@@ -135,7 +136,7 @@ class TestPolicyDocuments:
 
     def test_policies_use_correct_bucket(self):
         other = "other-bucket"
-        for policy_fn in (django_policy, planka_policy, backup_policy):
+        for policy_fn in (django_policy, planka_policy, backup_policy, media_public_read_policy):
             doc = policy_fn(other)
             resources = []
             for stmt in doc["Statement"]:
@@ -145,6 +146,18 @@ class TestPolicyDocuments:
             assert all(
                 other in r for r in bucket_resources
             ), f"{policy_fn.__name__} has resources not scoped to bucket '{other}'"
+
+    def test_media_public_read_policy_only_exposes_media_prefix(self):
+        doc = media_public_read_policy(BUCKET)
+        assert doc["Statement"] == [
+            {
+                "Sid": "PublicReadMedia",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": f"arn:aws:s3:::{BUCKET}/media/*",
+            }
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -163,14 +176,20 @@ class TestSetupS3:
         resp = s3.get_bucket_versioning(Bucket=BUCKET)
         assert resp["Status"] == "Enabled"
 
-    def test_public_access_blocked(self, s3):
+    def test_public_access_blocked_except_for_bucket_policy(self, s3):
         setup_s3(s3, BUCKET, REGION)
         resp = s3.get_public_access_block(Bucket=BUCKET)
         cfg = resp["PublicAccessBlockConfiguration"]
         assert cfg["BlockPublicAcls"] is True
         assert cfg["IgnorePublicAcls"] is True
-        assert cfg["BlockPublicPolicy"] is True
-        assert cfg["RestrictPublicBuckets"] is True
+        assert cfg["BlockPublicPolicy"] is False
+        assert cfg["RestrictPublicBuckets"] is False
+
+    def test_bucket_policy_allows_public_read_for_media_only(self, s3):
+        setup_s3(s3, BUCKET, REGION)
+        resp = s3.get_bucket_policy(Bucket=BUCKET)
+        policy = json.loads(resp["Policy"])
+        assert policy == media_public_read_policy(BUCKET)
 
     def test_idempotent(self, s3):
         """Running setup twice should not raise."""

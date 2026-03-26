@@ -174,6 +174,21 @@ def backup_policy(bucket):
     }
 
 
+def media_public_read_policy(bucket):
+    return {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "PublicReadMedia",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": f"arn:aws:s3:::{bucket}/media/*",
+            }
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # S3
 # ---------------------------------------------------------------------------
@@ -202,11 +217,14 @@ def setup_s3(s3, bucket, region):
         PublicAccessBlockConfiguration={
             "BlockPublicAcls": True,
             "IgnorePublicAcls": True,
-            "BlockPublicPolicy": True,
-            "RestrictPublicBuckets": True,
+            "BlockPublicPolicy": False,
+            "RestrictPublicBuckets": False,
         },
     )
-    ok("Block all public access: enabled")
+    ok("Public ACLs blocked; bucket policy access allowed")
+
+    s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(media_public_read_policy(bucket)))
+    ok("Bucket policy: public read enabled for media/* only")
 
     # Versioning
     s3.put_bucket_versioning(
