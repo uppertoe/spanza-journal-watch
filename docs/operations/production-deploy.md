@@ -2,6 +2,10 @@
 
 This guide covers a complete first-time deployment, from an empty VPS to a fully operational Journal Watch instance. Images are pulled from Docker Hub — no build step is needed on the server.
 
+For the practical command-by-command runbook, including AWS login, PostgreSQL
+restores, Restic restores, and the Compose-project pitfalls we hit during
+staging, see [deploy-runbook.md](deploy-runbook.md).
+
 ---
 
 ## Prerequisites

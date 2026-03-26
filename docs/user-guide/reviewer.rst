@@ -7,11 +7,6 @@ As a reviewer, you write article summaries and commentaries directly in the
 Planka kanban board. You do not need access to the backend editorial interface —
 everything happens in Planka.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
-
 Accepting your invitation
 --------------------------
 

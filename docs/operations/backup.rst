@@ -1,10 +1,6 @@
 Backup and Restore
 ==================
 
-.. contents:: Contents
-   :local:
-   :depth: 2
-
 Overview
 --------
 

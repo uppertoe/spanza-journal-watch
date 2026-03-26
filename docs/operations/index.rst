@@ -7,5 +7,6 @@ Runbooks and operational guides for the Journal Watch production stack.
    :maxdepth: 2
 
    production-deploy
+   deploy-runbook
    aws-setup
    backup

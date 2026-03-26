@@ -7,11 +7,6 @@ The chief editor has full access to all editorial functions. This guide walks
 through the complete workflow for a single newsletter issue — from creating the
 issue through to publication.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
-
 Dashboard
 ---------
 

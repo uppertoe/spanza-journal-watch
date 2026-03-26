@@ -93,8 +93,9 @@ STORAGES = {
     },
 }
 # WhiteNoise docs recommend overriding immutable file detection when your
-# versioned filenames use a hash pattern outside the default matcher.
-WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/.+\.[0-9a-f]{20}\..+$"
+# versioned filenames use a hash pattern outside the default matcher. Our
+# static assets include webpack/Sphinx outputs with 12+ hex hash lengths.
+WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/.+\.[0-9a-f]{8,64}\..+$"
 # MEDIA
 # ------------------------------------------------------------------------------
 MEDIA_URL = f"https://{aws_s3_domain}/media/"

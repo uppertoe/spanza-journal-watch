@@ -8,11 +8,6 @@ Your role is to help manage article intake and contributors for the issues
 assigned to you. You have access to the backend editorial interface for those
 issues only.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
-
 Logging in
 ----------
 
