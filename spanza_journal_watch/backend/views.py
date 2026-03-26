@@ -4,6 +4,7 @@ import hmac
 import io
 import json
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -3458,7 +3459,8 @@ def backend_settings(request):
     pubmed_credential = _get_pubmed_integration_credential()
     planka_credential = _get_planka_integration_credential()
     watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
-    planka_oidc_app = OAuthApplication.objects.filter(client_id="planka-local").first()
+    planka_client_id = os.getenv("OIDC_CLIENT_ID", "planka-local")
+    planka_oidc_app = OAuthApplication.objects.filter(client_id=planka_client_id).first()
 
     # Test live Planka connection and check chief editor's Planka role.
     planka_connected = False
