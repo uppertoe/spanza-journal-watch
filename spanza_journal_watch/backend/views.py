@@ -494,7 +494,18 @@ def _build_pubmed_client(api_key=None):
     if not key:
         credential = _get_pubmed_integration_credential()
         key = credential.get_api_key() if credential else ""
-    return PubmedClient(api_key=key, timeout=int(getattr(settings, "PUBMED_TIMEOUT_SECONDS", 20)))
+    return PubmedClient(
+        api_key=key,
+        timeout=int(getattr(settings, "PUBMED_TIMEOUT_SECONDS", 20)),
+        tool=str(getattr(settings, "PUBMED_TOOL_NAME", "spanza-journal-watch")),
+        email=str(
+            getattr(
+                settings,
+                "PUBMED_CONTACT_EMAIL",
+                getattr(settings, "DEFAULT_FROM_EMAIL", "queries@journalwatch.org.au"),
+            )
+        ),
+    )
 
 
 def _build_pubmed_term(watched_journal):
@@ -647,22 +658,17 @@ def _fill_missing_article_metadata(article, payload):
 
 def _import_pubmed_batch(batch, watched_journals):
     client = _build_pubmed_client()
-    pmid_to_journal = {}
+    seen_pmids = set()
+
     for watched_journal in watched_journals:
         term = _build_pubmed_term(watched_journal)
-        for pmid in client.search_pmids(term, batch.from_month, batch.to_month):
-            if pmid and pmid not in pmid_to_journal:
-                pmid_to_journal[pmid] = watched_journal
-
-    all_pmids = list(pmid_to_journal.keys())
-    for start in range(0, len(all_pmids), 200):
-        end = start + 200
-        chunk = all_pmids[start:end]
-        for payload in client.fetch_articles(chunk):
+        history = client.search_pmids_history(term, batch.from_month, batch.to_month)
+        for payload in client.fetch_articles_history(history["webenv"], history["query_key"], history["count"]):
             pmid = (payload.get("pmid") or "").strip()
             doi = (payload.get("doi") or "").strip().lower() or None
-            if not pmid:
+            if not pmid or pmid in seen_pmids:
                 continue
+            seen_pmids.add(pmid)
 
             article = None
             if doi:
@@ -686,7 +692,6 @@ def _import_pubmed_batch(batch, watched_journals):
             else:
                 _fill_missing_article_metadata(article, payload)
 
-            watched_journal = pmid_to_journal.get(pmid)
             link, created = PubmedBatchArticle.objects.get_or_create(
                 batch=batch,
                 article=article,

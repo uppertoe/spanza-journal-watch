@@ -1,6 +1,9 @@
 import calendar
 import datetime
+import email.utils
 import json
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -13,21 +16,84 @@ class PubmedAPIError(Exception):
 class PubmedClient:
     BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
-    def __init__(self, api_key="", timeout=20):
+    def __init__(self, api_key="", timeout=20, max_retries=3, tool="spanza-journal-watch", email=""):
         self.api_key = (api_key or "").strip()
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.tool = (tool or "").strip()
+        self.email = (email or "").strip()
+        self.min_interval_seconds = 0.11 if self.api_key else 0.34
+        self._next_request_at = 0.0
 
-    def _request_json(self, endpoint, params):
+    def _respect_rate_limit(self):
+        delay = self._next_request_at - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+
+    def _mark_request_complete(self):
+        self._next_request_at = time.monotonic() + self.min_interval_seconds
+
+    def _parse_retry_after(self, value):
+        if not value:
+            return None
+
+        try:
+            return max(int(value), 0)
+        except (TypeError, ValueError):
+            pass
+
+        try:
+            retry_at = email.utils.parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+
+        if retry_at is None:
+            return None
+
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=datetime.timezone.utc)
+
+        seconds = (retry_at - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        return max(int(seconds), 0)
+
+    def _request_text(self, endpoint, params):
         query = dict(params or {})
         if self.api_key:
             query["api_key"] = self.api_key
+        if self.tool:
+            query["tool"] = self.tool
+        if self.email:
+            query["email"] = self.email
         url = f"{self.BASE_URL}/{endpoint}?{urllib.parse.urlencode(query)}"
         request = urllib.request.Request(url=url, headers={"User-Agent": "spanza-journal-watch/1.0"})
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                payload = response.read().decode("utf-8")
-        except Exception as error:
-            raise PubmedAPIError(f"PubMed request failed: {error}") from error
+
+        last_error = None
+        for attempt in range(self.max_retries + 1):
+            self._respect_rate_limit()
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    payload = response.read().decode("utf-8")
+                self._mark_request_complete()
+                return payload
+            except urllib.error.HTTPError as error:
+                last_error = error
+                if error.code == 429 and attempt < self.max_retries:
+                    self._next_request_at = 0.0
+                    retry_after = self._parse_retry_after(error.headers.get("Retry-After"))
+                    time.sleep(retry_after if retry_after is not None else min(2**attempt, 8))
+                    continue
+
+                self._mark_request_complete()
+                if error.code != 429 or attempt >= self.max_retries:
+                    break
+            except Exception as error:
+                self._mark_request_complete()
+                raise PubmedAPIError(f"PubMed request failed: {error}") from error
+
+        raise PubmedAPIError(f"PubMed request failed: {last_error}")
+
+    def _request_json(self, endpoint, params):
+        payload = self._request_text(endpoint, params)
 
         try:
             return json.loads(payload)
@@ -35,16 +101,7 @@ class PubmedClient:
             raise PubmedAPIError(f"PubMed returned invalid JSON: {error}") from error
 
     def _request_xml(self, endpoint, params):
-        query = dict(params or {})
-        if self.api_key:
-            query["api_key"] = self.api_key
-        url = f"{self.BASE_URL}/{endpoint}?{urllib.parse.urlencode(query)}"
-        request = urllib.request.Request(url=url, headers={"User-Agent": "spanza-journal-watch/1.0"})
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                payload = response.read().decode("utf-8")
-        except Exception as error:
-            raise PubmedAPIError(f"PubMed request failed: {error}") from error
+        payload = self._request_text(endpoint, params)
 
         try:
             return ET.fromstring(payload)
@@ -141,21 +198,33 @@ class PubmedClient:
         return self.fetch_articles(pmids)
 
     def search_pmids(self, term, from_month, to_month, retmax=1000):
+        history = self.search_pmids_history(term, from_month, to_month)
+        return history["pmids"][:retmax]
+
+    def search_pmids_history(self, term, from_month, to_month):
         start, end = self.month_to_bounds(from_month, to_month)
         data = self._request_json(
             "esearch.fcgi",
             {
                 "db": "pubmed",
                 "retmode": "json",
-                "retmax": retmax,
+                "retmax": 0,
                 "term": term,
                 "datetype": "pdat",
                 "mindate": start.strftime("%Y/%m/%d"),
                 "maxdate": end.strftime("%Y/%m/%d"),
                 "sort": "pub date",
+                "usehistory": "y",
             },
         )
-        return data.get("esearchresult", {}).get("idlist", []) or []
+        result = data.get("esearchresult", {}) or {}
+        count = int(result.get("count") or 0)
+        return {
+            "count": count,
+            "webenv": (result.get("webenv") or "").strip(),
+            "query_key": (result.get("querykey") or "").strip(),
+            "pmids": result.get("idlist", []) or [],
+        }
 
     def fetch_articles(self, pmids):
         if not pmids:
@@ -170,6 +239,27 @@ class PubmedClient:
             },
         )
         return [self._parse_article(node) for node in root.findall(".//PubmedArticle")]
+
+    def fetch_articles_history(self, webenv, query_key, count, batch_size=200):
+        if not webenv or not query_key or count <= 0:
+            return []
+
+        articles = []
+        for retstart in range(0, count, batch_size):
+            root = self._request_xml(
+                "efetch.fcgi",
+                {
+                    "db": "pubmed",
+                    "retmode": "xml",
+                    "query_key": query_key,
+                    "WebEnv": webenv,
+                    "retstart": retstart,
+                    "retmax": batch_size,
+                },
+            )
+            articles.extend(self._parse_article(node) for node in root.findall(".//PubmedArticle"))
+
+        return articles
 
     def _parse_article(self, node):
         medline = node.find("MedlineCitation")
