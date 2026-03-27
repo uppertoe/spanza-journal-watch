@@ -172,7 +172,14 @@
           </div>
           <div class="col-sm-4 d-flex order-1 order-sm-1 justify-content-center justify-content-sm-start align-items-center">
             <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer">
-            <img src="{% static "images/logo/spanza-logo-blue.png" %}" alt="SPANZA Logo" width="200"class="py-3">
+            <img
+              src="{% static "images/logo/spanza-logo-blue.png" %}"
+              alt="SPANZA Logo"
+              width="200"
+              height="124"
+              decoding="async"
+              class="py-3"
+            >
             </a>
           </div>
         </div>
@@ -230,7 +237,17 @@
     {% block modal %}{% endblock modal %}
 
     <footer class="py-5 text-center text-body-secondary bg-body-tertiary">
-      <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer"><img src="{% static "images/logo/spanza-logo-blue.png" %}" alt="SPANZA Logo" width="300"class="py-3"></a>
+      <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer">
+        <img
+          src="{% static "images/logo/spanza-logo-blue.png" %}"
+          alt="SPANZA Logo"
+          width="300"
+          height="185"
+          loading="lazy"
+          decoding="async"
+          class="py-3"
+        >
+      </a>
       <p class="mb-5">
         <a href="#">Back to top</a>
       </p>

@@ -39,7 +39,8 @@ class FeatureArticle(TimeStampedModel):
         super().save(*args, **kwargs)
 
         # Delegate resizing to Celery
-        celery_resize_image.delay(self.image.name)
+        if self.image:
+            celery_resize_image.delay("layout.FeatureArticle", self.pk, "image", target_format="webp")
 
     def get_absolute_url(self):
         return reverse("layout:feature_article_detail", kwargs={"slug": self.slug})

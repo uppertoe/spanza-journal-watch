@@ -15,7 +15,15 @@
 <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary main-feature">
     {% if content.image %}
     <div class="transparent-overlay"></div>
-    <img src="{{ content.image.url }}" alt="Feature Image" class="feature-image" fetchpriority="high">
+    <img
+      src="{{ content.image.url }}"
+      alt="Feature Image"
+      class="feature-image"
+      fetchpriority="high"
+      decoding="async"
+      width="{{ content.image.width }}"
+      height="{{ content.image.height }}"
+    >
     {% endif %}
     <div class="row">
     <div class="col-lg-8 feature-content">
