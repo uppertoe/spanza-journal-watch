@@ -23,6 +23,7 @@
 
     <link rel="icon" href="{% static 'images/logo/newsstand-icon.svg' %}" type="image/svg+xml">
     <meta name="theme-color" content="#152b3b">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-W3HW0RB27V"></script>
@@ -153,9 +154,9 @@
           <div class="col-sm-4 d-flex order-3 order-sm-3 justify-content-center justify-content-sm-end align-items-center gap-2">
             <div id="subscribe-container">
               {% if request.session.subscribed %}
-                <a class="btn btn-outline-warning btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML transition:true">Subscribed!</a>
+                <button class="btn btn-outline-warning btn-sm" type="button" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML transition:true">Subscribed!</button>
               {% else %}
-                <a class="btn btn-outline-warning btn-sm" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML transition:true">Subscribe</a>
+                <button class="btn btn-outline-warning btn-sm" type="button" hx-get="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML transition:true">Subscribe</button>
               {% endif %}
             </div>
             <div class="btn-group btn-group-sm" role="group">
@@ -171,14 +172,13 @@
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
           </div>
           <div class="col-sm-4 d-flex order-1 order-sm-1 justify-content-center justify-content-sm-start align-items-center">
-            <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer">
+            <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer" class="d-inline-block py-3">
             <img
               src="{% static "images/logo/spanza-logo-blue.png" %}"
               alt="SPANZA Logo"
               width="200"
               height="124"
               decoding="async"
-              class="py-3"
             >
             </a>
           </div>
@@ -237,7 +237,7 @@
     {% block modal %}{% endblock modal %}
 
     <footer class="py-5 text-center text-body-secondary bg-body-tertiary">
-      <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer">
+      <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer" class="d-inline-block py-3">
         <img
           src="{% static "images/logo/spanza-logo-blue.png" %}"
           alt="SPANZA Logo"
@@ -245,7 +245,6 @@
           height="185"
           loading="lazy"
           decoding="async"
-          class="py-3"
         >
       </a>
       <p class="mb-5">

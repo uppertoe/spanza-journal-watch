@@ -5,6 +5,7 @@
             <h5 class="mb-1">{{ feature.article.get_title }}</h5>
             <div class="mb-1 text-body-secondary">By {{ feature.author }}</div>
             <a
+            href="{{ feature.get_absolute_url }}"
             role="button"
             class="icon-link gap-1 icon-link-hover stretched-link"
             data-bs-toggle="modal"
