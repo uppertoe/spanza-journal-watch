@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from spanza_journal_watch.layout.models import FeatureArticle
-from spanza_journal_watch.submissions.models import Author, HealthService, Review
+from spanza_journal_watch.submissions.models import Author, HealthService, Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_image, resize_uploaded_image
 
 
@@ -9,10 +9,11 @@ class Command(BaseCommand):
     help = "Reprocess uploaded frontend-facing images through the Pillow/WebP pipeline."
 
     TARGETS = (
-        ("layout.FeatureArticle", FeatureArticle, "image", 800, "webp"),
-        ("submissions.HealthService", HealthService, "logo", 400, "webp"),
-        ("submissions.Author", Author, "profile_image", 400, "webp"),
-        ("submissions.Review", Review, "feature_image", 800, "original"),
+        ("layout.FeatureArticle", FeatureArticle, "image", 800, "webp", (240, 480)),
+        ("submissions.Issue", Issue, "image", 800, "webp", (240, 480)),
+        ("submissions.HealthService", HealthService, "logo", 400, "webp", (200,)),
+        ("submissions.Author", Author, "profile_image", 400, "webp", (200,)),
+        ("submissions.Review", Review, "feature_image", 800, "original", (240, 480)),
     )
 
     def add_arguments(self, parser):
@@ -26,7 +27,7 @@ class Command(BaseCommand):
         total = 0
         sync = options["sync"]
 
-        for model_label, model, field_name, size, target_format in self.TARGETS:
+        for model_label, model, field_name, size, target_format, variant_widths in self.TARGETS:
             queryset = model.objects.filter(**{f"{field_name}__isnull": False}).exclude(**{field_name: ""})
             count = queryset.count()
             total += count
@@ -34,7 +35,14 @@ class Command(BaseCommand):
 
             for obj in queryset.iterator():
                 if sync:
-                    resize_uploaded_image(model_label, obj.pk, field_name, size=size, target_format=target_format)
+                    resize_uploaded_image(
+                        model_label,
+                        obj.pk,
+                        field_name,
+                        size=size,
+                        target_format=target_format,
+                        variant_widths=variant_widths,
+                    )
                 else:
                     celery_resize_image.delay(
                         model_label,
@@ -42,6 +50,7 @@ class Command(BaseCommand):
                         field_name,
                         size=size,
                         target_format=target_format,
+                        variant_widths=variant_widths,
                     )
 
         mode = "processed inline" if sync else "queued"

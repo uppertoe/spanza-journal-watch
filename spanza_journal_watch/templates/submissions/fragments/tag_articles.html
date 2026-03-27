@@ -1,4 +1,4 @@
-{% load cache %}
+{% load cache responsive_images %}
 {% cache 1800 "tag_detail_articles" content_cache_version request.get_full_path %}
 <div id="articles">
     <div class="row row-cols-{{ article_cols }} g-3 py-2">
@@ -10,7 +10,14 @@
                 role="button"
                 aria-label="Open review for {{ article.get_title|capfirst }}">
                 {% if review.feature_image %}
-                <img src="{{ review.feature_image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
+                <img
+                  src="{{ review.feature_image|image_variant_url:480 }}"
+                  srcset="{% image_variant_srcset review.feature_image 240 480 %}"
+                  sizes="(min-width: 1200px) 360px, (min-width: 768px) 330px, 100vw"
+                  height="225"
+                  class="w-100 center-thumbnail object-fit-cover rounded-top"
+                  decoding="async"
+                >
                 {% endif %}
                 <div class="d-flex card-body flex-column">
                     <h5 class="card-title">{{ article.get_title|capfirst }}</h5>

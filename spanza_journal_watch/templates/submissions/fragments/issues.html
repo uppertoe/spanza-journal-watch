@@ -1,4 +1,4 @@
-{% load cache %}
+{% load cache responsive_images %}
 {% cache 1800 "issues_cards" content_cache_version request.get_full_path %}
 <div id="articles">
         <div class="row row-cols-{{ issue_cols }} g-3 py-2">
@@ -11,7 +11,14 @@
                     aria-label="Open issue {{ issue.name }}">
                     {% with issue_image=issue.get_issue_image %}
                     {% if issue_image %}
-                    <img src="{{ issue_image.url}}" height="225" class="w-100 center-thumbnail object-fit-cover rounded-top">
+                    <img
+                      src="{{ issue_image|image_variant_url:480 }}"
+                      srcset="{% image_variant_srcset issue_image 240 480 %}"
+                      sizes="(min-width: 1200px) 360px, (min-width: 768px) 330px, 100vw"
+                      height="225"
+                      class="w-100 center-thumbnail object-fit-cover rounded-top"
+                      decoding="async"
+                    >
                     {% else %}
                     <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/></svg>
                     {% endif %}

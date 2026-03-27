@@ -9,6 +9,7 @@ from PIL import Image, ImageOps
 from config.celery_app import app as celery_app
 
 from .functions import resize_to_max_dimension
+from .image_variants import image_variant_name
 
 
 def _webp_name(path):
@@ -58,7 +59,41 @@ def _build_output_image(img, path, target_format):
     return output, next_path, content_type, size
 
 
-def resize_uploaded_image(model_label, instance_pk, field_name, size=800, target_format="webp"):
+def _delete_variant_files(path, variant_widths):
+    for width in variant_widths:
+        variant_path = image_variant_name(path, width)
+        if default_storage.exists(variant_path):
+            default_storage.delete(variant_path)
+
+
+def _save_variant_images(img, path, variant_widths):
+    for width in variant_widths:
+        if img.width <= width:
+            continue
+
+        variant = img.copy()
+        new_height = int(round(img.height * (width / img.width)))
+        variant = variant.resize((width, new_height), Image.Resampling.LANCZOS)
+
+        output = BytesIO()
+        variant.save(
+            output,
+            format="WEBP",
+            quality=76,
+            method=6,
+        )
+        size = output.tell()
+        output.seek(0)
+
+        variant_path = image_variant_name(path, width)
+        if default_storage.exists(variant_path):
+            default_storage.delete(variant_path)
+
+        imagefile = InMemoryUploadedFile(output, None, variant_path, "image/webp", size, None)
+        default_storage.save(variant_path, imagefile)
+
+
+def resize_uploaded_image(model_label, instance_pk, field_name, size=800, target_format="webp", variant_widths=()):
     model = apps.get_model(model_label)
     instance = model.objects.filter(pk=instance_pk).only(field_name).first()
     if not instance:
@@ -73,7 +108,7 @@ def resize_uploaded_image(model_label, instance_pk, field_name, size=800, target
     # File may be local or remote (S3)
     with default_storage.open(path, mode="rb") as file:
         file.seek(0)
-        img = Image.open(file)
+        img = ImageOps.exif_transpose(Image.open(file))
 
         has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
         target_mode = "RGBA" if has_alpha else "RGB"
@@ -95,7 +130,15 @@ def resize_uploaded_image(model_label, instance_pk, field_name, size=800, target
             saved_path = default_storage.save(path, imagefile)
             if saved_path != path:
                 model.objects.filter(pk=instance_pk).update(**{field_name: saved_path})
+                if variant_widths:
+                    _delete_variant_files(path, variant_widths)
+                    _save_variant_images(img, saved_path, variant_widths)
+            elif variant_widths:
+                _save_variant_images(img, path, variant_widths)
             return
+
+        if variant_widths:
+            _delete_variant_files(path, variant_widths)
 
         if default_storage.exists(next_path):
             default_storage.delete(next_path)
@@ -103,14 +146,24 @@ def resize_uploaded_image(model_label, instance_pk, field_name, size=800, target
         saved_path = default_storage.save(next_path, imagefile)
         model.objects.filter(pk=instance_pk).update(**{field_name: saved_path})
 
+        if variant_widths:
+            _save_variant_images(img, saved_path, variant_widths)
+
         if default_storage.exists(path):
             default_storage.delete(path)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=20)
-def celery_resize_image(self, model_label, instance_pk, field_name, size=800, target_format="webp"):
+def celery_resize_image(self, model_label, instance_pk, field_name, size=800, target_format="webp", variant_widths=()):
     try:
-        resize_uploaded_image(model_label, instance_pk, field_name, size=size, target_format=target_format)
+        resize_uploaded_image(
+            model_label,
+            instance_pk,
+            field_name,
+            size=size,
+            target_format=target_format,
+            variant_widths=variant_widths,
+        )
     except Exception as e:
         # Retry the task after a delay if it fails
         raise self.retry(exc=e, max_retries=self.max_retries, countdown=self.default_retry_delay)
