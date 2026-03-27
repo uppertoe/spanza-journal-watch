@@ -283,7 +283,8 @@ class Review(TimeStampedModel):
         html = markdownify(self.body)
         if exclude_headings:
             html = self.heading_tag_re.sub(" ", html)
-        return strip_tags(html)
+        text = strip_tags(html).strip()
+        return text
 
     def get_truncated_body(self):
         return shorten_text(self.get_plain_body(exclude_headings=True), self.TRUNCATED_BODY_LENGTH)
