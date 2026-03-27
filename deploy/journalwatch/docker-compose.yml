@@ -46,6 +46,9 @@ services:
       PLANKA_DB_URL: postgresql://postgres@jw_planka_postgres/planka
     volumes:
       - jw_access_logs:/app/access_logs
+      # Host-backed so Caddy can serve collected static files directly from
+      # /srv/repo/apps/journalwatch/staticfiles without going through Django.
+      - ./staticfiles:/app/staticfiles
     networks:
       - caddy
       - jw_internal
@@ -60,7 +63,7 @@ services:
     volumes:
       - jw_postgres_data:/var/lib/postgresql/data
       - jw_postgres_backups:/backups
-    # Loopback-only — lets the host-side backup agent (ops/systemd/) connect
+    # Loopback-only — lets the server-level backup tooling connect from the host
     ports:
       - '127.0.0.1:5432:5432'
     healthcheck:

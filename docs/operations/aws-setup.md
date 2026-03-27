@@ -12,24 +12,16 @@ Most of the infrastructure can be provisioned in a single command:
 
 ```bash
 # Requires admin AWS credentials (not the service credentials in .env)
-python ops/aws_setup.py \
+python deploy/bootstrap/aws_setup.py \
   --bucket your-bucket-name \
   --domain yourdomain.com \
   --webhook-secret "$(grep WEBHOOK_SECRET .env | cut -d= -f2)"
 ```
 
-Or via Make (reads BUCKET, DOMAIN, AWS_REGION, WEBHOOK_SECRET from the environment):
-
-```bash
-export BUCKET=your-bucket-name DOMAIN=yourdomain.com AWS_REGION=ap-southeast-2
-export WEBHOOK_SECRET=$(grep WEBHOOK_SECRET .env | cut -d= -f2)
-make aws-setup
-```
-
 Run the isolated AWS provisioning tests with:
 
 ```bash
-make aws-setup-test
+python3 -m pytest -q -o addopts='' deploy/bootstrap/tests/test_aws_setup.py
 ```
 
 The script is **idempotent** — safe to run multiple times.
@@ -199,8 +191,8 @@ It should use a dedicated bucket referenced by `PLANKA_S3_BUCKET`.
 
 ### 2c. `jw-backup` — Restic backups only
 
-This user's credentials go into `/etc/restic/env` on the VPS (see
-`ops/systemd/env.example`). They are **not** used by any Docker service.
+This user's credentials belong to the server repo / VPS backup layer, not to
+any Journal Watch Docker service.
 
 **Inline policy — `jw-backup-policy`:**
 ```json

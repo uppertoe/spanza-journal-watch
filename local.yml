@@ -3,7 +3,6 @@ volumes:
   spanza_journal_watch_local_postgres_data_backups: {}
   spanza_journal_watch_local_planka_data: {}
   spanza_journal_watch_local_planka_postgres_data: {}
-  spanza_journal_watch_local_backup_repo: {}
 
 services:
   django: &django
@@ -133,7 +132,7 @@ services:
         condition: service_healthy
     volumes:
       - spanza_journal_watch_local_planka_data:/app/data
-      - ./planka/custom:/app/terms/custom:ro
+      - ./deploy/journalwatch/planka/custom:/app/terms/custom:ro
     ports:
       - '3001:1337'
     environment:
@@ -158,46 +157,6 @@ services:
       DEFAULT_ADMIN_USERNAME: demo
     extra_hosts:
       - 'localhost:host-gateway'
-
-  # ---------------------------------------------------------------------------
-  # Backup — local testing container (profile: backup)
-  # ---------------------------------------------------------------------------
-  # Bind-mounts ops/backup/ so script changes are reflected immediately.
-  # Mailpit catches notification emails at http://localhost:8025.
-  #
-  # Usage:
-  #   docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --dry-run
-  #   docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --verify
-  #   docker compose -f local.yml --profile backup run --rm backup \
-  #     /backup/restore.sh --database django --target django_restore_test
-  backup:
-    build:
-      context: .
-      dockerfile: ./compose/local/backup/Dockerfile
-    profiles: ['backup']
-    volumes:
-      - ./ops/backup:/backup:ro
-      - spanza_journal_watch_local_backup_repo:/restic-repo
-    env_file: .env.local
-    environment:
-      RESTIC_REPOSITORY: /restic-repo
-      RESTIC_PASSWORD: local-test-password
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: '5432'
-      PLANKA_DB_HOST: planka_postgres
-      PLANKA_DB_PORT: '5432'
-      KEEP_DAILY: '3'
-      KEEP_WEEKLY: '2'
-      KEEP_MONTHLY: '1'
-      SMTP_HOST: mailpit
-      SMTP_PORT: '1025'
-      SMTP_TLS: 'off'
-      SMTP_FROM: backup@journalwatch.local
-      ALERT_EMAIL: admin@journalwatch.local
-      NOTIFY_ON_SUCCESS: 'true'
-    depends_on:
-      - postgres
-      - mailpit
 
   planka_postgres:
     image: postgres:16-alpine

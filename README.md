@@ -58,6 +58,8 @@ Production uses pre-built Docker Hub images — no build step is required on the
 
 See **[docs/operations/production-deploy.md](docs/operations/production-deploy.md)** for the complete step-by-step deployment guide.
 
+App-specific server export files live in [deploy/journalwatch](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/deploy/journalwatch), ready to be copied into `apps/journalwatch/` inside the `server-instance-template` repo. One-off bootstrap helpers live in [deploy/bootstrap](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/deploy/bootstrap).
+
 ---
 
 ## Local development
@@ -76,26 +78,9 @@ docker exec spanza_journal_watch_local_django /entrypoint python manage.py shell
 # Flower (Celery monitor) is at http://localhost:5555
 ```
 
-### Test the backup scripts locally
-
-```bash
-# Dry run
-docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --dry-run
-
-# Full backup + verify
-docker compose -f local.yml --profile backup run --rm backup /backup/backup.sh --verify
-
-# Test restore into a temporary database (safe — does not touch the real DB)
-docker compose -f local.yml --profile backup run --rm backup \
-  /backup/restore.sh --database django --target django_restore_test
-```
-
----
-
 ## Operations
 
-Full runbooks are in `docs/operations/`:
+Full runbooks are in `docs/operations/`, and deployment helper ownership is summarised in [deploy/README.md](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/deploy/README.md):
 
 - `production-deploy.md` — complete first-time deployment guide (start here)
 - `aws-setup.md` — S3, IAM, SES, and SNS configuration reference
-- `backup.rst` — backup architecture, configuration, local testing, restore procedures

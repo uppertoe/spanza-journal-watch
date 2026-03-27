@@ -105,8 +105,9 @@ COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
 # Copy built documentation so it can be served at /editorial/docs/
 COPY --from=docs-builder --chown=django:django /docs-build ${APP_HOME}/docs/_build/html
 
-# make django owner of the WORKDIR directory as well.
-RUN mkdir -p ${APP_HOME}/access_logs \
+RUN mkdir -p \
+    ${APP_HOME}/access_logs \
+    ${APP_HOME}/staticfiles \
   && chown -R django:django ${APP_HOME}
 
 USER django

@@ -88,7 +88,7 @@ services:
         condition: service_healthy
     volumes:
       # No data volume — attachments stored in S3 (see S3_* below)
-      - ./planka/custom:/app/terms/custom:ro
+      - ./deploy/journalwatch/planka/custom:/app/terms/custom:ro
     env_file: .env
     environment:
       # S3 — uses a dedicated IAM user scoped to attachments/* only.

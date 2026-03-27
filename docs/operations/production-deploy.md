@@ -3,7 +3,7 @@
 This guide covers a complete first-time deployment, from an empty VPS to a fully operational Journal Watch instance. Images are pulled from Docker Hub — no build step is needed on the server.
 
 For the practical command-by-command runbook, including AWS login, PostgreSQL
-restores, Restic restores, and the Compose-project pitfalls we hit during
+restores, server-repo backup notes, and the Compose-project pitfalls we hit during
 staging, see [deploy-runbook.md](deploy-runbook.md).
 
 ---
@@ -62,33 +62,25 @@ Most setup work happens on your **local machine** — the VPS only needs Docker 
 
 | Task | Where |
 |------|-------|
-| Generate `.env` (`gen-env.sh`) | Local machine |
-| Provision AWS (`aws_setup.py`) | Local machine (needs admin AWS credentials) |
-| Compose file, Makefile, Planka terms | VPS (copied or cloned) |
-| Backup install scripts | VPS |
+| Generate `.env` (`deploy/bootstrap/gen-env.sh`) | Local machine |
+| Provision AWS (`deploy/bootstrap/aws_setup.py`) | Local machine (needs admin AWS credentials) |
+| App export files under `deploy/journalwatch/` | Server repo (`apps/journalwatch/`) |
 | Application images | Pulled from Docker Hub by the VPS |
 
 ---
 
-## Step 1 — Get the config files onto the VPS
+## Step 1 — Copy the app export files into the server repo
 
-The VPS needs the Compose file, Makefile, Planka terms content, and backup scripts. The easiest way is to clone the repository — not to build anything, but to have these config files in a known location that `git pull` can update when they change.
+Journal Watch is expected to deploy through
+`server-instance-template`. Copy the contents of `deploy/journalwatch/` into
+`apps/journalwatch/` in the server repo.
 
 ```bash
-git clone https://github.com/your-org/spanza-journal-watch.git /opt/journalwatch
-cd /opt/journalwatch
+cp -R deploy/journalwatch /path/to/server-repo/apps/journalwatch
 ```
 
-If you prefer not to keep git on the server, you can `scp` just the files that are needed:
-
-```
-compose.prod.example.yml
-Makefile
-planka/custom/          (Planka terms content — bind-mounted into the container)
-ops/systemd/            (backup install scripts)
-```
-
-Everything else in the repository (`ops/gen-env.sh`, `ops/aws_setup.py`, application source, etc.) stays on your local machine.
+Everything else in this repository stays local. The server repo owns the
+runtime Compose project, Caddy base config, and backup automation.
 
 ---
 
@@ -97,7 +89,7 @@ Everything else in the repository (`ops/gen-env.sh`, `ops/aws_setup.py`, applica
 Run this on your local machine, not the VPS:
 
 ```bash
-bash ops/gen-env.sh
+bash deploy/bootstrap/gen-env.sh
 ```
 
 The script prompts for four values:
@@ -109,7 +101,7 @@ The script prompts for four values:
 | Admin email | `admin@journalwatch.org.au` |
 | Docker Hub namespace | `your-namespace` |
 
-Everything else (Django secret key, database password, OIDC RSA key, Flower credentials, etc.) is generated automatically. The script writes `.env` (mode `600`) and a pre-filled `ops/systemd/env.local` for the backup configuration.
+Everything else (Django secret key, database password, OIDC RSA key, Flower credentials, etc.) is generated automatically.
 
 After the script completes, there are five AWS placeholders to fill in — these come from Step 3:
 
@@ -135,7 +127,7 @@ python3 -m venv /tmp/jw-ops-venv
 source /tmp/jw-ops-venv/bin/activate
 pip install boto3
 
-python ops/aws_setup.py \
+python deploy/bootstrap/aws_setup.py \
   --bucket your-bucket-name \
   --domain yourdomain.com \
   --webhook-secret "$(grep WEBHOOK_SECRET .env | cut -d= -f2)"
@@ -150,7 +142,7 @@ The script creates:
 
 It prints:
 
-- **IAM access keys** — paste the `jw-django` and `jw-planka` keys into `.env`, and the `jw-backup` keys into `ops/systemd/env.local`
+- **IAM access keys** — paste the `jw-django` and `jw-planka` keys into `.env`
 - **DNS records** — add the SES TXT and three DKIM CNAMEs to your DNS provider
 - **Manual steps** that require human action (SES production access, SNS webhook subscription)
 
@@ -271,17 +263,14 @@ server {
 
 ## Step 5 — Pull images and start the stack (VPS)
 
-From `/opt/journalwatch` on the VPS:
+From the server repo root on the VPS:
 
 ```bash
-make pull    # pulls all images (django, mjml, planka, postgres, redis)
-make up      # starts the full stack with all profiles
-```
-
-Verify all containers are healthy:
-
-```bash
-make ps
+cd /opt/deploy
+set -a; source apps/journalwatch/.env; set +a
+docker compose --profile workers --profile planka pull
+docker compose --profile workers --profile planka up -d
+docker compose ps
 ```
 
 All services should show `running` or `healthy` within about 30 seconds.
@@ -293,14 +282,12 @@ All services should show `running` or `healthy` within about 30 seconds.
 Run once after the stack is up for the first time:
 
 ```bash
-make bootstrap
+cd /opt/deploy
+set -a; source apps/journalwatch/.env; set +a
+docker compose exec -T jw_django python manage.py migrate
+docker compose exec -T jw_django python manage.py create_chief_editor
+docker compose exec -T jw_django python manage.py setup_planka_oidc
 ```
-
-This runs in order:
-
-1. `migrate` — applies all database migrations
-2. `create_chief_editor` — creates the chief editor account (prompts for email and password)
-3. `setup_planka_oidc` — registers Django as the Planka OIDC provider
 
 ---
 
@@ -311,11 +298,13 @@ This runs in order:
 
 After this succeeds:
 
-3. Uncomment `OIDC_ENFORCED=true` in `.env` (it is already present but commented out).
+3. Uncomment `OIDC_ENFORCED=true` in `apps/journalwatch/.env` (it is already present but commented out).
 4. Restart the stack to pick up the change:
 
 ```bash
-make restart
+cd /opt/deploy
+set -a; source apps/journalwatch/.env; set +a
+docker compose --profile workers --profile planka up -d
 ```
 
 From this point, Planka login is SSO-only — users log in through Django. The `DEFAULT_ADMIN_PASSWORD` in `.env` is no longer used and can be removed.
@@ -338,54 +327,11 @@ Django auto-confirms the subscription. Check the SNS console — the subscriptio
 
 ---
 
-## Step 9 — Set up backups
+## Step 9 — Configure backups in the server repo
 
-First, copy the pre-filled backup env file from your local machine to the VPS:
-
-```bash
-# On your local machine
-scp ops/systemd/env.local user@your-vps:/tmp/restic-env
-```
-
-Then on the VPS:
-
-```bash
-# Install restic, msmtp, and the backup scripts/systemd units
-sudo bash ops/systemd/install.sh
-
-# Put the pre-filled env in place
-sudo cp /tmp/restic-env /etc/restic/env
-sudo chmod 600 /etc/restic/env
-rm /tmp/restic-env
-
-# Fill in the IAM backup credentials and SES SMTP credentials
-sudo nano /etc/restic/env
-```
-
-The values to fill in:
-
-| Key | Where to get it |
-|-----|----------------|
-| `RESTIC_REPOSITORY` | Update the bucket name printed by `aws_setup.py` |
-| `AWS_ACCESS_KEY_ID` | `jw-backup` key printed by `aws_setup.py` |
-| `AWS_SECRET_ACCESS_KEY` | `jw-backup` secret printed by `aws_setup.py` |
-| `SMTP_USER` / `SMTP_PASSWORD` | SES SMTP credentials (AWS console → SES → SMTP settings) |
-
-Initialise the repository and verify:
-
-```bash
-# Initialise the Restic repository (first time only)
-sudo bash -c 'source /etc/restic/env && restic init'
-
-# Start the timer
-sudo systemctl start backup.service
-sudo journalctl -u backup.service -f   # watch the first backup complete
-
-# Confirm the daily timer is scheduled
-sudo systemctl list-timers backup.timer
-```
-
-See [backup.rst](backup.rst) for the full backup runbook, retention policy, and restore procedures.
+Backup and restore are now owned by the `server-instance-template` repo rather
+than this application repo. Configure them in the server repo's `backup/`
+directory and follow that repo's backup playbook.
 
 ---
 
@@ -393,7 +339,7 @@ See [backup.rst](backup.rst) for the full backup runbook, retention policy, and 
 
 After completing all steps, verify the following:
 
-- [ ] `make ps` — all containers `running` or `healthy`
+- [ ] `docker compose ps` — all containers `running` or `healthy`
 - [ ] `https://yourdomain.com/` — app loads
 - [ ] `https://yourdomain.com/backend/` — backend login works
 - [ ] `https://planka.yourdomain.com/` — redirects to Django login (OIDC enforced)
@@ -403,8 +349,8 @@ After completing all steps, verify the following:
 - [ ] Send a newsletter test to [mail-tester.com](https://www.mail-tester.com) — confirm SPF, DKIM, and DMARC all pass
 - [ ] Trigger a test bounce (`bounce@simulator.amazonses.com`) — confirm SNS webhook fires and Django logs it
 - [ ] Confirm BIMI logo appears in Gmail and Apple Mail (may take up to 48 hours after DNS propagation)
-- [ ] Check `systemctl list-timers backup.timer` — next backup scheduled
-- [ ] Run a manual backup restore to a test database (see backup runbook)
+- [ ] Check the server repo backup service/timer state
+- [ ] Run a manual backup restore to a test database using the server repo tooling
 
 ---
 
@@ -413,18 +359,20 @@ After completing all steps, verify the following:
 ### Deploying a new version
 
 ```bash
-make pull      # pull new images from Docker Hub
-make restart   # recreate containers with the new images
-make migrate   # apply any new migrations (safe to run every time)
+cd /opt/deploy
+set -a; source apps/journalwatch/.env; set +a
+docker compose --profile workers --profile planka pull
+docker compose --profile workers --profile planka up -d
+docker compose exec -T jw_django python manage.py migrate
 ```
 
 ### Useful commands
 
 ```bash
-make logs      # tail all container logs
-make ps        # container status
-make shell     # Django management shell
-make migrate   # run migrations
+docker compose logs -f jw_django jw_celeryworker jw_celerybeat jw_planka
+docker compose ps
+docker compose exec -T jw_django python manage.py shell
+docker compose exec -T jw_django python manage.py migrate
 ```
 
 ### Updating `.env`

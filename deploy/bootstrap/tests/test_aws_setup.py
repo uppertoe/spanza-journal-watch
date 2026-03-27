@@ -1,5 +1,5 @@
 """
-ops/tests/test_aws_setup.py — Tests for ops/aws_setup.py.
+deploy/bootstrap/tests/test_aws_setup.py — Tests for deploy/bootstrap/aws_setup.py.
 
 These tests are Django-free; the --ds flag loads settings at collection time
 but no database is touched (no django_db marker).
@@ -15,7 +15,7 @@ import pytest
 from botocore.exceptions import ClientError
 from moto import mock_aws
 
-from ops.aws_setup import (
+from deploy.bootstrap.aws_setup import (
     backup_policy,
     create_iam_user,
     django_policy,
@@ -516,14 +516,14 @@ class TestProfileArg:
             ses_mock.create_configuration_set.return_value = {}
             ses_mock.create_configuration_set_event_destination.return_value = {}
 
-            with patch("ops.aws_setup.boto3.Session", side_effect=fake_session), patch("sys.argv", argv), patch(
-                "ops.aws_setup.boto3.Session"
+            with patch("deploy.bootstrap.aws_setup.boto3.Session", side_effect=fake_session), patch("sys.argv", argv), patch(
+                "deploy.bootstrap.aws_setup.boto3.Session"
             ) as mock_boto_session:
                 mock_boto_session.return_value.client.return_value = ses_mock
                 # We just need to verify the call signature — don't run full main()
                 mock_boto_session.reset_mock()
 
-                from ops.aws_setup import main as aws_main
+                from deploy.bootstrap.aws_setup import main as aws_main
 
                 try:
                     aws_main()
@@ -541,13 +541,13 @@ class TestProfileArg:
         """Omitting --profile results in profile_name=None (boto3 default chain)."""
         argv = ["aws_setup.py", "--bucket", BUCKET, "--domain", DOMAIN, "--region", REGION]
 
-        with patch("sys.argv", argv), patch("ops.aws_setup.boto3.Session") as mock_boto_session:
+        with patch("sys.argv", argv), patch("deploy.bootstrap.aws_setup.boto3.Session") as mock_boto_session:
             mock_boto_session.return_value.client.return_value = MagicMock()
             mock_boto_session.return_value.client.return_value.get_caller_identity.return_value = {
                 "Account": ACCOUNT_ID
             }
 
-            from ops.aws_setup import main as aws_main
+            from deploy.bootstrap.aws_setup import main as aws_main
 
             try:
                 aws_main()
@@ -561,7 +561,7 @@ class TestProfileArg:
 
 class TestCliEntryPoints:
     def test_main_accepts_explicit_argv(self):
-        with patch("ops.aws_setup.boto3.Session") as mock_boto_session:
+        with patch("deploy.bootstrap.aws_setup.boto3.Session") as mock_boto_session:
             sts = MagicMock()
             sts.get_caller_identity.return_value = {"Account": ACCOUNT_ID}
 
@@ -578,7 +578,7 @@ class TestCliEntryPoints:
             mock_boto_session.return_value.client.side_effect = fake_client
 
             with patch(
-                "ops.aws_setup.provision",
+                "deploy.bootstrap.aws_setup.provision",
                 return_value=({}, [], "arn:aws:sns:ap-southeast-2:123456789012:journalwatch-ses-events"),
             ):
                 main(["--bucket", BUCKET, "--domain", DOMAIN, "--profile", "jw-admin", "--region", REGION])

@@ -1,0 +1,26 @@
+# Journal Watch — Caddy routing snippet
+# Auto-discovered by scaffold/docker/run-caddy.sh at container startup.
+# DOMAIN is set in the server repo root .env (e.g. DOMAIN=journalwatch.org.au).
+
+# Main application
+{$DOMAIN} {
+    # Serve collected static files directly from the server repo checkout.
+    # This assumes the Django service bind-mounts ./staticfiles and that the
+    # Caddy container can already read /srv/repo/apps/journalwatch/.
+    handle_path /static/* {
+        root * /srv/repo/apps/journalwatch/staticfiles
+
+        @immutable path_regexp immutable ^.+(?:[.-][0-9a-f]{8,64})\..+$
+        header @immutable Cache-Control "public, max-age=315360000, immutable"
+        header Cache-Control "public, max-age=3600"
+
+        file_server
+    }
+
+    reverse_proxy jw_django:5000
+}
+
+# Planka project management (active when --profile planka is used)
+planka.{$DOMAIN} {
+    reverse_proxy jw_planka:1337
+}

@@ -6000,7 +6000,6 @@
       "created": "2023-06-22T05:21:58.522Z",
       "modified": "2023-07-12T04:09:03.429Z",
       "issue": 5,
-      "override_main": true,
       "publication_ready": false
     }
   },
@@ -6011,7 +6010,6 @@
       "created": "2023-07-08T12:25:45.466Z",
       "modified": "2023-09-14T22:19:49.451Z",
       "issue": 6,
-      "override_main": true,
       "publication_ready": false
     }
   },
@@ -6022,7 +6020,6 @@
       "created": "2023-09-14T22:19:39.328Z",
       "modified": "2023-09-14T22:19:39.328Z",
       "issue": 8,
-      "override_main": true,
       "publication_ready": true
     }
   },
@@ -6033,7 +6030,6 @@
       "created": "2023-10-09T05:39:47.448Z",
       "modified": "2023-10-09T05:39:47.448Z",
       "issue": 9,
-      "override_main": true,
       "publication_ready": true
     }
   },
@@ -6044,7 +6040,6 @@
       "created": "2023-12-14T13:21:28.782Z",
       "modified": "2023-12-14T13:21:28.782Z",
       "issue": 10,
-      "override_main": true,
       "publication_ready": true
     }
   },
@@ -6055,7 +6050,6 @@
       "created": "2024-05-30T01:35:37.887Z",
       "modified": "2024-05-30T01:35:37.887Z",
       "issue": 11,
-      "override_main": true,
       "publication_ready": true
     }
   },
@@ -6066,7 +6060,6 @@
       "created": "2024-08-18T23:10:59.278Z",
       "modified": "2024-08-18T23:10:59.278Z",
       "issue": 12,
-      "override_main": false,
       "publication_ready": true
     }
   },
@@ -6077,7 +6070,6 @@
       "created": "2024-09-03T23:25:22.448Z",
       "modified": "2024-09-03T23:25:22.448Z",
       "issue": 13,
-      "override_main": false,
       "publication_ready": true
     }
   },
@@ -6088,7 +6080,6 @@
       "created": "2024-11-14T09:29:18.836Z",
       "modified": "2024-11-14T09:29:18.836Z",
       "issue": 14,
-      "override_main": false,
       "publication_ready": true
     }
   },

@@ -10,7 +10,7 @@ Use this when you want the exact commands for:
 - provisioning AWS buckets and IAM users
 - deploying on the VPS
 - restoring PostgreSQL from SQL dumps
-- restoring databases from Restic backups
+- checking server-managed backup/restore flow
 
 ## Assumptions
 
@@ -83,7 +83,7 @@ Run from the repo root on your local machine:
 
 ```bash
 cd /Users/eamonnupperton/Documents/developer/spanza_journal_watch
-python ops/aws_setup.py \
+python deploy/bootstrap/aws_setup.py \
   --profile default \
   --bucket spanza-journal-watch-staging-150064991851 \
   --planka-bucket spanza-journal-watch-staging-150064991851-planka \
@@ -97,7 +97,7 @@ the unsuffixed IAM user names:
 
 ```bash
 cd /Users/eamonnupperton/Documents/developer/spanza_journal_watch
-python ops/aws_setup.py \
+python deploy/bootstrap/aws_setup.py \
   --profile default \
   --bucket spanza-journal-watch-production-150064991851 \
   --planka-bucket spanza-journal-watch-production-150064991851-planka \
@@ -192,7 +192,7 @@ consistent:
 
 ```bash
 cd /opt/deploy
-./ops/migrate_postgres.sh \
+./deploy/bootstrap/migrate_postgres.sh \
   --compose-file apps/journal-watch/docker-compose.yml \
   --env-file apps/journal-watch/.env \
   --service jw_postgres \

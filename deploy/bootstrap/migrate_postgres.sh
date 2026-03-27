@@ -3,7 +3,7 @@
 # Migrate PostgreSQL data into a fresh Postgres 17 Docker volume using a .sql/.sql.gz dump.
 #
 # Default usage (production):
-#   ./ops/migrate_postgres.sh ./backups/your_backup.sql
+#   ./deploy/bootstrap/migrate_postgres.sh ./backups/your_backup.sql
 #
 # Optional flags:
 #   --compose-file <path>   (default: compose.prod.example.yml)
