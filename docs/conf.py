@@ -2,7 +2,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 project = "SPANZA Journal Watch"
-copyright = "2023, Eamonn Upperton"
+copyright = "2026, Eamonn Upperton"
 author = "Eamonn Upperton"
 
 extensions = [
@@ -12,3 +12,4 @@ extensions = [
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "furo"
+html_favicon = "../spanza_journal_watch/static/images/favicon_package/favicon-32x32.png"
