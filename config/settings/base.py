@@ -53,7 +53,20 @@ MESSAGE_TAGS = {
 # DATABASES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
-DATABASES = {"default": env.db("DATABASE_URL")}
+DATABASE_URL = env("DATABASE_URL", default="")
+if not DATABASE_URL:
+    postgres_name = env("POSTGRES_DB", default="")
+    postgres_user = env("POSTGRES_USER", default="")
+    postgres_password = env("POSTGRES_PASSWORD", default="")
+    postgres_host = env("POSTGRES_HOST", default="")
+    postgres_port = env("POSTGRES_PORT", default="5432")
+
+    if all([postgres_name, postgres_user, postgres_password, postgres_host]):
+        DATABASE_URL = (
+            f"postgres://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_name}"
+        )
+
+DATABASES = {"default": env.db("DATABASE_URL", default=DATABASE_URL)}
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 # https://docs.djangoproject.com/en/stable/ref/settings/#std:setting-DEFAULT_AUTO_FIELD
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -326,7 +339,7 @@ if USE_TZ:
     # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-timezone
     CELERY_TIMEZONE = TIME_ZONE
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-broker_url
-CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=env("REDIS_URL", default="redis://redis:6379/0"))
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-result_backend
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#result-extended

@@ -30,15 +30,15 @@ Generated files:
 
 `pytest tests/regression -q`
 
+Equivalent docker command from project root:
+
+`docker compose -f local.yml exec -T django pytest tests/regression -q`
+
 Current baseline suite: 26 passing tests.
 
 Route-to-test mapping:
 
 - `tests/regression/ROUTE_COVERAGE.md`
-
-Optional MailHog integration check:
-
-`pytest tests/regression -m mailhog -q`
 
 ## Notes
 

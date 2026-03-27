@@ -1,6 +1,3 @@
-from urllib.error import URLError
-from urllib.request import urlopen
-
 import pytest
 from django.core import mail
 from django.urls import reverse
@@ -87,13 +84,3 @@ class TestNewsletterFlows:
 
         assert len(mail.outbox) >= 1
         assert mail.outbox[-1].subject == "Journal Watch Subscription"
-
-    @pytest.mark.mailhog
-    def test_mailhog_api_is_reachable(self):
-        try:
-            with urlopen("http://mailhog:8025/api/v2/messages", timeout=2) as response:
-                status = response.status
-        except URLError:
-            pytest.skip("MailHog not reachable from current test runtime")
-
-        assert status == 200

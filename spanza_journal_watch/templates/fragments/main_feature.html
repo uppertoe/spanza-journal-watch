@@ -21,8 +21,8 @@
       class="feature-image"
       fetchpriority="high"
       decoding="async"
-      width="{{ content.image.width }}"
-      height="{{ content.image.height }}"
+      {% if content.image_width_safe %}width="{{ content.image_width_safe }}"{% endif %}
+      {% if content.image_height_safe %}height="{{ content.image_height_safe }}"{% endif %}
     >
     {% endif %}
     <div class="row">

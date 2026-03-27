@@ -33,6 +33,26 @@ class FeatureArticle(TimeStampedModel):
     def get_truncated_body(self):
         return HTMLShortener(self.TRUNCATED_BODY_LENGTH).truncate_html(self.body)
 
+    @property
+    def image_width_safe(self):
+        if not self.image:
+            return None
+
+        try:
+            return self.image.width
+        except (FileNotFoundError, OSError, ValueError):
+            return None
+
+    @property
+    def image_height_safe(self):
+        if not self.image:
+            return None
+
+        try:
+            return self.image.height
+        except (FileNotFoundError, OSError, ValueError):
+            return None
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.title))
