@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 
 from django.apps import apps
 from django.conf import settings
@@ -269,6 +270,7 @@ class Review(TimeStampedModel):
         blank=True,
         null=True,
     )
+    heading_tag_re = re.compile(r"<h[1-6]\b[^>]*>.*?</h[1-6]>", re.IGNORECASE | re.DOTALL)
 
     class Meta:
         # Requires from django.contrib.postgres.operations import BtreeGinExtension in the migration
@@ -277,8 +279,14 @@ class Review(TimeStampedModel):
     def get_markdown_body(self, strip=False):
         return markdownify(self.body) if not strip else strip_tags(markdownify(self.body))
 
+    def get_plain_body(self, exclude_headings=False):
+        html = markdownify(self.body)
+        if exclude_headings:
+            html = self.heading_tag_re.sub(" ", html)
+        return strip_tags(html)
+
     def get_truncated_body(self):
-        return shorten_text(self.get_markdown_body(strip=True), self.TRUNCATED_BODY_LENGTH)
+        return shorten_text(self.get_plain_body(exclude_headings=True), self.TRUNCATED_BODY_LENGTH)
 
     def get_longer_truncated_body(self):
         return shorten_text(self.get_markdown_body(), 500)

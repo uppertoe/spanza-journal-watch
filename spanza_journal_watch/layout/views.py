@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.http import FileResponse, HttpRequest, HttpResponse
 from django.views.decorators.cache import cache_control
@@ -6,6 +8,7 @@ from django.views.generic import DetailView, ListView
 
 from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Review
+from spanza_journal_watch.utils.functions import get_domain_url
 from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
 
 from .models import FeatureArticle, Homepage, PageHeader
@@ -44,10 +47,30 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         homepage = Homepage.get_current_homepage()
+        domain = get_domain_url()
 
         context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]
         context["article_cols"] = self.article_cols
         context["feature_text_styles"] = self.feature_text_styles
+        context["page_title"] = "SPANZA Journal Watch"
+        context["page_meta_description"] = (
+            "Review highlights from the paediatric anaesthesia literature curated by the SPANZA Journal Watch community."
+        )
+        context["canonical_url"] = self.request.build_absolute_uri(self.request.path)
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                "name": "SPANZA Journal Watch",
+                "url": f"{domain}/",
+                "description": context["page_meta_description"],
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": f"{domain}/search?q={{search_term_string}}",
+                    "query-input": "required name=search_term_string",
+                },
+            }
+        )
 
         # Override header
         override = {}

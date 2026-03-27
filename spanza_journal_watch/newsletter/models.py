@@ -67,11 +67,14 @@ class Subscriber(models.Model):
         email = mail.EmailMultiAlternatives(
             subject="Journal Watch Subscription",
             body=body,
-            from_email="SPANZA Journal Watch <subscribe@journalwatch.org.au>",
+            from_email=settings.SUBSCRIBE_FROM_EMAIL,
             to=[self.email],
             headers=headers,
+            reply_to=[settings.NEWSLETTER_REPLY_TO],
         )
         email.attach_alternative(html, "text/html")
+        email.metadata = {"type": "subscription_confirmation"}
+        email.tags = ["subscription-confirmation"]
         return email
 
     def generate_unsubscribe_token(self):
@@ -209,14 +212,16 @@ class Newsletter(models.Model):
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
                 body=self.generate_txt_content(context),
-                from_email="SPANZA Journal Watch <newsletter@journalwatch.org.au>",
+                from_email=settings.NEWSLETTER_FROM_EMAIL,
                 to=[subscriber.email],
                 headers=headers,
+                reply_to=[settings.NEWSLETTER_REPLY_TO],
             )
             email.attach_alternative(self.generate_html_content(context), "text/html")
 
             # Attach token to identify instigating email for bounces/complaints
             email.metadata = {"email_token": self.email_token, "type": "newsletter"}
+            email.tags = ["newsletter"]
 
             emails.append(email)
         return emails

@@ -132,6 +132,16 @@ class ReviewModelTest(TestCase):
         url = reverse("submissions:review_detail", kwargs={"slug": self.review.slug})
         self.assertEqual(self.review.get_absolute_url(), url)
 
+    def test_get_truncated_body_excludes_markdown_headings(self):
+        self.review.body = "# Main heading\n\nIntro paragraph.\n\n## Secondary heading\n\nMore body copy."
+
+        truncated = self.review.get_truncated_body()
+
+        self.assertNotIn("Main heading", truncated)
+        self.assertNotIn("Secondary heading", truncated)
+        self.assertIn("Intro paragraph.", truncated)
+        self.assertIn("More body copy.", truncated)
+
 
 class IssueModelTest(TestCase):
     def setUp(self):

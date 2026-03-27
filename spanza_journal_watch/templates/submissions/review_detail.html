@@ -2,7 +2,6 @@
 {% block title %}{{ share_title }}{% endblock title %}
 {% block meta_description %}{{ share_description }}{% endblock meta_description %}
 {% block head_meta %}
-<link rel="canonical" href="{{ canonical_url }}">
 <meta property="og:type" content="article">
 <meta property="og:title" content="{{ share_title }}">
 <meta property="og:description" content="{{ share_description }}">
@@ -13,24 +12,6 @@
 <meta name="twitter:title" content="{{ share_title }}">
 <meta name="twitter:description" content="{{ share_description }}">
 {% if share_image_url %}<meta name="twitter:image" content="{{ share_image_url }}">{% endif %}
-<script type="application/ld+json">
-{
-    "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": "{{ share_title|escapejs }}",
-    "description": "{{ share_description|escapejs }}",
-    "url": "{{ canonical_url }}",
-    "datePublished": "{{ review.get_review_date|date:'c' }}",
-    "author": {
-        "@type": "Person",
-        "name": "{{ review.author }}"
-    },
-    "publisher": {
-        "@type": "Organization",
-        "name": "Journal Watch"
-    }
-}
-</script>
 {% endblock head_meta %}
 {% block main-feature %}
     <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">

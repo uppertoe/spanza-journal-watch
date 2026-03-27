@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+from django.test import override_settings
 
 from spanza_journal_watch.newsletter.models import Subscriber
 from spanza_journal_watch.newsletter.signals import (
@@ -141,3 +142,19 @@ class TestNewsletterTrackingSignals:
         assert unsubscribed not in valid
         assert complained not in valid
         assert bounced not in valid
+
+
+@pytest.mark.django_db
+@override_settings(
+    SUBSCRIBE_FROM_EMAIL="Journal Watch <subscribe@example.test>",
+    NEWSLETTER_REPLY_TO="queries@example.test",
+)
+def test_confirmation_email_uses_reply_to_and_metadata():
+    subscriber = Subscriber.objects.create(email="subscriber@example.test", subscribed=True)
+
+    message = subscriber.generate_confirmation_email()
+
+    assert message.from_email == "Journal Watch <subscribe@example.test>"
+    assert message.reply_to == ["queries@example.test"]
+    assert message.metadata == {"type": "subscription_confirmation"}
+    assert message.tags == ["subscription-confirmation"]

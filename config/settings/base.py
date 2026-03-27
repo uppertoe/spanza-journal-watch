@@ -261,6 +261,16 @@ EMAIL_BACKEND = env(
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-timeout
 EMAIL_TIMEOUT = 5
+CONTACT_EMAIL = env("CONTACT_EMAIL", default="queries@journalwatch.org.au")
+SUBSCRIBE_FROM_EMAIL = env(
+    "SUBSCRIBE_FROM_EMAIL",
+    default="SPANZA Journal Watch <subscribe@journalwatch.org.au>",
+)
+NEWSLETTER_FROM_EMAIL = env(
+    "NEWSLETTER_FROM_EMAIL",
+    default="SPANZA Journal Watch <newsletter@journalwatch.org.au>",
+)
+NEWSLETTER_REPLY_TO = env("NEWSLETTER_REPLY_TO", default=CONTACT_EMAIL)
 
 # MJML
 # ------------------------------------------------------------------------------
@@ -405,7 +415,7 @@ OAUTH2_PROVIDER = {
         "email": "Email address",
         "profile": "Profile information",
     },
-    "PKCE_REQUIRED": False,
+    "PKCE_REQUIRED": env.bool("OIDC_PKCE_REQUIRED", default=False),
 }
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")

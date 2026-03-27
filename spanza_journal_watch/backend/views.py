@@ -3119,8 +3119,11 @@ def _send_issue_invite_email(request, invite, raw_token):
         body=text_body,
         from_email=None,
         to=[contributor.email],
+        reply_to=[settings.CONTACT_EMAIL],
     )
     message.attach_alternative(html_body, "text/html")
+    message.metadata = {"type": "issue_contributor_invite", "issue_id": issue.pk}
+    message.tags = ["issue-contributor-invite"]
     message.send()
 
     invite.sent_at = timezone.now()
@@ -3144,8 +3147,11 @@ def _send_issue_welcome_email(request, contributor):
         body=text_body,
         from_email=None,
         to=[contributor.email],
+        reply_to=[settings.CONTACT_EMAIL],
     )
     message.attach_alternative(html_body, "text/html")
+    message.metadata = {"type": "issue_contributor_welcome", "issue_id": issue.pk}
+    message.tags = ["issue-contributor-welcome"]
     message.send()
 
 

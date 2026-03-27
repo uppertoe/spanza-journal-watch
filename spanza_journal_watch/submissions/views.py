@@ -1,3 +1,4 @@
+import json
 from urllib.parse import urlencode
 
 from django.core.cache import cache
@@ -30,6 +31,10 @@ def build_share_urls(share_title, canonical_url):
     }
 
 
+def build_absolute_url(path):
+    return f"{get_domain_url()}{path}"
+
+
 class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
     model = Review
     context_object_name = "review"
@@ -47,8 +52,7 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        domain = get_domain_url()
-        canonical_url = f"{domain}{self.object.get_absolute_url()}"
+        canonical_url = build_absolute_url(self.object.get_absolute_url())
 
         article_title = self.object.article.get_title().strip()
         share_title = f"SPANZA Journal Watch - {article_title}"
@@ -56,10 +60,30 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         share_context = build_share_urls(share_title, canonical_url)
 
         context["canonical_url"] = canonical_url
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "Article",
+                "headline": share_title,
+                "description": share_description,
+                "url": canonical_url,
+                "datePublished": self.object.get_review_date().isoformat() if self.object.get_review_date() else "",
+                "author": {
+                    "@type": "Person",
+                    "name": str(self.object.author),
+                },
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "Journal Watch",
+                },
+            }
+        )
         context["share_title"] = share_title
         context["share_description"] = share_description
         context["share_text"] = share_context["share_text"]
-        context["share_image_url"] = f"{domain}{self.object.feature_image.url}" if self.object.feature_image else ""
+        context["share_image_url"] = (
+            f"{get_domain_url()}{self.object.feature_image.url}" if self.object.feature_image else ""
+        )
         context["bluesky_share_url"] = share_context["bluesky_share_url"]
         context["x_share_url"] = share_context["x_share_url"]
         context["facebook_share_url"] = share_context["facebook_share_url"]
@@ -100,6 +124,20 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         context = super().get_context_data(**kwargs)
         context["issue"] = self.object
         context["article_cols"] = self.article_cols
+        context["page_title"] = f"{self.object.name} | SPANZA Journal Watch"
+        context["page_meta_description"] = (
+            f"{self.object.name}: curated Journal Watch reviews and commentary from the paediatric anaesthesia literature."
+        )
+        context["canonical_url"] = self.request.build_absolute_uri()
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": self.object.name,
+                "url": build_absolute_url(self.object.get_absolute_url()),
+                "description": context["page_meta_description"],
+            }
+        )
 
         # Rearrange the sidebar to ensure on top in mobile
         context["arrange_sidebar_top"] = self.arrange_sidebar_top
@@ -114,11 +152,10 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         page = context["page_obj"]
         context["articles"] = paginator.get_page(page.number)
 
-        domain = get_domain_url()
         for review in context["articles"]:
             article_title = review.article.get_title().strip()
             review_share_title = f"SPANZA Journal Watch - {article_title}"
-            review_canonical_url = f"{domain}{review.get_absolute_url()}"
+            review_canonical_url = build_absolute_url(review.get_absolute_url())
             review_share_context = build_share_urls(review_share_title, review_canonical_url)
 
             review.share_title = review_share_title
@@ -155,6 +192,20 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["issue_cols"] = self.issue_cols
+        context["page_title"] = "Issues | SPANZA Journal Watch"
+        context["page_meta_description"] = (
+            "Browse previous SPANZA Journal Watch issues and collections of paediatric anaesthesia literature reviews."
+        )
+        context["canonical_url"] = self.request.build_absolute_uri()
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": "Issues",
+                "url": build_absolute_url(reverse("submissions:issue_list")),
+                "description": context["page_meta_description"],
+            }
+        )
 
         # Override header
         header = PageHeader.get_active_for(PageHeader.PageType.ISSUE_LIST)
@@ -210,6 +261,20 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
         context["filter_querystring"] = query_params.urlencode()
+        context["page_title"] = "Tags | SPANZA Journal Watch"
+        context["page_meta_description"] = "Browse topics and themes used across SPANZA Journal Watch reviews."
+        context["canonical_url"] = build_absolute_url(reverse("submissions:tag_list"))
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": "Tags",
+                "url": context["canonical_url"],
+                "description": context["page_meta_description"],
+            }
+        )
+        if context["query"] or context["sort"] != "popular" or self.request.GET.get("page"):
+            context["meta_robots"] = "noindex,follow"
 
         page_obj = context["page_obj"]
         total_pages = page_obj.paginator.num_pages
@@ -272,6 +337,18 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
         context["page_header"] = header.collate_fields(**override) if header else override
 
         context["article_cols"] = self.article_cols
+        context["page_title"] = f"{self.object} | SPANZA Journal Watch"
+        context["page_meta_description"] = f"Browse Journal Watch reviews tagged {self.object}."
+        context["canonical_url"] = build_absolute_url(self.object.get_absolute_url())
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": str(self.object),
+                "url": context["canonical_url"],
+                "description": context["page_meta_description"],
+            }
+        )
 
         return context
 
@@ -319,6 +396,19 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         context["query"] = query
         context["selected_year"] = selected_year
         context["selected_tags"] = selected_tags
+        context["page_title"] = "Search | SPANZA Journal Watch"
+        context["page_meta_description"] = "Search SPANZA Journal Watch reviews by title, author, journal, year, and topic."
+        context["canonical_url"] = build_absolute_url(reverse("submissions:search"))
+        context["meta_robots"] = "noindex,follow"
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "SearchResultsPage",
+                "name": "Search",
+                "url": context["canonical_url"],
+                "description": context["page_meta_description"],
+            }
+        )
 
         cache_version = get_content_cache_version()
         year_options_key = f"search_year_options:v{cache_version}"
@@ -424,6 +514,20 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["article_cols"] = self.article_cols
+        context["page_title"] = f"{self.object} | SPANZA Journal Watch"
+        context["page_meta_description"] = f"Reviews contributed to SPANZA Journal Watch by {self.object}."
+        context["canonical_url"] = build_absolute_url(self.object.get_absolute_url())
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "ProfilePage",
+                "url": context["canonical_url"],
+                "mainEntity": {
+                    "@type": "Person",
+                    "name": str(self.object),
+                },
+            }
+        )
 
         # Supply only paginated objects to the template
         paginator = context["paginator"]

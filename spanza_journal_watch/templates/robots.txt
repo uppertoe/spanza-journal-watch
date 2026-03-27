@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://journalwatch.org.au/sitemap.xml
+Sitemap: {{ request.scheme }}://{{ request.get_host }}/sitemap.xml
