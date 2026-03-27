@@ -19,9 +19,13 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[".journalwatch.org.au"
 # DATABASES
 # ------------------------------------------------------------------------------
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)  # noqa: F405
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("DJANGO_CONN_HEALTH_CHECKS", default=True)  # noqa: F405
 
 # CACHES
 # ------------------------------------------------------------------------------
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = env.bool("DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS", default=True)
+DJANGO_REDIS_LOGGER = "django_redis"
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -31,6 +35,9 @@ CACHES = {
             # Mimicing memcache behavior.
             # https://github.com/jazzband/django-redis#memcached-exceptions-behavior
             "IGNORE_EXCEPTIONS": True,
+            # Fail fast if Redis is unavailable so requests do not stall.
+            "SOCKET_CONNECT_TIMEOUT": env.float("DJANGO_REDIS_SOCKET_CONNECT_TIMEOUT", default=2.0),
+            "SOCKET_TIMEOUT": env.float("DJANGO_REDIS_SOCKET_TIMEOUT", default=2.0),
         },
     }
 }
@@ -183,6 +190,11 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        "django_redis": {
+            "level": env("DJANGO_REDIS_LOG_LEVEL", default="WARNING"),
+            "handlers": ["console"],
+            "propagate": False,
+        },
         # Errors logged by the SDK itself
         "sentry_sdk": {"level": "ERROR", "handlers": ["console"], "propagate": False},
         "django.security.DisallowedHost": {
@@ -213,6 +225,8 @@ sentry_sdk.init(
     integrations=integrations,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
     send_default_pii=True,  # Attaches authenticated user (id, email) to Sentry events
+    attach_stacktrace=env.bool("SENTRY_ATTACH_STACKTRACE", default=True),
+    max_breadcrumbs=env.int("SENTRY_MAX_BREADCRUMBS", default=100),
     traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
     profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.1),
 )
