@@ -1,0 +1,312 @@
+{% extends "backend/backend_base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="mb-1">Site analytics</h1>
+        <p class="text-muted mb-0">Human-filtered reading, sharing, and search behaviour across the public site.</p>
+    </div>
+    <form class="d-flex flex-wrap gap-2 align-items-end" method="get">
+        <div>
+            <label class="form-label small text-muted mb-1" for="analytics-start">From</label>
+            <input id="analytics-start" class="form-control form-control-sm" type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+        </div>
+        <div>
+            <label class="form-label small text-muted mb-1" for="analytics-end">To</label>
+            <input id="analytics-end" class="form-control form-control-sm" type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">Apply</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Review opens</h6>
+                <p class="display-6 mb-0">{{ total_review_opens }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4 col-xl-2">
+        <div class="card h-100 border-primary-subtle">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Engaged views</h6>
+                <p class="display-6 mb-0">{{ total_engaged_views }}</p>
+                <p class="small text-muted mb-0">{{ engaged_rate }} of opens</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4 col-xl-2">
+        <div class="card h-100 border-success-subtle">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Avg dwell</h6>
+                <p class="display-6 mb-0">{{ average_dwell_seconds }}s</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Full text clicks</h6>
+                <p class="display-6 mb-0">{{ total_full_text_clicks }}</p>
+                <p class="small text-muted mb-0">{{ full_text_ctr }} CTR</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Shares</h6>
+                <p class="display-6 mb-0">{{ total_shares }}</p>
+                <p class="small text-muted mb-0">{{ share_rate }} of opens</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Searches</h6>
+                <p class="display-6 mb-0">{{ search_count }}</p>
+                <p class="small text-muted mb-0">{{ search_click_rate }} click-through</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-7">
+        <div class="card mb-4">
+            <div class="card-header">How readers arrive at reviews</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Opens</th>
+                            <th>Engaged rate</th>
+                            <th>Share rate</th>
+                            <th>Action rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in source_breakdown %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.opens }}</td>
+                            <td>{{ item.engaged_rate }}</td>
+                            <td>{{ item.share_rate }}</td>
+                            <td>{{ item.action_rate }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No source data yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Top reviews by engagement</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Review</th>
+                            <th>Opens</th>
+                            <th>Engaged</th>
+                            <th>Rates</th>
+                            <th>Actions</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in top_reviews %}
+                        <tr>
+                            <td>
+                                <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">{{ item.review.article.get_title|capfirst }}</a>
+                                <div class="small text-muted">{{ item.review.article.journal }}</div>
+                            </td>
+                            <td>{{ item.opens }}</td>
+                            <td>{{ item.engaged_views }}</td>
+                            <td>
+                                <div class="small">Engaged {{ item.engaged_rate }}</div>
+                                <div class="small text-muted">Dwell {{ item.avg_dwell_seconds }}s</div>
+                            </td>
+                            <td>
+                                <div class="small">{{ item.full_text_clicks }} full text</div>
+                                <div class="small text-muted">{{ item.total_shares }} shares</div>
+                            </td>
+                            <td><span class="badge text-bg-primary">{{ item.engagement_score }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-muted">No analytics yet in this date range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Search insights</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Query</th>
+                            <th>Searches</th>
+                            <th>Result clicks</th>
+                            <th>CTR</th>
+                            <th>Zero results</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in search_insights %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.searches }}</td>
+                            <td>{{ item.result_clicks }}</td>
+                            <td>{{ item.click_through_rate }}</td>
+                            <td>{{ item.zero_results }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No search activity yet in this date range.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Editorial opportunities</div>
+            <div class="list-group list-group-flush">
+                {% for item in content_opportunities %}
+                <div class="list-group-item">
+                    <div class="fw-semibold">
+                        <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                            {{ item.review.article.get_title|capfirst }}
+                        </a>
+                    </div>
+                    <div class="small">{{ item.signal }}</div>
+                    <div class="small text-muted">{{ item.detail }}</div>
+                </div>
+                {% empty %}
+                <div class="list-group-item text-muted">Not enough activity yet to surface opportunities.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-5">
+        <div class="card mb-4">
+            <div class="card-header">Featured vs standard reviews</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Opens</th>
+                            <th>Engaged rate</th>
+                            <th>Action rate</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in review_type_breakdown %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.opens }}</td>
+                            <td>{{ item.engaged_rate }}</td>
+                            <td>{{ item.action_rate }}</td>
+                            <td>{{ item.score }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Share methods</div>
+            <div class="card-body">
+                {% if share_breakdown %}
+                <div class="d-flex flex-column gap-3">
+                    {% for item in share_breakdown %}
+                    <div>
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ item.label }}</span>
+                            <span class="text-muted">{{ item.count }}</span>
+                        </div>
+                        <div class="progress" role="presentation" aria-hidden="true">
+                            <div class="progress-bar" style="width: {% widthratio item.count total_shares 100 %}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No share events yet in this date range.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">Top journals</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Journal</th>
+                            <th>Opens</th>
+                            <th>Engaged</th>
+                            <th>Shares</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in top_journals %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.opens }}</td>
+                            <td>{{ item.engaged }}</td>
+                            <td>{{ item.shares }}</td>
+                            <td>{{ item.score }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No journal trends yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Top tags</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Tag</th>
+                            <th>Opens</th>
+                            <th>Engaged</th>
+                            <th>Shares</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in top_tags %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.opens }}</td>
+                            <td>{{ item.engaged }}</td>
+                            <td>{{ item.shares }}</td>
+                            <td>{{ item.score }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No tag trends yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

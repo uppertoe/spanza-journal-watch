@@ -1,12 +1,15 @@
 import logging
+from json import JSONDecodeError, loads
 from urllib.parse import urlparse
 
 from django.contrib.staticfiles import finders
 from django.core.exceptions import MultipleObjectsReturned
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.urls import resolve
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
-from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen, PageView
+from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen, PageView
 from spanza_journal_watch.analytics.utils import (
     is_probable_automated_event,
     is_probable_automated_newsletter_event,
@@ -140,3 +143,38 @@ def track_email_click(request):
         logger.warning("No subscriber by this email: %s", email)
 
     return _get_next_url(request, next)
+
+
+@csrf_exempt
+@require_POST
+def track_event(request):
+    try:
+        payload = loads(request.body.decode("utf-8"))
+    except (JSONDecodeError, UnicodeDecodeError):
+        return HttpResponseBadRequest("Invalid analytics payload")
+
+    event_type = (payload.get("event_type") or "").strip()
+    allowed_event_types = {choice for choice, _label in AnalyticsEvent.EventType.choices}
+    if event_type not in allowed_event_types:
+        return HttpResponseBadRequest("Unsupported analytics event type")
+
+    review_id = payload.get("review_id")
+    review = None
+    if review_id is not None:
+        try:
+            review = Review.objects.select_related("article__journal", "author").get(pk=int(review_id))
+        except (Review.DoesNotExist, TypeError, ValueError):
+            return HttpResponseBadRequest("Invalid review")
+
+    subscriber_id = request.session.get("subscriber_id")
+    AnalyticsEvent.record_event(
+        event_type=event_type,
+        request=request,
+        content_object=review,
+        subscriber_id=subscriber_id,
+        source=payload.get("source") or "",
+        duration_ms=payload.get("duration_ms"),
+        scroll_depth=payload.get("scroll_depth"),
+        metadata=payload.get("metadata") or {},
+    )
+    return JsonResponse({"ok": True})

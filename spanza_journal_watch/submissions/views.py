@@ -1,6 +1,7 @@
 import json
 from urllib.parse import urlencode
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, JsonResponse
@@ -11,13 +12,13 @@ from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
-from spanza_journal_watch.analytics.models import PageView
+from spanza_journal_watch.analytics.models import AnalyticsEvent, PageView
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
-from .models import Author, HealthService, Issue, Review, Tag
+from .models import Article, Author, HealthService, Hit, Issue, Review, Tag
 
 
 def build_share_urls(
@@ -59,6 +60,68 @@ def build_share_urls(
 
 def build_absolute_url(path):
     return f"{get_domain_url()}{path}"
+
+
+def attach_review_display_fields(reviews, *, issue=None, include_share_context=False):
+    review_list = list(reviews)
+    if not review_list:
+        return review_list
+
+    review_ids = [review.id for review in review_list]
+    content_type = ContentType.objects.get_for_model(Review)
+
+    human_open_rows = (
+        AnalyticsEvent.objects.filter(
+            content_type=content_type,
+            object_id__in=review_ids,
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            automated=False,
+        )
+        .values("object_id")
+        .annotate(
+            distinct_sessions=Count("session_key", filter=~Q(session_key=""), distinct=True),
+            sessionless=Count("id", filter=Q(session_key="")),
+        )
+    )
+    human_hits_by_review = {
+        row["object_id"]: row["distinct_sessions"] + row["sessionless"] for row in human_open_rows if row["object_id"]
+    }
+    legacy_hits_by_review = {
+        object_id: count
+        for object_id, count in Hit.objects.filter(content_type=content_type, object_id__in=review_ids).values_list(
+            "object_id", "count"
+        )
+    }
+
+    for review in review_list:
+        review.display_review_date = issue.date if issue and issue.date else review.get_review_date()
+        review.display_hits = human_hits_by_review.get(review.id, legacy_hits_by_review.get(review.id, 0))
+
+        if include_share_context:
+            article_title = review.article.get_title().strip()
+            review_share_title = f"SPANZA Journal Watch - {article_title}"
+            review_canonical_url = build_absolute_url(review.get_absolute_url())
+            review_share_description = review.get_truncated_body().strip()
+            review_share_email_summary = review.get_plain_body().strip()
+            review_share_context = build_share_urls(
+                review_share_title,
+                review_canonical_url,
+                review_share_description,
+                journal_name=str(review.article.journal),
+                email_summary=review_share_email_summary,
+            )
+
+            review.share_title = review_share_title
+            review.canonical_url = review_canonical_url
+            review.share_description = review_share_description
+            review.share_email_summary = review_share_email_summary
+            review.share_text = review_share_context["share_text"]
+            review.bluesky_share_url = review_share_context["bluesky_share_url"]
+            review.x_share_url = review_share_context["x_share_url"]
+            review.facebook_share_url = review_share_context["facebook_share_url"]
+            review.email_share_url = review_share_context["email_share_url"]
+
+    return review_list
 
 
 class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
@@ -114,6 +177,8 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         context["share_title"] = share_title
         context["share_description"] = share_description
         context["share_email_summary"] = share_email_summary
+        self.object.display_review_date = self.object.get_review_date()
+        self.object.display_hits = self.object.get_hits()
         context["share_text"] = share_context["share_text"]
         context["share_image_url"] = (
             f"{get_domain_url()}{self.object.feature_image.url}" if self.object.feature_image else ""
@@ -186,30 +251,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         paginator = context["paginator"]
         page = context["page_obj"]
         context["articles"] = paginator.get_page(page.number)
-
-        for review in context["articles"]:
-            article_title = review.article.get_title().strip()
-            review_share_title = f"SPANZA Journal Watch - {article_title}"
-            review_canonical_url = build_absolute_url(review.get_absolute_url())
-            review_share_description = review.get_truncated_body().strip()
-            review_share_email_summary = review.get_plain_body().strip()
-            review_share_context = build_share_urls(
-                review_share_title,
-                review_canonical_url,
-                review_share_description,
-                journal_name=str(review.article.journal),
-                email_summary=review_share_email_summary,
-            )
-
-            review.share_title = review_share_title
-            review.canonical_url = review_canonical_url
-            review.share_description = review_share_description
-            review.share_email_summary = review_share_email_summary
-            review.share_text = review_share_context["share_text"]
-            review.bluesky_share_url = review_share_context["bluesky_share_url"]
-            review.x_share_url = review_share_context["x_share_url"]
-            review.facebook_share_url = review_share_context["facebook_share_url"]
-            review.email_share_url = review_share_context["email_share_url"]
+        attach_review_display_fields(context["articles"], issue=self.object, include_share_context=True)
 
         return context
 
@@ -217,7 +259,8 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         return (
             Review.objects.filter(issues=self.object, active=True)
             .order_by("-created")
-            .select_related("article__journal")
+            .select_related("article__journal", "author")
+            .prefetch_related("article__tags", "issues")
         )
 
 
@@ -240,6 +283,7 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        Issue.attach_display_images(context["issues"])
         context["issue_cols"] = self.issue_cols
         context["show_default_action_dock"] = True
         context["action_dock_aria_label"] = "Issue list quick navigation"
@@ -363,7 +407,21 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
     queryset = Tag.objects.exclude(active=False).prefetch_related(
-        "articles", "articles__reviews", "articles__journal", "articles__reviews__author", "articles__reviews__issues"
+        Prefetch(
+            "articles",
+            queryset=(
+                Article.objects.select_related("journal")
+                .prefetch_related(
+                    Prefetch(
+                        "reviews",
+                        queryset=Review.objects.filter(active=True)
+                        .select_related("author", "article__journal")
+                        .prefetch_related("article__tags", "issues")
+                        .order_by("-created"),
+                    )
+                )
+            ),
+        )
     )
 
     # Breadcrumb
@@ -400,6 +458,14 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
                 "description": context["page_meta_description"],
             }
         )
+
+        tag_reviews = []
+        for article in self.object.articles.all():
+            latest_review = next(iter(article.reviews.all()), None)
+            if latest_review is not None:
+                tag_reviews.append(latest_review)
+        attach_review_display_fields(tag_reviews)
+        context["tag_reviews"] = tag_reviews
 
         return context
 
@@ -442,7 +508,8 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
             if comma_tags:
                 selected_tags = [slug.strip() for slug in comma_tags.split(",") if slug.strip()]
 
-        context.update(self.search(query, year=selected_year, tag_slugs=selected_tags))
+        search_results = self.search(query, year=selected_year, tag_slugs=selected_tags)
+        context.update(search_results)
 
         context["query"] = query
         context["selected_year"] = selected_year
@@ -497,7 +564,46 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         override = {}
         context["page_header"] = header.collate_fields(**override) if header else override
 
+        self.record_search_event(
+            query=query,
+            selected_year=selected_year,
+            selected_tags=selected_tags,
+            result_count=search_results["result_count"],
+            is_browse_mode=search_results["is_browse_mode"],
+        )
+
         return context
+
+    def record_search_event(self, *, query, selected_year, selected_tags, result_count, is_browse_mode):
+        if not any([query, selected_year, selected_tags]):
+            return
+
+        signature = json.dumps(
+            {
+                "query": query,
+                "year": selected_year,
+                "tags": selected_tags,
+            },
+            sort_keys=True,
+        )
+        session_key = "analytics:last_search_signature"
+        if self.request.session.get(session_key) == signature:
+            return
+
+        self.request.session[session_key] = signature
+        AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.SEARCH,
+            request=self.request,
+            subscriber_id=self.request.session.get("subscriber_id"),
+            source="search_page",
+            metadata={
+                "query": query,
+                "selected_year": selected_year,
+                "selected_tags": selected_tags,
+                "result_count": result_count,
+                "is_browse_mode": is_browse_mode,
+            },
+        )
 
     def search(self, query, year="", tag_slugs=None):
         tag_slugs = tag_slugs or []
@@ -508,7 +614,7 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
             reviews = (
                 Review.objects.exclude(active=False)
                 .select_related("article__journal", "author")
-                .prefetch_related("article__tags")
+                .prefetch_related("article__tags", "issues")
                 .order_by("-created")
             )
 
@@ -518,11 +624,14 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         if tag_slugs:
             reviews = reviews.filter(article__tags__slug__in=tag_slugs).distinct()
 
+        reviews = reviews.prefetch_related("article__tags", "issues")
         result_count = reviews.count()
 
         # Keep search pages fast and readable
+        result_reviews = list(reviews[:80])
+        attach_review_display_fields(result_reviews)
         results = {
-            "result_reviews": reviews[:80],
+            "result_reviews": result_reviews,
             "result_count": result_count,
             "is_browse_mode": not bool(query),
         }
@@ -590,6 +699,7 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
         paginator = context["paginator"]
         page = context["page_obj"]
         context["reviews"] = paginator.get_page(page.number)
+        attach_review_display_fields(context["reviews"])
 
         return context
 
@@ -597,7 +707,8 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
         return (
             Review.objects.filter(author=self.object, active=True)
             .order_by("-created")
-            .select_related("article__journal")
+            .select_related("article__journal", "author")
+            .prefetch_related("article__tags", "issues")
         )
 
 

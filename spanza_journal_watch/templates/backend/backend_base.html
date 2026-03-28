@@ -230,6 +230,12 @@
               </li>
               {% endif %}
 
+              {% if perms.backend.view_newsletter_stats %}
+              <li class="nav-item">
+                <a class="nav-link{% if current == 'site_analytics' or current == 'newsletter_stats_list' or current == 'newsletter_stats_detail' %} active{% endif %}" href="{% url "backend:site_analytics" %}">Analytics</a>
+              </li>
+              {% endif %}
+
               {% endwith %}
               {% endif %}
               {% if request.user.is_staff %}

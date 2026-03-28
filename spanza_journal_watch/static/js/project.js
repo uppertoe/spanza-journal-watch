@@ -82,6 +82,10 @@ const mobileDockSlot = () => document.getElementById('mobile-action-dock-slot');
 const desktopDockSlot = () => document.getElementById('desktop-action-dock-slot');
 const mobileToolbarInner = () =>
   document.querySelector('.sticky-mobile-toolbar__inner');
+const analyticsEndpoint = '/reader/action';
+const reviewSessionThresholdMs = 5000;
+const reviewSessions = new Map();
+let reviewSessionCounter = 0;
 const getSharedReviewModalTriggers = (modalId) =>
   Array.from(
     document.querySelectorAll(
@@ -136,6 +140,250 @@ const copyTextToClipboard = async (text) => {
 const syncNativeShareButtons = (root = document) => {
   root.querySelectorAll('[data-native-share]').forEach((button) => {
     button.classList.toggle('d-none', !window.navigator.share);
+  });
+};
+
+const getCookie = (name) => {
+  const cookieValue = `; ${document.cookie}`;
+  const cookieParts = cookieValue.split(`; ${name}=`);
+  if (cookieParts.length !== 2) return '';
+  return decodeURIComponent(cookieParts.pop().split(';').shift());
+};
+
+const sendAnalyticsEvent = (payload, { beacon = false } = {}) => {
+  const body = JSON.stringify(payload);
+
+  if (beacon && navigator.sendBeacon) {
+    const blob = new Blob([body], { type: 'application/json' });
+    navigator.sendBeacon(analyticsEndpoint, blob);
+    return Promise.resolve(true);
+  }
+
+  return window
+    .fetch(analyticsEndpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body,
+      keepalive: beacon,
+    })
+    .then((response) => response.ok)
+    .catch(() => false);
+};
+
+const getReviewAnalyticsContext = (element) => {
+  const reviewRoot = element?.closest('[data-analytics-review-id]');
+  if (!reviewRoot) return null;
+
+  const reviewId = Number(reviewRoot.dataset.analyticsReviewId);
+  if (!reviewId) return null;
+
+  return {
+    element: reviewRoot,
+    reviewId,
+    source: reviewRoot.dataset.analyticsSource || '',
+  };
+};
+
+const trackReviewAnalytics = (element, eventType, extra = {}, options = {}) => {
+  const context = getReviewAnalyticsContext(element);
+  if (!context) return Promise.resolve(false);
+
+  return sendAnalyticsEvent(
+    {
+      event_type: eventType,
+      review_id: context.reviewId,
+      source: context.source,
+      ...extra,
+    },
+    options,
+  );
+};
+
+const getSearchFilterState = () => {
+  const form = document.getElementById('search-filter-form');
+  if (!form) return {};
+
+  const formData = new window.FormData(form);
+  return {
+    query: (formData.get('q') || '').toString(),
+    selected_year: (formData.get('year') || '').toString(),
+    selected_tags: formData.getAll('tag'),
+  };
+};
+
+const getReviewSessionKey = (element) => {
+  if (!element.dataset.analyticsSessionKey) {
+    reviewSessionCounter += 1;
+    element.dataset.analyticsSessionKey = `review-session-${reviewSessionCounter}`;
+  }
+  return element.dataset.analyticsSessionKey;
+};
+
+const getElementScrollDepth = (element) => {
+  const modalBody = element.closest('.modal-body');
+  if (modalBody) {
+    const scrollableHeight = modalBody.scrollHeight - modalBody.clientHeight;
+    if (scrollableHeight <= 0) return 100;
+    return Math.max(
+      0,
+      Math.min(100, Math.round((modalBody.scrollTop / scrollableHeight) * 100)),
+    );
+  }
+
+  const rect = element.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const rawDepth = ((viewportHeight - rect.top) / Math.max(rect.height, 1)) * 100;
+  return Math.max(0, Math.min(100, Math.round(rawDepth)));
+};
+
+const ensureReviewSession = (element) => {
+  const context = getReviewAnalyticsContext(element);
+  if (!context) return null;
+
+  const key = getReviewSessionKey(context.element);
+  if (!reviewSessions.has(key)) {
+    reviewSessions.set(key, {
+      key,
+      element: context.element,
+      reviewId: context.reviewId,
+      source: context.source,
+      openSent: false,
+      visibleSince: null,
+      totalVisibleMs: 0,
+      maxScrollDepth: 0,
+      engagedSent: false,
+    });
+  }
+
+  return reviewSessions.get(key);
+};
+
+const updateReviewSessionDepth = (session) => {
+  if (!session?.element?.isConnected) return;
+  session.maxScrollDepth = Math.max(
+    session.maxScrollDepth,
+    getElementScrollDepth(session.element),
+  );
+};
+
+const openReviewSession = (element, { immediate = false } = {}) => {
+  const session = ensureReviewSession(element);
+  if (!session) return;
+
+  if (!session.openSent) {
+    sendAnalyticsEvent({
+      event_type: 'review_open',
+      review_id: session.reviewId,
+      source: session.source,
+    });
+    session.openSent = true;
+  }
+
+  if (session.visibleSince === null) {
+    session.visibleSince = window.performance.now();
+  }
+
+  updateReviewSessionDepth(session);
+
+  if (immediate) {
+    updateReviewSessionDepth(session);
+  }
+};
+
+const pauseReviewSession = (element) => {
+  const session = ensureReviewSession(element);
+  if (!session || session.visibleSince === null) return;
+
+  session.totalVisibleMs += Math.max(
+    0,
+    Math.round(window.performance.now() - session.visibleSince),
+  );
+  session.visibleSince = null;
+  updateReviewSessionDepth(session);
+};
+
+const flushReviewSession = (element, { beacon = true } = {}) => {
+  const session = ensureReviewSession(element);
+  if (!session) return;
+
+  pauseReviewSession(session.element);
+
+  if (session.engagedSent || session.totalVisibleMs < reviewSessionThresholdMs) {
+    return;
+  }
+
+  sendAnalyticsEvent(
+    {
+      event_type: 'review_engaged',
+      review_id: session.reviewId,
+      source: session.source,
+      duration_ms: session.totalVisibleMs,
+      scroll_depth: session.maxScrollDepth,
+    },
+    { beacon },
+  );
+  session.engagedSent = true;
+};
+
+const registerAnalyticsReviewElements = (root = document) => {
+  root.querySelectorAll('[data-analytics-review-id]').forEach((element) => {
+    ensureReviewSession(element);
+  });
+};
+
+const reviewVisibilityObserver = new window.IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      const reviewElement = entry.target;
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
+        openReviewSession(reviewElement);
+      } else {
+        pauseReviewSession(reviewElement);
+      }
+    });
+  },
+  {
+    threshold: [0, 0.25],
+  },
+);
+
+const observeAnalyticsReviewElements = (root = document) => {
+  root.querySelectorAll('[data-analytics-review-id]').forEach((element) => {
+    ensureReviewSession(element);
+    reviewVisibilityObserver.observe(element);
+  });
+};
+
+const isReviewElementVisible = (element) => {
+  if (!element?.isConnected) return false;
+
+  const modalBody = element.closest('.modal-body');
+  if (modalBody) {
+    const bodyRect = modalBody.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    const visibleTop = Math.max(rect.top, bodyRect.top);
+    const visibleBottom = Math.min(rect.bottom, bodyRect.bottom);
+    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+    return visibleHeight / Math.max(rect.height, 1) >= 0.25;
+  }
+
+  const rect = element.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const visibleTop = Math.max(rect.top, 0);
+  const visibleBottom = Math.min(rect.bottom, viewportHeight);
+  const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+  return visibleHeight / Math.max(rect.height, 1) >= 0.25;
+};
+
+const primeVisibleReviewSessions = (root = document) => {
+  root.querySelectorAll('[data-analytics-review-id]').forEach((element) => {
+    if (isReviewElementVisible(element)) {
+      openReviewSession(element, { immediate: true });
+    }
   });
 };
 
@@ -217,6 +465,11 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
   const container = getSharedReviewModalContainer(modal);
   if (!trigger || !container) return;
 
+  const currentReviewElement = container.querySelector('[data-analytics-review-id]');
+  if (currentReviewElement) {
+    flushReviewSession(currentReviewElement);
+  }
+
   setSharedReviewModalLoading(modal, true);
 
   try {
@@ -233,6 +486,12 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
   }
 
   syncReviewModalShareControls(modal);
+  registerAnalyticsReviewElements(container);
+  observeAnalyticsReviewElements(container);
+  const nextReviewElement = container.querySelector('[data-analytics-review-id]');
+  if (nextReviewElement) {
+    openReviewSession(nextReviewElement, { immediate: true });
+  }
 };
 
 const rememberDefaultDockMarkup = () => {
@@ -420,6 +679,10 @@ window.addEventListener('popstate', () => {
 
 document.addEventListener('hidden.bs.modal', (event) => {
   const modal = event.target;
+  const currentReviewElement = modal.querySelector('[data-analytics-review-id]');
+  if (currentReviewElement) {
+    flushReviewSession(currentReviewElement);
+  }
   if (!modal.id) {
     restoreDefaultDockMarkup();
     cleanupModalArtifacts();
@@ -474,6 +737,31 @@ document.addEventListener('hidden.bs.modal', (event) => {
 rememberDefaultDockMarkup();
 updateMobileToolbarState();
 syncNativeShareButtons();
+registerAnalyticsReviewElements();
+observeAnalyticsReviewElements();
+primeVisibleReviewSessions();
+
+document.addEventListener(
+  'scroll',
+  () => {
+    reviewSessions.forEach((session) => {
+      if (session.visibleSince !== null) {
+        updateReviewSessionDepth(session);
+      }
+    });
+  },
+  { passive: true, capture: true },
+);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    reviewSessions.forEach((session) => flushReviewSession(session.element));
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  reviewSessions.forEach((session) => flushReviewSession(session.element));
+});
 
 const getIssueReviewArticles = () =>
   Array.from(document.querySelectorAll('#articles .article-post[id^="list-item-"]'));
@@ -500,6 +788,16 @@ const updateIssueReviewNavigator = () => {
   const index = getCurrentIssueReviewIndex();
   if (!reviews.length || index === -1) return;
 
+  const currentReview = reviews[index];
+  if (currentReview) {
+    openReviewSession(currentReview, { immediate: true });
+    reviews.forEach((review, reviewIndex) => {
+      if (reviewIndex !== index) {
+        pauseReviewSession(review);
+      }
+    });
+  }
+
   const prevButtons = document.querySelectorAll('[data-issue-review-nav="prev"]');
   const nextButtons = document.querySelectorAll('[data-issue-review-nav="next"]');
 
@@ -515,6 +813,51 @@ const updateIssueReviewNavigator = () => {
 };
 
 document.addEventListener('click', async (event) => {
+  const emailShareLink = event.target.closest('[data-share-email]');
+  if (emailShareLink && !emailShareLink.classList.contains('disabled')) {
+    trackReviewAnalytics(emailShareLink, 'review_share_email', {}, { beacon: true });
+    return;
+  }
+
+  const socialShareLink = event.target.closest(
+    '.share-chip--bluesky, .share-chip--x, .share-chip--facebook',
+  );
+  if (socialShareLink) {
+    let eventType = '';
+    if (socialShareLink.classList.contains('share-chip--bluesky')) {
+      eventType = 'review_share_bluesky';
+    } else if (socialShareLink.classList.contains('share-chip--x')) {
+      eventType = 'review_share_x';
+    } else if (socialShareLink.classList.contains('share-chip--facebook')) {
+      eventType = 'review_share_facebook';
+    }
+    if (eventType) {
+      trackReviewAnalytics(socialShareLink, eventType, {}, { beacon: true });
+    }
+    return;
+  }
+
+  const fullTextLink = event.target.closest('[data-analytics-full-text]');
+  if (fullTextLink) {
+    trackReviewAnalytics(fullTextLink, 'review_full_text_click', {}, { beacon: true });
+    return;
+  }
+
+  const searchResultLink = event.target.closest('[data-search-result-click]');
+  if (searchResultLink) {
+    const reviewId = Number(searchResultLink.dataset.reviewId || 0);
+    sendAnalyticsEvent(
+      {
+        event_type: 'search_result_click',
+        ...(reviewId ? { review_id: reviewId } : {}),
+        source: 'search_results',
+        metadata: getSearchFilterState(),
+      },
+      { beacon: true },
+    );
+    return;
+  }
+
   const copyButton = event.target.closest('[data-copy-share]');
   if (copyButton) {
     const shareUrl = toAbsoluteUrl(copyButton.dataset.shareUrl);
@@ -522,6 +865,7 @@ document.addEventListener('click', async (event) => {
 
     const copied = await copyTextToClipboard(shareUrl);
     if (copied) {
+      trackReviewAnalytics(copyButton, 'review_share_copy_link');
       const label = copyButton.querySelector('span');
       const originalText = label ? label.textContent : '';
       if (label) {
@@ -547,6 +891,7 @@ document.addEventListener('click', async (event) => {
         text: nativeShareButton.dataset.shareText || '',
         url: shareUrl,
       });
+      trackReviewAnalytics(nativeShareButton, 'review_share_native');
     } catch (_error) {
       // Treat cancelled share dialogs as a no-op.
     }
@@ -610,6 +955,9 @@ document.body.addEventListener('htmx:afterSettle', () => {
   updateMobileToolbarState();
   updateIssueReviewNavigator();
   syncNativeShareButtons();
+  registerAnalyticsReviewElements();
+  observeAnalyticsReviewElements();
+  primeVisibleReviewSessions();
   if (typeof scrollSpy.refresh === 'function') {
     scrollSpy.refresh();
   }
@@ -620,4 +968,7 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
   if (!modal || !event.target.matches('[data-review-modal-container]')) return;
 
   syncReviewModalShareControls(modal);
+  registerAnalyticsReviewElements(event.target);
+  observeAnalyticsReviewElements(event.target);
+  primeVisibleReviewSessions(event.target);
 });

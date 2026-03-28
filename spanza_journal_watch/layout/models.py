@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils.text import slugify
 
 from spanza_journal_watch.submissions.models import Author, Issue, Review, Tag
+from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import HTMLShortener, get_unique_slug
 from spanza_journal_watch.utils.modelmethods import name_image
@@ -129,7 +130,16 @@ class PageHeader(PageModel):
 
     @classmethod
     def get_active_for(cls, page_type):
-        return cls.objects.filter(page_type=page_type, active=True).order_by("-modified").first()
+        cache_version = get_content_cache_version()
+        cache_key = f"layout:page_header:v{cache_version}:type:{page_type}"
+        return cache.get_or_set(
+            cache_key,
+            lambda: cls.objects.select_related("feature_article")
+            .filter(page_type=page_type, active=True)
+            .order_by("-modified")
+            .first(),
+            timeout=60 * 30,
+        )
 
     def __str__(self):
         return f"{self.get_page_type_display()}: {self.feature_article}"

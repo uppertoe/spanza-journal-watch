@@ -15,6 +15,7 @@ from django.contrib.postgres.search import (
     SearchVectorField,
     TrigramSimilarity,
 )
+from django.core.cache import cache
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
@@ -26,6 +27,7 @@ from markdownx.models import MarkdownxField
 from markdownx.utils import markdownify
 
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
+from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text
 from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
@@ -306,8 +308,21 @@ class Review(TimeStampedModel):
         return self.publish_date if self.publish_date else self.issues.all()[0].date
 
     def get_hits(self):
+        from spanza_journal_watch.analytics.models import AnalyticsEvent
+
         object_id = self.id
         content_type = ContentType.objects.get_for_model(self)
+
+        human_open_events = AnalyticsEvent.objects.filter(
+            content_type=content_type,
+            object_id=object_id,
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            automated=False,
+        )
+        if human_open_events.exists():
+            distinct_session_views = human_open_events.exclude(session_key="").values("session_key").distinct().count()
+            sessionless_views = human_open_events.filter(session_key="").count()
+            return distinct_session_views + sessionless_views
 
         try:
             hit = Hit.objects.get(
@@ -399,6 +414,68 @@ class Issue(TimeStampedModel):
                 features.append(review)
         return features
 
+    @classmethod
+    def attach_display_images(cls, issues):
+        issue_list = list(issues)
+        if not issue_list:
+            return issue_list
+
+        unresolved = [issue for issue in issue_list if not issue.image]
+        if not unresolved:
+            for issue in issue_list:
+                issue.display_issue_image = issue.image
+            return issue_list
+
+        PageHeader = apps.get_model("layout", "PageHeader")
+        headers = list(
+            PageHeader.objects.filter(page_type=PageHeader.PageType.ISSUE_DETAIL, active=True)
+            .select_related("feature_article")
+            .order_by("-modified")
+        )
+
+        def match_feature_article(issue):
+            issue_slug = (issue.slug or "").strip().lower()
+            issue_name = (issue.name or "").strip().lower()
+
+            if issue_slug:
+                for header in headers:
+                    feature_slug = (header.feature_article.slug or "").strip().lower()
+                    if feature_slug == issue_slug:
+                        return header.feature_article
+                for header in headers:
+                    feature_slug = (header.feature_article.slug or "").strip().lower()
+                    if feature_slug.startswith(issue_slug):
+                        return header.feature_article
+
+            if issue_name:
+                for header in headers:
+                    feature_title = (header.feature_article.title or "").strip().lower()
+                    if feature_title == issue_name:
+                        return header.feature_article
+                for header in headers:
+                    feature_title = (header.feature_article.title or "").strip().lower()
+                    if feature_title.startswith(issue_name):
+                        return header.feature_article
+
+            if issue.date:
+                month_year = issue.date.strftime("%B %Y").lower()
+                for header in headers:
+                    feature_title = (header.feature_article.title or "").strip().lower()
+                    if month_year in feature_title:
+                        return header.feature_article
+
+            return None
+
+        for issue in issue_list:
+            if issue.image:
+                issue.display_issue_image = issue.image
+                continue
+
+            feature_article = match_feature_article(issue)
+            issue.display_issue_image = feature_article.image if feature_article and feature_article.image else None
+
+        return issue_list
+
     def get_absolute_url(self):
         return reverse("submissions:issue_detail", kwargs={"slug": self.slug})
 
@@ -407,31 +484,41 @@ class Issue(TimeStampedModel):
 
     def get_header_feature_article(self):
         PageHeader = apps.get_model("layout", "PageHeader")
-        headers = PageHeader.objects.filter(page_type=PageHeader.PageType.ISSUE_DETAIL, active=True).select_related(
-            "feature_article"
-        )
+        cache_version = get_content_cache_version()
+        issue_key = self.slug or f"pk-{self.pk}"
+        cache_key = f"issue:header_feature_article:v{cache_version}:{issue_key}"
 
-        issue_slug = (self.slug or "").strip()
-        issue_name = (self.name or "").strip()
-        header = None
+        def resolve_feature_article():
+            headers = PageHeader.objects.filter(page_type=PageHeader.PageType.ISSUE_DETAIL, active=True).select_related(
+                "feature_article"
+            )
 
-        if issue_slug:
-            header = headers.filter(feature_article__slug__iexact=issue_slug).order_by("-modified").first()
-            if not header:
-                header = headers.filter(feature_article__slug__istartswith=issue_slug).order_by("-modified").first()
+            issue_slug = (self.slug or "").strip()
+            issue_name = (self.name or "").strip()
+            header = None
 
-        if not header and issue_name:
-            header = headers.filter(feature_article__title__iexact=issue_name).order_by("-modified").first()
-            if not header:
-                header = headers.filter(feature_article__title__istartswith=issue_name).order_by("-modified").first()
+            if issue_slug:
+                header = headers.filter(feature_article__slug__iexact=issue_slug).order_by("-modified").first()
+                if not header:
+                    header = headers.filter(feature_article__slug__istartswith=issue_slug).order_by("-modified").first()
 
-        if not header and self.date:
-            month_year = self.date.strftime("%B %Y")
-            header = headers.filter(feature_article__title__icontains=month_year).order_by("-modified").first()
+            if not header and issue_name:
+                header = headers.filter(feature_article__title__iexact=issue_name).order_by("-modified").first()
+                if not header:
+                    header = headers.filter(feature_article__title__istartswith=issue_name).order_by("-modified").first()
 
-        return header.feature_article if header else None
+            if not header and self.date:
+                month_year = self.date.strftime("%B %Y")
+                header = headers.filter(feature_article__title__icontains=month_year).order_by("-modified").first()
+
+            return header.feature_article if header else None
+
+        return cache.get_or_set(cache_key, resolve_feature_article, timeout=60 * 30)
 
     def get_issue_image(self):
+        cached_image = getattr(self, "display_issue_image", None)
+        if cached_image is not None:
+            return cached_image
         if self.image:
             return self.image
         feature_article = self.get_header_feature_article()

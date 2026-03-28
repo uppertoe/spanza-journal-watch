@@ -1,13 +1,15 @@
-<h5 class="card-title">{{ review.article.get_title|capfirst }}</h5>
-{% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
-<hr>
-<p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal }}</a>
-<p class="card-subtitle text-muted mb-3">Submitted {{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
-<p class="mb-1 fw-lighter">Read by {{ review.get_hits }} Journal Watch subscribers</p>
-<p class="mb-1">{{ review.article.citation }}</p>
-<a href="{{ review.article.url }}" class="my-2 icon-link gap-1 icon-link-hover text-decoration-none" target="_blank" rel="noopener noreferrer">View full text article<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
-<div class="my-3">
-  {% include 'fragments/share_actions.html' with show_social_links=True %}
+<div data-analytics-review-id="{{ review.pk }}" data-analytics-source="review_modal">
+  <h5 class="card-title">{{ review.article.get_title|capfirst }}</h5>
+  {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
+  <hr>
+  <p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal }}</a>
+  <p class="card-subtitle text-muted mb-3">Submitted {{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+  <p class="mb-1 fw-lighter">Read by {{ review.display_hits }} Journal Watch subscribers</p>
+  <p class="mb-1">{{ review.article.citation }}</p>
+  <a href="{{ review.article.url }}" class="my-2 icon-link gap-1 icon-link-hover text-decoration-none" target="_blank" rel="noopener noreferrer" data-analytics-full-text>View full text article<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
+  <div class="my-3">
+    {% include 'fragments/share_actions.html' with show_social_links=True %}
+  </div>
+  {% include 'fragments/review_tags_inline.html' %}
+  {{ review.get_markdown_body|safe }}
 </div>
-{% include 'fragments/review_tags_inline.html' %}
-{{ review.get_markdown_body|safe }}

@@ -9,7 +9,7 @@
                     role="link"
                     data-card-href="{{ issue.get_absolute_url }}"
                     aria-label="Open issue {{ issue.name }}">
-                    {% with issue_image=issue.get_issue_image %}
+                    {% with issue_image=issue.display_issue_image %}
                     {% if issue_image %}
                     <img
                       src="{{ issue_image|image_variant_url:480 }}"

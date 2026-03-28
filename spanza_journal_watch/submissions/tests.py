@@ -1,9 +1,11 @@
 import datetime
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
+from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.layout.models import FeatureArticle, PageHeader
 
 from .models import Article, Author, Comment, Hit, Issue, Journal, Review, Tag
@@ -205,3 +207,49 @@ class HitTestCase(TestCase):
 
     def test_get_count(self):
         self.assertEqual(Hit.get_count(self.article), self.hit.count)
+
+
+class ReviewHumanHitsTestCase(TestCase):
+    def setUp(self):
+        self.journal = Journal.objects.create(name="Test Journal")
+        self.author = Author.objects.create(name="Test Author")
+        self.article = Article.objects.create(name="Test Article", journal=self.journal)
+        self.review = Review.objects.create(article=self.article, author=self.author, body="Review body", active=True)
+
+    def test_get_hits_prefers_distinct_human_review_open_events(self):
+        content_type = ContentType.objects.get_for_model(self.review)
+        AnalyticsEvent.objects.create(
+            content_type=content_type,
+            object_id=self.review.id,
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            session_key="session-a",
+            automated=False,
+        )
+        AnalyticsEvent.objects.create(
+            content_type=content_type,
+            object_id=self.review.id,
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            session_key="session-a",
+            automated=False,
+        )
+        AnalyticsEvent.objects.create(
+            content_type=content_type,
+            object_id=self.review.id,
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            session_key="session-b",
+            automated=False,
+        )
+        AnalyticsEvent.objects.create(
+            content_type=content_type,
+            object_id=self.review.id,
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            session_key="scanner",
+            automated=True,
+        )
+
+        self.assertEqual(self.review.get_hits(), 2)
+
+    def test_get_hits_falls_back_to_legacy_hit_counter(self):
+        Hit.objects.create(content_object=self.review, count=7)
+
+        self.assertEqual(self.review.get_hits(), 7)

@@ -21,3 +21,12 @@ class PageViewAdmin(admin.ModelAdmin):
     list_filter = ("automated", "content_type")
 
     empty_value_display = "-anonymous-"
+
+
+@admin.register(models.AnalyticsEvent)
+class AnalyticsEventAdmin(admin.ModelAdmin):
+    list_display = ("event_type", "content_object", "source", "automated", "timestamp")
+    list_filter = ("event_type", "automated", "source")
+    search_fields = ("user_agent", "session_key")
+
+    empty_value_display = "-anonymous-"

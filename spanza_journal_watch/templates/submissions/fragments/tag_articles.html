@@ -2,8 +2,8 @@
 {% cache 1800 "tag_detail_articles" content_cache_version request.get_full_path %}
 <div id="articles">
     <div class="row row-cols-{{ article_cols }} g-3 py-2">
-        {% for article in tag.articles.all %}
-        {% with article.reviews.last as review %}
+        {% for review in tag_reviews %}
+        {% with article=review.article %}
         <div class="col">
             <div class="card shadow-sm h-100 js-review-card-modal"
                 tabindex="0"
@@ -24,7 +24,7 @@
                     {% if article.get_subtitle %}<p class="card-subtitle mb-1">{{ article.get_subtitle|capfirst }}</p>{% endif %}
                     <div class="mb-2"></div>
                     <p class="card-subtitle text-muted mb-1 fst-italic">{{ article.journal }}</a>
-                    <p class="card-subtitle text-muted mb-1">Reviewed {{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+                    <p class="card-subtitle text-muted mb-1">Reviewed {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
                     <div class="mb-2"></div>
                     <p class="card-text">{{ review.get_truncated_body|safe }}</p>
                     {% include 'fragments/review_tags_inline.html' %}

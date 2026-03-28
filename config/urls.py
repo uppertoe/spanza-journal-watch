@@ -7,6 +7,7 @@ from django.views import defaults as default_views
 from django.views.generic.base import TemplateView
 from markdownx import urls as markdownx
 
+from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import views as backend_views
 from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
 from spanza_journal_watch.layout.views import HomepageView
@@ -36,6 +37,7 @@ urlpatterns = [
     path("", include("spanza_journal_watch.submissions.urls")),
     path("", include("spanza_journal_watch.layout.urls")),
     path("newsletter/", include("spanza_journal_watch.newsletter.urls")),
+    path("reader/action", analytics_views.track_event, name="reader_action"),
     path("analytics/", include("spanza_journal_watch.analytics.urls")),
     path("editorial/", include("spanza_journal_watch.backend.urls")),
     path("invites/issue/<str:token>/", backend_views.issue_invite_accept, name="issue_invite_accept"),

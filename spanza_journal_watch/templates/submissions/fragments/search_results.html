@@ -15,18 +15,18 @@
 
     {% for review in result_reviews %}
         <div class="mb-4 pb-3 border-bottom">
-            <a href="{{ review.get_absolute_url }}" class="text-decoration-none mb-0">
+            <a href="{{ review.get_absolute_url }}" class="text-decoration-none mb-0" data-search-result-click data-review-id="{{ review.pk }}">
                 <h3 class="mb-0">{{ review.article.get_title|capfirst }}</h3>
                 <h5 class="text-muted">{{ review.article.get_subtitle|capfirst }}</h5>
             </a>
 
             <p class="mb-0 fst-italic">{{ review.article.journal }}</p>
             <p class="mb-2">
-                <a href="{% url "submissions:search" %}?year={{ review.get_review_date|date:'Y' }}"
-                   hx-get="{% url "submissions:search" %}?year={{ review.get_review_date|date:'Y' }}"
+                <a href="{% url "submissions:search" %}?year={{ review.display_review_date|date:'Y' }}"
+                   hx-get="{% url "submissions:search" %}?year={{ review.display_review_date|date:'Y' }}"
                    hx-target="#search-results"
                    hx-push-url="true"
-                   class="text-decoration-none">{{ review.get_review_date|date:"F Y" }}</a>
+                   class="text-decoration-none">{{ review.display_review_date|date:"F Y" }}</a>
                 by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a>
             </p>
 

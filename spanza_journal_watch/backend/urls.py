@@ -161,6 +161,7 @@ urlpatterns = [
     path("newsletter/send/confirm/<str:send_token>", views.send_final_newsletter, name="send_final_newsletter"),
     path("newsletter/stats", views.newsletter_stats_list, name="newsletter_stats_list"),
     path("newsletter/stats/<int:pk>", views.newsletter_stats_detail, name="newsletter_stats_detail"),
+    path("analytics", views.site_analytics, name="site_analytics"),
     path("settings/run/planka-oidc", views.planka_run_setup_oidc, name="planka_run_setup_oidc"),
     path("settings/run/planka-api-key", views.planka_run_setup_api_key, name="planka_run_setup_api_key"),
     path(

@@ -92,6 +92,7 @@ class SidebarMixin:
             ),
             timeout=60 * 30,
         )
+        Issue.attach_display_images(context["sidebar_issues"])
         return context
 
 

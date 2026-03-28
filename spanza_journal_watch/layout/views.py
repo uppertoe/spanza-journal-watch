@@ -8,6 +8,7 @@ from django.views.generic import DetailView, ListView
 
 from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Review
+from spanza_journal_watch.submissions.views import attach_review_display_fields
 from spanza_journal_watch.utils.functions import get_domain_url
 from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
 
@@ -43,7 +44,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
                 "article__journal",
                 "author",
             )
-            .prefetch_related("issues")
+            .prefetch_related("issues", "article__tags")
             .order_by("-created")
         )
         return queryset
@@ -54,6 +55,8 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         domain = get_domain_url()
 
         context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]
+        attach_review_display_fields(context["card_features"])
+        attach_review_display_fields(context["reviews"])
         context["article_cols"] = self.article_cols
         context["feature_text_styles"] = self.feature_text_styles
         context["page_title"] = "SPANZA Journal Watch"
