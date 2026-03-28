@@ -62,7 +62,13 @@ def build_absolute_url(path):
     return f"{get_domain_url()}{path}"
 
 
-def attach_review_display_fields(reviews, *, issue=None, include_share_context=False):
+def build_request_absolute_url(request, path):
+    if request is None:
+        return build_absolute_url(path)
+    return request.build_absolute_uri(path)
+
+
+def attach_review_display_fields(reviews, *, issue=None, include_share_context=False, request=None):
     review_list = list(reviews)
     if not review_list:
         return review_list
@@ -100,7 +106,7 @@ def attach_review_display_fields(reviews, *, issue=None, include_share_context=F
         if include_share_context:
             article_title = review.article.get_title().strip()
             review_share_title = f"SPANZA Journal Watch - {article_title}"
-            review_canonical_url = build_absolute_url(review.get_absolute_url())
+            review_canonical_url = build_request_absolute_url(request, review.get_absolute_url())
             review_share_description = review.get_truncated_body().strip()
             review_share_email_summary = review.get_plain_body().strip()
             review_share_context = build_share_urls(
@@ -141,7 +147,7 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        canonical_url = build_absolute_url(self.object.get_absolute_url())
+        canonical_url = build_request_absolute_url(self.request, self.object.get_absolute_url())
 
         article_title = self.object.article.get_title().strip()
         share_title = f"SPANZA Journal Watch - {article_title}"
@@ -181,7 +187,7 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         self.object.display_hits = self.object.get_hits()
         context["share_text"] = share_context["share_text"]
         context["share_image_url"] = (
-            f"{get_domain_url()}{self.object.feature_image.url}" if self.object.feature_image else ""
+            self.request.build_absolute_uri(self.object.feature_image.url) if self.object.feature_image else ""
         )
         context["bluesky_share_url"] = share_context["bluesky_share_url"]
         context["x_share_url"] = share_context["x_share_url"]
@@ -234,7 +240,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
                 "name": self.object.name,
-                "url": build_absolute_url(self.object.get_absolute_url()),
+                "url": build_request_absolute_url(self.request, self.object.get_absolute_url()),
                 "description": context["page_meta_description"],
             }
         )
@@ -251,7 +257,12 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         paginator = context["paginator"]
         page = context["page_obj"]
         context["articles"] = paginator.get_page(page.number)
-        attach_review_display_fields(context["articles"], issue=self.object, include_share_context=True)
+        attach_review_display_fields(
+            context["articles"],
+            issue=self.object,
+            include_share_context=True,
+            request=self.request,
+        )
 
         return context
 
@@ -297,7 +308,7 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
                 "name": "Issues",
-                "url": build_absolute_url(reverse("submissions:issue_list")),
+                "url": build_request_absolute_url(self.request, reverse("submissions:issue_list")),
                 "description": context["page_meta_description"],
             }
         )
@@ -358,7 +369,7 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         context["filter_querystring"] = query_params.urlencode()
         context["page_title"] = "Tags | SPANZA Journal Watch"
         context["page_meta_description"] = "Browse topics and themes used across SPANZA Journal Watch reviews."
-        context["canonical_url"] = build_absolute_url(reverse("submissions:tag_list"))
+        context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:tag_list"))
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
@@ -448,7 +459,7 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
         context["article_cols"] = self.article_cols
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
         context["page_meta_description"] = f"Browse Journal Watch reviews tagged {self.object}."
-        context["canonical_url"] = build_absolute_url(self.object.get_absolute_url())
+        context["canonical_url"] = build_request_absolute_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
@@ -516,7 +527,7 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         context["selected_tags"] = selected_tags
         context["page_title"] = "Search | SPANZA Journal Watch"
         context["page_meta_description"] = "Search SPANZA Journal Watch reviews by title, author, journal, year, and topic."
-        context["canonical_url"] = build_absolute_url(reverse("submissions:search"))
+        context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:search"))
         context["meta_robots"] = "noindex,follow"
         context["structured_data"] = json.dumps(
             {
@@ -682,7 +693,7 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
         context["action_dock_aria_label"] = "Author page navigation"
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
         context["page_meta_description"] = f"Reviews contributed to SPANZA Journal Watch by {self.object}."
-        context["canonical_url"] = build_absolute_url(self.object.get_absolute_url())
+        context["canonical_url"] = build_request_absolute_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
