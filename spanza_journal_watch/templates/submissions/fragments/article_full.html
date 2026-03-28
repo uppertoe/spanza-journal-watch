@@ -1,6 +1,6 @@
 {% load cache %}
 {% cache 1800 "issue_detail_articles" content_cache_version request.get_full_path %}
-<div id="articles" data-bs-spy="scroll" data-bs-target="#list-reviews"  tabindex="0">
+<div id="articles" class="scrollspy-focus-target" data-bs-spy="scroll" data-bs-target="#list-reviews" tabindex="0">
     {% for review in articles %}
     <article class="article-post" id="list-item-{{ review.slug }}">
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>

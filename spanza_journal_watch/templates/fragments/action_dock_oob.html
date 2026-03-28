@@ -1,0 +1,10 @@
+<div id="mobile-action-dock-slot" hx-swap-oob="innerHTML">
+{% if show_default_action_dock and page_obj.paginator.num_pages > 1 %}
+{% include "fragments/sticky_pager_actions.html" with aria_label=action_dock_aria_label %}
+{% endif %}
+</div>
+<div id="desktop-action-dock-slot" hx-swap-oob="innerHTML">
+{% if show_default_action_dock and page_obj.paginator.num_pages > 1 %}
+{% include "fragments/sticky_pager_actions.html" with aria_label=action_dock_aria_label %}
+{% endif %}
+</div>

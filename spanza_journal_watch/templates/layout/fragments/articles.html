@@ -26,13 +26,13 @@
                                     type="button"
                                     class="btn btn-sm btn-outline-secondary js-review-modal-trigger"
                                     data-bs-toggle="modal"
-                                    data-bs-target="#{% if shared_review_modal %}home-review-modal{% else %}modal-{{ review.slug }}{% endif %}"
+                                    data-bs-target="#{% if shared_review_modal %}{{ shared_review_modal }}{% else %}modal-{{ review.slug }}{% endif %}"
                                     data-review-modal-url="{{ review.get_absolute_url }}"
                                     data-review-modal-slug="{{ review.slug }}"
-                                    {% if shared_review_modal %}data-review-modal-shell="home"{% endif %}
+                                    {% if shared_review_modal %}data-review-modal-shell="{{ shared_review_modal }}"{% endif %}
                                     hx-get="{{ review.get_absolute_url }}"
-                                    hx-indicator="#{% if shared_review_modal %}home-review-modal-indicator{% else %}indicator-{{ review.slug }}{% endif %}"
-                                    hx-target="#{% if shared_review_modal %}home-review-modal-container{% else %}container-{{ review.slug }}{% endif %}"
+                                    hx-indicator="#{% if shared_review_modal %}{{ shared_review_modal }}-indicator{% else %}indicator-{{ review.slug }}{% endif %}"
+                                    hx-target="#{% if shared_review_modal %}{{ shared_review_modal }}-container{% else %}container-{{ review.slug }}{% endif %}"
                                     >Review</a>
                                     {% if review.article.url %}<a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">View full text article</a>{% endif %}
                                 </div>

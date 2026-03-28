@@ -10,7 +10,7 @@
       <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="next">Next</button>
     {% else %}
       {% if page_obj.has_previous %}
-        <a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}#articles">Previous</a>
+        <a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block" hx-push-url="true">Previous</a>
       {% else %}
         <button class="btn btn-outline-secondary" type="button" disabled>Previous</button>
       {% endif %}
@@ -22,7 +22,7 @@
       {% endif %}
 
       {% if page_obj.has_next %}
-        <a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}#articles">Next</a>
+        <a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block" hx-push-url="true">Next</a>
       {% else %}
         <button class="btn btn-outline-secondary" type="button" disabled>Next</button>
       {% endif %}

@@ -109,6 +109,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         "submissions/fragments/article_full.html",
         "submissions/fragments/issue_pagination.html",
         "submissions/fragments/contents_list_group.html",
+        "submissions/fragments/issue_detail_action_dock_oob.html",
     ]
 
     # Frontend options
@@ -183,7 +184,11 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     queryset = Issue.objects.exclude(active=False).order_by("-date")
 
     # HTMX
-    htmx_templates = ["submissions/fragments/issues.html", "submissions/fragments/issue_list_pagination.html"]
+    htmx_templates = [
+        "submissions/fragments/issues.html",
+        "submissions/fragments/issue_list_pagination.html",
+        "fragments/action_dock_oob.html",
+    ]
 
     # Frontend options
     paginate_by = 5
@@ -192,6 +197,8 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["issue_cols"] = self.issue_cols
+        context["show_default_action_dock"] = True
+        context["action_dock_aria_label"] = "Issue list quick navigation"
         context["page_title"] = "Issues | SPANZA Journal Watch"
         context["page_meta_description"] = (
             "Browse previous SPANZA Journal Watch issues and collections of paediatric anaesthesia literature reviews."
@@ -495,7 +502,11 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
     template_name = "submissions/author_detail.html"
 
     # HTMX
-    htmx_templates = ["layout/fragments/articles.html", "fragments/pagination.html"]
+    htmx_templates = [
+        "layout/fragments/articles.html",
+        "fragments/pagination.html",
+        "fragments/action_dock_oob.html",
+    ]
 
     # Frontend options
     paginate_by = 8
@@ -514,6 +525,8 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["article_cols"] = self.article_cols
+        context["show_default_action_dock"] = False
+        context["action_dock_aria_label"] = "Author page navigation"
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
         context["page_meta_description"] = f"Reviews contributed to SPANZA Journal Watch by {self.object}."
         context["canonical_url"] = build_absolute_url(self.object.get_absolute_url())

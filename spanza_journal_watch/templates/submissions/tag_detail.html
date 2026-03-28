@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block main-feature %}
 {% if page_header %}
@@ -21,7 +22,7 @@
 {% block article-block %}
 <div id="article-block">
     {% block articles %}
-    {% include "submissions/fragments/tag_articles.html" %}
+    {% include "submissions/fragments/tag_articles.html" with shared_review_modal="tag-review-modal" %}
     {% endblock articles %}
 
     {% block pagination %}
@@ -33,13 +34,38 @@
 {% endblock article-block %}
 
 {% block mobile_action_dock %}
-{% if page_obj.paginator.num_pages > 1 %}
-{% include "fragments/sticky_pager_actions.html" with aria_label="Tag page navigation" %}
-{% endif %}
 {% endblock mobile_action_dock %}
 
 {% block desktop_action_dock %}
-{% if page_obj.paginator.num_pages > 1 %}
-{% include "fragments/sticky_pager_actions.html" with aria_label="Tag page navigation" %}
-{% endif %}
 {% endblock desktop_action_dock %}
+
+{% block modal %}
+<div class="modal fade pb-5" id="tag-review-modal" tabindex="-1" aria-labelledby="tag-review-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="tag-review-modal-label">Journal Watch - Review</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-center">
+                    <img src="{% static "images/spinners/3-dots-move.svg" %}" id="tag-review-modal-indicator" class="htmx-indicator">
+                </div>
+                <div class="container p-2 px-md-5" id="tag-review-modal-container" data-shared-review-modal-container></div>
+            </div>
+            <div class="modal-footer sticky-modal-footer">
+                <div class="sticky-modal-footer__inner">
+                    <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
+                        <a rel="bookmark" href="#" data-shared-review-modal-permalink class="icon-link gap-1 icon-link-hover text-decoration-none d-none">Permalink<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template data-review-modal-dock-template="tag-review-modal">
+    {% include "fragments/sticky_pager_actions.html" with is_modal_navigation=True modal_id="tag-review-modal" aria_label="Review modal navigation" %}
+</template>
+{% endblock modal %}

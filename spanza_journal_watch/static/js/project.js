@@ -76,25 +76,26 @@ let closingModalFromPopStateId = null;
 let pendingModalTargetId = null;
 let mobileDockDefaultMarkup = null;
 let desktopDockDefaultMarkup = null;
-let currentHomeModalIndex = -1;
+const sharedReviewModalIndices = new Map();
 
 const mobileDockSlot = () => document.getElementById('mobile-action-dock-slot');
 const desktopDockSlot = () => document.getElementById('desktop-action-dock-slot');
-const homeReviewModal = () => document.getElementById('home-review-modal');
-const homeReviewModalContainer = () =>
-  document.getElementById('home-review-modal-container');
-const homeReviewModalPermalink = () =>
-  document.getElementById('home-review-modal-permalink');
-
-const getHomeReviewModalTriggers = () =>
+const mobileToolbarInner = () =>
+  document.querySelector('.sticky-mobile-toolbar__inner');
+const getSharedReviewModalTriggers = (modalId) =>
   Array.from(
     document.querySelectorAll(
-      '[data-review-modal-shell="home"][data-review-modal-url]',
+      `[data-bs-target="#${modalId}"][data-review-modal-url]`,
     ),
   );
 
-const setHomeReviewModalLoading = (isLoading) => {
-  const modal = homeReviewModal();
+const getSharedReviewModalContainer = (modal) =>
+  modal?.querySelector('[data-shared-review-modal-container]');
+
+const getSharedReviewModalPermalink = (modal) =>
+  modal?.querySelector('[data-shared-review-modal-permalink]');
+
+const setSharedReviewModalLoading = (modal, isLoading) => {
   if (!modal) return;
 
   const controls = modal.querySelectorAll(
@@ -105,11 +106,11 @@ const setHomeReviewModalLoading = (isLoading) => {
   });
 };
 
-const loadHomeReviewModalContent = async (trigger) => {
-  const container = homeReviewModalContainer();
+const loadSharedReviewModalContent = async (modal, trigger) => {
+  const container = getSharedReviewModalContainer(modal);
   if (!trigger || !container) return;
 
-  setHomeReviewModalLoading(true);
+  setSharedReviewModalLoading(modal, true);
 
   try {
     const response = await window.fetch(trigger.href, {
@@ -121,10 +122,10 @@ const loadHomeReviewModalContent = async (trigger) => {
     const html = await response.text();
     container.innerHTML = html;
   } finally {
-    setHomeReviewModalLoading(false);
+    setSharedReviewModalLoading(modal, false);
   }
 
-  const permalink = homeReviewModalPermalink();
+  const permalink = getSharedReviewModalPermalink(modal);
   if (permalink) {
     permalink.href = trigger.href;
     permalink.classList.remove('d-none');
@@ -144,6 +145,14 @@ const rememberDefaultDockMarkup = () => {
   }
 };
 
+const snapshotCurrentDockMarkup = () => {
+  const mobileSlot = mobileDockSlot();
+  const desktopSlot = desktopDockSlot();
+
+  mobileDockDefaultMarkup = mobileSlot ? mobileSlot.innerHTML : null;
+  desktopDockDefaultMarkup = desktopSlot ? desktopSlot.innerHTML : null;
+};
+
 const restoreDefaultDockMarkup = () => {
   const mobileSlot = mobileDockSlot();
   const desktopSlot = desktopDockSlot();
@@ -155,6 +164,8 @@ const restoreDefaultDockMarkup = () => {
   if (desktopSlot && desktopDockDefaultMarkup !== null) {
     desktopSlot.innerHTML = desktopDockDefaultMarkup;
   }
+
+  updateMobileToolbarState();
 };
 
 const syncModalDockMarkup = (modal) => {
@@ -174,6 +185,20 @@ const syncModalDockMarkup = (modal) => {
   if (desktopSlot) {
     desktopSlot.innerHTML = markup;
   }
+
+  updateMobileToolbarState();
+};
+
+const updateMobileToolbarState = () => {
+  const mobileSlot = mobileDockSlot();
+  const mobileInner = mobileToolbarInner();
+  if (!mobileSlot || !mobileInner) return;
+
+  const hasVisibleActions = mobileSlot.children.length > 0;
+  mobileInner.classList.toggle(
+    'sticky-mobile-toolbar__inner--theme-only',
+    !hasVisibleActions,
+  );
 };
 
 const getReviewModalIds = () =>
@@ -182,9 +207,9 @@ const getReviewModalIds = () =>
   );
 
 const updateReviewModalNavigator = (modal) => {
-  if (modal.id === 'home-review-modal') {
-    const triggers = getHomeReviewModalTriggers();
-    const index = currentHomeModalIndex;
+  const sharedTriggers = getSharedReviewModalTriggers(modal.id);
+  if (sharedTriggers.length) {
+    const index = sharedReviewModalIndices.get(modal.id) ?? -1;
     if (index === -1) return;
 
     const prevButtons = document.querySelectorAll(
@@ -202,13 +227,13 @@ const updateReviewModalNavigator = (modal) => {
     });
 
     nextButtons.forEach((nextButton) => {
-      nextButton.disabled = index >= triggers.length - 1;
+      nextButton.disabled = index >= sharedTriggers.length - 1;
       nextButton.dataset.targetIndex = String(index + 1);
       nextButton.dataset.currentModalId = modal.id;
     });
 
     positions.forEach((position) => {
-      position.textContent = `Review ${index + 1} of ${triggers.length}`;
+      position.textContent = `Review ${index + 1} of ${sharedTriggers.length}`;
     });
 
     return;
@@ -257,11 +282,11 @@ document.addEventListener('show.bs.modal', async (event) => {
   const modal = event.target;
   if (!modal.id || closingModalFromPopStateId) return;
 
-  if (modal.id === 'home-review-modal') {
+  if (getSharedReviewModalTriggers(modal.id).length) {
     const trigger = event.relatedTarget;
-    const triggers = getHomeReviewModalTriggers();
-    currentHomeModalIndex = trigger ? triggers.indexOf(trigger) : -1;
-    await loadHomeReviewModalContent(trigger);
+    const triggers = getSharedReviewModalTriggers(modal.id);
+    sharedReviewModalIndices.set(modal.id, trigger ? triggers.indexOf(trigger) : -1);
+    await loadSharedReviewModalContent(modal, trigger);
   }
 
   rememberDefaultDockMarkup();
@@ -298,9 +323,7 @@ document.addEventListener('hidden.bs.modal', (event) => {
 
   if (closingModalFromPopStateId && closingModalFromPopStateId === modal.id) {
     closingModalFromPopStateId = null;
-    if (modal.id === 'home-review-modal') {
-      currentHomeModalIndex = -1;
-    }
+    sharedReviewModalIndices.delete(modal.id);
     restoreDefaultDockMarkup();
     cleanupModalArtifacts();
     return;
@@ -330,14 +353,14 @@ document.addEventListener('hidden.bs.modal', (event) => {
     window.history.back();
   }
 
-  if (modal.id === 'home-review-modal') {
-    currentHomeModalIndex = -1;
-    const permalink = homeReviewModalPermalink();
+  if (getSharedReviewModalTriggers(modal.id).length) {
+    sharedReviewModalIndices.delete(modal.id);
+    const permalink = getSharedReviewModalPermalink(modal);
     if (permalink) {
       permalink.href = '#';
       permalink.classList.add('d-none');
     }
-    const container = homeReviewModalContainer();
+    const container = getSharedReviewModalContainer(modal);
     if (container) {
       container.innerHTML = '';
     }
@@ -348,6 +371,7 @@ document.addEventListener('hidden.bs.modal', (event) => {
 });
 
 rememberDefaultDockMarkup();
+updateMobileToolbarState();
 
 const getIssueReviewArticles = () =>
   Array.from(document.querySelectorAll('#articles .article-post[id^="list-item-"]'));
@@ -407,15 +431,15 @@ document.addEventListener('click', async (event) => {
   const currentModalId = button.dataset.currentModalId;
   if (!currentModalId) return;
 
-  if (currentModalId === 'home-review-modal') {
+  if (getSharedReviewModalTriggers(currentModalId).length) {
     const targetIndex = Number(button.dataset.targetIndex);
-    const triggers = getHomeReviewModalTriggers();
+    const triggers = getSharedReviewModalTriggers(currentModalId);
     const targetTrigger = triggers[targetIndex];
-    const modal = homeReviewModal();
+    const modal = document.getElementById(currentModalId);
     if (!targetTrigger || !modal) return;
 
-    currentHomeModalIndex = targetIndex;
-    await loadHomeReviewModalContent(targetTrigger);
+    sharedReviewModalIndices.set(currentModalId, targetIndex);
+    await loadSharedReviewModalContent(modal, targetTrigger);
     syncModalDockMarkup(modal);
     updateReviewModalNavigator(modal);
     return;
@@ -437,3 +461,15 @@ document.addEventListener('click', async (event) => {
 
 window.addEventListener('scroll', updateIssueReviewNavigator, { passive: true });
 window.addEventListener('load', updateIssueReviewNavigator);
+
+document.body.addEventListener('htmx:afterSettle', () => {
+  if (!document.querySelector('.modal.show')) {
+    snapshotCurrentDockMarkup();
+  }
+
+  updateMobileToolbarState();
+  updateIssueReviewNavigator();
+  if (typeof scrollSpy.refresh === 'function') {
+    scrollSpy.refresh();
+  }
+});

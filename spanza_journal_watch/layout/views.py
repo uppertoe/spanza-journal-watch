@@ -20,7 +20,11 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     context_object_name = "reviews"
 
     # HTMX
-    htmx_templates = ["layout/fragments/articles.html", "layout/fragments/home_pagination.html"]
+    htmx_templates = [
+        "layout/fragments/articles.html",
+        "layout/fragments/home_pagination.html",
+        "fragments/action_dock_oob.html",
+    ]
 
     # Layout variables
     number_of_card_features = 2
@@ -53,6 +57,8 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         context["article_cols"] = self.article_cols
         context["feature_text_styles"] = self.feature_text_styles
         context["page_title"] = "SPANZA Journal Watch"
+        context["show_default_action_dock"] = False
+        context["action_dock_aria_label"] = "Homepage quick navigation"
         context["page_meta_description"] = (
             "Review highlights from the paediatric anaesthesia literature curated by the SPANZA Journal Watch community."
         )
