@@ -9,8 +9,11 @@
         </div>
         <h1>Unsubscribe from Journal Watch?</h1>
 
-        <p>Follow the link below to unsubscribe {{ email }} from the Journal Watch newsletter:</p>
-        <p><a href="{% url "newsletter:confirm-unsubscribe" unsubscribe_token=unsubscribe_token %}" class="text-decoration-none">Unsubscribe here</a></p>
+        <p>Confirm that you want to unsubscribe {{ email }} from the Journal Watch newsletter.</p>
+        <form method="post" action="{% url "newsletter:confirm-unsubscribe" unsubscribe_token=unsubscribe_token %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-warning">Unsubscribe</button>
+        </form>
     </div>
 </div>
 {% endblock content %}

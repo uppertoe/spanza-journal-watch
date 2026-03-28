@@ -7,7 +7,10 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.urls import resolve
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen, PageView
-from spanza_journal_watch.analytics.utils import is_probable_automated_event
+from spanza_journal_watch.analytics.utils import (
+    is_probable_automated_event,
+    is_probable_automated_newsletter_event,
+)
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Review
 
@@ -67,7 +70,7 @@ def track_email_open(request):
             subscriber=subscriber,
             newsletter=newsletter,
             user_agent=request.headers.get("user-agent", ""),
-            automated=is_probable_automated_event(request),
+            automated=is_probable_automated_newsletter_event(request, newsletter),
         )
         tracker.save()
 
@@ -93,7 +96,7 @@ def track_newsletter_link(request, newsletter_token):
             subscriber=subscriber,
             newsletter=newsletter,
             user_agent=request.headers.get("user-agent", ""),
-            automated=is_probable_automated_event(request),
+            automated=is_probable_automated_newsletter_event(request, newsletter),
         )
         tracker.save()
 

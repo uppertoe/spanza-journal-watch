@@ -287,6 +287,21 @@ The configuration set is named `TrackingConfigSet` in `settings/production.py`.
 3. Leave all other settings as defaults for now — you will add an SNS
    destination in the next step.
 
+### 3e. Add DMARC and BIMI DNS records
+
+Once SES domain verification and DKIM are passing, complete the mailbox-branding
+setup by adding DMARC and BIMI records in DNS.
+
+- DMARC is required by Gmail for bulk senders.
+- BIMI enables supported inboxes to show the Journal Watch logo next to your mail.
+
+The full record values, asset path, and verification checklist are documented in
+[production-deploy.md](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/docs/operations/production-deploy.md)
+under:
+
+- `Step 3b — Email authentication DNS records`
+- `BIMI (brand logo in inbox)`
+
 ---
 
 ## Step 4 — SNS for bounce and complaint tracking

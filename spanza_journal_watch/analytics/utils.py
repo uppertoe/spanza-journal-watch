@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from django.utils import timezone
+
 from django.template.loader import render_to_string
 
 from spanza_journal_watch.utils.functions import get_domain_url
@@ -14,7 +18,12 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "trend micro",
     "talos",
     "cloudflare",
+    "python-requests",
+    "curl/",
+    "wget/",
 ]
+
+NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=5)
 
 
 def is_probable_automated_event(request):
@@ -35,6 +44,17 @@ def is_probable_automated_event(request):
     if sec_fetch_mode == "no-cors" and sec_fetch_site == "cross-site":
         # Often image preloading/proxy behavior
         return True
+
+    return False
+
+
+def is_probable_automated_newsletter_event(request, newsletter):
+    if is_probable_automated_event(request):
+        return True
+
+    if newsletter and newsletter.send_date:
+        if timezone.now() - newsletter.send_date <= NEWSLETTER_AUTOMATION_WINDOW:
+            return True
 
     return False
 

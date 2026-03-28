@@ -23,7 +23,7 @@
     </article>
     <div
     hx-get="/analytics/page/review/{{ review.slug }}"
-    hx-trigger="intersect once threshold:0.6"
+    hx-trigger="intersect once threshold:0.6 delay:2s"
     hx-swap="none"></div>
 {% endfor %}
 </div>

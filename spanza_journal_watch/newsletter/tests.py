@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
 import pytest
+from django.test import Client
 from django.test import override_settings
+from django.urls import reverse
 
 from spanza_journal_watch.newsletter.models import Subscriber
 from spanza_journal_watch.newsletter.signals import (
@@ -158,3 +160,52 @@ def test_confirmation_email_uses_reply_to_and_metadata():
     assert message.reply_to == ["queries@example.test"]
     assert message.metadata == {"type": "subscription_confirmation"}
     assert message.tags == ["subscription-confirmation"]
+
+
+@pytest.mark.django_db
+class TestUnsubscribeViews:
+    def test_unsubscribe_get_shows_confirmation_page(self):
+        subscriber = Subscriber.objects.create(email="reader@example.test", subscribed=True)
+        client = Client()
+
+        response = client.get(reverse("newsletter:unsubscribe", args=[subscriber.unsubscribe_token]))
+
+        assert response.status_code == 200
+        assert b"Confirm that you want to unsubscribe" in response.content
+        subscriber.refresh_from_db()
+        assert subscriber.subscribed is True
+
+    def test_confirm_unsubscribe_requires_post(self):
+        subscriber = Subscriber.objects.create(email="reader@example.test", subscribed=True)
+        client = Client()
+
+        response = client.get(reverse("newsletter:confirm-unsubscribe", args=[subscriber.unsubscribe_token]))
+
+        assert response.status_code == 405
+        subscriber.refresh_from_db()
+        assert subscriber.subscribed is True
+
+    def test_confirm_unsubscribe_post_unsubscribes_and_redirects(self):
+        subscriber = Subscriber.objects.create(email="reader@example.test", subscribed=True)
+        client = Client()
+
+        response = client.post(reverse("newsletter:confirm-unsubscribe", args=[subscriber.unsubscribe_token]))
+
+        assert response.status_code == 302
+        subscriber.refresh_from_db()
+        assert subscriber.subscribed is False
+
+    def test_unsubscribe_post_is_idempotent_and_returns_200_without_redirect(self):
+        subscriber = Subscriber.objects.create(email="reader@example.test", subscribed=True)
+        client = Client()
+        url = reverse("newsletter:unsubscribe", args=[subscriber.unsubscribe_token])
+
+        first = client.post(url)
+        second = client.post(url)
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert "Location" not in first.headers
+        assert "Location" not in second.headers
+        subscriber.refresh_from_db()
+        assert subscriber.subscribed is False

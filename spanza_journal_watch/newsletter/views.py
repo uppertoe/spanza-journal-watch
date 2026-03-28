@@ -1,16 +1,22 @@
 from django.contrib import messages
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import SubscriberForm
 from .models import Subscriber
-from .tasks import reset_unsubscribe_token, send_confirmation_email
+from .tasks import send_confirmation_email
 
 
 def success(request):
     messages_to_render = messages.get_messages(request)
     return render(request, "newsletter/success.html", {"messages": messages_to_render})
+
+
+def _unsubscribe_subscriber(request, subscriber):
+    subscriber.subscribed = False
+    subscriber.save(update_fields=["subscribed", "modified"])
+    request.session["subscribed"] = False
 
 
 @csrf_exempt  # Allow POST for list-unsubscribe-post
@@ -19,47 +25,30 @@ def unsubscribe(request, unsubscribe_token):
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
     except Subscriber.DoesNotExist:
         if request.method == "POST":
-            return HttpResponse(status=204)  # Silent fail for Gmail
+            return HttpResponse(status=200)  # Silent success for mailbox-provider one-click POST
         messages.error(request, "Invalid unsubscribe link.")
         return redirect("home")
 
     if request.method == "POST":
-        # Perform the unsubscribe directly here
-        subscriber.subscribed = False
-        subscriber.save()
-
-        # Optional: mark session or analytics if relevant
-        request.session["subscribed"] = False
-        reset_unsubscribe_token.apply_async((subscriber.pk,), countdown=3 * 60)
-
-        return HttpResponse(status=204)  # No redirect or content for Gmail
+        _unsubscribe_subscriber(request, subscriber)
+        return HttpResponse(status=200)  # Immediate success, no redirect, for one-click unsubscribe POST
 
     # For manual GET-based unsubscribe with confirmation UI
     context = {"unsubscribe_token": unsubscribe_token, "email": subscriber.email}
     return render(request, "newsletter/unsubscribe.html", context)
 
 
-@csrf_exempt  # Allow POST for list-unsubscribe-postt
 def confirm_unsubscribe(request, unsubscribe_token):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
     try:
         subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
-        subscriber.subscribed = False
-        subscriber.save()
+        _unsubscribe_subscriber(request, subscriber)
         messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
-
-        # Set the subscribed flag in session
-        request.session["subscribed"] = False
-
-        # Reset the unsubscribe token in 3 minutes
-        # Ensures that repeated unsubscribe attempts are seen to succeed
-        reset_unsubscribe_token.apply_async((subscriber.pk,), countdown=3 * 60)
 
     except Subscriber.DoesNotExist:
         messages.error(request, "Invalid unsubscribe link.")
-
-    # Return 204 for list-unsubscribe-post
-    if request.method == "POST":
-        return HttpResponse(status=204)
 
     return redirect("home")
 

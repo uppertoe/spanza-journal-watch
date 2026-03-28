@@ -19,7 +19,7 @@ from django.test import Client
 from django.urls import reverse
 
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.newsletter.tasks import send_newsletter_test_email
+from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
 from spanza_journal_watch.submissions.models import Issue
 from spanza_journal_watch.users.tests.factories import UserFactory
 
@@ -166,6 +166,26 @@ class TestSendNewsletterTestEmailTask:
             send_newsletter_test_email(newsletter.pk, "test.recipient@example.com")
 
         assert len(django_mail.outbox) >= 1
+
+
+class TestSendNewsletterTask:
+    def test_final_send_sets_send_date(self):
+        newsletter = _make_newsletter()
+        newsletter.ready_to_send = True
+        newsletter.is_test_sent = True
+        newsletter.save()
+        Subscriber.objects.create(email="sub@example.com", subscribed=True)
+
+        with patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch") as mock_batch, patch(
+            "spanza_journal_watch.newsletter.tasks.send_newsletter_stats"
+        ) as mock_stats:
+            mock_batch.delay = MagicMock()
+            mock_stats.delay = MagicMock()
+            send_newsletter(newsletter.pk, test_email=False)
+
+        newsletter.refresh_from_db()
+        assert newsletter.is_sent is True
+        assert newsletter.send_date is not None
 
 
 # ---------------------------------------------------------------------------

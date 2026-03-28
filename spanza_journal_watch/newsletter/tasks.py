@@ -7,6 +7,7 @@ from django.core import mail
 from django.core.mail import send_mail
 from django.db.models import F
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from config.celery_app import app as celery_app
 
@@ -143,7 +144,7 @@ def send_newsletter(newsletter_pk, test_email=True):
             f"Newsletter {newsletter} already sent to {newsletter.emails_sent} recipients; sending aborted"
         )
     else:
-        newsletter_queryset.update(is_sent=True, resend_enabled=False)
+        newsletter_queryset.update(is_sent=True, resend_enabled=False, send_date=timezone.now())
 
     # Serialise queryset for Celery
     subscriber_pks = list(subscribers.values_list("pk", flat=True))
@@ -195,12 +196,3 @@ def send_confirmation_email(self, subscriber_pk):
         logger.info("Sign-up email sent to %s", subscriber.email)
     except Subscriber.DoesNotExist as exc:
         raise self.retry(exc=exc, countdown=3 * 60)
-
-
-@celery_app.task()
-def reset_unsubscribe_token(subscriber_pk):
-    from .models import Subscriber
-
-    subscriber = Subscriber.objects.get(pk=subscriber_pk)
-    subscriber.unsubscribe_token = ""
-    subscriber.save()
