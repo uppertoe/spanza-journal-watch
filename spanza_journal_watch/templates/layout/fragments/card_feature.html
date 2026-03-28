@@ -8,12 +8,15 @@
             <a
             href="{{ feature.get_absolute_url }}"
             role="button"
-            class="icon-link gap-1 icon-link-hover stretched-link"
+            class="icon-link gap-1 icon-link-hover stretched-link js-review-modal-trigger"
             data-bs-toggle="modal"
-            data-bs-target="#modal-{{ feature.slug }}"
+            data-bs-target="#{% if shared_review_modal %}home-review-modal{% else %}modal-{{ feature.slug }}{% endif %}"
+            data-review-modal-url="{{ feature.get_absolute_url }}"
+            data-review-modal-slug="{{ feature.slug }}"
+            {% if shared_review_modal %}data-review-modal-shell="home"{% endif %}
             hx-get="{{ feature.get_absolute_url }}"
-            hx-indicator="#indicator-{{ feature.slug }}"
-            hx-target="#container-{{ feature.slug }}"
+            hx-indicator="#{% if shared_review_modal %}home-review-modal-indicator{% else %}indicator-{{ feature.slug }}{% endif %}"
+            hx-target="#{% if shared_review_modal %}home-review-modal-container{% else %}container-{{ feature.slug }}{% endif %}"
             >Continue reading
             <svg class="bi"><use xlink:href="#chevron-right"/></svg>
             </a>
@@ -35,6 +38,8 @@
     </div>
 </div>
 
+{% if not shared_review_modal %}
 {% with feature as review %}
 {% include 'layout/fragments/modal.html' %}
 {% endwith %}
+{% endif %}

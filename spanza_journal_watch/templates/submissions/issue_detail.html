@@ -30,36 +30,14 @@
 {% include 'submissions/fragments/contents_list_group.html' %}
 {% endblock additional_sidebar_content %}
 
-{% block inline_javascript %}
-{{ block.super }}
-<script>
-    (function () {
-        const bindIssueBottomActions = () => {
-            const actions = document.getElementById('issue-scroll-actions');
-            if (!actions) return;
+{% block mobile_action_dock %}
+{% if articles|length > 1 %}
+{% include "fragments/sticky_pager_actions.html" with aria_label="Issue review navigation" is_issue_review_navigation=True %}
+{% endif %}
+{% endblock mobile_action_dock %}
 
-            const updateVisibility = () => {
-                const viewportBottom = window.scrollY + window.innerHeight;
-                const docHeight = Math.max(
-                    document.body.scrollHeight,
-                    document.documentElement.scrollHeight
-                );
-                const nearBottom = viewportBottom >= (docHeight - 260);
-                actions.classList.toggle('d-none', !nearBottom);
-            };
-
-            window.removeEventListener('scroll', updateVisibility);
-            window.addEventListener('scroll', updateVisibility, { passive: true });
-            window.addEventListener('resize', updateVisibility);
-            updateVisibility();
-        };
-
-        document.addEventListener('DOMContentLoaded', bindIssueBottomActions);
-        document.body.addEventListener('htmx:afterSwap', function (event) {
-            if (event.target && event.target.id === 'article-block') {
-                bindIssueBottomActions();
-            }
-        });
-    })();
-</script>
-{% endblock inline_javascript %}
+{% block desktop_action_dock %}
+{% if articles|length > 1 %}
+{% include "fragments/sticky_pager_actions.html" with aria_label="Issue review navigation" is_issue_review_navigation=True %}
+{% endif %}
+{% endblock desktop_action_dock %}

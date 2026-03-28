@@ -1,6 +1,10 @@
-<h3 class="mb-4 fst-italic mt-5">Use the page navigation below to view more articles</h3>
-<nav class="dropdown bd-mode-toggle position-fixed bottom-0 start-0 px-3 px-lg-5" aria-label="Article navigation">
-    <ul class="pagination">
+<div class="mt-5 mb-3 p-3 p-md-4 rounded border bg-body-tertiary shadow-sm">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h3 class="h5 fst-italic mb-0">Use the page navigation below to view more articles</h3>
+        <span class="badge text-bg-secondary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </div>
+    <nav aria-label="Article navigation">
+    <ul class="pagination justify-content-center flex-wrap mb-0">
         {% if page_obj.has_previous %}
         <li class="page-item">
             <a class="page-link" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block">Previous</a>
@@ -33,4 +37,5 @@
         </li>
         {% endif %}
     </ul>
-</nav>
+    </nav>
+</div>

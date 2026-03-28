@@ -31,7 +31,8 @@ class TestNewsletterFlows:
         post_response = route_client.post(
             reverse("newsletter:unsubscribe", kwargs={"unsubscribe_token": subscriber.unsubscribe_token})
         )
-        assert post_response.status_code == 204
+        assert post_response.status_code == 200
+        assert "Location" not in post_response
 
         subscriber.refresh_from_db()
         assert subscriber.subscribed is False

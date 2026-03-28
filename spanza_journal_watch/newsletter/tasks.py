@@ -196,3 +196,14 @@ def send_confirmation_email(self, subscriber_pk):
         logger.info("Sign-up email sent to %s", subscriber.email)
     except Subscriber.DoesNotExist as exc:
         raise self.retry(exc=exc, countdown=3 * 60)
+
+
+@celery_app.task()
+def reset_unsubscribe_token(subscriber_pk):
+    """Compatibility shim for older flows/tests.
+
+    Unsubscribe links now remain stable and idempotent, so no token reset work
+    is required here.
+    """
+
+    return None

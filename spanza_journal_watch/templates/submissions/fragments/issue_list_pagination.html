@@ -40,17 +40,3 @@
         </ul>
     </nav>
 </div>
-
-<div id="issue-list-scroll-actions" class="position-fixed bottom-0 start-50 translate-middle-x p-2 d-none" style="z-index: 1040; width: min(680px, calc(100% - 1rem));">
-    <div class="btn-group w-100 shadow" role="group" aria-label="Issue list quick navigation">
-        {% if page_obj.has_previous %}
-        <a class="btn btn-light" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block">Previous</a>
-        {% endif %}
-
-        <a class="btn btn-primary" href="#top">Back to top</a>
-
-        {% if page_obj.has_next %}
-        <a class="btn btn-light" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block">Next</a>
-        {% endif %}
-    </div>
-</div>

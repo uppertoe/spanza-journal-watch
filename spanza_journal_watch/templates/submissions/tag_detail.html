@@ -31,3 +31,15 @@
     {% endblock pagination %}
 </div>
 {% endblock article-block %}
+
+{% block mobile_action_dock %}
+{% if page_obj.paginator.num_pages > 1 %}
+{% include "fragments/sticky_pager_actions.html" with aria_label="Tag page navigation" %}
+{% endif %}
+{% endblock mobile_action_dock %}
+
+{% block desktop_action_dock %}
+{% if page_obj.paginator.num_pages > 1 %}
+{% include "fragments/sticky_pager_actions.html" with aria_label="Tag page navigation" %}
+{% endif %}
+{% endblock desktop_action_dock %}

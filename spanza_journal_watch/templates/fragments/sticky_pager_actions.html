@@ -1,0 +1,31 @@
+<div class="sticky-dock-panel">
+  <div class="sticky-pager-actions" role="group" aria-label="{{ aria_label|default:'Page navigation' }}">
+    {% if is_modal_navigation %}
+      <button type="button" class="btn btn-outline-secondary" data-review-modal-nav="prev" data-current-modal-id="{{ modal_id }}">Previous</button>
+      <span class="badge text-bg-secondary" data-review-modal-position>Review</span>
+      <button type="button" class="btn btn-outline-secondary" data-review-modal-nav="next" data-current-modal-id="{{ modal_id }}">Next</button>
+    {% elif is_issue_review_navigation %}
+      <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="prev">Previous</button>
+      <a class="btn btn-primary" href="#top" data-issue-review-top>Back to top</a>
+      <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="next">Next</button>
+    {% else %}
+      {% if page_obj.has_previous %}
+        <a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}#articles">Previous</a>
+      {% else %}
+        <button class="btn btn-outline-secondary" type="button" disabled>Previous</button>
+      {% endif %}
+
+      {% if show_back_to_top %}
+        <a class="btn btn-primary" href="#top">Back to top</a>
+      {% else %}
+        <span class="badge text-bg-secondary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% endif %}
+
+      {% if page_obj.has_next %}
+        <a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}#articles">Next</a>
+      {% else %}
+        <button class="btn btn-outline-secondary" type="button" disabled>Next</button>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>

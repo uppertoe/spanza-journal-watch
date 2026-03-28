@@ -19,7 +19,6 @@
     </div>
     <p class="text-break">{{ review.get_markdown_body|safe }}</p>
     {% include 'fragments/review_tags_inline.html' %}
-    <p class="mb-3"><a href="#top">Back to top</a></p>
     </article>
     <div
     hx-get="/analytics/page/review/{{ review.slug }}"
