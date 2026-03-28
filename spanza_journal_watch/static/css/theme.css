@@ -54,8 +54,21 @@ p br {
 
 @media (min-width: 768px) {
   .card-feature-tile {
-    min-height: 17rem;
+    height: 300px;
   }
+}
+
+.card-feature-tile__body {
+  min-width: 0;
+}
+
+.card-feature-tile__media {
+  height: 100%;
+}
+
+.card-feature-tile__image {
+  display: block;
+  height: 100%;
 }
 
 /* Image thumbnails for cards */

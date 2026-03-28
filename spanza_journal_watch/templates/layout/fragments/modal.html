@@ -10,12 +10,11 @@
             <div class="d-flex justify-content-center">
                 <img src="{% static "images/spinners/3-dots-move.svg" %}" id="indicator-{{ review.slug }}" class="htmx-indicator">
                 </div>
-            <div class="container p-2 px-md-5" id="container-{{ review.slug }}"></div>
+            <div class="container p-2 px-md-5" id="container-{{ review.slug }}" data-review-modal-container></div>
         </div>
         <div class="modal-footer sticky-modal-footer">
             <div class="sticky-modal-footer__inner">
                 <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
-                    <a rel="bookmark" href="{{ review.get_absolute_url }}" class="icon-link gap-1 icon-link-hover text-decoration-none">Permalink<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>

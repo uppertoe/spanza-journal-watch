@@ -14,20 +14,46 @@ from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBre
 from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
-from spanza_journal_watch.utils.functions import get_domain_url
+from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
 from .models import Author, HealthService, Issue, Review, Tag
 
 
-def build_share_urls(share_title, canonical_url):
-    share_text = f"{share_title}\n\n{canonical_url}"
+def build_share_urls(
+    share_title,
+    canonical_url,
+    share_description="",
+    *,
+    journal_name="",
+    email_summary="",
+):
+    share_text = "\n".join(part for part in [share_title, "", canonical_url] if part)
+    trimmed_email_summary = shorten_text(email_summary or share_description, 900).strip()
+    email_lines = [
+        "This Journal Watch review is being shared with you from SPANZA Journal Watch.",
+        "",
+        f"Review: {share_title.removeprefix('SPANZA Journal Watch - ').strip()}",
+    ]
+    if journal_name:
+        email_lines.append(f"Journal: {journal_name}")
+    if trimmed_email_summary:
+        email_lines.extend(
+            [
+                "",
+                "A brief summary is below. You can read the full review at the link.",
+                "",
+                trimmed_email_summary,
+            ]
+        )
+    email_lines.extend(["", "Read the review:", canonical_url])
+    email_body = "\n".join(email_lines)
     return {
         "share_text": share_text,
         "bluesky_share_url": f"https://bsky.app/intent/compose?{urlencode({'text': share_text})}",
         "x_share_url": f"https://twitter.com/intent/tweet?{urlencode({'text': share_title, 'url': canonical_url})}",
         "facebook_share_url": f"https://www.facebook.com/sharer/sharer.php?{urlencode({'u': canonical_url})}",
-        "email_share_url": f"mailto:?{urlencode({'subject': share_title, 'body': share_text})}",
+        "email_share_url": f"mailto:?{urlencode({'subject': share_title, 'body': email_body})}",
     }
 
 
@@ -57,7 +83,14 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         article_title = self.object.article.get_title().strip()
         share_title = f"SPANZA Journal Watch - {article_title}"
         share_description = self.object.get_truncated_body().strip()
-        share_context = build_share_urls(share_title, canonical_url)
+        share_email_summary = self.object.get_plain_body().strip()
+        share_context = build_share_urls(
+            share_title,
+            canonical_url,
+            share_description,
+            journal_name=str(self.object.article.journal),
+            email_summary=share_email_summary,
+        )
 
         context["canonical_url"] = canonical_url
         context["structured_data"] = json.dumps(
@@ -80,6 +113,7 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         )
         context["share_title"] = share_title
         context["share_description"] = share_description
+        context["share_email_summary"] = share_email_summary
         context["share_text"] = share_context["share_text"]
         context["share_image_url"] = (
             f"{get_domain_url()}{self.object.feature_image.url}" if self.object.feature_image else ""
@@ -157,10 +191,20 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
             article_title = review.article.get_title().strip()
             review_share_title = f"SPANZA Journal Watch - {article_title}"
             review_canonical_url = build_absolute_url(review.get_absolute_url())
-            review_share_context = build_share_urls(review_share_title, review_canonical_url)
+            review_share_description = review.get_truncated_body().strip()
+            review_share_email_summary = review.get_plain_body().strip()
+            review_share_context = build_share_urls(
+                review_share_title,
+                review_canonical_url,
+                review_share_description,
+                journal_name=str(review.article.journal),
+                email_summary=review_share_email_summary,
+            )
 
             review.share_title = review_share_title
             review.canonical_url = review_canonical_url
+            review.share_description = review_share_description
+            review.share_email_summary = review_share_email_summary
             review.share_text = review_share_context["share_text"]
             review.bluesky_share_url = review_share_context["bluesky_share_url"]
             review.x_share_url = review_share_context["x_share_url"]

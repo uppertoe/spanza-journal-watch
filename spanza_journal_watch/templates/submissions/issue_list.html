@@ -31,12 +31,12 @@
 
 {% block mobile_action_dock %}
 {% if page_obj.paginator.num_pages > 1 %}
-{% include "fragments/sticky_pager_actions.html" with aria_label="Issue list quick navigation" show_back_to_top=True %}
+{% include "fragments/sticky_pager_actions.html" with aria_label="Issue list quick navigation" %}
 {% endif %}
 {% endblock mobile_action_dock %}
 
 {% block desktop_action_dock %}
 {% if page_obj.paginator.num_pages > 1 %}
-{% include "fragments/sticky_pager_actions.html" with aria_label="Issue list quick navigation" show_back_to_top=True %}
+{% include "fragments/sticky_pager_actions.html" with aria_label="Issue list quick navigation" %}
 {% endif %}
 {% endblock desktop_action_dock %}

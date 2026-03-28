@@ -92,8 +92,115 @@ const getSharedReviewModalTriggers = (modalId) =>
 const getSharedReviewModalContainer = (modal) =>
   modal?.querySelector('[data-shared-review-modal-container]');
 
-const getSharedReviewModalPermalink = (modal) =>
-  modal?.querySelector('[data-shared-review-modal-permalink]');
+const getModalShareMetadata = (modal) =>
+  modal?.querySelector('[data-share-metadata]');
+
+const toAbsoluteUrl = (url) => {
+  if (!url) return '';
+  return new URL(url, window.location.origin).toString();
+};
+
+const copyTextToClipboard = async (text) => {
+  if (!text) return false;
+
+  if (window.navigator.clipboard?.writeText) {
+    try {
+      await window.navigator.clipboard.writeText(text);
+      return true;
+    } catch (_error) {
+      // Fall through to the legacy copy path below.
+    }
+  }
+
+  const helper = document.createElement('textarea');
+  helper.value = text;
+  helper.setAttribute('readonly', '');
+  helper.style.position = 'fixed';
+  helper.style.top = '-9999px';
+  helper.style.left = '-9999px';
+  document.body.appendChild(helper);
+  helper.focus();
+  helper.select();
+
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch (_error) {
+    copied = false;
+  }
+
+  document.body.removeChild(helper);
+  return copied;
+};
+
+const syncNativeShareButtons = (root = document) => {
+  root.querySelectorAll('[data-native-share]').forEach((button) => {
+    button.classList.toggle('d-none', !window.navigator.share);
+  });
+};
+
+const syncReviewModalShareControls = (modal) => {
+  if (!modal) return;
+
+  const shareControls = modal.querySelector('[data-modal-share-controls]');
+  if (!shareControls) return;
+
+  const metadata = getModalShareMetadata(modal);
+  const copyButton = shareControls.querySelector('[data-copy-share]');
+  const emailLink = shareControls.querySelector('[data-share-email]');
+  const nativeShareButton = shareControls.querySelector('[data-native-share]');
+
+  if (!metadata) {
+    if (copyButton) {
+      copyButton.dataset.shareUrl = '';
+      copyButton.disabled = true;
+    }
+
+    if (emailLink) {
+      emailLink.setAttribute('href', '#');
+      emailLink.classList.add('disabled');
+      emailLink.setAttribute('aria-disabled', 'true');
+    }
+
+    if (nativeShareButton) {
+      nativeShareButton.dataset.shareTitle = '';
+      nativeShareButton.dataset.shareText = '';
+      nativeShareButton.dataset.shareUrl = '';
+      nativeShareButton.disabled = true;
+    }
+
+    return;
+  }
+
+  const shareUrl = metadata.dataset.shareUrl || '';
+  const shareTitle = metadata.dataset.shareTitle || '';
+  const shareText = metadata.dataset.shareText || '';
+  const emailUrl = metadata.dataset.shareEmailUrl || '';
+
+  if (copyButton) {
+    copyButton.dataset.shareUrl = shareUrl;
+    copyButton.disabled = !shareUrl;
+  }
+
+  if (emailLink) {
+    emailLink.setAttribute('href', emailUrl || '#');
+    emailLink.classList.toggle('disabled', !emailUrl);
+    if (emailUrl) {
+      emailLink.removeAttribute('aria-disabled');
+    } else {
+      emailLink.setAttribute('aria-disabled', 'true');
+    }
+  }
+
+  if (nativeShareButton) {
+    nativeShareButton.dataset.shareTitle = shareTitle;
+    nativeShareButton.dataset.shareText = shareText;
+    nativeShareButton.dataset.shareUrl = shareUrl;
+    nativeShareButton.disabled = !shareUrl;
+  }
+
+  syncNativeShareButtons(shareControls);
+};
 
 const setSharedReviewModalLoading = (modal, isLoading) => {
   if (!modal) return;
@@ -125,11 +232,7 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
     setSharedReviewModalLoading(modal, false);
   }
 
-  const permalink = getSharedReviewModalPermalink(modal);
-  if (permalink) {
-    permalink.href = trigger.href;
-    permalink.classList.remove('d-none');
-  }
+  syncReviewModalShareControls(modal);
 };
 
 const rememberDefaultDockMarkup = () => {
@@ -282,6 +385,8 @@ document.addEventListener('show.bs.modal', async (event) => {
   const modal = event.target;
   if (!modal.id || closingModalFromPopStateId) return;
 
+  syncReviewModalShareControls(modal);
+
   if (getSharedReviewModalTriggers(modal.id).length) {
     const trigger = event.relatedTarget;
     const triggers = getSharedReviewModalTriggers(modal.id);
@@ -355,15 +460,11 @@ document.addEventListener('hidden.bs.modal', (event) => {
 
   if (getSharedReviewModalTriggers(modal.id).length) {
     sharedReviewModalIndices.delete(modal.id);
-    const permalink = getSharedReviewModalPermalink(modal);
-    if (permalink) {
-      permalink.href = '#';
-      permalink.classList.add('d-none');
-    }
     const container = getSharedReviewModalContainer(modal);
     if (container) {
       container.innerHTML = '';
     }
+    syncReviewModalShareControls(modal);
   }
 
   restoreDefaultDockMarkup();
@@ -372,6 +473,7 @@ document.addEventListener('hidden.bs.modal', (event) => {
 
 rememberDefaultDockMarkup();
 updateMobileToolbarState();
+syncNativeShareButtons();
 
 const getIssueReviewArticles = () =>
   Array.from(document.querySelectorAll('#articles .article-post[id^="list-item-"]'));
@@ -413,6 +515,44 @@ const updateIssueReviewNavigator = () => {
 };
 
 document.addEventListener('click', async (event) => {
+  const copyButton = event.target.closest('[data-copy-share]');
+  if (copyButton) {
+    const shareUrl = toAbsoluteUrl(copyButton.dataset.shareUrl);
+    if (!shareUrl) return;
+
+    const copied = await copyTextToClipboard(shareUrl);
+    if (copied) {
+      const label = copyButton.querySelector('span');
+      const originalText = label ? label.textContent : '';
+      if (label) {
+        label.textContent = 'Copied';
+      }
+      window.setTimeout(() => {
+        if (label) {
+          label.textContent = originalText;
+        }
+      }, 1600);
+    }
+    return;
+  }
+
+  const nativeShareButton = event.target.closest('[data-native-share]');
+  if (nativeShareButton && window.navigator.share) {
+    const shareUrl = toAbsoluteUrl(nativeShareButton.dataset.shareUrl);
+    if (!shareUrl) return;
+
+    try {
+      await window.navigator.share({
+        title: nativeShareButton.dataset.shareTitle || document.title,
+        text: nativeShareButton.dataset.shareText || '',
+        url: shareUrl,
+      });
+    } catch (_error) {
+      // Treat cancelled share dialogs as a no-op.
+    }
+    return;
+  }
+
   const issueButton = event.target.closest('[data-issue-review-nav]');
   if (issueButton && !issueButton.disabled) {
     const targetIndex = Number(issueButton.dataset.targetIndex);
@@ -469,7 +609,15 @@ document.body.addEventListener('htmx:afterSettle', () => {
 
   updateMobileToolbarState();
   updateIssueReviewNavigator();
+  syncNativeShareButtons();
   if (typeof scrollSpy.refresh === 'function') {
     scrollSpy.refresh();
   }
+});
+
+document.body.addEventListener('htmx:afterSwap', (event) => {
+  const modal = event.target.closest('.modal');
+  if (!modal || !event.target.matches('[data-review-modal-container]')) return;
+
+  syncReviewModalShareControls(modal);
 });
