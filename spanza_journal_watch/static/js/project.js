@@ -882,7 +882,7 @@ document.body.addEventListener('htmx:afterSettle', () => {
   scheduleIssueReviewNavigatorUpdate();
   syncNativeShareButtons();
   observeAnalyticsReviewElements();
-  if (typeof scrollSpy.refresh === 'function') {
+  if (scrollSpy && typeof scrollSpy.refresh === 'function') {
     scrollSpy.refresh();
   }
 });
