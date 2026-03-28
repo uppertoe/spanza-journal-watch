@@ -2689,7 +2689,6 @@ def site_analytics(request):
             native_shares=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE)),
             social_shares=Count("id", filter=Q(event_type__in=social_share_event_types)),
             total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
-            max_scroll_depth=Avg("scroll_depth", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
         )
         .order_by("-opens", "-engaged_views", "-full_text_clicks")
     )
@@ -2729,7 +2728,6 @@ def site_analytics(request):
             "native_shares": row["native_shares"],
             "social_shares": row["social_shares"],
             "total_shares": row["total_shares"],
-            "avg_scroll_depth": round(row["max_scroll_depth"] or 0),
             "engagement_score": engagement_score,
             "engaged_rate": _safe_percentage(row["engaged_views"], row["opens"]),
             "share_rate": _safe_percentage(row["total_shares"], row["opens"]),

@@ -11,9 +11,12 @@ const popoverList = [...popoverTriggerList].map(
   (popoverTriggerEl) => new Popover(popoverTriggerEl),
 );
 
-var scrollSpy = new ScrollSpy(document.body, {
-  target: '#contents-list-group',
-});
+const contentsListGroup = document.getElementById('contents-list-group');
+var scrollSpy = contentsListGroup
+  ? new ScrollSpy(document.body, {
+      target: '#contents-list-group',
+    })
+  : null;
 
 const isInteractiveElement = (element) =>
   !!element.closest(
@@ -86,6 +89,7 @@ const analyticsEndpoint = '/reader/action';
 const reviewSessionThresholdMs = 5000;
 const reviewSessions = new Map();
 let reviewSessionCounter = 0;
+let issueNavigatorFrame = null;
 const getSharedReviewModalTriggers = (modalId) =>
   Array.from(
     document.querySelectorAll(
@@ -223,23 +227,6 @@ const getReviewSessionKey = (element) => {
   return element.dataset.analyticsSessionKey;
 };
 
-const getElementScrollDepth = (element) => {
-  const modalBody = element.closest('.modal-body');
-  if (modalBody) {
-    const scrollableHeight = modalBody.scrollHeight - modalBody.clientHeight;
-    if (scrollableHeight <= 0) return 100;
-    return Math.max(
-      0,
-      Math.min(100, Math.round((modalBody.scrollTop / scrollableHeight) * 100)),
-    );
-  }
-
-  const rect = element.getBoundingClientRect();
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-  const rawDepth = ((viewportHeight - rect.top) / Math.max(rect.height, 1)) * 100;
-  return Math.max(0, Math.min(100, Math.round(rawDepth)));
-};
-
 const ensureReviewSession = (element) => {
   const context = getReviewAnalyticsContext(element);
   if (!context) return null;
@@ -254,20 +241,11 @@ const ensureReviewSession = (element) => {
       openSent: false,
       visibleSince: null,
       totalVisibleMs: 0,
-      maxScrollDepth: 0,
       engagedSent: false,
     });
   }
 
   return reviewSessions.get(key);
-};
-
-const updateReviewSessionDepth = (session) => {
-  if (!session?.element?.isConnected) return;
-  session.maxScrollDepth = Math.max(
-    session.maxScrollDepth,
-    getElementScrollDepth(session.element),
-  );
 };
 
 const openReviewSession = (element, { immediate = false } = {}) => {
@@ -286,12 +264,6 @@ const openReviewSession = (element, { immediate = false } = {}) => {
   if (session.visibleSince === null) {
     session.visibleSince = window.performance.now();
   }
-
-  updateReviewSessionDepth(session);
-
-  if (immediate) {
-    updateReviewSessionDepth(session);
-  }
 };
 
 const pauseReviewSession = (element) => {
@@ -303,7 +275,6 @@ const pauseReviewSession = (element) => {
     Math.round(window.performance.now() - session.visibleSince),
   );
   session.visibleSince = null;
-  updateReviewSessionDepth(session);
 };
 
 const flushReviewSession = (element, { beacon = true } = {}) => {
@@ -322,17 +293,10 @@ const flushReviewSession = (element, { beacon = true } = {}) => {
       review_id: session.reviewId,
       source: session.source,
       duration_ms: session.totalVisibleMs,
-      scroll_depth: session.maxScrollDepth,
     },
     { beacon },
   );
   session.engagedSent = true;
-};
-
-const registerAnalyticsReviewElements = (root = document) => {
-  root.querySelectorAll('[data-analytics-review-id]').forEach((element) => {
-    ensureReviewSession(element);
-  });
 };
 
 const reviewVisibilityObserver = new window.IntersectionObserver(
@@ -354,36 +318,9 @@ const reviewVisibilityObserver = new window.IntersectionObserver(
 const observeAnalyticsReviewElements = (root = document) => {
   root.querySelectorAll('[data-analytics-review-id]').forEach((element) => {
     ensureReviewSession(element);
+    if (element.dataset.analyticsObserved === 'true') return;
+    element.dataset.analyticsObserved = 'true';
     reviewVisibilityObserver.observe(element);
-  });
-};
-
-const isReviewElementVisible = (element) => {
-  if (!element?.isConnected) return false;
-
-  const modalBody = element.closest('.modal-body');
-  if (modalBody) {
-    const bodyRect = modalBody.getBoundingClientRect();
-    const rect = element.getBoundingClientRect();
-    const visibleTop = Math.max(rect.top, bodyRect.top);
-    const visibleBottom = Math.min(rect.bottom, bodyRect.bottom);
-    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-    return visibleHeight / Math.max(rect.height, 1) >= 0.25;
-  }
-
-  const rect = element.getBoundingClientRect();
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-  const visibleTop = Math.max(rect.top, 0);
-  const visibleBottom = Math.min(rect.bottom, viewportHeight);
-  const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-  return visibleHeight / Math.max(rect.height, 1) >= 0.25;
-};
-
-const primeVisibleReviewSessions = (root = document) => {
-  root.querySelectorAll('[data-analytics-review-id]').forEach((element) => {
-    if (isReviewElementVisible(element)) {
-      openReviewSession(element, { immediate: true });
-    }
   });
 };
 
@@ -486,7 +423,6 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
   }
 
   syncReviewModalShareControls(modal);
-  registerAnalyticsReviewElements(container);
   observeAnalyticsReviewElements(container);
   const nextReviewElement = container.querySelector('[data-analytics-review-id]');
   if (nextReviewElement) {
@@ -737,21 +673,7 @@ document.addEventListener('hidden.bs.modal', (event) => {
 rememberDefaultDockMarkup();
 updateMobileToolbarState();
 syncNativeShareButtons();
-registerAnalyticsReviewElements();
 observeAnalyticsReviewElements();
-primeVisibleReviewSessions();
-
-document.addEventListener(
-  'scroll',
-  () => {
-    reviewSessions.forEach((session) => {
-      if (session.visibleSince !== null) {
-        updateReviewSessionDepth(session);
-      }
-    });
-  },
-  { passive: true, capture: true },
-);
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
@@ -765,6 +687,9 @@ window.addEventListener('pagehide', () => {
 
 const getIssueReviewArticles = () =>
   Array.from(document.querySelectorAll('#articles .article-post[id^="list-item-"]'));
+
+const hasIssueReviewNavigator = () =>
+  !!document.querySelector('[data-issue-review-nav="prev"], [data-issue-review-nav="next"]');
 
 const getCurrentIssueReviewIndex = () => {
   const reviews = getIssueReviewArticles();
@@ -784,19 +709,13 @@ const getCurrentIssueReviewIndex = () => {
 };
 
 const updateIssueReviewNavigator = () => {
+  issueNavigatorFrame = null;
+
+  if (!hasIssueReviewNavigator()) return;
+
   const reviews = getIssueReviewArticles();
   const index = getCurrentIssueReviewIndex();
   if (!reviews.length || index === -1) return;
-
-  const currentReview = reviews[index];
-  if (currentReview) {
-    openReviewSession(currentReview, { immediate: true });
-    reviews.forEach((review, reviewIndex) => {
-      if (reviewIndex !== index) {
-        pauseReviewSession(review);
-      }
-    });
-  }
 
   const prevButtons = document.querySelectorAll('[data-issue-review-nav="prev"]');
   const nextButtons = document.querySelectorAll('[data-issue-review-nav="next"]');
@@ -810,6 +729,11 @@ const updateIssueReviewNavigator = () => {
     button.disabled = index >= reviews.length - 1;
     button.dataset.targetIndex = String(index + 1);
   });
+};
+
+const scheduleIssueReviewNavigatorUpdate = () => {
+  if (issueNavigatorFrame !== null) return;
+  issueNavigatorFrame = window.requestAnimationFrame(updateIssueReviewNavigator);
 };
 
 document.addEventListener('click', async (event) => {
@@ -905,7 +829,7 @@ document.addEventListener('click', async (event) => {
     const targetReview = reviews[targetIndex];
     if (targetReview) {
       targetReview.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.setTimeout(updateIssueReviewNavigator, 150);
+      window.setTimeout(scheduleIssueReviewNavigatorUpdate, 150);
     }
     return;
   }
@@ -944,8 +868,10 @@ document.addEventListener('click', async (event) => {
   currentInstance.hide();
 });
 
-window.addEventListener('scroll', updateIssueReviewNavigator, { passive: true });
-window.addEventListener('load', updateIssueReviewNavigator);
+window.addEventListener('scroll', scheduleIssueReviewNavigatorUpdate, {
+  passive: true,
+});
+window.addEventListener('load', scheduleIssueReviewNavigatorUpdate);
 
 document.body.addEventListener('htmx:afterSettle', () => {
   if (!document.querySelector('.modal.show')) {
@@ -953,11 +879,9 @@ document.body.addEventListener('htmx:afterSettle', () => {
   }
 
   updateMobileToolbarState();
-  updateIssueReviewNavigator();
+  scheduleIssueReviewNavigatorUpdate();
   syncNativeShareButtons();
-  registerAnalyticsReviewElements();
   observeAnalyticsReviewElements();
-  primeVisibleReviewSessions();
   if (typeof scrollSpy.refresh === 'function') {
     scrollSpy.refresh();
   }
@@ -968,7 +892,5 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
   if (!modal || !event.target.matches('[data-review-modal-container]')) return;
 
   syncReviewModalShareControls(modal);
-  registerAnalyticsReviewElements(event.target);
   observeAnalyticsReviewElements(event.target);
-  primeVisibleReviewSessions(event.target);
 });
