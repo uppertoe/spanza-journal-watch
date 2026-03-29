@@ -42,6 +42,7 @@ class Subscriber(models.Model):
             "email_down_chevron_url": f"{domain}{static('images/email/chevron-down.png')}",
             "email_logo_url": f"{domain}{static('images/email/logo.png')}",
             "email_heading_url": f"{domain}{static('images/email/heading.png')}",
+            "spanza_logo_url": f"{domain}{static('images/logo/spanza-logo-blue.png')}",
             "subscriber": self,
             "tracker": click_tracker(self.email),
         }
@@ -187,6 +188,7 @@ class Newsletter(models.Model):
             "email_down_chevron_url": f"{domain}{static('images/email/chevron-down.png')}",
             "email_logo_url": f"{domain}{static('images/email/logo.png')}",
             "email_heading_url": f"{domain}{static('images/email/heading.png')}",
+            "spanza_logo_url": f"{domain}{static('images/logo/spanza-logo-blue.png')}",
         }
         return context
 
