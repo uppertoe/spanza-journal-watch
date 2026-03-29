@@ -203,11 +203,11 @@ p br {
   inset: auto 0 0;
   z-index: 2000;
   padding: 0;
-  background: #f8f9fa;
+  background: rgba(248, 249, 250, 0.72);
 }
 
 [data-bs-theme='dark'] .sticky-mobile-toolbar {
-  background: #09203f;
+  background: rgba(9, 32, 63, 0.78);
 }
 
 .sticky-mobile-toolbar__inner {
@@ -217,13 +217,13 @@ p br {
   width: 100%;
   padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(21, 43, 59, 0.08);
-  background: #f8f9fa;
+  background: rgba(248, 249, 250, 0.58);
   box-shadow: 0 -0.75rem 2rem rgba(21, 43, 59, 0.08);
 }
 
 [data-bs-theme='dark'] .sticky-mobile-toolbar__inner {
   border-top-color: rgba(233, 236, 239, 0.12);
-  background: #09203f;
+  background: rgba(9, 32, 63, 0.58);
   box-shadow: 0 -0.75rem 2rem rgba(0, 0, 0, 0.22);
 }
 
@@ -309,6 +309,26 @@ p br {
 .sticky-mobile-toolbar .sticky-pager-actions .badge {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.sticky-mobile-toolbar .sticky-pager-actions .btn-outline-secondary {
+  background: rgba(var(--bs-body-bg-rgb), 0.98);
+  border-color: rgba(21, 43, 59, 0.16);
+  color: var(--bs-body-color);
+}
+
+.sticky-mobile-toolbar .sticky-pager-actions .btn-outline-secondary:hover,
+.sticky-mobile-toolbar .sticky-pager-actions .btn-outline-secondary:focus-visible,
+.sticky-mobile-toolbar .sticky-pager-actions .btn-outline-secondary:active {
+  background: rgba(var(--bs-body-bg-rgb), 1);
+  border-color: rgba(21, 43, 59, 0.24);
+  color: var(--bs-body-color);
+}
+
+.sticky-mobile-toolbar .sticky-pager-actions .btn-outline-secondary:disabled {
+  background: rgba(var(--bs-body-bg-rgb), 0.9);
+  border-color: rgba(21, 43, 59, 0.12);
+  color: rgba(var(--bs-body-color-rgb), 0.62);
 }
 
 .sticky-pager-actions .badge {
@@ -465,6 +485,27 @@ h6 {
 .article-post-meta {
   margin-bottom: 1.25rem;
   color: #727272;
+}
+
+@supports (content-visibility: auto) {
+  .deferred-card,
+  .deferred-article,
+  .deferred-search-result {
+    content-visibility: auto;
+    contain: layout style paint;
+  }
+
+  .deferred-card {
+    contain-intrinsic-size: 420px;
+  }
+
+  .deferred-article {
+    contain-intrinsic-size: 1400px;
+  }
+
+  .deferred-search-result {
+    contain-intrinsic-size: 320px;
+  }
 }
 
 /* cyrillic */

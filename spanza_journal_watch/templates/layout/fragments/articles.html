@@ -4,7 +4,7 @@
     <div class="row row-cols-{{ article_cols }} g-3 py-2">
         {% for review in reviews %}
         <div class="col">
-            <div class="card h-100 {% if card_modal_click %}js-review-card-modal{% endif %}"
+            <div class="card h-100 deferred-card {% if card_modal_click %}js-review-card-modal{% endif %}"
                 {% if card_modal_click %}
                 tabindex="0"
                 role="button"

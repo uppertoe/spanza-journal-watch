@@ -4,7 +4,7 @@
         <div class="row row-cols-{{ issue_cols }} g-3 py-2">
             {% for issue in issues %}
             <div class="col">
-                <div class="card js-card-link"
+                <div class="card js-card-link deferred-card"
                     tabindex="0"
                     role="link"
                     data-card-href="{{ issue.get_absolute_url }}"

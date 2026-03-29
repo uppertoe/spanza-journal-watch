@@ -2,7 +2,7 @@
 {% cache 1800 "issue_detail_articles" content_cache_version request.get_full_path %}
 <div id="articles" class="scrollspy-focus-target" data-bs-spy="scroll" data-bs-target="#list-reviews" tabindex="0">
     {% for review in articles %}
-    <article class="article-post" id="list-item-{{ review.slug }}" data-analytics-review-id="{{ review.pk }}" data-analytics-source="issue_detail">
+    <article class="article-post deferred-article" id="list-item-{{ review.slug }}" data-analytics-review-id="{{ review.pk }}" data-analytics-source="issue_detail">
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>
     <h5 class="mb-1">{{ review.article.get_subtitle|capfirst }}</h5></a>
     <p class="mb-1 fst-italic">{{ review.article.journal }}</p>

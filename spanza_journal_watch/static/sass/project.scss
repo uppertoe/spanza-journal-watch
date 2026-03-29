@@ -171,8 +171,7 @@ $red: #b94a48;
     padding: 0.75rem 0.85rem;
     gap: 0.65rem;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: thin;
+    overflow: hidden;
   }
 
   .share-actions__primary {
@@ -183,8 +182,8 @@ $red: #b94a48;
 
   .share-actions__secondary {
     flex-wrap: nowrap;
-    min-width: max-content;
-    margin-left: auto;
+    flex: 0 0 auto;
+    margin-left: 0;
   }
 
   .share-chip {
@@ -195,6 +194,48 @@ $red: #b94a48;
   .share-actions__secondary .share-chip {
     width: 2.2rem;
     height: 2.2rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .share-actions {
+    gap: 0.45rem;
+    padding: 0.65rem 0.7rem;
+  }
+
+  .share-actions__primary {
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 0.4rem !important;
+  }
+
+  .share-actions__secondary {
+    gap: 0.3rem !important;
+  }
+
+  .share-chip {
+    padding: 0.32rem 0.58rem;
+    font-size: 0.76rem;
+    gap: 0.35rem;
+  }
+
+  .share-chip__icon {
+    width: 0.82rem;
+    height: 0.82rem;
+  }
+
+  .share-chip--copy {
+    min-width: 5.6rem;
+  }
+
+  .share-actions__secondary .share-chip {
+    width: 1.95rem;
+    height: 1.95rem;
+  }
+
+  .share-actions__secondary .share-chip__icon {
+    width: 0.86rem;
+    height: 0.86rem;
   }
 }
 

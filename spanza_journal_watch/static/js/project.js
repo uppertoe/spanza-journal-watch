@@ -79,6 +79,7 @@ let closingModalFromPopStateId = null;
 let pendingModalTargetId = null;
 let mobileDockDefaultMarkup = null;
 let desktopDockDefaultMarkup = null;
+let activeDockModalId = null;
 const sharedReviewModalIndices = new Map();
 
 const mobileDockSlot = () => document.getElementById('mobile-action-dock-slot');
@@ -90,6 +91,9 @@ const reviewSessionThresholdMs = 5000;
 const reviewSessions = new Map();
 let reviewSessionCounter = 0;
 let issueNavigatorFrame = null;
+let cachedIssueReviewArticles = [];
+let cachedIssuePrevButtons = [];
+let cachedIssueNextButtons = [];
 const getSharedReviewModalTriggers = (modalId) =>
   Array.from(
     document.querySelectorAll(
@@ -421,13 +425,14 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
   } finally {
     setSharedReviewModalLoading(modal, false);
   }
-
-  syncReviewModalShareControls(modal);
-  observeAnalyticsReviewElements(container);
-  const nextReviewElement = container.querySelector('[data-analytics-review-id]');
-  if (nextReviewElement) {
-    openReviewSession(nextReviewElement, { immediate: true });
-  }
+  window.requestAnimationFrame(() => {
+    syncReviewModalShareControls(modal);
+    observeAnalyticsReviewElements(container);
+    const nextReviewElement = container.querySelector('[data-analytics-review-id]');
+    if (nextReviewElement) {
+      openReviewSession(nextReviewElement, { immediate: true });
+    }
+  });
 };
 
 const rememberDefaultDockMarkup = () => {
@@ -464,9 +469,15 @@ const restoreDefaultDockMarkup = () => {
   }
 
   updateMobileToolbarState();
+  activeDockModalId = null;
 };
 
 const syncModalDockMarkup = (modal) => {
+  if (activeDockModalId === modal.id) {
+    updateMobileToolbarState();
+    return;
+  }
+
   const template = document.querySelector(
     `[data-review-modal-dock-template="${modal.id}"]`,
   );
@@ -485,6 +496,7 @@ const syncModalDockMarkup = (modal) => {
   }
 
   updateMobileToolbarState();
+  activeDockModalId = modal.id;
 };
 
 const updateMobileToolbarState = () => {
@@ -576,17 +588,19 @@ const cleanupModalArtifacts = () => {
   document.body.style.removeProperty('padding-right');
 };
 
-document.addEventListener('show.bs.modal', async (event) => {
+document.addEventListener('show.bs.modal', (event) => {
   const modal = event.target;
   if (!modal.id || closingModalFromPopStateId) return;
-
-  syncReviewModalShareControls(modal);
 
   if (getSharedReviewModalTriggers(modal.id).length) {
     const trigger = event.relatedTarget;
     const triggers = getSharedReviewModalTriggers(modal.id);
     sharedReviewModalIndices.set(modal.id, trigger ? triggers.indexOf(trigger) : -1);
-    await loadSharedReviewModalContent(modal, trigger);
+    window.requestAnimationFrame(() => {
+      loadSharedReviewModalContent(modal, trigger);
+    });
+  } else {
+    syncReviewModalShareControls(modal);
   }
 
   rememberDefaultDockMarkup();
@@ -685,11 +699,22 @@ window.addEventListener('pagehide', () => {
   reviewSessions.forEach((session) => flushReviewSession(session.element));
 });
 
-const getIssueReviewArticles = () =>
-  Array.from(document.querySelectorAll('#articles .article-post[id^="list-item-"]'));
+const refreshIssueReviewNavigatorCache = () => {
+  cachedIssueReviewArticles = Array.from(
+    document.querySelectorAll('#articles .article-post[id^="list-item-"]'),
+  );
+  cachedIssuePrevButtons = Array.from(
+    document.querySelectorAll('[data-issue-review-nav="prev"]'),
+  );
+  cachedIssueNextButtons = Array.from(
+    document.querySelectorAll('[data-issue-review-nav="next"]'),
+  );
+};
+
+const getIssueReviewArticles = () => cachedIssueReviewArticles;
 
 const hasIssueReviewNavigator = () =>
-  !!document.querySelector('[data-issue-review-nav="prev"], [data-issue-review-nav="next"]');
+  cachedIssuePrevButtons.length > 0 || cachedIssueNextButtons.length > 0;
 
 const getCurrentIssueReviewIndex = () => {
   const reviews = getIssueReviewArticles();
@@ -717,17 +742,26 @@ const updateIssueReviewNavigator = () => {
   const index = getCurrentIssueReviewIndex();
   if (!reviews.length || index === -1) return;
 
-  const prevButtons = document.querySelectorAll('[data-issue-review-nav="prev"]');
-  const nextButtons = document.querySelectorAll('[data-issue-review-nav="next"]');
-
-  prevButtons.forEach((button) => {
-    button.disabled = index <= 0;
-    button.dataset.targetIndex = String(index - 1);
+  cachedIssuePrevButtons.forEach((button) => {
+    const shouldDisable = index <= 0;
+    const targetIndex = String(index - 1);
+    if (button.disabled !== shouldDisable) {
+      button.disabled = shouldDisable;
+    }
+    if (button.dataset.targetIndex !== targetIndex) {
+      button.dataset.targetIndex = targetIndex;
+    }
   });
 
-  nextButtons.forEach((button) => {
-    button.disabled = index >= reviews.length - 1;
-    button.dataset.targetIndex = String(index + 1);
+  cachedIssueNextButtons.forEach((button) => {
+    const shouldDisable = index >= reviews.length - 1;
+    const targetIndex = String(index + 1);
+    if (button.disabled !== shouldDisable) {
+      button.disabled = shouldDisable;
+    }
+    if (button.dataset.targetIndex !== targetIndex) {
+      button.dataset.targetIndex = targetIndex;
+    }
   });
 };
 
@@ -868,6 +902,8 @@ document.addEventListener('click', async (event) => {
   currentInstance.hide();
 });
 
+refreshIssueReviewNavigatorCache();
+
 window.addEventListener('scroll', scheduleIssueReviewNavigatorUpdate, {
   passive: true,
 });
@@ -879,6 +915,7 @@ document.body.addEventListener('htmx:afterSettle', () => {
   }
 
   updateMobileToolbarState();
+  refreshIssueReviewNavigatorCache();
   scheduleIssueReviewNavigatorUpdate();
   syncNativeShareButtons();
   observeAnalyticsReviewElements();
