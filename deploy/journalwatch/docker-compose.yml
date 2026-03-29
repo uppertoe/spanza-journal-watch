@@ -145,6 +145,7 @@ services:
     oom_score_adj: -100
     volumes:
       - jw_access_logs:/app/access_logs
+      - jw_staticfiles:/app/staticfiles
     networks:
       - jw_internal # workers don't need caddy
 
