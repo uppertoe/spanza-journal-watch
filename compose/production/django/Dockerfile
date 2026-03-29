@@ -14,11 +14,10 @@ FROM node:22-bookworm-slim AS client-builder
 ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
 
-COPY ./package.json ${APP_HOME}
-#RUN npm install && npm cache clean --force
+COPY ./package.json ${APP_HOME}/
 RUN yarn install && yarn cache clean --force
-COPY . ${APP_HOME}
-#RUN npm run build
+COPY ./webpack ${APP_HOME}/webpack
+COPY ./spanza_journal_watch/static ${APP_HOME}/spanza_journal_watch/static
 RUN yarn run build
 # define an alias for the specific python version used in this file.
 FROM python:3.13-slim-bookworm AS python
@@ -60,8 +59,8 @@ RUN addgroup --system django \
 
 # Install required system dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
-  # psycopg2 dependencies
-  libpq-dev \
+  # PostgreSQL runtime library for psycopg
+  libpq5 \
   # Translations dependencies
   gettext \
   # cleaning up unused files
@@ -99,8 +98,16 @@ COPY ./compose/production/django/celery/flower/start /start-flower
 RUN sed -i 's/\r$//g' /start-flower
 RUN chmod +x /start-flower
 
-# copy application code to WORKDIR
-COPY --from=client-builder --chown=django:django ${APP_HOME} ${APP_HOME}
+# Copy application code into the runtime image. Frontend build dependencies
+# stay in the Node build stage; only built assets are copied below.
+COPY --chown=django:django ./config ${APP_HOME}/config
+COPY --chown=django:django ./docs ${APP_HOME}/docs
+COPY --chown=django:django ./manage.py ${APP_HOME}/manage.py
+COPY --chown=django:django ./spanza_journal_watch ${APP_HOME}/spanza_journal_watch
+COPY --from=client-builder --chown=django:django \
+  ${APP_HOME}/spanza_journal_watch/static/webpack_bundles \
+  ${APP_HOME}/spanza_journal_watch/static/webpack_bundles
+COPY --from=client-builder --chown=django:django ${APP_HOME}/webpack-stats.json ${APP_HOME}/webpack-stats.json
 
 # Copy built documentation so it can be served at /editorial/docs/
 COPY --from=docs-builder --chown=django:django /docs-build ${APP_HOME}/docs/_build/html
