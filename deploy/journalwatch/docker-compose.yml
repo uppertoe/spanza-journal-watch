@@ -133,7 +133,9 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - jw_internal
+      jw_internal:
+        aliases:
+          - mjml
 
   # ---------------------------------------------------------------------------
   # Celery worker + beat
