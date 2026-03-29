@@ -27,7 +27,7 @@ if not settings.DEBUG:  # Anymail only available in production
 
             message = event.message
             msg_id = (getattr(message, "message_id", None) or "").strip()
-            in_reply_to = (message.headers.get("In-Reply-To") or "").strip() if message.headers else ""
+            in_reply_to = (message.get("In-Reply-To") or "").strip()
             received_at = message.date or timezone.now()
 
             # Try to link to an existing thread via In-Reply-To matching a sent message_id

@@ -30,6 +30,9 @@ What this script does:
   - Creates the SES configuration set (TrackingConfigSet[-suffix])
   - Creates the SNS topic for bounce/complaint events (journalwatch-ses-events[-suffix])
   - Wires SES → SNS for Bounce + Complaint event types
+  - Optionally creates SES inbound resources:
+    - SNS topic for inbound events (journalwatch-ses-inbound[-suffix])
+    - receipt rule set + active receipt rule writing to S3 email/*
   - Prints the SNS subscription command to run once the app is live
 
 What requires manual steps:
@@ -128,6 +131,12 @@ def django_policy(bucket):
                 "Action": ["ses:SendEmail", "ses:SendRawEmail"],
                 "Resource": "*",
             },
+            {
+                "Sid": "SNSConfirmSubscription",
+                "Effect": "Allow",
+                "Action": ["sns:ConfirmSubscription"],
+                "Resource": "arn:aws:sns:*:*:*",
+            },
         ],
     }
 
@@ -172,10 +181,10 @@ def backup_policy(bucket):
     }
 
 
-def media_public_read_policy(bucket):
-    return {
-        "Version": "2012-10-17",
-        "Statement": [
+def bucket_policy(bucket, *, enable_media_public_read=True, ses_inbound_source_arn=None, account_id=None):
+    statements = []
+    if enable_media_public_read:
+        statements.append(
             {
                 "Sid": "PublicReadMedia",
                 "Effect": "Allow",
@@ -183,8 +192,26 @@ def media_public_read_policy(bucket):
                 "Action": "s3:GetObject",
                 "Resource": f"arn:aws:s3:::{bucket}/media/*",
             }
-        ],
-    }
+        )
+    if ses_inbound_source_arn and account_id:
+        statements.append(
+            {
+                "Sid": "AllowSESPuts",
+                "Effect": "Allow",
+                "Principal": {"Service": "ses.amazonaws.com"},
+                "Action": "s3:PutObject",
+                "Resource": f"arn:aws:s3:::{bucket}/email/*",
+                "Condition": {
+                    "StringEquals": {
+                        "AWS:SourceArn": ses_inbound_source_arn,
+                        "AWS:SourceAccount": account_id,
+                    }
+                },
+            }
+        )
+    if not statements:
+        return None
+    return {"Version": "2012-10-17", "Statement": statements}
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +224,9 @@ def setup_s3(
     bucket,
     region,
     *,
+    account_id=None,
     enable_media_public_read=True,
+    ses_inbound_source_arn=None,
     backup_noncurrent_expiration_days=0,
     enable_versioning=True,
 ):
@@ -229,9 +258,20 @@ def setup_s3(
     )
     ok("Public ACLs blocked; bucket policy access allowed")
 
-    if enable_media_public_read:
-        s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(media_public_read_policy(bucket)))
-        ok("Bucket policy: public read enabled for media/* only")
+    policy = bucket_policy(
+        bucket,
+        enable_media_public_read=enable_media_public_read,
+        ses_inbound_source_arn=ses_inbound_source_arn,
+        account_id=account_id,
+    )
+    if policy:
+        s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(policy))
+        policy_bits = []
+        if enable_media_public_read:
+            policy_bits.append("public read enabled for media/*")
+        if ses_inbound_source_arn and account_id:
+            policy_bits.append("SES inbound write enabled for email/*")
+        ok(f"Bucket policy: {' + '.join(policy_bits)}")
 
     # Versioning
     if enable_versioning:
@@ -426,6 +466,62 @@ def setup_sns(sns, ses_v2, region, account_id, domain, webhook_secret, suffix=""
     return topic_arn
 
 
+def inbound_ses_names(region, account_id, domain, suffix=""):
+    sfx = f"-{suffix}" if suffix else ""
+    topic_name = f"journalwatch-ses-inbound{sfx}"
+    rule_set_name = f"journalwatch-inbound{sfx}" if suffix else "journalwatch-inbound"
+    rule_name = f"ReceiveToS3SNS{sfx}" if suffix else "ReceiveToS3SNS"
+    recipient = f"hello@{domain}"
+    rule_arn = f"arn:aws:ses:{region}:{account_id}:receipt-rule-set/{rule_set_name}:receipt-rule/{rule_name}"
+    return topic_name, rule_set_name, rule_name, recipient, rule_arn
+
+
+def setup_inbound_ses(ses, sns, bucket, region, account_id, domain, suffix=""):
+    section("SES inbound")
+    topic_name, rule_set_name, rule_name, recipient, rule_arn = inbound_ses_names(
+        region, account_id, domain, suffix=suffix
+    )
+
+    topic_arn = sns.create_topic(Name=topic_name)["TopicArn"]
+    ok(f"Inbound SNS topic ready: {topic_arn}")
+
+    try:
+        ses.create_receipt_rule_set(RuleSetName=rule_set_name)
+        ok(f"Receipt rule set created: {rule_set_name}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "AlreadyExists":
+            skip(f"Receipt rule set already exists: {rule_set_name}")
+        else:
+            raise
+
+    rule = {
+        "Name": rule_name,
+        "Enabled": True,
+        "TlsPolicy": "Optional",
+        "Recipients": [recipient],
+        "Actions": [
+            {"S3Action": {"BucketName": bucket, "ObjectKeyPrefix": "email/"}},
+            {"SNSAction": {"TopicArn": topic_arn, "Encoding": "UTF-8"}},
+        ],
+        "ScanEnabled": True,
+    }
+
+    try:
+        ses.create_receipt_rule(RuleSetName=rule_set_name, Rule=rule)
+        ok(f"Receipt rule created: {rule_name} for {recipient}")
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "AlreadyExists":
+            ses.update_receipt_rule(RuleSetName=rule_set_name, Rule=rule)
+            ok(f"Receipt rule updated: {rule_name}")
+        else:
+            raise
+
+    ses.set_active_receipt_rule_set(RuleSetName=rule_set_name)
+    ok(f"Active receipt rule set: {rule_set_name}")
+
+    return topic_arn, rule_set_name, rule_name, rule_arn
+
+
 # ---------------------------------------------------------------------------
 # Output helpers
 # ---------------------------------------------------------------------------
@@ -455,6 +551,7 @@ def print_credentials(keys, bucket, planka_bucket, backup_bucket, region, config
             ],
         )
         print("  WEBHOOK_SECRET is chosen by you, not AWS.")
+        print("  For Anymail with Amazon SES it must be in username:password format.")
         print("  Use the same value in .env and in the aws sns subscribe URL shown below.")
         print("  Django will not receive SNS events until you create that HTTPS subscription.\n")
 
@@ -518,7 +615,7 @@ def print_dns_records(ses_domain, dkim_tokens, region, reusing_identity=False):
         print(r)
 
 
-def print_manual_steps(domain, region, topic_arn, webhook_secret):
+def print_manual_steps(domain, region, topic_arn, webhook_secret, inbound_topic_arn=None):
     section("Manual steps remaining")
 
     steps = [
@@ -532,16 +629,29 @@ def print_manual_steps(domain, region, topic_arn, webhook_secret):
             "3. Subscribe SNS to the Django webhook",
             "Run this once your app is publicly reachable.\n"
             "     This is the step that connects the SNS topic to Django.\n"
-            "     Use the same WEBHOOK_SECRET value that you placed in .env.\n\n"
+            "     Use the exact WEBHOOK_SECRET value from .env in the HTTPS endpoint URL below.\n"
+            "     For Anymail this must already be in username:password format.\n\n"
             f"     aws sns subscribe \\\n"
             f"       --region {region} \\\n"
             f"       --topic-arn {topic_arn} \\\n"
             f"       --protocol https \\\n"
-            f"       --notification-endpoint 'https://{domain}/anymail/amazon_ses/tracking/?secret={webhook_secret}'\n\n"
+            "       --notification-endpoint "
+            f"'https://{webhook_secret}@{domain}/anymail/amazon_ses/tracking/'\n\n"
             "     Django auto-confirms the subscription. Check SNS console for 'Confirmed' status.",
         ),
         (
-            "4. Create SES SMTP credentials (for backup email notifications)",
+            "4. Subscribe inbound SNS to the Django inbound webhook",
+            "Run this only if you enabled SES inbound rule setup.\n"
+            "     Use the same WEBHOOK_SECRET value from .env.\n\n"
+            f"     aws sns subscribe \\\n"
+            f"       --region {region} \\\n"
+            f"       --topic-arn {inbound_topic_arn or 'YOUR-INBOUND-TOPIC-ARN'} \\\n"
+            f"       --protocol https \\\n"
+            f"       --notification-endpoint 'https://{webhook_secret}@{domain}/anymail/amazon_ses/inbound/'\n\n"
+            "     Django auto-confirms the subscription. Check SNS console for 'Confirmed' status.",
+        ),
+        (
+            "5. Create SES SMTP credentials (for backup email notifications)",
             f"https://console.aws.amazon.com/ses/home?region={region}#/smtp-settings\n"
             "     Click 'Create SMTP credentials'. Add the output to /etc/restic/env.",
         ),
@@ -563,6 +673,7 @@ def provision(
     iam,
     ses_v2,
     sns,
+    ses,
     bucket,
     planka_bucket,
     backup_bucket,
@@ -572,6 +683,7 @@ def provision(
     webhook_secret,
     suffix="",
     ses_domain=None,
+    enable_inbound=False,
     backup_noncurrent_expiration_days=0,
 ):
     """
@@ -588,6 +700,8 @@ def provision(
     """
     ses_domain = ses_domain or domain
     config_set_name = f"TrackingConfigSet-{suffix}" if suffix else "TrackingConfigSet"
+    inbound_rule_arn = None
+    inbound_topic_arn = None
 
     setup_s3(s3, bucket, region, backup_noncurrent_expiration_days=backup_noncurrent_expiration_days)
     if planka_bucket != bucket:
@@ -607,12 +721,28 @@ def provision(
             backup_noncurrent_expiration_days=0,
             enable_versioning=False,
         )
+    if enable_inbound:
+        _, _, _, _, inbound_rule_arn = inbound_ses_names(region, account_id, domain, suffix=suffix)
+        # Re-apply bucket policy before receipt rule creation validations are needed.
+        # SES requires permission to write to email/* at rule-creation time.
+        setup_s3(
+            s3,
+            bucket,
+            region,
+            account_id=account_id,
+            enable_media_public_read=True,
+            ses_inbound_source_arn=inbound_rule_arn,
+            backup_noncurrent_expiration_days=backup_noncurrent_expiration_days,
+        )
+        inbound_topic_arn, _, _, inbound_rule_arn = setup_inbound_ses(
+            ses, sns, bucket, region, account_id, domain, suffix=suffix
+        )
     keys = setup_iam(iam, bucket, planka_bucket, backup_bucket, suffix=suffix)
     dkim_tokens = setup_ses(ses_v2, ses_domain, config_set_name)
     topic_arn = setup_sns(
         sns, ses_v2, region, account_id, domain, webhook_secret, suffix=suffix, config_set_name=config_set_name
     )
-    return keys, dkim_tokens, topic_arn
+    return keys, dkim_tokens, topic_arn, inbound_topic_arn
 
 
 # ---------------------------------------------------------------------------
@@ -629,7 +759,8 @@ def parse_args(argv=None):
               # Production
               python deploy/bootstrap/aws_setup.py --profile jw-admin \\
                   --bucket jw-prod --planka-bucket jw-prod-planka \\
-                  --backup-bucket jw-prod-backups --domain journalwatch.org.au
+                  --backup-bucket jw-prod-backups --domain journalwatch.org.au \\
+                  --enable-inbound
 
               # Staging — reuses the existing SES identity (journalwatch.org.au is already verified)
               python deploy/bootstrap/aws_setup.py --profile jw-admin \\
@@ -694,6 +825,11 @@ def parse_args(argv=None):
         help="Expire noncurrent object versions under backups/ after N days. "
         "Default: 0 (disabled; useful when Restic already manages snapshots).",
     )
+    p.add_argument(
+        "--enable-inbound",
+        action="store_true",
+        help="Create/update SES inbound SNS topic + receipt rule set and make it active for hello@<domain>.",
+    )
     return p.parse_args(argv)
 
 
@@ -726,6 +862,7 @@ def main(argv=None):
         s3 = session.client("s3")
         iam = session.client("iam")
         ses_v2 = session.client("sesv2")
+        ses = session.client("ses")
         sns = session.client("sns")
         sts = session.client("sts")
 
@@ -735,11 +872,12 @@ def main(argv=None):
         sys.exit(f"\nAWS authentication failed: {e}")
 
     try:
-        keys, dkim_tokens, topic_arn = provision(
+        keys, dkim_tokens, topic_arn, inbound_topic_arn = provision(
             s3,
             iam,
             ses_v2,
             sns,
+            ses,
             args.bucket,
             args.planka_bucket,
             args.backup_bucket,
@@ -749,6 +887,7 @@ def main(argv=None):
             args.webhook_secret,
             suffix=args.suffix,
             ses_domain=ses_domain,
+            enable_inbound=args.enable_inbound,
             backup_noncurrent_expiration_days=args.backup_noncurrent_expiration_days,
         )
     except ClientError as e:
@@ -764,7 +903,13 @@ def main(argv=None):
         webhook_secret=args.webhook_secret,
     )
     print_dns_records(ses_domain, dkim_tokens, args.region, reusing_identity=reusing_identity)
-    print_manual_steps(args.domain, args.region, topic_arn, args.webhook_secret or "YOUR-WEBHOOK-SECRET")
+    print_manual_steps(
+        args.domain,
+        args.region,
+        topic_arn,
+        args.webhook_secret or "YOUR-WEBHOOK-SECRET",
+        inbound_topic_arn=inbound_topic_arn,
+    )
 
     print(f"\n{GREEN}{BOLD}Done.{RESET}\n")
 

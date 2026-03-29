@@ -17,10 +17,10 @@ from moto import mock_aws
 
 from deploy.bootstrap.aws_setup import (
     backup_policy,
+    bucket_policy,
     create_iam_user,
     django_policy,
     main,
-    media_public_read_policy,
     parse_args,
     planka_policy,
     print_credentials,
@@ -81,6 +81,16 @@ def ses_v2():
     return mock
 
 
+@pytest.fixture
+def ses():
+    mock = MagicMock()
+    mock.create_receipt_rule_set.return_value = {}
+    mock.create_receipt_rule.return_value = {}
+    mock.update_receipt_rule.return_value = {}
+    mock.set_active_receipt_rule_set.return_value = {}
+    return mock
+
+
 # ---------------------------------------------------------------------------
 # Policy document tests (pure unit — no mocking)
 # ---------------------------------------------------------------------------
@@ -90,7 +100,7 @@ class TestPolicyDocuments:
     def test_django_policy_sids(self):
         doc = django_policy(BUCKET)
         sids = {s["Sid"] for s in doc["Statement"]}
-        assert sids == {"S3MediaReadWrite", "S3InboundEmailRead", "S3ListBucket", "SESSend"}
+        assert sids == {"S3MediaReadWrite", "S3InboundEmailRead", "S3ListBucket", "SESSend", "SNSConfirmSubscription"}
 
     def test_django_policy_media_resource(self):
         doc = django_policy(BUCKET)
@@ -105,6 +115,12 @@ class TestPolicyDocuments:
         assert "ses:SendEmail" in ses["Action"]
         assert "ses:SendRawEmail" in ses["Action"]
         assert ses["Resource"] == "*"
+
+    def test_django_policy_allows_sns_confirm_subscription(self):
+        doc = django_policy(BUCKET)
+        sns = next(s for s in doc["Statement"] if s["Sid"] == "SNSConfirmSubscription")
+        assert sns["Action"] == ["sns:ConfirmSubscription"]
+        assert sns["Resource"] == "arn:aws:sns:*:*:*"
 
     def test_planka_policy_sids(self):
         doc = planka_policy(BUCKET)
@@ -136,19 +152,19 @@ class TestPolicyDocuments:
 
     def test_policies_use_correct_bucket(self):
         other = "other-bucket"
-        for policy_fn in (django_policy, planka_policy, backup_policy, media_public_read_policy):
+        for policy_fn in (django_policy, planka_policy, backup_policy):
             doc = policy_fn(other)
             resources = []
             for stmt in doc["Statement"]:
                 r = stmt.get("Resource", "")
                 resources += r if isinstance(r, list) else [r]
-            bucket_resources = [r for r in resources if r != "*"]
+            bucket_resources = [r for r in resources if r != "*" and not r.startswith("arn:aws:sns:")]
             assert all(
                 other in r for r in bucket_resources
             ), f"{policy_fn.__name__} has resources not scoped to bucket '{other}'"
 
-    def test_media_public_read_policy_only_exposes_media_prefix(self):
-        doc = media_public_read_policy(BUCKET)
+    def test_bucket_policy_public_read_only_exposes_media_prefix(self):
+        doc = bucket_policy(BUCKET)
         assert doc["Statement"] == [
             {
                 "Sid": "PublicReadMedia",
@@ -158,6 +174,15 @@ class TestPolicyDocuments:
                 "Resource": f"arn:aws:s3:::{BUCKET}/media/*",
             }
         ]
+
+    def test_bucket_policy_can_include_ses_inbound_write(self):
+        doc = bucket_policy(
+            BUCKET,
+            ses_inbound_source_arn=f"arn:aws:ses:{REGION}:{ACCOUNT_ID}:receipt-rule-set/journalwatch-inbound:receipt-rule/ReceiveToS3SNS",
+            account_id=ACCOUNT_ID,
+        )
+        sids = {s["Sid"] for s in doc["Statement"]}
+        assert {"PublicReadMedia", "AllowSESPuts"} <= sids
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +214,7 @@ class TestSetupS3:
         setup_s3(s3, BUCKET, REGION)
         resp = s3.get_bucket_policy(Bucket=BUCKET)
         policy = json.loads(resp["Policy"])
-        assert policy == media_public_read_policy(BUCKET)
+        assert policy == bucket_policy(BUCKET)
 
     def test_idempotent(self, s3):
         """Running setup twice should not raise."""
@@ -392,23 +417,37 @@ class TestSetupSNS:
         assert sum(1 for t in topics if "journalwatch-ses-events" in t) == 1
 
 
+class TestSetupInboundSES:
+    def test_creates_inbound_topic_rule_set_and_rule(self, sns, ses):
+        from deploy.bootstrap.aws_setup import setup_inbound_ses
+
+        topic_arn, rule_set_name, rule_name, rule_arn = setup_inbound_ses(ses, sns, BUCKET, REGION, ACCOUNT_ID, DOMAIN)
+        assert "journalwatch-ses-inbound" in topic_arn
+        assert rule_set_name == "journalwatch-inbound"
+        assert rule_name == "ReceiveToS3SNS"
+        assert rule_arn.endswith("receipt-rule/ReceiveToS3SNS")
+        ses.create_receipt_rule_set.assert_called_once_with(RuleSetName="journalwatch-inbound")
+        ses.set_active_receipt_rule_set.assert_called_once_with(RuleSetName="journalwatch-inbound")
+
+
 # ---------------------------------------------------------------------------
 # End-to-end provision() tests
 # ---------------------------------------------------------------------------
 
 
 class TestProvision:
-    def test_provision_creates_all_resources(self, ses_v2):
+    def test_provision_creates_all_resources(self, ses_v2, ses):
         with mock_aws():
             s3 = boto3.client("s3", region_name=REGION)
             iam = boto3.client("iam", region_name=REGION)
             sns = boto3.client("sns", region_name=REGION)
 
-            keys, dkim_tokens, topic_arn = provision(
+            keys, dkim_tokens, topic_arn, inbound_topic_arn = provision(
                 s3,
                 iam,
                 ses_v2,
                 sns,
+                ses,
                 BUCKET,
                 f"{BUCKET}-planka",
                 f"{BUCKET}-backups",
@@ -436,11 +475,12 @@ class TestProvision:
 
             # SNS topic ARN returned
             assert "journalwatch-ses-events" in topic_arn
+            assert inbound_topic_arn is None
 
             backup_versioning = s3.get_bucket_versioning(Bucket=f"{BUCKET}-backups")
             assert "Status" not in backup_versioning
 
-    def test_provision_idempotent(self, ses_v2):
+    def test_provision_idempotent(self, ses_v2, ses):
         """Running provision twice should not raise."""
         ses_v2.create_configuration_set_event_destination.side_effect = [
             {},
@@ -459,6 +499,7 @@ class TestProvision:
                 iam,
                 ses_v2,
                 sns,
+                ses,
                 BUCKET,
                 f"{BUCKET}-planka",
                 f"{BUCKET}-backups",
@@ -468,11 +509,12 @@ class TestProvision:
                 WEBHOOK_SECRET,
             )
             # Second call — users and bucket already exist
-            keys2, _, _ = provision(
+            keys2, _, _, _ = provision(
                 s3,
                 iam,
                 ses_v2,
                 sns,
+                ses,
                 BUCKET,
                 f"{BUCKET}-planka",
                 f"{BUCKET}-backups",
@@ -485,7 +527,7 @@ class TestProvision:
             # No new keys on second run (users already have keys)
             assert keys2 == {}
 
-    def test_provision_staging_suffix(self, ses_v2):
+    def test_provision_staging_suffix(self, ses_v2, ses):
         """--suffix creates namespaced IAM users, SNS topic, and config set."""
         staging_bucket = "jw-staging"
         with mock_aws():
@@ -493,11 +535,12 @@ class TestProvision:
             iam = boto3.client("iam", region_name=REGION)
             sns = boto3.client("sns", region_name=REGION)
 
-            keys, _, topic_arn = provision(
+            keys, _, topic_arn, inbound_topic_arn = provision(
                 s3,
                 iam,
                 ses_v2,
                 sns,
+                ses,
                 staging_bucket,
                 f"{staging_bucket}-planka",
                 f"{staging_bucket}-backups",
@@ -514,6 +557,7 @@ class TestProvision:
             assert "jw-django" not in users
 
             assert "journalwatch-ses-events-staging" in topic_arn
+            assert inbound_topic_arn is None
 
             ses_v2.create_configuration_set.assert_called_with(ConfigurationSetName="TrackingConfigSet-staging")
             # SES identity uses ses_domain (prod domain), not the staging app domain
@@ -521,6 +565,30 @@ class TestProvision:
                 EmailIdentity=DOMAIN,
                 DkimSigningAttributes={"NextSigningKeyLength": "RSA_2048_BIT"},
             )
+
+    def test_provision_can_enable_inbound(self, ses_v2, ses):
+        with mock_aws():
+            s3 = boto3.client("s3", region_name=REGION)
+            iam = boto3.client("iam", region_name=REGION)
+            sns = boto3.client("sns", region_name=REGION)
+
+            _, _, _, inbound_topic_arn = provision(
+                s3,
+                iam,
+                ses_v2,
+                sns,
+                ses,
+                BUCKET,
+                f"{BUCKET}-planka",
+                f"{BUCKET}-backups",
+                REGION,
+                DOMAIN,
+                ACCOUNT_ID,
+                WEBHOOK_SECRET,
+                enable_inbound=True,
+            )
+
+            assert "journalwatch-ses-inbound" in inbound_topic_arn
 
 
 # ---------------------------------------------------------------------------
@@ -630,6 +698,7 @@ class TestCliEntryPoints:
                 clients = {
                     "s3": MagicMock(),
                     "iam": MagicMock(),
+                    "ses": MagicMock(),
                     "sesv2": MagicMock(),
                     "sns": MagicMock(),
                     "sts": sts,
@@ -640,7 +709,7 @@ class TestCliEntryPoints:
 
             with patch(
                 "deploy.bootstrap.aws_setup.provision",
-                return_value=({}, [], "arn:aws:sns:ap-southeast-2:123456789012:journalwatch-ses-events"),
+                return_value=({}, [], "arn:aws:sns:ap-southeast-2:123456789012:journalwatch-ses-events", None),
             ):
                 main(["--bucket", BUCKET, "--domain", DOMAIN, "--profile", "jw-admin", "--region", REGION])
 

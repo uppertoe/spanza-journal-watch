@@ -22,6 +22,12 @@ DRY_RUN=false
 # ---------------------------------------------------------------------------
 gen_token() { python3 -c "import secrets; print(secrets.token_urlsafe($1))"; }
 gen_hex()   { openssl rand -hex "$1"; }
+gen_webhook_secret() {
+    local user pass
+    user="$(gen_token 12)"
+    pass="$(gen_token 18)"
+    printf '%s:%s' "$user" "$pass"
+}
 prompt() {
     local var="$1" label="$2" default="${3:-}"
     local value=""
@@ -67,7 +73,7 @@ echo "Generating secrets..."
 DJANGO_SECRET_KEY="$(gen_token 64)"
 POSTGRES_USER="jw_$(gen_token 8 | tr -dc 'a-z0-9' | head -c 8)"
 POSTGRES_PASSWORD="$(gen_token 24)"
-WEBHOOK_SECRET="$(gen_token 24)"
+WEBHOOK_SECRET="$(gen_webhook_secret)"
 FLOWER_USER="flower"
 FLOWER_PASSWORD="$(gen_token 24)"
 OIDC_CLIENT_SECRET="$(gen_hex 32)"
@@ -148,7 +154,9 @@ DJANGO_AWS_DEFAULT_REGION=ap-southeast-2
 # Amazon SES (transactional email)
 # =============================================================================
 
-# SNS webhook signing secret — must match the value registered in SES/SNS
+# SNS webhook basic-auth secret for Anymail.
+# Format must be username:password and must exactly match the value embedded in
+# the SNS subscription endpoint URL.
 WEBHOOK_SECRET=${WEBHOOK_SECRET}
 DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX=email
 
