@@ -57,6 +57,8 @@ jobs:
           context: .
           file: compose/production/django/Dockerfile
           push: true
+          sbom: true
+          provenance: mode=max
           tags: ${{ steps.refs.outputs.app_tags }}
 
       - name: Build and push mjml image
@@ -65,4 +67,6 @@ jobs:
           context: .
           file: compose/production/mjml-tcp/Dockerfile
           push: true
+          sbom: true
+          provenance: mode=max
           tags: ${{ steps.refs.outputs.mjml_tags }}

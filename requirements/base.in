@@ -20,7 +20,7 @@ django-environ
 django-model-utils
 django-allauth
 django-oauth-toolkit[oidc]
-PyJWT
+PyJWT>=2.12.1,<3
 django-crispy-forms
 crispy-bootstrap5
 django-redis
