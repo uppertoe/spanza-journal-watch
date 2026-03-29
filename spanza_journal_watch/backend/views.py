@@ -506,6 +506,7 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None):
     planka_credential = _get_planka_integration_credential()
     watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
     planka_client_id = os.getenv("OIDC_CLIENT_ID", "planka-local")
+    planka_client_secret = os.getenv("OIDC_CLIENT_SECRET", "")
     planka_oidc_app = OAuthApplication.objects.filter(client_id=planka_client_id).first()
     backend_preference = _get_backend_preference() or BackendPreference(singleton=1)
 
@@ -536,6 +537,7 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None):
         "pubmed_api_key_form": PubmedApiKeyForm(),
         "planka_credential": planka_credential,
         "planka_oidc_app": planka_oidc_app,
+        "planka_oidc_client_secret_configured": bool(planka_client_secret.strip()),
         "planka_connected": planka_connected,
         "planka_connection_user": planka_connection_user,
         "planka_connection_error": planka_connection_error,

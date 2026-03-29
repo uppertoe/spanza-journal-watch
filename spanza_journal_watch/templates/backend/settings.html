@@ -88,6 +88,12 @@
             Registered as <code>{{ planka_oidc_app.client_id }}</code>.
           {% endif %}
         </p>
+        {% if not planka_oidc_client_secret_configured %}
+          <div class="alert alert-warning py-2 small mb-2">
+            <strong>OIDC client secret is missing.</strong>
+            Set <code>OIDC_CLIENT_SECRET</code> in the server env before running this step, otherwise Django will register Planka with a blank or fallback secret.
+          </div>
+        {% endif %}
         <div class="d-inline-flex align-items-center gap-2">
           <button
             type="button"

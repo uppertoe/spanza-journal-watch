@@ -929,6 +929,13 @@ document.addEventListener('click', async (event) => {
   currentInstance.hide();
 });
 
+document.addEventListener('pointerdown', (event) => {
+  const button = event.target.closest('[data-review-modal-nav]');
+  if (!button || button.disabled) return;
+
+  event.preventDefault();
+});
+
 refreshIssueReviewNavigatorCache();
 
 window.addEventListener('scroll', scheduleIssueReviewNavigatorUpdate, {
