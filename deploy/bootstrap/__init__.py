@@ -1,1 +1,1 @@
-"""Bootstrap helpers for new Journal Watch environments."""
+"""Deploy bootstrap helpers for one-off environment operations."""

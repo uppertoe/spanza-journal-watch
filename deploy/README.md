@@ -30,6 +30,9 @@ This repository contains two kinds of non-application files:
 - `aws_setup.py`
   Use to provision the Journal Watch AWS resources from a local machine with
   AWS admin credentials.
+- `backfill_inbox_threads.py`
+  Use after restoring an older database dump to link legacy inbound emails into
+  the newer threaded inbox model. Safe to rerun; start with `--dry-run`.
 - `migrate_postgres.sh`
   Use for rare Postgres major-version or dump-import migrations.
 
