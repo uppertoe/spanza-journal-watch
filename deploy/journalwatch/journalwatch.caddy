@@ -28,3 +28,8 @@
           reverse_proxy jw_planka:1337
       }
   }
+
+  # Flower — Celery monitoring
+  flower.{$DOMAIN} {
+      reverse_proxy jw_flower:5555
+  }

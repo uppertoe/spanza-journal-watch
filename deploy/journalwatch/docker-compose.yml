@@ -160,6 +160,31 @@ services:
     networks:
       - jw_internal
 
+  jw_flower:
+    <<: *jw_django
+    command: /start-flower
+    mem_reservation: 96m
+    mem_limit: 192m
+    oom_score_adj: 200
+    pids_limit: 64
+    volumes:
+      - jw_access_logs:/app/access_logs
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          'import base64, os; from urllib.request import Request, urlopen; token = base64.b64encode(f"{os.environ[''CELERY_FLOWER_USER'']}:{os.environ[''CELERY_FLOWER_PASSWORD'']}".encode()).decode(); req = Request(''http://127.0.0.1:5555/'', headers={''Authorization'': f''Basic {token}''}); urlopen(req, timeout=5)',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - caddy
+      - jw_internal
+
   # ---------------------------------------------------------------------------
   # Planka (profile: planka)
   # ---------------------------------------------------------------------------
