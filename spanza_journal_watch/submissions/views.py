@@ -1,7 +1,6 @@
 import json
 from urllib.parse import urlencode
 
-from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, JsonResponse
@@ -18,7 +17,7 @@ from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
-from .models import Article, Author, HealthService, Hit, Issue, Review, Tag
+from .models import Article, Author, HealthService, Issue, Review, Tag
 
 
 def build_share_urls(
@@ -73,35 +72,8 @@ def attach_review_display_fields(reviews, *, issue=None, include_share_context=F
     if not review_list:
         return review_list
 
-    review_ids = [review.id for review in review_list]
-    content_type = ContentType.objects.get_for_model(Review)
-
-    human_open_rows = (
-        AnalyticsEvent.objects.filter(
-            content_type=content_type,
-            object_id__in=review_ids,
-            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
-            automated=False,
-        )
-        .values("object_id")
-        .annotate(
-            distinct_sessions=Count("session_key", filter=~Q(session_key=""), distinct=True),
-            sessionless=Count("id", filter=Q(session_key="")),
-        )
-    )
-    human_hits_by_review = {
-        row["object_id"]: row["distinct_sessions"] + row["sessionless"] for row in human_open_rows if row["object_id"]
-    }
-    legacy_hits_by_review = {
-        object_id: count
-        for object_id, count in Hit.objects.filter(content_type=content_type, object_id__in=review_ids).values_list(
-            "object_id", "count"
-        )
-    }
-
     for review in review_list:
         review.display_review_date = issue.date if issue and issue.date else review.get_review_date()
-        review.display_hits = human_hits_by_review.get(review.id, legacy_hits_by_review.get(review.id, 0))
 
         if include_share_context:
             article_title = review.article.get_title().strip()
@@ -153,6 +125,8 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         share_title = f"SPANZA Journal Watch - {article_title}"
         share_description = self.object.get_truncated_body().strip()
         share_email_summary = self.object.get_plain_body().strip()
+        attach_review_display_fields([self.object], request=self.request)
+        review_date = self.object.display_review_date
         share_context = build_share_urls(
             share_title,
             canonical_url,
@@ -169,7 +143,7 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
                 "headline": share_title,
                 "description": share_description,
                 "url": canonical_url,
-                "datePublished": self.object.get_review_date().isoformat() if self.object.get_review_date() else "",
+                "datePublished": review_date.isoformat() if review_date else "",
                 "author": {
                     "@type": "Person",
                     "name": str(self.object.author),
@@ -183,8 +157,6 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         context["share_title"] = share_title
         context["share_description"] = share_description
         context["share_email_summary"] = share_email_summary
-        self.object.display_review_date = self.object.get_review_date()
-        self.object.display_hits = self.object.get_hits()
         context["share_text"] = share_context["share_text"]
         context["share_image_url"] = (
             self.request.build_absolute_uri(self.object.feature_image.url) if self.object.feature_image else ""
@@ -232,7 +204,8 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         context["article_cols"] = self.article_cols
         context["page_title"] = f"{self.object.name} | SPANZA Journal Watch"
         context["page_meta_description"] = (
-            f"{self.object.name}: curated Journal Watch reviews and commentary from the paediatric anaesthesia literature."
+            f"{self.object.name}: curated Journal Watch reviews and commentary "
+            "from the paediatric anaesthesia literature."
         )
         context["canonical_url"] = self.request.build_absolute_uri()
         context["structured_data"] = json.dumps(
@@ -421,8 +394,7 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
         Prefetch(
             "articles",
             queryset=(
-                Article.objects.select_related("journal")
-                .prefetch_related(
+                Article.objects.select_related("journal").prefetch_related(
                     Prefetch(
                         "reviews",
                         queryset=Review.objects.filter(active=True)
@@ -526,7 +498,9 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         context["selected_year"] = selected_year
         context["selected_tags"] = selected_tags
         context["page_title"] = "Search | SPANZA Journal Watch"
-        context["page_meta_description"] = "Search SPANZA Journal Watch reviews by title, author, journal, year, and topic."
+        context["page_meta_description"] = (
+            "Search SPANZA Journal Watch reviews by title, author, journal, year, and topic."
+        )
         context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:search"))
         context["meta_robots"] = "noindex,follow"
         context["structured_data"] = json.dumps(

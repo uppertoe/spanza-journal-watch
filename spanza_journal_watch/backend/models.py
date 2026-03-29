@@ -2,6 +2,7 @@ import base64
 import hashlib
 import secrets
 import uuid
+from email.utils import formataddr
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
@@ -606,8 +607,13 @@ class WatchedJournal(TimeStampedModel):
 
 
 class BackendPreference(TimeStampedModel):
+    DEFAULT_INBOX_FROM_NAME = "Journal Watch Admin"
+    DEFAULT_INBOX_FROM_ADDRESS = "admin@journalwatch.org.au"
+
     singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     default_watched_journals = models.ManyToManyField(WatchedJournal, blank=True, related_name="backend_preferences")
+    inbox_from_name = models.CharField(max_length=255, blank=True, default="")
+    inbox_from_address = models.EmailField(blank=True, default="")
 
     class Meta:
         verbose_name = "Backend Preference"
@@ -619,6 +625,15 @@ class BackendPreference(TimeStampedModel):
 
     def __str__(self):
         return "Backend preferences"
+
+    def get_inbox_from_name(self):
+        return (self.inbox_from_name or "").strip() or self.DEFAULT_INBOX_FROM_NAME
+
+    def get_inbox_from_address(self):
+        return (self.inbox_from_address or "").strip().lower() or self.DEFAULT_INBOX_FROM_ADDRESS
+
+    def get_inbox_from_email(self):
+        return formataddr((self.get_inbox_from_name(), self.get_inbox_from_address()))
 
 
 class PubmedImportBatch(TimeStampedModel):

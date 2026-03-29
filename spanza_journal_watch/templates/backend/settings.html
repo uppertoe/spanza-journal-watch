@@ -7,6 +7,32 @@
 </div>
 
 <div class="card mb-4">
+  <div class="card-header">Inbox sender</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Outgoing replies from the editorial inbox use this sender name and address.
+      Recipients will see it in the format <code>John Smith &lt;john.smith@domain.com&gt;</code>.
+    </p>
+    <p class="text-muted small mb-3">
+      Use an address on a domain already verified in Amazon SES. Changing only the display name does not require extra SES configuration.
+    </p>
+    <form method="post" action="{% url "backend:save_inbox_sender_settings" %}" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-lg-6">{{ inbox_settings_form.inbox_from_name|as_crispy_field }}</div>
+      <div class="col-12 col-lg-6">{{ inbox_settings_form.inbox_from_address|as_crispy_field }}</div>
+      <div class="col-12">
+        <div class="alert alert-secondary py-2 mb-0">
+          <strong>Preview:</strong> <code>{{ inbox_settings_preview }}</code>
+        </div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">Save inbox sender</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>PubMed API key</span>
     {% if pubmed_credential and pubmed_credential.get_api_key %}

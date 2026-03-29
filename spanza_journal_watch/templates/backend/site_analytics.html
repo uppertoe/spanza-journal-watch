@@ -73,8 +73,61 @@
     </div>
 </div>
 
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-6">
+        <div class="card h-100 border-success-subtle">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Known subscriber events</h6>
+                <p class="display-6 mb-0">{{ known_subscriber_events }}</p>
+                <p class="small text-muted mb-0">{{ known_subscriber_share }} of human-filtered activity</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Probable human events</h6>
+                <p class="display-6 mb-0">{{ probable_human_events }}</p>
+                <p class="small text-muted mb-0">{{ probable_human_share }} of human-filtered activity</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-12 col-xl-7">
+        <div class="card mb-4">
+            <div class="card-header">Human confidence mix</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Confidence</th>
+                            <th>Events</th>
+                            <th>Share</th>
+                            <th>Opens</th>
+                            <th>Engaged</th>
+                            <th>Shares</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in confidence_breakdown %}
+                        <tr>
+                            <td>{{ item.label }}</td>
+                            <td>{{ item.events }}</td>
+                            <td>{{ item.share_of_events }}</td>
+                            <td>{{ item.opens }}</td>
+                            <td>{{ item.engaged }}</td>
+                            <td>{{ item.shares }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-muted">No confidence data yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="card mb-4">
             <div class="card-header">How readers arrive at reviews</div>
             <div class="table-responsive">

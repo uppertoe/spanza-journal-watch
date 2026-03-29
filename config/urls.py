@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
+from django.http import HttpResponse
 from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic.base import TemplateView
@@ -20,8 +21,14 @@ sitemaps = {
     "authors": AuthorSitemap,
 }
 
+
+def healthz(_request):
+    return HttpResponse("ok", content_type="text/plain")
+
+
 urlpatterns = [
     # Layout
+    path("healthz", healthz, name="healthz"),
     path("", HomepageView.as_view(), name="home"),
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),
     path("robots.txt", TemplateView.as_view(template_name="robots.txt", content_type="text/plain")),

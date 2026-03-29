@@ -1,0 +1,8 @@
+<span
+  id="backend-inbox-unread-badge"
+  {% if oob %}hx-swap-oob="outerHTML"{% endif %}
+>
+  {% if inbox_unread_count %}
+  <span class="badge text-bg-danger rounded-pill" style="font-size:0.65em;">{{ inbox_unread_count }}</span>
+  {% endif %}
+</span>

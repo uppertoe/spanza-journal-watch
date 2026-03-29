@@ -1,11 +1,5 @@
-# Journal Watch — compose snippet for the vps-base-template server repo.
-# Copy the apps/journalwatch/ directory into your server repo's apps/ folder.
-#
-# Bring up the full stack:
-#   docker compose --profile workers --profile planka up -d
-#
-# Scale workers independently:
-#   docker compose up -d --scale jw_celeryworker=2
+# Journal Watch — included into the server master docker-compose.yml
+# Bring up with:  docker compose --profile workers --profile planka up -d
 
 networks:
   caddy:
@@ -20,6 +14,7 @@ volumes:
   jw_planka_data: {}
   jw_planka_postgres_data: {}
   jw_access_logs: {}
+  jw_staticfiles: {}
 
 services:
   # ---------------------------------------------------------------------------
@@ -28,30 +23,47 @@ services:
   jw_django: &jw_django
     image: ${JW_DOCKERHUB_NAMESPACE}/journalwatch-app:${JW_APP_TAG:-latest}
     restart: unless-stopped
+    mem_reservation: 256m
+    oom_score_adj: -300
+    pids_limit: 128
     command: /start
     depends_on:
       jw_postgres:
         condition: service_healthy
       jw_redis:
-        condition: service_started
+        condition: service_healthy
       jw_mjml:
-        condition: service_started
+        condition: service_healthy
     env_file: .env
     environment:
-      # Docker-internal addresses — always set here, never in .env
+      # Docker-internal addresses — always override these here, not in .env
       POSTGRES_HOST: jw_postgres
       POSTGRES_PORT: '5432'
       REDIS_URL: redis://jw_redis:6379/0
       PLANKA_BASE_URL: http://jw_planka:1337
-      PLANKA_DB_URL: postgresql://postgres@jw_planka_postgres/planka
+      PLANKA_DB_URL: postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
     volumes:
       - jw_access_logs:/app/access_logs
-      # Host-backed so Caddy can serve collected static files directly from
-      # /srv/repo/apps/journalwatch/staticfiles without going through Django.
-      - ./staticfiles:/app/staticfiles
+      - jw_staticfiles:/app/staticfiles
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - caddy
       - jw_internal
+
+  caddy:
+    volumes:
+      - jw_staticfiles:/srv/static/journal-watch:ro
 
   # ---------------------------------------------------------------------------
   # PostgreSQL (Django)
@@ -59,11 +71,13 @@ services:
   jw_postgres:
     image: postgres:17-alpine
     restart: unless-stopped
+    oom_score_adj: -500
+    pids_limit: 128
     env_file: .env
     volumes:
       - jw_postgres_data:/var/lib/postgresql/data
       - jw_postgres_backups:/backups
-    # Loopback-only — lets the server-level backup tooling connect from the host
+    # Exposed on loopback only so the VPS backup agent can connect from the host
     ports:
       - '127.0.0.1:5432:5432'
     healthcheck:
@@ -72,7 +86,7 @@ services:
           'CMD-SHELL',
           'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-spanza_journal_watch}',
         ]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
     networks:
@@ -84,56 +98,84 @@ services:
   jw_redis:
     image: redis:7-alpine
     restart: unless-stopped
+    mem_limit: 128m
+    oom_score_adj: 300
+    pids_limit: 64
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - jw_internal
 
   # ---------------------------------------------------------------------------
-  # MJML TCP server (transactional email template rendering)
+  # MJML TCP server (email template rendering)
   # ---------------------------------------------------------------------------
   jw_mjml:
     image: ${JW_DOCKERHUB_NAMESPACE}/journalwatch-mjml:${JW_APP_TAG:-latest}
     restart: unless-stopped
+    mem_limit: 128m
+    oom_score_adj: 400
+    pids_limit: 64
     command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "const net=require('net'); const socket=net.connect({host:'127.0.0.1',port:28101},()=>{socket.end(); process.exit(0)}); socket.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1),5000);",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - jw_internal
 
   # ---------------------------------------------------------------------------
-  # Celery worker  (profile: workers)
+  # Celery worker + beat
   # ---------------------------------------------------------------------------
   jw_celeryworker:
     <<: *jw_django
     command: /start-celeryworker
-    profiles: ['workers']
+    mem_reservation: 192m
+    oom_score_adj: -100
+    volumes:
+      - jw_access_logs:/app/access_logs
     networks:
-      - jw_internal # workers don't need Caddy access
+      - jw_internal # workers don't need caddy
 
-  # ---------------------------------------------------------------------------
-  # Celery beat  (profile: workers)
-  # ---------------------------------------------------------------------------
   jw_celerybeat:
     <<: *jw_django
     command: /start-celerybeat
-    profiles: ['workers']
+    mem_reservation: 64m
+    mem_limit: 128m
+    oom_score_adj: 350
+    pids_limit: 64
+    volumes:
+      - jw_access_logs:/app/access_logs
     networks:
       - jw_internal
 
   # ---------------------------------------------------------------------------
-  # Planka  (profile: planka)
+  # Planka (profile: planka)
   # ---------------------------------------------------------------------------
   jw_planka:
     image: ghcr.io/plankanban/planka:2.1.0
     restart: unless-stopped
-    profiles: ['planka']
+    mem_limit: 256m
+    oom_score_adj: 250
+    pids_limit: 128
     depends_on:
       jw_planka_postgres:
         condition: service_healthy
     env_file: .env
     environment:
-      # Internal DB URL — always set here
-      DATABASE_URL: postgresql://postgres@jw_planka_postgres/planka
-      # These derive from .env values; Docker Compose substitutes them at startup.
-      # Load .env into shell before running docker compose:
-      #   set -a; source apps/journalwatch/.env; set +a
+      DATABASE_URL: postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
+      # OIDC issuer is the public Django URL — read from .env
       OIDC_ISSUER: ${OIDC_ISS_ENDPOINT}
       DEFAULT_ADMIN_EMAIL: ${PLANKA_ADMIN_EMAIL}
       S3_REGION: ${PLANKA_S3_REGION}
@@ -143,6 +185,18 @@ services:
       S3_FORCE_PATH_STYLE: 'false'
     volumes:
       - ./planka/custom:/app/terms/custom:ro
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "const http=require('http'); const req=http.get('http://127.0.0.1:1337/', (res)=>{process.exit(res.statusCode === 200 ? 0 : 1)}); req.on('error',()=>process.exit(1)); req.setTimeout(5000,()=>{req.destroy(); process.exit(1)});",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - caddy
       - jw_internal
@@ -153,18 +207,23 @@ services:
   jw_planka_postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    profiles: ['planka']
+    oom_score_adj: -400
+    pids_limit: 128
     environment:
       POSTGRES_DB: planka
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_PASSWORD: ${PLANKA_POSTGRES_PASSWORD}
     volumes:
       - jw_planka_postgres_data:/var/lib/postgresql/data
     # Port 5433 avoids conflict with Django postgres on 5432
     ports:
       - '127.0.0.1:5433:5432'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d planka']
-      interval: 10s
+      test:
+        [
+          'CMD-SHELL',
+          'PGPASSWORD=$${POSTGRES_PASSWORD} pg_isready -U postgres -d planka',
+        ]
+      interval: 30s
       timeout: 5s
       retries: 5
     networks:

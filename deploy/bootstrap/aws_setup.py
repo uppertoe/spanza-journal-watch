@@ -160,14 +160,13 @@ def backup_policy(bucket):
                 "Sid": "S3BackupReadWrite",
                 "Effect": "Allow",
                 "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-                "Resource": f"arn:aws:s3:::{bucket}/backups/*",
+                "Resource": f"arn:aws:s3:::{bucket}/*",
             },
             {
                 "Sid": "S3ListBucket",
                 "Effect": "Allow",
                 "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
                 "Resource": f"arn:aws:s3:::{bucket}",
-                "Condition": {"StringLike": {"s3:prefix": "backups/*"}},
             },
         ],
     }
@@ -193,7 +192,15 @@ def media_public_read_policy(bucket):
 # ---------------------------------------------------------------------------
 
 
-def setup_s3(s3, bucket, region, *, enable_media_public_read=True, enable_backup_lifecycle=True):
+def setup_s3(
+    s3,
+    bucket,
+    region,
+    *,
+    enable_media_public_read=True,
+    backup_noncurrent_expiration_days=0,
+    enable_versioning=True,
+):
     section("S3 bucket")
 
     # Create bucket
@@ -227,11 +234,14 @@ def setup_s3(s3, bucket, region, *, enable_media_public_read=True, enable_backup
         ok("Bucket policy: public read enabled for media/* only")
 
     # Versioning
-    s3.put_bucket_versioning(
-        Bucket=bucket,
-        VersioningConfiguration={"Status": "Enabled"},
-    )
-    ok("Versioning: enabled")
+    if enable_versioning:
+        s3.put_bucket_versioning(
+            Bucket=bucket,
+            VersioningConfiguration={"Status": "Enabled"},
+        )
+        ok("Versioning: enabled")
+    else:
+        skip("Versioning: left disabled")
 
     # Default encryption (SSE-S3)
     s3.put_bucket_encryption(
@@ -256,13 +266,13 @@ def setup_s3(s3, bucket, region, *, enable_media_public_read=True, enable_backup
             "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7},
         }
     ]
-    if enable_backup_lifecycle:
+    if backup_noncurrent_expiration_days and backup_noncurrent_expiration_days > 0:
         rules.append(
             {
                 "ID": "expire-old-backup-versions",
                 "Status": "Enabled",
                 "Filter": {"Prefix": "backups/"},
-                "NoncurrentVersionExpiration": {"NoncurrentDays": 90},
+                "NoncurrentVersionExpiration": {"NoncurrentDays": backup_noncurrent_expiration_days},
             }
         )
 
@@ -270,8 +280,11 @@ def setup_s3(s3, bucket, region, *, enable_media_public_read=True, enable_backup
         Bucket=bucket,
         LifecycleConfiguration={"Rules": rules},
     )
-    if enable_backup_lifecycle:
-        ok("Lifecycle rules: incomplete multipart (7d) + old backup versions (90d)")
+    if backup_noncurrent_expiration_days and backup_noncurrent_expiration_days > 0:
+        ok(
+            "Lifecycle rules: incomplete multipart (7d) + old backup versions "
+            f"({backup_noncurrent_expiration_days}d)"
+        )
     else:
         ok("Lifecycle rules: incomplete multipart uploads expire after 7d")
 
@@ -315,7 +328,7 @@ def create_iam_user(iam, username, policy_name, policy_doc):
     return key["AccessKeyId"], key["SecretAccessKey"]
 
 
-def setup_iam(iam, bucket, planka_bucket, suffix=""):
+def setup_iam(iam, bucket, planka_bucket, backup_bucket, suffix=""):
     section("IAM users")
     keys = {}
     sfx = f"-{suffix}" if suffix else ""
@@ -328,7 +341,7 @@ def setup_iam(iam, bucket, planka_bucket, suffix=""):
     if result:
         keys["planka"] = result
 
-    result = create_iam_user(iam, f"jw-backup{sfx}", f"jw-backup{sfx}-policy", backup_policy(bucket))
+    result = create_iam_user(iam, f"jw-backup{sfx}", f"jw-backup{sfx}-policy", backup_policy(backup_bucket))
     if result:
         keys["backup"] = result
 
@@ -418,7 +431,7 @@ def setup_sns(sns, ses_v2, region, account_id, domain, webhook_secret, suffix=""
 # ---------------------------------------------------------------------------
 
 
-def print_credentials(keys, bucket, planka_bucket, region, config_set_name, webhook_secret=""):
+def print_credentials(keys, bucket, planka_bucket, backup_bucket, region, config_set_name, webhook_secret=""):
     if not keys:
         return
 
@@ -462,7 +475,7 @@ def print_credentials(keys, bucket, planka_bucket, region, config_set_name, webh
         box(
             "/etc/restic/env  →  Restic backups",
             [
-                f"RESTIC_REPOSITORY=s3:s3.amazonaws.com/{bucket}/backups",
+                f"RESTIC_REPOSITORY=s3:s3.amazonaws.com/{backup_bucket}",
                 f"AWS_ACCESS_KEY_ID={ak}",
                 f"AWS_SECRET_ACCESS_KEY={sk}",
                 f"AWS_DEFAULT_REGION={region}",
@@ -552,12 +565,14 @@ def provision(
     sns,
     bucket,
     planka_bucket,
+    backup_bucket,
     region,
     domain,
     account_id,
     webhook_secret,
     suffix="",
     ses_domain=None,
+    backup_noncurrent_expiration_days=0,
 ):
     """
     Run all provisioning steps and return (keys, dkim_tokens, topic_arn).
@@ -574,10 +589,25 @@ def provision(
     ses_domain = ses_domain or domain
     config_set_name = f"TrackingConfigSet-{suffix}" if suffix else "TrackingConfigSet"
 
-    setup_s3(s3, bucket, region)
+    setup_s3(s3, bucket, region, backup_noncurrent_expiration_days=backup_noncurrent_expiration_days)
     if planka_bucket != bucket:
-        setup_s3(s3, planka_bucket, region, enable_media_public_read=False, enable_backup_lifecycle=False)
-    keys = setup_iam(iam, bucket, planka_bucket, suffix=suffix)
+        setup_s3(
+            s3,
+            planka_bucket,
+            region,
+            enable_media_public_read=False,
+            backup_noncurrent_expiration_days=0,
+        )
+    if backup_bucket not in {bucket, planka_bucket}:
+        setup_s3(
+            s3,
+            backup_bucket,
+            region,
+            enable_media_public_read=False,
+            backup_noncurrent_expiration_days=0,
+            enable_versioning=False,
+        )
+    keys = setup_iam(iam, bucket, planka_bucket, backup_bucket, suffix=suffix)
     dkim_tokens = setup_ses(ses_v2, ses_domain, config_set_name)
     topic_arn = setup_sns(
         sns, ses_v2, region, account_id, domain, webhook_secret, suffix=suffix, config_set_name=config_set_name
@@ -597,10 +627,14 @@ def parse_args(argv=None):
         epilog=textwrap.dedent("""
             Examples:
               # Production
-              python deploy/bootstrap/aws_setup.py --profile jw-admin --bucket jw-prod --planka-bucket jw-prod-planka --domain journalwatch.org.au
+              python deploy/bootstrap/aws_setup.py --profile jw-admin \\
+                  --bucket jw-prod --planka-bucket jw-prod-planka \\
+                  --backup-bucket jw-prod-backups --domain journalwatch.org.au
 
               # Staging — reuses the existing SES identity (journalwatch.org.au is already verified)
-              python deploy/bootstrap/aws_setup.py --profile jw-admin --bucket jw-staging --planka-bucket jw-staging-planka \\
+              python deploy/bootstrap/aws_setup.py --profile jw-admin \\
+                  --bucket jw-staging --planka-bucket jw-staging-planka \\
+                  --backup-bucket jw-staging-backups \\
                   --domain staging.journalwatch.org.au --ses-domain journalwatch.org.au \\
                   --suffix staging
 
@@ -616,6 +650,12 @@ def parse_args(argv=None):
         default=None,
         dest="planka_bucket",
         help="Dedicated S3 bucket for Planka objects. Defaults to <bucket>-planka.",
+    )
+    p.add_argument(
+        "--backup-bucket",
+        default=None,
+        dest="backup_bucket",
+        help="Dedicated S3 bucket for Restic backups. Defaults to <bucket>-backups.",
     )
     p.add_argument(
         "--domain", required=True, help="App domain used for the SNS webhook URL (e.g. staging.journalwatch.org.au)"
@@ -646,6 +686,14 @@ def parse_args(argv=None):
         "Set to the prod domain (e.g. journalwatch.org.au) when the SES identity "
         "is already verified and you just need new IAM users / SNS topic.",
     )
+    p.add_argument(
+        "--backup-noncurrent-expiration-days",
+        type=int,
+        default=0,
+        dest="backup_noncurrent_expiration_days",
+        help="Expire noncurrent object versions under backups/ after N days. "
+        "Default: 0 (disabled; useful when Restic already manages snapshots).",
+    )
     return p.parse_args(argv)
 
 
@@ -653,6 +701,8 @@ def main(argv=None):
     args = parse_args(argv)
     if not args.planka_bucket:
         args.planka_bucket = f"{args.bucket}-planka"
+    if not args.backup_bucket:
+        args.backup_bucket = f"{args.bucket}-backups"
 
     ses_domain = args.ses_domain or args.domain
     reusing_identity = ses_domain != args.domain
@@ -661,6 +711,7 @@ def main(argv=None):
     print(f"\n{BOLD}Journal Watch — AWS provisioning{RESET}")
     print(f"  App bucket:   {args.bucket}")
     print(f"  Planka bucket:{' ' if len(args.planka_bucket) >= len(args.bucket) else '  '}{args.planka_bucket}")
+    print(f"  Backup bucket:{' ' if len(args.backup_bucket) >= len(args.bucket) else '  '}{args.backup_bucket}")
     print(f"  App domain:   {args.domain}")
     print(f"  SES identity: {ses_domain}{' (reusing existing)' if reusing_identity else ''}")
     print(f"  Config set:   {config_set_name}")
@@ -691,12 +742,14 @@ def main(argv=None):
             sns,
             args.bucket,
             args.planka_bucket,
+            args.backup_bucket,
             args.region,
             args.domain,
             account_id,
             args.webhook_secret,
             suffix=args.suffix,
             ses_domain=ses_domain,
+            backup_noncurrent_expiration_days=args.backup_noncurrent_expiration_days,
         )
     except ClientError as e:
         sys.exit(f"\n{RED}AWS error:{RESET} {e}")
@@ -705,6 +758,7 @@ def main(argv=None):
         keys,
         args.bucket,
         args.planka_bucket,
+        args.backup_bucket,
         args.region,
         config_set_name,
         webhook_secret=args.webhook_secret,

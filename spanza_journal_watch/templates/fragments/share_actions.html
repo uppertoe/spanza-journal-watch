@@ -6,7 +6,7 @@
             data-copy-share
             data-share-url="{{ canonical_url|default:'' }}"
         >
-            <svg class="share-chip__icon" aria-hidden="true"><use href="#icon-share"></use></svg>
+            <svg class="share-chip__icon" aria-hidden="true"><use href="#icon-link"></use></svg>
             <span>Copy link</span>
         </button>
         <a
@@ -20,11 +20,13 @@
         </a>
         <button
             type="button"
-            class="share-chip share-chip--native d-none"
+            class="share-chip share-chip--native"
             data-native-share
             data-share-title="{{ share_title|default:'' }}"
             data-share-text="{{ share_email_summary|default:'' }}"
             data-share-url="{{ canonical_url|default:'' }}"
+            hidden
+            aria-hidden="true"
         >
             <svg class="share-chip__icon" aria-hidden="true"><use href="#icon-share"></use></svg>
             <span>Share</span>

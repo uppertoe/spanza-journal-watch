@@ -7,7 +7,6 @@
     <h5 class="mb-1">{{ review.article.get_subtitle|capfirst }}</h5></a>
     <p class="mb-1 fst-italic">{{ review.article.journal }}</p>
     <p class="mb-1">Submitted {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
-    <p class="mb-3 fw-lighter">Read by {{ review.display_hits }} Journal Watch subscribers</p>
     <div class="mb-3">
         {% include 'fragments/share_actions.html' with share_title=review.share_title share_description=review.share_description share_email_summary=review.share_email_summary canonical_url=review.canonical_url share_text=review.share_text email_share_url=review.email_share_url bluesky_share_url=review.bluesky_share_url x_share_url=review.x_share_url facebook_share_url=review.facebook_share_url show_social_links=True %}
     </div>

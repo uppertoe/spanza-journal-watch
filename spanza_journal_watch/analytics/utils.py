@@ -1,8 +1,7 @@
 from datetime import timedelta
 
-from django.utils import timezone
-
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from spanza_journal_watch.utils.functions import get_domain_url
 
@@ -57,6 +56,14 @@ def is_probable_automated_newsletter_event(request, newsletter):
             return True
 
     return False
+
+
+def classify_event_confidence(*, automated, subscriber=None):
+    if automated:
+        return "suspected_automated"
+    if subscriber is not None:
+        return "known_subscriber_human"
+    return "probable_human"
 
 
 def click_tracker(email):

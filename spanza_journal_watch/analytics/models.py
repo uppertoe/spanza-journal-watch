@@ -6,7 +6,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.db import models
 from django.template.loader import render_to_string
 
-from spanza_journal_watch.analytics.utils import is_probable_automated_event
+from spanza_journal_watch.analytics.utils import classify_event_confidence, is_probable_automated_event
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.utils.functions import get_domain_url
 
@@ -57,6 +57,11 @@ class NewsletterClick(models.Model):
 
 
 class PageView(models.Model):
+    class HumanConfidence(models.TextChoices):
+        SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
+        PROBABLE_HUMAN = "probable_human", "Probable human"
+        KNOWN_SUBSCRIBER_HUMAN = "known_subscriber_human", "Known subscriber human"
+
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey("content_type", "object_id")
@@ -65,6 +70,11 @@ class PageView(models.Model):
     user_agent = models.TextField(blank=True, default="")
     automated = models.BooleanField(default=False)
     session_key = models.CharField(max_length=64, blank=True, default="")
+    human_confidence = models.CharField(
+        max_length=32,
+        choices=HumanConfidence.choices,
+        default=HumanConfidence.PROBABLE_HUMAN,
+    )
 
     class Meta:
         indexes = [
@@ -83,17 +93,23 @@ class PageView(models.Model):
     def get_page_views(cls, content_type, object_id):
         return cls.objects.filter(content_type=content_type, object_id=object_id)
 
+    @staticmethod
+    def _get_subscriber(subscriber_id, *, log_context):
+        if not subscriber_id:
+            return None
+
+        try:
+            return Subscriber.objects.get(id=subscriber_id)
+        except (Subscriber.DoesNotExist, MultipleObjectsReturned) as error:
+            logger.warning("Unable to attach subscriber to %s: %s %s", log_context, error, subscriber_id)
+            return None
+
     @classmethod
     def record_view(cls, object, subscriber_id=None, request=None):
         content_type = ContentType.objects.get_for_model(object)
         id = object.id
 
-        # Attempt to find a subscriber in the session
-        try:
-            subscriber = Subscriber.objects.get(id=subscriber_id)
-        except (Subscriber.DoesNotExist, MultipleObjectsReturned) as e:
-            subscriber = None
-            logger.warning("Unable to attach subscriber to pageview: %s %s", e, subscriber_id)
+        subscriber = cls._get_subscriber(subscriber_id, log_context="pageview")
 
         user_agent = ""
         automated = False
@@ -104,6 +120,7 @@ class PageView(models.Model):
             user_agent = request.headers.get("user-agent", "")
             automated = is_probable_automated_event(request)
             session_key = request.session.session_key or ""
+        human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         view = cls(
             content_type=content_type,
@@ -112,6 +129,7 @@ class PageView(models.Model):
             user_agent=user_agent,
             automated=automated,
             session_key=session_key,
+            human_confidence=human_confidence,
         )
         view.save()
 
@@ -134,6 +152,11 @@ class AnalyticsEvent(models.Model):
         SEARCH = "search", "Search performed"
         SEARCH_RESULT_CLICK = "search_result_click", "Search result clicked"
 
+    class HumanConfidence(models.TextChoices):
+        SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
+        PROBABLE_HUMAN = "probable_human", "Probable human"
+        KNOWN_SUBSCRIBER_HUMAN = "known_subscriber_human", "Known subscriber human"
+
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
     object_id = models.PositiveIntegerField(blank=True, null=True)
     content_object = GenericForeignKey("content_type", "object_id")
@@ -147,6 +170,11 @@ class AnalyticsEvent(models.Model):
     user_agent = models.TextField(blank=True, default="")
     automated = models.BooleanField(default=False)
     session_key = models.CharField(max_length=64, blank=True, default="")
+    human_confidence = models.CharField(
+        max_length=32,
+        choices=HumanConfidence.choices,
+        default=HumanConfidence.PROBABLE_HUMAN,
+    )
 
     class Meta:
         indexes = [
@@ -169,12 +197,7 @@ class AnalyticsEvent(models.Model):
         scroll_depth=None,
         metadata=None,
     ):
-        subscriber = None
-        if subscriber_id:
-            try:
-                subscriber = Subscriber.objects.get(id=subscriber_id)
-            except (Subscriber.DoesNotExist, MultipleObjectsReturned) as error:
-                logger.warning("Unable to attach subscriber to analytics event: %s %s", error, subscriber_id)
+        subscriber = PageView._get_subscriber(subscriber_id, log_context="analytics event")
 
         user_agent = ""
         automated = False
@@ -183,6 +206,7 @@ class AnalyticsEvent(models.Model):
             user_agent = request.headers.get("user-agent", "")
             automated = is_probable_automated_event(request)
             session_key = request.session.session_key or ""
+        human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         content_type = None
         object_id = None
@@ -205,6 +229,7 @@ class AnalyticsEvent(models.Model):
             user_agent=user_agent,
             automated=automated,
             session_key=session_key,
+            human_confidence=human_confidence,
         )
 
     def __str__(self):

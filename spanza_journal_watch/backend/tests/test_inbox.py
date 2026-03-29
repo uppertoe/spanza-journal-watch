@@ -17,12 +17,13 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, Permission
+from django.core import mail
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
 from spanza_journal_watch.backend.context_processors import selected_issue
-from spanza_journal_watch.backend.models import EmailThread, InboundEmail, SentEmail
+from spanza_journal_watch.backend.models import BackendPreference, EmailThread, InboundEmail, SentEmail
 from spanza_journal_watch.backend.signals import _normalize_subject
 from spanza_journal_watch.users.tests.factories import UserFactory
 
@@ -247,6 +248,30 @@ class TestInboxView:
         content = r.content.decode()
         assert content.index("New thread") < content.index("Old thread")
 
+    def test_search_filters_threads_by_subject_and_address(self):
+        make_thread(subject="Question about billing", external="reader@example.com")
+        make_thread(subject="Another topic", external="someone@else.com")
+        c, _ = editor_client()
+        r = c.get(reverse("backend:inbox"), {"q": "billing"})
+        content = r.content.decode()
+        assert "Question about billing" in content
+        assert "Another topic" not in content
+
+    def test_htmx_search_returns_partial_markup(self):
+        make_thread(subject="Newsletter question", external="reader@example.com")
+        c, _ = editor_client()
+        r = c.get(reverse("backend:inbox"), {"q": "reader"}, HTTP_HX_REQUEST="true")
+        assert r.status_code == 200
+        content = r.content.decode()
+        assert "reader@example.com" in content
+        assert "<h4" not in content
+
+    def test_empty_search_state_mentions_filter(self):
+        make_thread(subject="Newsletter question", external="reader@example.com")
+        c, _ = editor_client()
+        r = c.get(reverse("backend:inbox"), {"q": "nomatch"})
+        assert b"No messages match this filter." in r.content
+
 
 # ---------------------------------------------------------------------------
 # 6. inbox_thread view
@@ -302,6 +327,53 @@ class TestInboxThreadView:
         r = c.get(reverse("backend:inbox_thread", args=[thread.pk]))
         content = r.content.decode()
         assert content.index("Came first") < content.index("Came second")
+
+
+class TestInboxMarkAllRead:
+    def test_marks_all_visible_threads_and_messages_read(self):
+        thread_one = make_thread(unread=True, subject="One", external="one@example.com")
+        thread_two = make_thread(unread=True, subject="Two", external="two@example.com")
+        make_inbound(thread_one, read=False)
+        make_inbound(thread_two, read=False)
+        c, _ = editor_client()
+
+        r = c.post(reverse("backend:inbox_mark_all_read"))
+
+        assert r.status_code == 302
+        thread_one.refresh_from_db()
+        thread_two.refresh_from_db()
+        assert thread_one.has_unread is False
+        assert thread_two.has_unread is False
+        assert InboundEmail.objects.filter(thread__in=[thread_one, thread_two], read=False).count() == 0
+
+    def test_marks_only_filtered_threads_when_query_present(self):
+        matching = make_thread(unread=True, subject="Billing question", external="reader@example.com")
+        other = make_thread(unread=True, subject="Clinical note", external="other@example.com")
+        make_inbound(matching, read=False)
+        make_inbound(other, read=False)
+        c, _ = editor_client()
+
+        c.post(reverse("backend:inbox_mark_all_read"), {"q": "Billing"})
+
+        matching.refresh_from_db()
+        other.refresh_from_db()
+        assert matching.has_unread is False
+        assert other.has_unread is True
+        assert InboundEmail.objects.filter(thread=matching, read=False).count() == 0
+        assert InboundEmail.objects.filter(thread=other, read=False).count() == 1
+
+    def test_htmx_mark_all_read_returns_partial(self):
+        thread = make_thread(unread=True, subject="Question", external="reader@example.com")
+        make_inbound(thread, read=False)
+        c, _ = editor_client()
+
+        r = c.post(reverse("backend:inbox_mark_all_read"), {"q": "reader"}, HTTP_HX_REQUEST="true")
+
+        assert r.status_code == 200
+        assert b"<h4" not in r.content
+        assert b'hx-swap-oob="outerHTML"' in r.content
+        thread.refresh_from_db()
+        assert thread.has_unread is False
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +455,61 @@ class TestInboxReply:
         sent = SentEmail.objects.get(thread=thread)
         assert sent.message_id.startswith("<")
         assert "@" in sent.message_id
+
+    def test_reply_uses_backend_preference_sender(self):
+        c, _ = editor_client()
+        thread = make_thread()
+        preference = BackendPreference.objects.create(singleton=1)
+        preference.inbox_from_name = "Journal Watch Admin"
+        preference.inbox_from_address = "admin@journalwatch.org.au"
+        preference.save(update_fields=["inbox_from_name", "inbox_from_address"])
+
+        c.post(reverse("backend:inbox_reply", args=[thread.pk]), {"body": "Reply"})
+
+        assert mail.outbox[-1].from_email == "Journal Watch Admin <admin@journalwatch.org.au>"
+
+    def test_reply_message_id_domain_uses_backend_preference_address(self):
+        c, _ = editor_client()
+        thread = make_thread()
+        preference = BackendPreference.objects.create(singleton=1)
+        preference.inbox_from_name = "Inbox Team"
+        preference.inbox_from_address = "team@journalwatch.org.au"
+        preference.save(update_fields=["inbox_from_name", "inbox_from_address"])
+
+        with patch("django.core.mail.EmailMessage.send", return_value=1):
+            c.post(reverse("backend:inbox_reply", args=[thread.pk]), {"body": "Reply"})
+
+        sent = SentEmail.objects.get(thread=thread)
+        assert sent.message_id.endswith("@journalwatch.org.au>")
+
+
+class TestInboxSenderSettings:
+    def test_settings_page_renders_inbox_sender_section(self):
+        c, _ = editor_client()
+
+        r = c.get(reverse("backend:backend_settings"))
+
+        assert r.status_code == 200
+        content = r.content.decode()
+        assert "Inbox sender" in content
+        assert "John Smith &lt;john.smith@domain.com&gt;" in content
+
+    def test_save_inbox_sender_settings_updates_backend_preference(self):
+        c, _ = editor_client()
+
+        r = c.post(
+            reverse("backend:save_inbox_sender_settings"),
+            {
+                "inbox_from_name": "Journal Watch Admin",
+                "inbox_from_address": "admin@journalwatch.org.au",
+            },
+        )
+
+        assert r.status_code == 302
+        preference = BackendPreference.get_solo()
+        assert preference is not None
+        assert preference.inbox_from_name == "Journal Watch Admin"
+        assert preference.inbox_from_address == "admin@journalwatch.org.au"
 
 
 # ---------------------------------------------------------------------------

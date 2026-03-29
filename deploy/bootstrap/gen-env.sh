@@ -72,6 +72,7 @@ FLOWER_USER="flower"
 FLOWER_PASSWORD="$(gen_token 24)"
 OIDC_CLIENT_SECRET="$(gen_hex 32)"
 PLANKA_SECRET_KEY="$(gen_hex 32)"
+PLANKA_POSTGRES_PASSWORD="$(gen_token 24)"
 DJANGO_ADMIN_PATH="$(gen_token 12 | tr -dc 'a-zA-Z0-9' | head -c 12)"
 DEFAULT_ADMIN_PASSWORD="$(gen_token 16)"
 
@@ -107,7 +108,7 @@ APP_TAG=latest
 DJANGO_SETTINGS_MODULE=config.settings.production
 DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
 DJANGO_ADMIN_URL=${DJANGO_ADMIN_PATH}/
-DJANGO_ALLOWED_HOSTS=[\".${DOMAIN}\"]
+DJANGO_ALLOWED_HOSTS=.${DOMAIN}
 
 # Set False when TLS is terminated upstream (nginx, Caddy, ALB, etc.)
 DJANGO_SECURE_SSL_REDIRECT=False
@@ -193,7 +194,7 @@ PLANKA_ADMIN_EMAIL=${ADMIN_EMAIL}
 # =============================================================================
 
 BASE_URL=https://${PLANKA_DOMAIN}
-DATABASE_URL=postgresql://postgres@planka_postgres/planka
+PLANKA_POSTGRES_PASSWORD=${PLANKA_POSTGRES_PASSWORD}
 SECRET_KEY=${PLANKA_SECRET_KEY}
 USER_TERMS_OF_SERVICE_VERSION=1
 

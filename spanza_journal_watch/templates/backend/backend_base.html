@@ -207,7 +207,7 @@
               </li>
               <li class="nav-item">
                 <a class="nav-link{% if current == 'inbox' or current == 'inbox_thread' %} active{% endif %}" href="{% url "backend:inbox" %}">
-                  Inbox{% if inbox_unread_count %} <span class="badge text-bg-danger rounded-pill" style="font-size:0.65em;">{{ inbox_unread_count }}</span>{% endif %}
+                  Inbox {% include "backend/_inbox_unread_badge.html" %}
                 </a>
               </li>
               {% endif %}

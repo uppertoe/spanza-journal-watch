@@ -1,0 +1,55 @@
+{% load tz %}
+
+{% if is_htmx %}
+{% include "backend/_inbox_unread_badge.html" with oob=True %}
+{% endif %}
+
+{% if page.object_list %}
+<div class="card">
+  <div class="list-group list-group-flush">
+    {% for thread in page.object_list %}
+    <a
+      href="{% url 'backend:inbox_thread' thread.pk %}"
+      class="list-group-item list-group-item-action px-3 py-3 d-flex align-items-start gap-3 text-decoration-none"
+    >
+      <span
+        class="mt-1 flex-shrink-0 rounded-circle{% if thread.has_unread %} bg-primary{% else %} bg-transparent border{% endif %}"
+        style="width:8px;height:8px;"
+        aria-label="{% if thread.has_unread %}Unread{% else %}Read{% endif %}"
+      ></span>
+
+      <div class="flex-grow-1 overflow-hidden">
+        <div class="d-flex justify-content-between align-items-baseline gap-2">
+          <span class="text-truncate{% if thread.has_unread %} fw-semibold{% endif %}">
+            {{ thread.external_address }}
+          </span>
+          <span class="text-muted small flex-shrink-0">
+            {{ thread.last_message_at|localtime|date:"j M Y" }}
+          </span>
+        </div>
+        <div class="text-truncate{% if thread.has_unread %} text-body{% else %} text-muted{% endif %} small">
+          {{ thread.subject|default:"(no subject)" }}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if page.has_other_pages %}
+<nav class="mt-3 d-flex justify-content-between align-items-center">
+  {% if page.has_previous %}
+  <a class="btn btn-sm btn-outline-secondary" href="?page={{ page.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}">← Previous</a>
+  {% else %}<span></span>{% endif %}
+  <small class="text-muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</small>
+  {% if page.has_next %}
+  <a class="btn btn-sm btn-outline-secondary" href="?page={{ page.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}">Next →</a>
+  {% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <p class="mb-0">No messages match this filter.</p>
+</div>
+{% endif %}

@@ -132,7 +132,7 @@ class TestPolicyDocuments:
     def test_backup_policy_backups_prefix(self):
         doc = backup_policy(BUCKET)
         obj = next(s for s in doc["Statement"] if s["Sid"] == "S3BackupReadWrite")
-        assert obj["Resource"] == f"arn:aws:s3:::{BUCKET}/backups/*"
+        assert obj["Resource"] == f"arn:aws:s3:::{BUCKET}/*"
 
     def test_policies_use_correct_bucket(self):
         other = "other-bucket"
@@ -198,6 +198,25 @@ class TestSetupS3:
         buckets = [b["Name"] for b in s3.list_buckets()["Buckets"]]
         assert buckets.count(BUCKET) == 1
 
+    def test_default_lifecycle_does_not_expire_backup_versions(self, s3):
+        setup_s3(s3, BUCKET, REGION)
+        resp = s3.get_bucket_lifecycle_configuration(Bucket=BUCKET)
+        rules = resp["Rules"]
+        assert len(rules) == 1
+        assert rules[0]["ID"] == "expire-incomplete-multipart"
+
+    def test_optional_backup_noncurrent_expiration_rule(self, s3):
+        setup_s3(s3, BUCKET, REGION, backup_noncurrent_expiration_days=90)
+        resp = s3.get_bucket_lifecycle_configuration(Bucket=BUCKET)
+        rules = {rule["ID"]: rule for rule in resp["Rules"]}
+        assert "expire-old-backup-versions" in rules
+        assert rules["expire-old-backup-versions"]["NoncurrentVersionExpiration"]["NoncurrentDays"] == 90
+
+    def test_can_leave_versioning_disabled(self, s3):
+        setup_s3(s3, BUCKET, REGION, enable_versioning=False)
+        resp = s3.get_bucket_versioning(Bucket=BUCKET)
+        assert "Status" not in resp
+
 
 # ---------------------------------------------------------------------------
 # IAM setup tests
@@ -206,26 +225,26 @@ class TestSetupS3:
 
 class TestSetupIAM:
     def test_creates_three_users(self, iam):
-        setup_iam(iam, BUCKET, f"{BUCKET}-planka")
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups")
         users = {u["UserName"] for u in iam.list_users()["Users"]}
         assert {"jw-django", "jw-planka", "jw-backup"} <= users
 
     def test_creates_three_users_with_suffix(self, iam):
-        setup_iam(iam, BUCKET, f"{BUCKET}-planka", suffix="staging")
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups", suffix="staging")
         users = {u["UserName"] for u in iam.list_users()["Users"]}
         assert {"jw-django-staging", "jw-planka-staging", "jw-backup-staging"} <= users
         # Must not create un-suffixed names
         assert "jw-django" not in users
 
     def test_returns_keys_for_new_users(self, iam):
-        keys = setup_iam(iam, BUCKET, f"{BUCKET}-planka")
+        keys = setup_iam(iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups")
         assert set(keys) == {"django", "planka", "backup"}
         for name, (ak, sk) in keys.items():
             assert ak.startswith("AKIA") or len(ak) > 0
             assert len(sk) > 0
 
     def test_policies_attached(self, iam):
-        setup_iam(iam, BUCKET, f"{BUCKET}-planka")
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups")
         for username, expected_policy in [
             ("jw-django", "jw-django-policy"),
             ("jw-planka", "jw-planka-policy"),
@@ -240,7 +259,7 @@ class TestSetupIAM:
             assert "Statement" in doc
 
     def test_policies_attached_with_suffix(self, iam):
-        setup_iam(iam, BUCKET, f"{BUCKET}-planka", suffix="staging")
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups", suffix="staging")
         for username, expected_policy in [
             ("jw-django-staging", "jw-django-staging-policy"),
             ("jw-planka-staging", "jw-planka-staging-policy"),
@@ -256,8 +275,10 @@ class TestSetupIAM:
 
     def test_idempotent_no_new_keys(self, iam):
         """Second run skips users that already have keys."""
-        setup_iam(iam, BUCKET, f"{BUCKET}-planka")  # first run — creates keys
-        keys = setup_iam(iam, BUCKET, f"{BUCKET}-planka")  # second run — users exist, already have keys
+        setup_iam(iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups")  # first run — creates keys
+        keys = setup_iam(
+            iam, BUCKET, f"{BUCKET}-planka", f"{BUCKET}-backups"
+        )  # second run — users exist, already have keys
         # Keys should be None (skipped) for all three
         assert keys == {}
 
@@ -390,6 +411,7 @@ class TestProvision:
                 sns,
                 BUCKET,
                 f"{BUCKET}-planka",
+                f"{BUCKET}-backups",
                 REGION,
                 DOMAIN,
                 ACCOUNT_ID,
@@ -400,6 +422,7 @@ class TestProvision:
             buckets = [b["Name"] for b in s3.list_buckets()["Buckets"]]
             assert BUCKET in buckets
             assert f"{BUCKET}-planka" in buckets
+            assert f"{BUCKET}-backups" in buckets
 
             # IAM users were created
             users = {u["UserName"] for u in iam.list_users()["Users"]}
@@ -413,6 +436,9 @@ class TestProvision:
 
             # SNS topic ARN returned
             assert "journalwatch-ses-events" in topic_arn
+
+            backup_versioning = s3.get_bucket_versioning(Bucket=f"{BUCKET}-backups")
+            assert "Status" not in backup_versioning
 
     def test_provision_idempotent(self, ses_v2):
         """Running provision twice should not raise."""
@@ -428,10 +454,32 @@ class TestProvision:
             iam = boto3.client("iam", region_name=REGION)
             sns = boto3.client("sns", region_name=REGION)
 
-            provision(s3, iam, ses_v2, sns, BUCKET, f"{BUCKET}-planka", REGION, DOMAIN, ACCOUNT_ID, WEBHOOK_SECRET)
+            provision(
+                s3,
+                iam,
+                ses_v2,
+                sns,
+                BUCKET,
+                f"{BUCKET}-planka",
+                f"{BUCKET}-backups",
+                REGION,
+                DOMAIN,
+                ACCOUNT_ID,
+                WEBHOOK_SECRET,
+            )
             # Second call — users and bucket already exist
             keys2, _, _ = provision(
-                s3, iam, ses_v2, sns, BUCKET, f"{BUCKET}-planka", REGION, DOMAIN, ACCOUNT_ID, WEBHOOK_SECRET
+                s3,
+                iam,
+                ses_v2,
+                sns,
+                BUCKET,
+                f"{BUCKET}-planka",
+                f"{BUCKET}-backups",
+                REGION,
+                DOMAIN,
+                ACCOUNT_ID,
+                WEBHOOK_SECRET,
             )
 
             # No new keys on second run (users already have keys)
@@ -452,6 +500,7 @@ class TestProvision:
                 sns,
                 staging_bucket,
                 f"{staging_bucket}-planka",
+                f"{staging_bucket}-backups",
                 REGION,
                 "staging.journalwatch.test",
                 ACCOUNT_ID,
@@ -493,6 +542,18 @@ class TestProfileArg:
         args = parse_args(["--bucket", "b", "--planka-bucket", "b-planka", "--domain", "d.com"])
         assert args.planka_bucket == "b-planka"
 
+    def test_backup_bucket_accepted(self):
+        args = parse_args(["--bucket", "b", "--backup-bucket", "b-backups", "--domain", "d.com"])
+        assert args.backup_bucket == "b-backups"
+
+    def test_backup_noncurrent_expiration_days_defaults_to_zero(self):
+        args = parse_args(["--bucket", "b", "--domain", "d.com"])
+        assert args.backup_noncurrent_expiration_days == 0
+
+    def test_backup_noncurrent_expiration_days_accepted(self):
+        args = parse_args(["--bucket", "b", "--domain", "d.com", "--backup-noncurrent-expiration-days", "30"])
+        assert args.backup_noncurrent_expiration_days == 30
+
     def test_profile_passed_to_boto3_session(self, monkeypatch):
         """boto3.Session must receive profile_name so credentials never need to be in env."""
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
@@ -516,9 +577,9 @@ class TestProfileArg:
             ses_mock.create_configuration_set.return_value = {}
             ses_mock.create_configuration_set_event_destination.return_value = {}
 
-            with patch("deploy.bootstrap.aws_setup.boto3.Session", side_effect=fake_session), patch("sys.argv", argv), patch(
-                "deploy.bootstrap.aws_setup.boto3.Session"
-            ) as mock_boto_session:
+            with patch("deploy.bootstrap.aws_setup.boto3.Session", side_effect=fake_session), patch(
+                "sys.argv", argv
+            ), patch("deploy.bootstrap.aws_setup.boto3.Session") as mock_boto_session:
                 mock_boto_session.return_value.client.return_value = ses_mock
                 # We just need to verify the call signature — don't run full main()
                 mock_boto_session.reset_mock()
@@ -599,6 +660,7 @@ class TestOutputHelpers:
             keys,
             BUCKET,
             f"{BUCKET}-planka",
+            f"{BUCKET}-backups",
             REGION,
             "TrackingConfigSet-staging",
             webhook_secret=WEBHOOK_SECRET,
@@ -617,7 +679,7 @@ class TestOutputHelpers:
         assert "PLANKA_S3_SECRET_ACCESS_KEY=planka-sk" in out
         assert f"PLANKA_S3_BUCKET={BUCKET}-planka" in out
         assert f"PLANKA_S3_REGION={REGION}" in out
-        assert f"RESTIC_REPOSITORY=s3:s3.amazonaws.com/{BUCKET}/backups" in out
+        assert f"RESTIC_REPOSITORY=s3:s3.amazonaws.com/{BUCKET}-backups" in out
         assert "AWS_ACCESS_KEY_ID=backup-ak" in out
         assert "AWS_SECRET_ACCESS_KEY=backup-sk" in out
         assert f"AWS_DEFAULT_REGION={REGION}" in out

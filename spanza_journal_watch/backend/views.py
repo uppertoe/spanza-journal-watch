@@ -13,6 +13,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import MultipleObjectsReturned, PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
@@ -30,8 +31,6 @@ from django.views.decorators.http import require_POST
 from django.views.static import serve as static_serve
 from PIL import Image, UnidentifiedImageError
 
-from django.contrib.contenttypes.models import ContentType
-
 from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
@@ -42,6 +41,7 @@ from .forms import (
     ArticleIntakeAssignIssueForm,
     ArticleIntakeFetchForm,
     AuthorForm,
+    BackendPreferenceInboxSettingsForm,
     HeaderForm,
     HealthServiceForm,
     IssueBuilderIssueForm,
@@ -490,6 +490,61 @@ def _get_pubmed_integration_credential():
 
 def _get_backend_preference():
     return BackendPreference.get_solo()
+
+
+def _get_inbox_from_email():
+    preference = _get_backend_preference()
+    if preference:
+        return preference.get_inbox_from_email()
+    return BackendPreference().get_inbox_from_email()
+
+
+def _build_backend_settings_context(request, *, inbox_settings_form=None):
+    from oauth2_provider.models import Application as OAuthApplication
+
+    pubmed_credential = _get_pubmed_integration_credential()
+    planka_credential = _get_planka_integration_credential()
+    watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
+    planka_client_id = os.getenv("OIDC_CLIENT_ID", "planka-local")
+    planka_oidc_app = OAuthApplication.objects.filter(client_id=planka_client_id).first()
+    backend_preference = _get_backend_preference() or BackendPreference(singleton=1)
+
+    if inbox_settings_form is None:
+        inbox_settings_form = BackendPreferenceInboxSettingsForm(instance=backend_preference)
+
+    planka_connected = False
+    planka_connection_user = None
+    planka_connection_error = None
+    chief_editor_planka_user = None
+    if planka_credential and planka_credential.get_api_key():
+        try:
+            client = PlankaClient(api_key=planka_credential.get_api_key(), access_token="")
+            planka_connection_user = client.get_current_user()
+            planka_connected = True
+            if planka_credential.last_error:
+                planka_credential.last_error = ""
+                planka_credential.save(update_fields=["last_error", "modified"])
+            chief_editor_planka_user = client.find_user_by_email(request.user.email)
+        except PlankaAPIError as exc:
+            planka_connection_error = _safe_planka_error(exc)
+            if planka_credential.last_error != planka_connection_error:
+                planka_credential.last_error = planka_connection_error
+                planka_credential.save(update_fields=["last_error", "modified"])
+
+    return {
+        "pubmed_credential": pubmed_credential,
+        "pubmed_api_key_form": PubmedApiKeyForm(),
+        "planka_credential": planka_credential,
+        "planka_oidc_app": planka_oidc_app,
+        "planka_connected": planka_connected,
+        "planka_connection_user": planka_connection_user,
+        "planka_connection_error": planka_connection_error,
+        "chief_editor_planka_user": chief_editor_planka_user,
+        "watched_journal_form": WatchedJournalForm(),
+        "watched_journals": watched_items,
+        "inbox_settings_form": inbox_settings_form,
+        "inbox_settings_preview": inbox_settings_form.get_preview_value(),
+    }
 
 
 def _build_pubmed_client(api_key=None):
@@ -2659,6 +2714,7 @@ def site_analytics(request):
     end_ts = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max))
 
     human_events = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
+    human_event_count = human_events.count()
     review_content_type = ContentType.objects.get_for_model(Review)
     review_events = human_events.filter(content_type=review_content_type)
 
@@ -2675,7 +2731,6 @@ def site_analytics(request):
         AnalyticsEvent.EventType.REVIEW_SHARE_X,
         AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
     }
-    action_event_types = share_event_types + [AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK]
 
     review_summary_rows = list(
         review_events.values("object_id")
@@ -2711,10 +2766,7 @@ def site_analytics(request):
             continue
 
         engagement_score = (
-            row["opens"]
-            + (row["engaged_views"] * 3)
-            + (row["full_text_clicks"] * 4)
-            + (row["total_shares"] * 5)
+            row["opens"] + (row["engaged_views"] * 3) + (row["full_text_clicks"] * 4) + (row["total_shares"] * 5)
         )
 
         summary = {
@@ -2769,7 +2821,9 @@ def site_analytics(request):
     total_full_text_clicks = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK).count()
     total_shares = review_events.filter(event_type__in=share_event_types).count()
     average_engaged_ms = (
-        review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).aggregate(avg=Avg("duration_ms"))["avg"]
+        review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).aggregate(avg=Avg("duration_ms"))[
+            "avg"
+        ]
         or 0
     )
 
@@ -2782,6 +2836,51 @@ def site_analytics(request):
         "Facebook": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK).count(),
     }
     share_breakdown = [{"label": label, "count": count} for label, count in share_counts.items() if count]
+
+    confidence_rows = list(
+        human_events.values("human_confidence")
+        .annotate(
+            events=Count("id"),
+            opens=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)),
+            engaged=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
+            shares=Count("id", filter=Q(event_type__in=share_event_types)),
+            full_text=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)),
+        )
+        .order_by("-events")
+    )
+    confidence_labels = {
+        AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN: "Known subscriber human",
+        AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN: "Probable human",
+        AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED: "Suspected automated",
+    }
+    confidence_breakdown = [
+        {
+            "label": confidence_labels.get(row["human_confidence"], row["human_confidence"] or "Unknown"),
+            "events": row["events"],
+            "opens": row["opens"],
+            "engaged": row["engaged"],
+            "shares": row["shares"],
+            "full_text": row["full_text"],
+            "share_of_events": _safe_percentage(row["events"], human_event_count),
+        }
+        for row in confidence_rows
+    ]
+    known_subscriber_events = next(
+        (
+            row["events"]
+            for row in confidence_rows
+            if row["human_confidence"] == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
+        ),
+        0,
+    )
+    probable_human_events = next(
+        (
+            row["events"]
+            for row in confidence_rows
+            if row["human_confidence"] == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+        ),
+        0,
+    )
 
     source_rows = list(
         review_events.values("source")
@@ -2907,6 +3006,11 @@ def site_analytics(request):
         "search_result_click_count": search_click_events.count(),
         "search_click_rate": _safe_percentage(search_click_events.count(), search_events.count()),
         "share_breakdown": share_breakdown,
+        "confidence_breakdown": confidence_breakdown,
+        "known_subscriber_events": known_subscriber_events,
+        "known_subscriber_share": _safe_percentage(known_subscriber_events, human_event_count),
+        "probable_human_events": probable_human_events,
+        "probable_human_share": _safe_percentage(probable_human_events, human_event_count),
         "source_breakdown": source_breakdown,
         "review_type_breakdown": review_type_breakdown,
         "top_reviews": top_reviews,
@@ -3774,48 +3878,27 @@ def issue_planka_import(request):
 @login_required
 @permission_required("submissions.chief_editor", raise_exception=True)
 def backend_settings(request):
-    from oauth2_provider.models import Application as OAuthApplication
-
-    pubmed_credential = _get_pubmed_integration_credential()
-    planka_credential = _get_planka_integration_credential()
-    watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
-    planka_client_id = os.getenv("OIDC_CLIENT_ID", "planka-local")
-    planka_oidc_app = OAuthApplication.objects.filter(client_id=planka_client_id).first()
-
-    # Test live Planka connection and check chief editor's Planka role.
-    planka_connected = False
-    planka_connection_user = None
-    planka_connection_error = None
-    chief_editor_planka_user = None
-    if planka_credential and planka_credential.get_api_key():
-        try:
-            client = PlankaClient(api_key=planka_credential.get_api_key(), access_token="")
-            planka_connection_user = client.get_current_user()
-            planka_connected = True
-            if planka_credential.last_error:
-                planka_credential.last_error = ""
-                planka_credential.save(update_fields=["last_error", "modified"])
-            # Look up the chief editor's own Planka account.
-            chief_editor_planka_user = client.find_user_by_email(request.user.email)
-        except PlankaAPIError as exc:
-            planka_connection_error = _safe_planka_error(exc)
-            if planka_credential.last_error != planka_connection_error:
-                planka_credential.last_error = planka_connection_error
-                planka_credential.save(update_fields=["last_error", "modified"])
-
-    context = {
-        "pubmed_credential": pubmed_credential,
-        "pubmed_api_key_form": PubmedApiKeyForm(),
-        "planka_credential": planka_credential,
-        "planka_oidc_app": planka_oidc_app,
-        "planka_connected": planka_connected,
-        "planka_connection_user": planka_connection_user,
-        "planka_connection_error": planka_connection_error,
-        "chief_editor_planka_user": chief_editor_planka_user,
-        "watched_journal_form": WatchedJournalForm(),
-        "watched_journals": watched_items,
-    }
+    context = _build_backend_settings_context(request)
     return render(request, "backend/settings.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def save_inbox_sender_settings(request):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    preference = _get_backend_preference() or BackendPreference(singleton=1)
+    form = BackendPreferenceInboxSettingsForm(request.POST, instance=preference)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Inbox sender settings saved.")
+        return redirect(reverse("backend:backend_settings"))
+
+    context = _build_backend_settings_context(request, inbox_settings_form=form)
+    response = render(request, "backend/settings.html", context)
+    response.status_code = 400
+    return response
 
 
 def _run_management_command(command_name, **kwargs):
@@ -5624,10 +5707,48 @@ def planka_card_revision_restore(request, issue_id, revision_id):
 def inbox(request):
     from .models import EmailThread
 
+    query = (request.GET.get("q") or "").strip()
     threads = EmailThread.objects.prefetch_related("inbound_messages", "sent_messages")
+    if query:
+        threads = threads.filter(Q(external_address__icontains=query) | Q(subject__icontains=query))
+
     paginator = Paginator(threads, 30)
     page = paginator.get_page(request.GET.get("page"))
-    return render(request, "backend/inbox.html", {"page": page})
+    context = {"page": page, "query": query}
+    if request.headers.get("HX-Request") == "true":
+        return render(request, "backend/_inbox_thread_list.html", context)
+    return render(request, "backend/inbox.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+@require_POST
+def inbox_mark_all_read(request):
+    from .models import EmailThread, InboundEmail
+
+    query = (request.POST.get("q") or "").strip()
+    threads = EmailThread.objects.all()
+    if query:
+        threads = threads.filter(Q(external_address__icontains=query) | Q(subject__icontains=query))
+
+    thread_ids = list(threads.filter(has_unread=True).values_list("id", flat=True))
+    if thread_ids:
+        InboundEmail.objects.filter(thread_id__in=thread_ids, read=False).update(read=True)
+        EmailThread.objects.filter(id__in=thread_ids).update(has_unread=False)
+
+    if request.headers.get("HX-Request") == "true":
+        mutable_get = request.GET.copy()
+        if query:
+            mutable_get["q"] = query
+        else:
+            mutable_get.pop("q", None)
+        request.GET = mutable_get
+        return inbox(request)
+
+    messages.success(request, "All visible inbox threads marked as read.")
+    if query:
+        return redirect(f"{reverse('backend:inbox')}?q={query}")
+    return redirect("backend:inbox")
 
 
 @login_required
@@ -5660,7 +5781,7 @@ def inbox_thread(request, thread_id):
 @permission_required("submissions.chief_editor", raise_exception=True)
 @require_POST
 def inbox_reply(request, thread_id):
-    from email.utils import make_msgid
+    from email.utils import make_msgid, parseaddr
 
     from django.core.mail import EmailMessage
 
@@ -5676,14 +5797,17 @@ def inbox_reply(request, thread_id):
     if not subject.lower().startswith("re:"):
         subject = f"Re: {subject}"
 
+    from_email = _get_inbox_from_email()
+    from_address = parseaddr(from_email)[1]
+    from_domain = from_address.split("@")[-1].strip() if "@" in from_address else ""
+
     # Generate a Message-ID we track so future replies can be threaded
-    from_domain = (getattr(settings, "DEFAULT_FROM_EMAIL", "") or "").split("@")[-1].rstrip(">").strip()
     msg_id = make_msgid(domain=from_domain or "journalwatch.org.au")
 
     email = EmailMessage(
         subject=subject,
         body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=from_email,
         to=[thread.external_address],
         headers={"Message-ID": msg_id},
     )

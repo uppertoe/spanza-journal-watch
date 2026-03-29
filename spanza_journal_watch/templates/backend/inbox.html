@@ -8,54 +8,41 @@
   <h4 class="mb-0">Inbox</h4>
 </div>
 
-{% if page.object_list %}
-<div class="card">
-  <div class="list-group list-group-flush">
-    {% for thread in page.object_list %}
-    <a
-      href="{% url 'backend:inbox_thread' thread.pk %}"
-      class="list-group-item list-group-item-action px-3 py-3 d-flex align-items-start gap-3 text-decoration-none"
-    >
-      <!-- Unread indicator -->
-      <span
-        class="mt-1 flex-shrink-0 rounded-circle{% if thread.has_unread %} bg-primary{% else %} bg-transparent border{% endif %}"
-        style="width:8px;height:8px;"
-        aria-label="{% if thread.has_unread %}Unread{% else %}Read{% endif %}"
-      ></span>
-
-      <div class="flex-grow-1 overflow-hidden">
-        <div class="d-flex justify-content-between align-items-baseline gap-2">
-          <span class="text-truncate{% if thread.has_unread %} fw-semibold{% endif %}">
-            {{ thread.external_address }}
-          </span>
-          <span class="text-muted small flex-shrink-0">
-            {{ thread.last_message_at|localtime|date:"j M Y" }}
-          </span>
-        </div>
-        <div class="text-truncate{% if thread.has_unread %} text-body{% else %} text-muted{% endif %} small">
-          {{ thread.subject|default:"(no subject)" }}
-        </div>
+<div class="card border-0 bg-body-tertiary mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md">
+        <label class="form-label small text-muted mb-1" for="inbox-search">Filter threads</label>
+        <input
+          id="inbox-search"
+          type="search"
+          name="q"
+          class="form-control"
+          placeholder="Search by email or subject"
+          value="{{ query }}"
+          hx-get="{% url 'backend:inbox' %}"
+          hx-target="#inbox-thread-list"
+          hx-trigger="input changed delay:250ms, search"
+          hx-push-url="true"
+        >
       </div>
-    </a>
-    {% endfor %}
+      <div class="col-12 col-md-auto">
+        <form
+          method="post"
+          action="{% url 'backend:inbox_mark_all_read' %}"
+          hx-post="{% url 'backend:inbox_mark_all_read' %}"
+          hx-target="#inbox-thread-list"
+          hx-include="#inbox-search"
+        >
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-secondary w-100">Mark All as Read</button>
+        </form>
+      </div>
+    </div>
   </div>
 </div>
 
-{% if page.has_other_pages %}
-<nav class="mt-3 d-flex justify-content-between align-items-center">
-  {% if page.has_previous %}
-  <a class="btn btn-sm btn-outline-secondary" href="?page={{ page.previous_page_number }}">← Previous</a>
-  {% else %}<span></span>{% endif %}
-  <small class="text-muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</small>
-  {% if page.has_next %}
-  <a class="btn btn-sm btn-outline-secondary" href="?page={{ page.next_page_number }}">Next →</a>
-  {% else %}<span></span>{% endif %}
-</nav>
-{% endif %}
-
-{% else %}
-<div class="text-center text-muted py-5">
-  <p class="mb-0">No messages yet.</p>
+<div id="inbox-thread-list">
+  {% include "backend/_inbox_thread_list.html" %}
 </div>
-{% endif %}
 {% endblock %}

@@ -1,26 +1,30 @@
-# Journal Watch — Caddy routing snippet
-# Auto-discovered by scaffold/docker/run-caddy.sh at container startup.
-# DOMAIN is set in the server repo root .env (e.g. DOMAIN=journalwatch.org.au).
-
-# Main application
-{$DOMAIN} {
-    # Serve collected static files directly from the server repo checkout.
-    # This assumes the Django service bind-mounts ./staticfiles and that the
-    # Caddy container can already read /srv/repo/apps/journalwatch/.
-    handle_path /static/* {
-        root * /srv/repo/apps/journalwatch/staticfiles
+  # Journal Watch — main app
+  {$DOMAIN} {
+      handle_path /static/* {
+        root * /srv/static/journal-watch
 
         @immutable path_regexp immutable ^.+(?:[.-][0-9a-f]{8,64})\..+$
-        header @immutable Cache-Control "public, max-age=315360000, immutable"
-        header Cache-Control "public, max-age=3600"
+        @nonimmutable not path_regexp immutable ^.+(?:[.-][0-9a-f]{8,64})\..+$
+
+        header @immutable Cache-Control "public, max-age=31536000, immutable"
+        header @nonimmutable Cache-Control "public, max-age=3600"
 
         file_server
-    }
+      }
+      reverse_proxy jw_django:5000
+  }
 
-    reverse_proxy jw_django:5000
-}
+  # Planka — project management
+  planka.{$DOMAIN} {
+      @custom_cover path_regexp cover ^/assets/(login-)?cover-[A-Za-z0-9-]+\.jpg$
 
-# Planka project management (active when --profile planka is used)
-planka.{$DOMAIN} {
-    reverse_proxy jw_planka:1337
-}
+      handle @custom_cover {
+          root * /srv/repo/apps/journal-watch/planka
+          rewrite * /cover-journalwatch.webp
+          file_server
+      }
+
+      handle {
+          reverse_proxy jw_planka:1337
+      }
+  }

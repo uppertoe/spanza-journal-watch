@@ -83,7 +83,8 @@ let activeDockModalId = null;
 const sharedReviewModalIndices = new Map();
 
 const mobileDockSlot = () => document.getElementById('mobile-action-dock-slot');
-const desktopDockSlot = () => document.getElementById('desktop-action-dock-slot');
+const desktopDockSlot = () =>
+  document.getElementById('desktop-action-dock-slot');
 const mobileToolbarInner = () =>
   document.querySelector('.sticky-mobile-toolbar__inner');
 const analyticsEndpoint = '/reader/action';
@@ -147,7 +148,9 @@ const copyTextToClipboard = async (text) => {
 
 const syncNativeShareButtons = (root = document) => {
   root.querySelectorAll('[data-native-share]').forEach((button) => {
-    button.classList.toggle('d-none', !window.navigator.share);
+    const available = typeof window.navigator.share === 'function';
+    button.hidden = !available;
+    button.setAttribute('aria-hidden', available ? 'false' : 'true');
   });
 };
 
@@ -287,7 +290,10 @@ const flushReviewSession = (element, { beacon = true } = {}) => {
 
   pauseReviewSession(session.element);
 
-  if (session.engagedSent || session.totalVisibleMs < reviewSessionThresholdMs) {
+  if (
+    session.engagedSent ||
+    session.totalVisibleMs < reviewSessionThresholdMs
+  ) {
     return;
   }
 
@@ -406,7 +412,9 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
   const container = getSharedReviewModalContainer(modal);
   if (!trigger || !container) return;
 
-  const currentReviewElement = container.querySelector('[data-analytics-review-id]');
+  const currentReviewElement = container.querySelector(
+    '[data-analytics-review-id]',
+  );
   if (currentReviewElement) {
     flushReviewSession(currentReviewElement);
   }
@@ -428,7 +436,9 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
   window.requestAnimationFrame(() => {
     syncReviewModalShareControls(modal);
     observeAnalyticsReviewElements(container);
-    const nextReviewElement = container.querySelector('[data-analytics-review-id]');
+    const nextReviewElement = container.querySelector(
+      '[data-analytics-review-id]',
+    );
     if (nextReviewElement) {
       openReviewSession(nextReviewElement, { immediate: true });
     }
@@ -595,7 +605,10 @@ document.addEventListener('show.bs.modal', (event) => {
   if (getSharedReviewModalTriggers(modal.id).length) {
     const trigger = event.relatedTarget;
     const triggers = getSharedReviewModalTriggers(modal.id);
-    sharedReviewModalIndices.set(modal.id, trigger ? triggers.indexOf(trigger) : -1);
+    sharedReviewModalIndices.set(
+      modal.id,
+      trigger ? triggers.indexOf(trigger) : -1,
+    );
     window.requestAnimationFrame(() => {
       loadSharedReviewModalContent(modal, trigger);
     });
@@ -629,7 +642,9 @@ window.addEventListener('popstate', () => {
 
 document.addEventListener('hidden.bs.modal', (event) => {
   const modal = event.target;
-  const currentReviewElement = modal.querySelector('[data-analytics-review-id]');
+  const currentReviewElement = modal.querySelector(
+    '[data-analytics-review-id]',
+  );
   if (currentReviewElement) {
     flushReviewSession(currentReviewElement);
   }
@@ -767,13 +782,20 @@ const updateIssueReviewNavigator = () => {
 
 const scheduleIssueReviewNavigatorUpdate = () => {
   if (issueNavigatorFrame !== null) return;
-  issueNavigatorFrame = window.requestAnimationFrame(updateIssueReviewNavigator);
+  issueNavigatorFrame = window.requestAnimationFrame(
+    updateIssueReviewNavigator,
+  );
 };
 
 document.addEventListener('click', async (event) => {
   const emailShareLink = event.target.closest('[data-share-email]');
   if (emailShareLink && !emailShareLink.classList.contains('disabled')) {
-    trackReviewAnalytics(emailShareLink, 'review_share_email', {}, { beacon: true });
+    trackReviewAnalytics(
+      emailShareLink,
+      'review_share_email',
+      {},
+      { beacon: true },
+    );
     return;
   }
 
@@ -797,7 +819,12 @@ document.addEventListener('click', async (event) => {
 
   const fullTextLink = event.target.closest('[data-analytics-full-text]');
   if (fullTextLink) {
-    trackReviewAnalytics(fullTextLink, 'review_full_text_click', {}, { beacon: true });
+    trackReviewAnalytics(
+      fullTextLink,
+      'review_full_text_click',
+      {},
+      { beacon: true },
+    );
     return;
   }
 

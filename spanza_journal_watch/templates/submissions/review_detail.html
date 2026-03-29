@@ -28,7 +28,6 @@
 {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
 <p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal }}</a>
 <p class="card-subtitle text-muted mb-1">Submitted {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
-<p class="mb-3 fw-lighter">Read by {{ review.display_hits }} Journal Watch subscribers</p>
 <div class="mb-3">
     {% include 'fragments/share_actions.html' with show_social_links=True %}
 </div>

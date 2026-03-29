@@ -7,12 +7,20 @@ from pathlib import Path
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.utils.safestring import mark_safe
 
 from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
 from ..submissions.models import Article, Author, HealthService, Issue, Journal, Review
-from .models import InboundEmail, IssueContributor, PlankaBoardBackgroundAsset, SubscriberCSV, WatchedJournal
+from .models import (
+    BackendPreference,
+    InboundEmail,
+    IssueContributor,
+    PlankaBoardBackgroundAsset,
+    SubscriberCSV,
+    WatchedJournal,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -662,6 +670,42 @@ class WatchedJournalForm(forms.ModelForm):
 
     def clean_issn_electronic(self):
         return (self.cleaned_data.get("issn_electronic") or "").strip()
+
+
+class BackendPreferenceInboxSettingsForm(forms.ModelForm):
+    class Meta:
+        model = BackendPreference
+        fields = ["inbox_from_name", "inbox_from_address"]
+        labels = {
+            "inbox_from_name": "Inbox sender name",
+            "inbox_from_address": "Inbox sender address",
+        }
+        help_texts = {
+            "inbox_from_name": "This is the display name recipients will see in their mail client.",
+            "inbox_from_address": "Use an email address on a domain already verified in Amazon SES.",
+        }
+
+    def clean_inbox_from_name(self):
+        return (self.cleaned_data.get("inbox_from_name") or "").strip()
+
+    def clean_inbox_from_address(self):
+        value = (self.cleaned_data.get("inbox_from_address") or "").strip().lower()
+        if not value:
+            return ""
+        validate_email(value)
+        return value
+
+    def get_preview_value(self):
+        if hasattr(self, "cleaned_data"):
+            raw_name = self.cleaned_data.get("inbox_from_name")
+            raw_address = self.cleaned_data.get("inbox_from_address")
+        else:
+            raw_name = getattr(self.instance, "inbox_from_name", "")
+            raw_address = getattr(self.instance, "inbox_from_address", "")
+
+        name = (raw_name or "").strip() or BackendPreference.DEFAULT_INBOX_FROM_NAME
+        address = (raw_address or "").strip() or BackendPreference.DEFAULT_INBOX_FROM_ADDRESS
+        return f"{name} <{address}>"
 
 
 class HealthServiceForm(forms.ModelForm):
