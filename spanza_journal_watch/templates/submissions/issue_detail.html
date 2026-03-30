@@ -1,11 +1,9 @@
 {% extends 'base.html' %}
 
 {% block main-feature %}
-
     {% with page_header as content %}
-    {% include "fragments/main_feature.html" %}
+    {% include "fragments/main_feature.html" with header_kicker="Current collection" %}
     {% endwith %}
-
 {% endblock main-feature %}
 
 {% block article-title %}

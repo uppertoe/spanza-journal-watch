@@ -808,6 +808,19 @@ def _available_publication_types(journal_links):
 
 def _journal_browser_rows(request):
     active_journals = list(WatchedJournal.objects.filter(active=True).order_by("name", "pk"))
+    shelf_tones = [
+        "cobalt",
+        "sunset",
+        "sage",
+        "berry",
+        "ochre",
+        "marine",
+        "rose",
+        "slate",
+    ]
+    for journal in active_journals:
+        journal.shelf_tone = shelf_tones[journal.pk % len(shelf_tones)]
+
     selected_month = _parse_journal_month(request.GET.get("month"))
     selected_journal_ids = [int(value) for value in request.GET.getlist("journal") if str(value).isdigit()]
     if not selected_journal_ids and request.user.is_authenticated:

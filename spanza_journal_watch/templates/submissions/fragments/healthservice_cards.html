@@ -6,15 +6,18 @@
 {% if health_services %}
 <div class="row g-4">
     {% for service in health_services %}
+    {% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as service_pattern silent %}
     <div class="col-12 col-xl-6">
-        <div class="card h-100 shadow-sm">
+        <div class="card h-100 shadow-sm health-service-card">
             <div class="card-body">
                 <div class="d-flex gap-3 align-items-start mb-3">
                     <div style="width: 110px; min-width: 110px;">
                         {% if service.is_logo_authorised %}
-                            <img src="{{ service.logo.url }}" alt="{{ service.name }} logo" class="img-fluid object-fit-contain" style="max-height: 80px; width: 100%;">
+                            <img src="{{ service.logo.url }}" alt="{{ service.name }} logo" class="img-fluid object-fit-contain rounded-4" style="max-height: 80px; width: 100%;">
                         {% else %}
-                            <svg class="rounded" height="80" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#777"/></svg>
+                            <div class="image-fallback-frame image-fallback-frame--{{ service_pattern }} rounded" style="height: 80px;">
+                                <svg class="rounded" height="80" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="transparent"/></svg>
+                            </div>
                         {% endif %}
                     </div>
                     <div class="flex-grow-1">

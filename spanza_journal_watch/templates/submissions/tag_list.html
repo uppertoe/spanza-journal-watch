@@ -3,15 +3,10 @@
 {% block main-feature %}
 {% if page_header %}
 {% with page_header as content %}
-    {% include "fragments/main_feature.html" %}
+    {% include "fragments/main_feature.html" with header_kicker="Browse topics" %}
     {% endwith %}
     {% else %}
-    <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-        <div class="col-lg-8 px-0">
-            <h1 class="display-4 fst-italic">#Tags</h1>
-            <p class="lead my-3">Find articles group by common #tags here</p>
-        </div>
-    </div>
+    {% include "fragments/main_feature.html" with title="#Tags" body="Find articles grouped by common tags here." header_theme="tags" header_pattern="crest" header_kicker="Browse topics" %}
 {% endif %}
 {% endblock main-feature %}
 

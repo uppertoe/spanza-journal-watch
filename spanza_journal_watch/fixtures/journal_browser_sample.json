@@ -1,0 +1,1969 @@
+[
+  {
+    "model": "users.user",
+    "pk": 4,
+    "fields": {
+      "password": "!nODYpobY9YcmrBgiJzFRu0aiZ1hooMJQZCdIPIp9",
+      "last_login": null,
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-03-30T03:22:54.209Z",
+      "name": "Journal Browser Demo",
+      "email": "journal-browser-demo@example.test",
+      "groups": [],
+      "user_permissions": [],
+      "watched_journals": [3, 2, 1]
+    }
+  },
+  {
+    "model": "submissions.journal",
+    "pk": 2,
+    "fields": {
+      "created": "2023-06-22T05:26:55.826Z",
+      "modified": "2023-06-22T05:26:55.826Z",
+      "name": "Pediatric Anesthesia",
+      "slug": "pediatric-anesthesia",
+      "abbreviation": "Pediatr. Anesth.",
+      "url": "https://onlinelibrary.wiley.com/journal/14609592",
+      "active": true
+    }
+  },
+  {
+    "model": "submissions.journal",
+    "pk": 4,
+    "fields": {
+      "created": "2023-06-22T06:57:33.756Z",
+      "modified": "2023-06-22T06:57:33.756Z",
+      "name": "Anaesthesia",
+      "slug": "anaesthesia",
+      "abbreviation": "Anaesthesia",
+      "url": "https://associationofanaesthetists-publications.onlinelibrary.wiley.com/journal/13652044",
+      "active": true
+    }
+  },
+  {
+    "model": "submissions.journal",
+    "pk": 8,
+    "fields": {
+      "created": "2023-06-23T05:06:29.430Z",
+      "modified": "2023-06-23T05:06:29.430Z",
+      "name": "British Journal of Anaesthesia",
+      "slug": "british-journal-of-anaesthesia",
+      "abbreviation": "Br. J. Anaesth.",
+      "url": "https://www.bjanaesthesia.org/",
+      "active": true
+    }
+  },
+  {
+    "model": "submissions.journal",
+    "pk": 9,
+    "fields": {
+      "created": "2023-06-23T06:31:21.506Z",
+      "modified": "2023-06-23T06:31:21.506Z",
+      "name": "Anesthesiology",
+      "slug": "anesthesiology",
+      "abbreviation": "Anesthesiology",
+      "url": "https://pubs.asahq.org/anesthesiology",
+      "active": true
+    }
+  },
+  {
+    "model": "submissions.journal",
+    "pk": 23,
+    "fields": {
+      "created": "2026-03-30T03:22:54.222Z",
+      "modified": "2026-03-30T03:22:54.222Z",
+      "name": "Paediatric & Neonatal Pain",
+      "slug": "paediatric-neonatal-pain",
+      "abbreviation": "",
+      "url": null,
+      "active": true
+    }
+  },
+  {
+    "model": "submissions.journal",
+    "pk": 24,
+    "fields": {
+      "created": "2026-03-30T03:22:54.225Z",
+      "modified": "2026-03-30T03:22:54.225Z",
+      "name": "Regional Anesthesia and Pain Medicine",
+      "slug": "regional-anesthesia-and-pain-medicine",
+      "abbreviation": "",
+      "url": null,
+      "active": true
+    }
+  },
+  {
+    "model": "backend.backendpreference",
+    "pk": 1,
+    "fields": {
+      "created": "2026-03-29T08:03:53.492Z",
+      "modified": "2026-03-30T03:23:38.089Z",
+      "singleton": 1,
+      "inbox_from_name": "",
+      "inbox_from_address": "",
+      "frontend_banner_enabled": true,
+      "frontend_banner_title": "New journals browser",
+      "frontend_banner_text": "Browse cached NIH articles by journal and month, then star or recommend papers.",
+      "frontend_banner_link_text": "Open journals",
+      "frontend_banner_link_url": "/journals",
+      "frontend_banner_tone": "primary",
+      "default_watched_journals": [3, 2, 4, 1]
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 1,
+    "fields": {
+      "created": "2026-03-30T03:22:54.214Z",
+      "modified": "2026-03-30T03:23:37.965Z",
+      "name": "Pediatric Anesthesia",
+      "journal": 2,
+      "issn_print": "1155-5645",
+      "issn_electronic": "1460-9592",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 2,
+    "fields": {
+      "created": "2026-03-30T03:22:54.218Z",
+      "modified": "2026-03-30T03:23:37.966Z",
+      "name": "British Journal of Anaesthesia",
+      "journal": 8,
+      "issn_print": "0007-0912",
+      "issn_electronic": "1471-6771",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 3,
+    "fields": {
+      "created": "2026-03-30T03:22:54.219Z",
+      "modified": "2026-03-30T03:23:37.967Z",
+      "name": "Anesthesiology",
+      "journal": 9,
+      "issn_print": "0003-3022",
+      "issn_electronic": "1528-1175",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 4,
+    "fields": {
+      "created": "2026-03-30T03:22:54.220Z",
+      "modified": "2026-03-30T03:23:37.967Z",
+      "name": "Paediatric & Neonatal Pain",
+      "journal": 23,
+      "issn_print": "2634-4891",
+      "issn_electronic": "2634-4905",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 5,
+    "fields": {
+      "created": "2026-03-30T03:22:54.223Z",
+      "modified": "2026-03-30T03:23:37.968Z",
+      "name": "Anaesthesia",
+      "journal": 4,
+      "issn_print": "0003-2409",
+      "issn_electronic": "1365-2044",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.watchedjournal",
+    "pk": 6,
+    "fields": {
+      "created": "2026-03-30T03:22:54.224Z",
+      "modified": "2026-03-30T03:23:37.969Z",
+      "name": "Regional Anesthesia and Pain Medicine",
+      "journal": 24,
+      "issn_print": "1098-7339",
+      "issn_electronic": "1532-8651",
+      "active": true
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 1,
+    "fields": {
+      "created": "2026-03-30T03:22:54.229Z",
+      "modified": "2026-03-30T03:23:37.971Z",
+      "pmid": "9501101",
+      "doi": "10.5555/jw.202603.11",
+      "title": "Pediatric Anesthesia: acute pain update 1 for March 2026",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in March 2026. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2026-03-12",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.11",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501101/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2026-03"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 2,
+    "fields": {
+      "created": "2026-03-30T03:22:54.234Z",
+      "modified": "2026-03-30T03:23:37.975Z",
+      "pmid": "9501102",
+      "doi": "10.5555/jw.202603.12",
+      "title": "Pediatric Anesthesia: infant, newborn update 2 for March 2026",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in March 2026. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2026-03-17",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.12",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501102/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2026-03"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 3,
+    "fields": {
+      "created": "2026-03-30T03:22:54.237Z",
+      "modified": "2026-03-30T03:23:37.979Z",
+      "pmid": "9501201",
+      "doi": "10.5555/jw.202602.11",
+      "title": "Pediatric Anesthesia: infant, newborn update 1 for February 2026",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in February 2026. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2026-02-12",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.11",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501201/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2026-02"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 4,
+    "fields": {
+      "created": "2026-03-30T03:22:54.240Z",
+      "modified": "2026-03-30T03:23:37.982Z",
+      "pmid": "9501202",
+      "doi": "10.5555/jw.202602.12",
+      "title": "Pediatric Anesthesia: simulation training update 2 for February 2026",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in February 2026. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2026-02-17",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.12",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501202/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2026-02"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 5,
+    "fields": {
+      "created": "2026-03-30T03:22:54.244Z",
+      "modified": "2026-03-30T03:23:37.987Z",
+      "pmid": "9501301",
+      "doi": "10.5555/jw.202601.11",
+      "title": "Pediatric Anesthesia: simulation training update 1 for January 2026",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in January 2026. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2026-01-12",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.11",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501301/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2026-01"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 6,
+    "fields": {
+      "created": "2026-03-30T03:22:54.247Z",
+      "modified": "2026-03-30T03:23:37.991Z",
+      "pmid": "9501302",
+      "doi": "10.5555/jw.202601.12",
+      "title": "Pediatric Anesthesia: airway management update 2 for January 2026",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in January 2026. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2026-01-17",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.12",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501302/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2026-01"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 7,
+    "fields": {
+      "created": "2026-03-30T03:22:54.249Z",
+      "modified": "2026-03-30T03:23:37.994Z",
+      "pmid": "9501401",
+      "doi": "10.5555/jw.202512.11",
+      "title": "Pediatric Anesthesia: airway management update 1 for December 2025",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in December 2025. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2025-12-12",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.11",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501401/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2025-12"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 8,
+    "fields": {
+      "created": "2026-03-30T03:22:54.251Z",
+      "modified": "2026-03-30T03:23:37.997Z",
+      "pmid": "9501402",
+      "doi": "10.5555/jw.202512.12",
+      "title": "Pediatric Anesthesia: conscious sedation update 2 for December 2025",
+      "abstract": "Synthetic fixture abstract for Pediatric Anesthesia in December 2025. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Pediatric Anesthesia",
+      "publication_date": "2025-12-17",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.12",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9501402/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2025-12"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 9,
+    "fields": {
+      "created": "2026-03-30T03:22:54.254Z",
+      "modified": "2026-03-30T03:23:37.999Z",
+      "pmid": "9502101",
+      "doi": "10.5555/jw.202603.21",
+      "title": "British Journal of Anaesthesia: infant, newborn update 1 for March 2026",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in March 2026. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2026-03-12",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.21",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502101/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2026-03"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 10,
+    "fields": {
+      "created": "2026-03-30T03:22:54.257Z",
+      "modified": "2026-03-30T03:23:38.002Z",
+      "pmid": "9502102",
+      "doi": "10.5555/jw.202603.22",
+      "title": "British Journal of Anaesthesia: simulation training update 2 for March 2026",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in March 2026. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2026-03-17",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.22",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502102/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2026-03"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 11,
+    "fields": {
+      "created": "2026-03-30T03:22:54.261Z",
+      "modified": "2026-03-30T03:23:38.004Z",
+      "pmid": "9502201",
+      "doi": "10.5555/jw.202602.21",
+      "title": "British Journal of Anaesthesia: simulation training update 1 for February 2026",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in February 2026. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2026-02-12",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.21",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502201/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2026-02"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 12,
+    "fields": {
+      "created": "2026-03-30T03:22:54.264Z",
+      "modified": "2026-03-30T03:23:38.006Z",
+      "pmid": "9502202",
+      "doi": "10.5555/jw.202602.22",
+      "title": "British Journal of Anaesthesia: airway management update 2 for February 2026",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in February 2026. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2026-02-17",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.22",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502202/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2026-02"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 13,
+    "fields": {
+      "created": "2026-03-30T03:22:54.268Z",
+      "modified": "2026-03-30T03:23:38.008Z",
+      "pmid": "9502301",
+      "doi": "10.5555/jw.202601.21",
+      "title": "British Journal of Anaesthesia: airway management update 1 for January 2026",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in January 2026. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2026-01-12",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.21",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502301/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2026-01"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 14,
+    "fields": {
+      "created": "2026-03-30T03:22:54.272Z",
+      "modified": "2026-03-30T03:23:38.010Z",
+      "pmid": "9502302",
+      "doi": "10.5555/jw.202601.22",
+      "title": "British Journal of Anaesthesia: conscious sedation update 2 for January 2026",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in January 2026. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2026-01-17",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.22",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502302/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2026-01"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 15,
+    "fields": {
+      "created": "2026-03-30T03:22:54.276Z",
+      "modified": "2026-03-30T03:23:38.012Z",
+      "pmid": "9502401",
+      "doi": "10.5555/jw.202512.21",
+      "title": "British Journal of Anaesthesia: conscious sedation update 1 for December 2025",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in December 2025. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2025-12-12",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.21",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502401/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2025-12"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 16,
+    "fields": {
+      "created": "2026-03-30T03:22:54.280Z",
+      "modified": "2026-03-30T03:23:38.015Z",
+      "pmid": "9502402",
+      "doi": "10.5555/jw.202512.22",
+      "title": "British Journal of Anaesthesia: regional anesthesia update 2 for December 2025",
+      "abstract": "Synthetic fixture abstract for British Journal of Anaesthesia in December 2025. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "British Journal of Anaesthesia",
+      "publication_date": "2025-12-17",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.22",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9502402/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2025-12"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 17,
+    "fields": {
+      "created": "2026-03-30T03:22:54.282Z",
+      "modified": "2026-03-30T03:23:38.017Z",
+      "pmid": "9503101",
+      "doi": "10.5555/jw.202603.31",
+      "title": "Anesthesiology: simulation training update 1 for March 2026",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in March 2026. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2026-03-12",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.31",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503101/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2026-03"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 18,
+    "fields": {
+      "created": "2026-03-30T03:22:54.285Z",
+      "modified": "2026-03-30T03:23:38.019Z",
+      "pmid": "9503102",
+      "doi": "10.5555/jw.202603.32",
+      "title": "Anesthesiology: airway management update 2 for March 2026",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in March 2026. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2026-03-17",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.32",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503102/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2026-03"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 19,
+    "fields": {
+      "created": "2026-03-30T03:22:54.288Z",
+      "modified": "2026-03-30T03:23:38.021Z",
+      "pmid": "9503201",
+      "doi": "10.5555/jw.202602.31",
+      "title": "Anesthesiology: airway management update 1 for February 2026",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in February 2026. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2026-02-12",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.31",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503201/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2026-02"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 20,
+    "fields": {
+      "created": "2026-03-30T03:22:54.290Z",
+      "modified": "2026-03-30T03:23:38.023Z",
+      "pmid": "9503202",
+      "doi": "10.5555/jw.202602.32",
+      "title": "Anesthesiology: conscious sedation update 2 for February 2026",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in February 2026. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2026-02-17",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.32",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503202/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2026-02"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 21,
+    "fields": {
+      "created": "2026-03-30T03:22:54.292Z",
+      "modified": "2026-03-30T03:23:38.025Z",
+      "pmid": "9503301",
+      "doi": "10.5555/jw.202601.31",
+      "title": "Anesthesiology: conscious sedation update 1 for January 2026",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in January 2026. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2026-01-12",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.31",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503301/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2026-01"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 22,
+    "fields": {
+      "created": "2026-03-30T03:22:54.295Z",
+      "modified": "2026-03-30T03:23:38.028Z",
+      "pmid": "9503302",
+      "doi": "10.5555/jw.202601.32",
+      "title": "Anesthesiology: regional anesthesia update 2 for January 2026",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in January 2026. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2026-01-17",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.32",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503302/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2026-01"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 23,
+    "fields": {
+      "created": "2026-03-30T03:22:54.297Z",
+      "modified": "2026-03-30T03:23:38.030Z",
+      "pmid": "9503401",
+      "doi": "10.5555/jw.202512.31",
+      "title": "Anesthesiology: regional anesthesia update 1 for December 2025",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in December 2025. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2025-12-12",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.31",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503401/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2025-12"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 24,
+    "fields": {
+      "created": "2026-03-30T03:22:54.300Z",
+      "modified": "2026-03-30T03:23:38.032Z",
+      "pmid": "9503402",
+      "doi": "10.5555/jw.202512.32",
+      "title": "Anesthesiology: acute pain update 2 for December 2025",
+      "abstract": "Synthetic fixture abstract for Anesthesiology in December 2025. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anesthesiology",
+      "publication_date": "2025-12-17",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.32",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9503402/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2025-12"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 25,
+    "fields": {
+      "created": "2026-03-30T03:22:54.302Z",
+      "modified": "2026-03-30T03:23:38.034Z",
+      "pmid": "9504101",
+      "doi": "10.5555/jw.202603.41",
+      "title": "Paediatric & Neonatal Pain: airway management update 1 for March 2026",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in March 2026. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2026-03-12",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.41",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504101/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2026-03"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 26,
+    "fields": {
+      "created": "2026-03-30T03:22:54.307Z",
+      "modified": "2026-03-30T03:23:38.036Z",
+      "pmid": "9504102",
+      "doi": "10.5555/jw.202603.42",
+      "title": "Paediatric & Neonatal Pain: conscious sedation update 2 for March 2026",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in March 2026. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2026-03-17",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.42",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504102/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2026-03"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 27,
+    "fields": {
+      "created": "2026-03-30T03:22:54.309Z",
+      "modified": "2026-03-30T03:23:38.038Z",
+      "pmid": "9504201",
+      "doi": "10.5555/jw.202602.41",
+      "title": "Paediatric & Neonatal Pain: conscious sedation update 1 for February 2026",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in February 2026. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2026-02-12",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.41",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504201/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2026-02"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 28,
+    "fields": {
+      "created": "2026-03-30T03:22:54.312Z",
+      "modified": "2026-03-30T03:23:38.040Z",
+      "pmid": "9504202",
+      "doi": "10.5555/jw.202602.42",
+      "title": "Paediatric & Neonatal Pain: regional anesthesia update 2 for February 2026",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in February 2026. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2026-02-17",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.42",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504202/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2026-02"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 29,
+    "fields": {
+      "created": "2026-03-30T03:22:54.314Z",
+      "modified": "2026-03-30T03:23:38.043Z",
+      "pmid": "9504301",
+      "doi": "10.5555/jw.202601.41",
+      "title": "Paediatric & Neonatal Pain: regional anesthesia update 1 for January 2026",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in January 2026. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2026-01-12",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.41",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504301/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2026-01"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 30,
+    "fields": {
+      "created": "2026-03-30T03:22:54.316Z",
+      "modified": "2026-03-30T03:23:38.045Z",
+      "pmid": "9504302",
+      "doi": "10.5555/jw.202601.42",
+      "title": "Paediatric & Neonatal Pain: acute pain update 2 for January 2026",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in January 2026. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2026-01-17",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.42",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504302/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2026-01"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 31,
+    "fields": {
+      "created": "2026-03-30T03:22:54.318Z",
+      "modified": "2026-03-30T03:23:38.047Z",
+      "pmid": "9504401",
+      "doi": "10.5555/jw.202512.41",
+      "title": "Paediatric & Neonatal Pain: acute pain update 1 for December 2025",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in December 2025. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2025-12-12",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.41",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504401/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2025-12"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 32,
+    "fields": {
+      "created": "2026-03-30T03:22:54.321Z",
+      "modified": "2026-03-30T03:23:38.049Z",
+      "pmid": "9504402",
+      "doi": "10.5555/jw.202512.42",
+      "title": "Paediatric & Neonatal Pain: infant, newborn update 2 for December 2025",
+      "abstract": "Synthetic fixture abstract for Paediatric & Neonatal Pain in December 2025. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Paediatric & Neonatal Pain",
+      "publication_date": "2025-12-17",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.42",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9504402/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2025-12"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 33,
+    "fields": {
+      "created": "2026-03-30T03:22:54.323Z",
+      "modified": "2026-03-30T03:23:38.051Z",
+      "pmid": "9505101",
+      "doi": "10.5555/jw.202603.51",
+      "title": "Anaesthesia: conscious sedation update 1 for March 2026",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in March 2026. This sample article focuses on sedation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2026-03-12",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.51",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505101/",
+      "metadata_json": {
+        "keywords": ["sedation", "journal-browser", "2026-03"],
+        "mesh_terms": ["Conscious Sedation", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 34,
+    "fields": {
+      "created": "2026-03-30T03:22:54.326Z",
+      "modified": "2026-03-30T03:23:38.053Z",
+      "pmid": "9505102",
+      "doi": "10.5555/jw.202603.52",
+      "title": "Anaesthesia: regional anesthesia update 2 for March 2026",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in March 2026. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2026-03-17",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.52",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505102/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2026-03"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 35,
+    "fields": {
+      "created": "2026-03-30T03:22:54.328Z",
+      "modified": "2026-03-30T03:23:38.055Z",
+      "pmid": "9505201",
+      "doi": "10.5555/jw.202602.51",
+      "title": "Anaesthesia: regional anesthesia update 1 for February 2026",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in February 2026. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2026-02-12",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.51",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505201/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2026-02"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 36,
+    "fields": {
+      "created": "2026-03-30T03:22:54.331Z",
+      "modified": "2026-03-30T03:23:38.058Z",
+      "pmid": "9505202",
+      "doi": "10.5555/jw.202602.52",
+      "title": "Anaesthesia: acute pain update 2 for February 2026",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in February 2026. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2026-02-17",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.52",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505202/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2026-02"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 37,
+    "fields": {
+      "created": "2026-03-30T03:22:54.333Z",
+      "modified": "2026-03-30T03:23:38.060Z",
+      "pmid": "9505301",
+      "doi": "10.5555/jw.202601.51",
+      "title": "Anaesthesia: acute pain update 1 for January 2026",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in January 2026. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2026-01-12",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.51",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505301/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2026-01"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 38,
+    "fields": {
+      "created": "2026-03-30T03:22:54.336Z",
+      "modified": "2026-03-30T03:23:38.062Z",
+      "pmid": "9505302",
+      "doi": "10.5555/jw.202601.52",
+      "title": "Anaesthesia: infant, newborn update 2 for January 2026",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in January 2026. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2026-01-17",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.52",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505302/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2026-01"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 39,
+    "fields": {
+      "created": "2026-03-30T03:22:54.338Z",
+      "modified": "2026-03-30T03:23:38.065Z",
+      "pmid": "9505401",
+      "doi": "10.5555/jw.202512.51",
+      "title": "Anaesthesia: infant, newborn update 1 for December 2025",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in December 2025. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2025-12-12",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.51",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505401/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2025-12"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 40,
+    "fields": {
+      "created": "2026-03-30T03:22:54.341Z",
+      "modified": "2026-03-30T03:23:38.067Z",
+      "pmid": "9505402",
+      "doi": "10.5555/jw.202512.52",
+      "title": "Anaesthesia: simulation training update 2 for December 2025",
+      "abstract": "Synthetic fixture abstract for Anaesthesia in December 2025. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Anaesthesia",
+      "publication_date": "2025-12-17",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.52",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9505402/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2025-12"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 41,
+    "fields": {
+      "created": "2026-03-30T03:22:54.343Z",
+      "modified": "2026-03-30T03:23:38.069Z",
+      "pmid": "9506101",
+      "doi": "10.5555/jw.202603.61",
+      "title": "Regional Anesthesia and Pain Medicine: regional anesthesia update 1 for March 2026",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in March 2026. This sample article focuses on regional, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2026-03-12",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.61",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506101/",
+      "metadata_json": {
+        "keywords": ["regional", "journal-browser", "2026-03"],
+        "mesh_terms": ["Regional Anesthesia", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Editorial"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 42,
+    "fields": {
+      "created": "2026-03-30T03:22:54.346Z",
+      "modified": "2026-03-30T03:23:38.071Z",
+      "pmid": "9506102",
+      "doi": "10.5555/jw.202603.62",
+      "title": "Regional Anesthesia and Pain Medicine: acute pain update 2 for March 2026",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in March 2026. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2026-03-17",
+      "publication_month": "2026-03-01",
+      "article_url": "https://doi.org/10.5555/jw.202603.62",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506102/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2026-03"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 43,
+    "fields": {
+      "created": "2026-03-30T03:22:54.349Z",
+      "modified": "2026-03-30T03:23:38.073Z",
+      "pmid": "9506201",
+      "doi": "10.5555/jw.202602.61",
+      "title": "Regional Anesthesia and Pain Medicine: acute pain update 1 for February 2026",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in February 2026. This sample article focuses on pain, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2026-02-12",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.61",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506201/",
+      "metadata_json": {
+        "keywords": ["pain", "journal-browser", "2026-02"],
+        "mesh_terms": ["Acute Pain", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Practice Guideline"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 44,
+    "fields": {
+      "created": "2026-03-30T03:22:54.351Z",
+      "modified": "2026-03-30T03:23:38.076Z",
+      "pmid": "9506202",
+      "doi": "10.5555/jw.202602.62",
+      "title": "Regional Anesthesia and Pain Medicine: infant, newborn update 2 for February 2026",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in February 2026. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2026-02-17",
+      "publication_month": "2026-02-01",
+      "article_url": "https://doi.org/10.5555/jw.202602.62",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506202/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2026-02"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 45,
+    "fields": {
+      "created": "2026-03-30T03:22:54.353Z",
+      "modified": "2026-03-30T03:23:38.078Z",
+      "pmid": "9506301",
+      "doi": "10.5555/jw.202601.61",
+      "title": "Regional Anesthesia and Pain Medicine: infant, newborn update 1 for January 2026",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in January 2026. This sample article focuses on neonatal, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2026-01-12",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.61",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506301/",
+      "metadata_json": {
+        "keywords": ["neonatal", "journal-browser", "2026-01"],
+        "mesh_terms": ["Infant, Newborn", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Journal Article"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 46,
+    "fields": {
+      "created": "2026-03-30T03:22:54.356Z",
+      "modified": "2026-03-30T03:23:38.080Z",
+      "pmid": "9506302",
+      "doi": "10.5555/jw.202601.62",
+      "title": "Regional Anesthesia and Pain Medicine: simulation training update 2 for January 2026",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in January 2026. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2026-01-17",
+      "publication_month": "2026-01-01",
+      "article_url": "https://doi.org/10.5555/jw.202601.62",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506302/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2026-01"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 47,
+    "fields": {
+      "created": "2026-03-30T03:22:54.360Z",
+      "modified": "2026-03-30T03:23:38.082Z",
+      "pmid": "9506401",
+      "doi": "10.5555/jw.202512.61",
+      "title": "Regional Anesthesia and Pain Medicine: simulation training update 1 for December 2025",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in December 2025. This sample article focuses on simulation, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2025-12-12",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.61",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506401/",
+      "metadata_json": {
+        "keywords": ["simulation", "journal-browser", "2025-12"],
+        "mesh_terms": ["Simulation Training", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Review"]
+      }
+    }
+  },
+  {
+    "model": "backend.pubmedarticle",
+    "pk": 48,
+    "fields": {
+      "created": "2026-03-30T03:22:54.363Z",
+      "modified": "2026-03-30T03:23:38.084Z",
+      "pmid": "9506402",
+      "doi": "10.5555/jw.202512.62",
+      "title": "Regional Anesthesia and Pain Medicine: airway management update 2 for December 2025",
+      "abstract": "Synthetic fixture abstract for Regional Anesthesia and Pain Medicine in December 2025. This sample article focuses on airway, perioperative care, and journal browser filtering.",
+      "source_journal_name": "Regional Anesthesia and Pain Medicine",
+      "publication_date": "2025-12-17",
+      "publication_month": "2025-12-01",
+      "article_url": "https://doi.org/10.5555/jw.202512.62",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/9506402/",
+      "metadata_json": {
+        "keywords": ["airway", "journal-browser", "2025-12"],
+        "mesh_terms": ["Airway Management", "Child", "Humans"],
+        "publication_types": ["Journal Article", "Clinical Trial"]
+      }
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 1,
+    "fields": {
+      "created": "2026-03-30T03:22:54.231Z",
+      "modified": "2026-03-30T03:23:37.973Z",
+      "watched_journal": 1,
+      "article": 1,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 2,
+    "fields": {
+      "created": "2026-03-30T03:22:54.235Z",
+      "modified": "2026-03-30T03:23:37.976Z",
+      "watched_journal": 1,
+      "article": 2,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 3,
+    "fields": {
+      "created": "2026-03-30T03:22:54.238Z",
+      "modified": "2026-03-30T03:23:37.980Z",
+      "watched_journal": 1,
+      "article": 3,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 4,
+    "fields": {
+      "created": "2026-03-30T03:22:54.241Z",
+      "modified": "2026-03-30T03:23:37.984Z",
+      "watched_journal": 1,
+      "article": 4,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 5,
+    "fields": {
+      "created": "2026-03-30T03:22:54.245Z",
+      "modified": "2026-03-30T03:23:37.989Z",
+      "watched_journal": 1,
+      "article": 5,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 6,
+    "fields": {
+      "created": "2026-03-30T03:22:54.247Z",
+      "modified": "2026-03-30T03:23:37.993Z",
+      "watched_journal": 1,
+      "article": 6,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 7,
+    "fields": {
+      "created": "2026-03-30T03:22:54.250Z",
+      "modified": "2026-03-30T03:23:37.995Z",
+      "watched_journal": 1,
+      "article": 7,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 8,
+    "fields": {
+      "created": "2026-03-30T03:22:54.252Z",
+      "modified": "2026-03-30T03:23:37.998Z",
+      "watched_journal": 1,
+      "article": 8,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 9,
+    "fields": {
+      "created": "2026-03-30T03:22:54.255Z",
+      "modified": "2026-03-30T03:23:38.000Z",
+      "watched_journal": 2,
+      "article": 9,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 10,
+    "fields": {
+      "created": "2026-03-30T03:22:54.258Z",
+      "modified": "2026-03-30T03:23:38.002Z",
+      "watched_journal": 2,
+      "article": 10,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 11,
+    "fields": {
+      "created": "2026-03-30T03:22:54.262Z",
+      "modified": "2026-03-30T03:23:38.005Z",
+      "watched_journal": 2,
+      "article": 11,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 12,
+    "fields": {
+      "created": "2026-03-30T03:22:54.265Z",
+      "modified": "2026-03-30T03:23:38.007Z",
+      "watched_journal": 2,
+      "article": 12,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 13,
+    "fields": {
+      "created": "2026-03-30T03:22:54.270Z",
+      "modified": "2026-03-30T03:23:38.009Z",
+      "watched_journal": 2,
+      "article": 13,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 14,
+    "fields": {
+      "created": "2026-03-30T03:22:54.275Z",
+      "modified": "2026-03-30T03:23:38.011Z",
+      "watched_journal": 2,
+      "article": 14,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 15,
+    "fields": {
+      "created": "2026-03-30T03:22:54.277Z",
+      "modified": "2026-03-30T03:23:38.013Z",
+      "watched_journal": 2,
+      "article": 15,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 16,
+    "fields": {
+      "created": "2026-03-30T03:22:54.281Z",
+      "modified": "2026-03-30T03:23:38.015Z",
+      "watched_journal": 2,
+      "article": 16,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 17,
+    "fields": {
+      "created": "2026-03-30T03:22:54.283Z",
+      "modified": "2026-03-30T03:23:38.017Z",
+      "watched_journal": 3,
+      "article": 17,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 18,
+    "fields": {
+      "created": "2026-03-30T03:22:54.286Z",
+      "modified": "2026-03-30T03:23:38.020Z",
+      "watched_journal": 3,
+      "article": 18,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 19,
+    "fields": {
+      "created": "2026-03-30T03:22:54.289Z",
+      "modified": "2026-03-30T03:23:38.022Z",
+      "watched_journal": 3,
+      "article": 19,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 20,
+    "fields": {
+      "created": "2026-03-30T03:22:54.291Z",
+      "modified": "2026-03-30T03:23:38.024Z",
+      "watched_journal": 3,
+      "article": 20,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 21,
+    "fields": {
+      "created": "2026-03-30T03:22:54.293Z",
+      "modified": "2026-03-30T03:23:38.026Z",
+      "watched_journal": 3,
+      "article": 21,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 22,
+    "fields": {
+      "created": "2026-03-30T03:22:54.296Z",
+      "modified": "2026-03-30T03:23:38.028Z",
+      "watched_journal": 3,
+      "article": 22,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 23,
+    "fields": {
+      "created": "2026-03-30T03:22:54.298Z",
+      "modified": "2026-03-30T03:23:38.031Z",
+      "watched_journal": 3,
+      "article": 23,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 24,
+    "fields": {
+      "created": "2026-03-30T03:22:54.301Z",
+      "modified": "2026-03-30T03:23:38.033Z",
+      "watched_journal": 3,
+      "article": 24,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 25,
+    "fields": {
+      "created": "2026-03-30T03:22:54.305Z",
+      "modified": "2026-03-30T03:23:38.035Z",
+      "watched_journal": 4,
+      "article": 25,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 26,
+    "fields": {
+      "created": "2026-03-30T03:22:54.308Z",
+      "modified": "2026-03-30T03:23:38.037Z",
+      "watched_journal": 4,
+      "article": 26,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 27,
+    "fields": {
+      "created": "2026-03-30T03:22:54.310Z",
+      "modified": "2026-03-30T03:23:38.039Z",
+      "watched_journal": 4,
+      "article": 27,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 28,
+    "fields": {
+      "created": "2026-03-30T03:22:54.313Z",
+      "modified": "2026-03-30T03:23:38.041Z",
+      "watched_journal": 4,
+      "article": 28,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 29,
+    "fields": {
+      "created": "2026-03-30T03:22:54.315Z",
+      "modified": "2026-03-30T03:23:38.044Z",
+      "watched_journal": 4,
+      "article": 29,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 30,
+    "fields": {
+      "created": "2026-03-30T03:22:54.317Z",
+      "modified": "2026-03-30T03:23:38.046Z",
+      "watched_journal": 4,
+      "article": 30,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 31,
+    "fields": {
+      "created": "2026-03-30T03:22:54.319Z",
+      "modified": "2026-03-30T03:23:38.048Z",
+      "watched_journal": 4,
+      "article": 31,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 32,
+    "fields": {
+      "created": "2026-03-30T03:22:54.322Z",
+      "modified": "2026-03-30T03:23:38.050Z",
+      "watched_journal": 4,
+      "article": 32,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 33,
+    "fields": {
+      "created": "2026-03-30T03:22:54.324Z",
+      "modified": "2026-03-30T03:23:38.052Z",
+      "watched_journal": 5,
+      "article": 33,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 34,
+    "fields": {
+      "created": "2026-03-30T03:22:54.327Z",
+      "modified": "2026-03-30T03:23:38.054Z",
+      "watched_journal": 5,
+      "article": 34,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 35,
+    "fields": {
+      "created": "2026-03-30T03:22:54.329Z",
+      "modified": "2026-03-30T03:23:38.056Z",
+      "watched_journal": 5,
+      "article": 35,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 36,
+    "fields": {
+      "created": "2026-03-30T03:22:54.332Z",
+      "modified": "2026-03-30T03:23:38.058Z",
+      "watched_journal": 5,
+      "article": 36,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 37,
+    "fields": {
+      "created": "2026-03-30T03:22:54.334Z",
+      "modified": "2026-03-30T03:23:38.061Z",
+      "watched_journal": 5,
+      "article": 37,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 38,
+    "fields": {
+      "created": "2026-03-30T03:22:54.337Z",
+      "modified": "2026-03-30T03:23:38.063Z",
+      "watched_journal": 5,
+      "article": 38,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 39,
+    "fields": {
+      "created": "2026-03-30T03:22:54.339Z",
+      "modified": "2026-03-30T03:23:38.066Z",
+      "watched_journal": 5,
+      "article": 39,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 40,
+    "fields": {
+      "created": "2026-03-30T03:22:54.342Z",
+      "modified": "2026-03-30T03:23:38.068Z",
+      "watched_journal": 5,
+      "article": 40,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 41,
+    "fields": {
+      "created": "2026-03-30T03:22:54.344Z",
+      "modified": "2026-03-30T03:23:38.070Z",
+      "watched_journal": 6,
+      "article": 41,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 42,
+    "fields": {
+      "created": "2026-03-30T03:22:54.347Z",
+      "modified": "2026-03-30T03:23:38.072Z",
+      "watched_journal": 6,
+      "article": 42,
+      "publication_month": "2026-03-01",
+      "first_seen_at": "2026-02-27T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 43,
+    "fields": {
+      "created": "2026-03-30T03:22:54.349Z",
+      "modified": "2026-03-30T03:23:38.074Z",
+      "watched_journal": 6,
+      "article": 43,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 44,
+    "fields": {
+      "created": "2026-03-30T03:22:54.352Z",
+      "modified": "2026-03-30T03:23:38.076Z",
+      "watched_journal": 6,
+      "article": 44,
+      "publication_month": "2026-02-01",
+      "first_seen_at": "2026-02-26T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 45,
+    "fields": {
+      "created": "2026-03-30T03:22:54.354Z",
+      "modified": "2026-03-30T03:23:38.078Z",
+      "watched_journal": 6,
+      "article": 45,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 46,
+    "fields": {
+      "created": "2026-03-30T03:22:54.357Z",
+      "modified": "2026-03-30T03:23:38.080Z",
+      "watched_journal": 6,
+      "article": 46,
+      "publication_month": "2026-01-01",
+      "first_seen_at": "2026-02-25T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 47,
+    "fields": {
+      "created": "2026-03-30T03:22:54.361Z",
+      "modified": "2026-03-30T03:23:38.082Z",
+      "watched_journal": 6,
+      "article": 47,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.watchedjournalarticle",
+    "pk": 48,
+    "fields": {
+      "created": "2026-03-30T03:22:54.364Z",
+      "modified": "2026-03-30T03:23:38.084Z",
+      "watched_journal": 6,
+      "article": 48,
+      "publication_month": "2025-12-01",
+      "first_seen_at": "2026-02-24T03:23:37.955Z",
+      "last_seen_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 1,
+    "fields": {
+      "created": "2026-03-30T03:22:54.232Z",
+      "modified": "2026-03-30T03:23:37.974Z",
+      "user": 4,
+      "article": 1,
+      "starred_at": "2026-03-29T03:23:37.955Z",
+      "recommended_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 2,
+    "fields": {
+      "created": "2026-03-30T03:22:54.236Z",
+      "modified": "2026-03-30T03:23:37.978Z",
+      "user": 4,
+      "article": 2,
+      "starred_at": "2026-03-28T03:23:37.955Z",
+      "recommended_at": null
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 3,
+    "fields": {
+      "created": "2026-03-30T03:22:54.239Z",
+      "modified": "2026-03-30T03:23:37.982Z",
+      "user": 4,
+      "article": 3,
+      "starred_at": "2026-03-29T03:23:37.955Z",
+      "recommended_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 4,
+    "fields": {
+      "created": "2026-03-30T03:22:54.243Z",
+      "modified": "2026-03-30T03:23:37.986Z",
+      "user": 4,
+      "article": 4,
+      "starred_at": "2026-03-28T03:23:37.955Z",
+      "recommended_at": null
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 5,
+    "fields": {
+      "created": "2026-03-30T03:22:54.256Z",
+      "modified": "2026-03-30T03:23:38.001Z",
+      "user": 4,
+      "article": 9,
+      "starred_at": "2026-03-29T03:23:37.955Z",
+      "recommended_at": "2026-03-29T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 6,
+    "fields": {
+      "created": "2026-03-30T03:22:54.259Z",
+      "modified": "2026-03-30T03:23:38.003Z",
+      "user": 4,
+      "article": 10,
+      "starred_at": "2026-03-28T03:23:37.955Z",
+      "recommended_at": null
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 7,
+    "fields": {
+      "created": "2026-03-30T03:22:54.263Z",
+      "modified": "2026-03-30T03:23:38.006Z",
+      "user": 4,
+      "article": 11,
+      "starred_at": "2026-03-29T03:23:37.955Z",
+      "recommended_at": "2026-03-28T03:23:37.955Z"
+    }
+  },
+  {
+    "model": "backend.pubmedarticleuserstate",
+    "pk": 8,
+    "fields": {
+      "created": "2026-03-30T03:22:54.266Z",
+      "modified": "2026-03-30T03:23:38.008Z",
+      "user": 4,
+      "article": 12,
+      "starred_at": "2026-03-28T03:23:37.955Z",
+      "recommended_at": null
+    }
+  }
+]

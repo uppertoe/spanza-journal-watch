@@ -1,7 +1,10 @@
 {% load responsive_images %}
 <div class="col-md-6 d-flex">
-    <div class="row g-0 border rounded overflow-hidden flex-md-row mb-4 position-relative w-100 h-100 card-feature-tile">
-        <div class="col-8 p-3 p-lg-4 d-flex flex-column justify-content-between position-static card-feature-tile__body">
+    <div class="row g-0 border rounded overflow-hidden flex-md-row mb-4 position-relative w-100 h-100 card-feature-tile js-review-card-modal"
+        tabindex="0"
+        role="button"
+        aria-label="Open featured review for {{ feature.article.get_title|capfirst }}">
+        <div class="col-8 p-3 p-lg-4 d-flex flex-column justify-content-between position-static card-feature-tile__body surface-pattern surface-pattern--{{ pattern_variant|default:'a' }}">
             <div>
             <strong class="d-inline-block mb-2 {{ feature_text_styles|random }}">Featured Article</strong>
             <h5 class="mb-1">{{ feature.article.get_title }}</h5>
@@ -23,20 +26,21 @@
             <svg class="bi"><use xlink:href="#chevron-right"/></svg>
             </a>
         </div>
-        <div class="col-4 d-none d-md-block card-feature-tile__media">
+        <div class="col-4 d-none d-md-block card-feature-tile__media image-fallback-frame image-fallback-frame--{{ pattern_variant|default:'a' }}">
             {% if feature.feature_image %}
             <img
               src="{{ feature.feature_image|image_variant_url:240 }}"
               srcset="{% image_variant_srcset feature.feature_image 240 480 %}"
               sizes="(min-width: 1200px) 240px, (min-width: 768px) 200px, 0px"
               width="240"
-              height="300"
+              height="272"
               alt=""
-              class="w-100 h-100 object-fit-cover card-feature-tile__image"
+              class="w-100 h-100 object-fit-cover card-feature-tile__image image-fallback-frame__image"
+              onerror="this.classList.add('image-fallback-frame__image--hidden')"
               decoding="async"
             >
             {% else %}
-            <svg class="w-100 h-100 card-feature-tile__image" height="300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/></svg>
+            <svg class="w-100 h-100 card-feature-tile__image" height="272" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="transparent"/></svg>
             {% endif %}
         </div>
     </div>

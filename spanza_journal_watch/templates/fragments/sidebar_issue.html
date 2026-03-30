@@ -4,17 +4,22 @@
       <div class="col-4 d-none d-lg-block">
   {% with issue_image=issue.display_issue_image %}
   {% if issue_image %}
-  <img
-    src="{{ issue_image|image_variant_url:240 }}"
-    srcset="{% image_variant_srcset issue_image 240 480 %}"
-    sizes="200px"
-    height="150"
-    alt=""
-    class="w-100 center-thumbnail object-fit-cover rounded"
-    decoding="async"
-  >
+  <div class="image-fallback-frame image-fallback-frame--{{ sidebar_issue_pattern }} rounded">
+    <img
+      src="{{ issue_image|image_variant_url:240 }}"
+      srcset="{% image_variant_srcset issue_image 240 480 %}"
+      sizes="200px"
+      height="150"
+      alt=""
+      class="w-100 center-thumbnail object-fit-cover rounded image-fallback-frame__image"
+      onerror="this.classList.add('image-fallback-frame__image--hidden')"
+      decoding="async"
+    >
+  </div>
       {% else %}
-      <svg class="rounded" height="150" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#777"/></svg>
+      <div class="image-fallback-frame image-fallback-frame--{{ sidebar_issue_pattern }} rounded">
+        <svg class="rounded" height="150" width="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="transparent"/></svg>
+      </div>
       {% endif %}
       {% endwith %}
       </div>

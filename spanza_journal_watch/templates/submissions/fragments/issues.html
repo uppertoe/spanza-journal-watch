@@ -11,17 +11,22 @@
                     aria-label="Open issue {{ issue.name }}">
                     {% with issue_image=issue.display_issue_image %}
                     {% if issue_image %}
-                    <img
-                      src="{{ issue_image|image_variant_url:480 }}"
-                      srcset="{% image_variant_srcset issue_image 240 480 %}"
-                      sizes="(min-width: 1200px) 360px, (min-width: 768px) 330px, 100vw"
-                      height="225"
-                      alt=""
-                      class="w-100 center-thumbnail object-fit-cover rounded-top"
-                      decoding="async"
-                    >
+                    <div class="image-fallback-frame image-fallback-frame--{{ issue_pattern }} rounded-top">
+                        <img
+                          src="{{ issue_image|image_variant_url:480 }}"
+                          srcset="{% image_variant_srcset issue_image 240 480 %}"
+                          sizes="(min-width: 1200px) 360px, (min-width: 768px) 330px, 100vw"
+                          height="225"
+                          alt=""
+                          class="w-100 center-thumbnail object-fit-cover rounded-top image-fallback-frame__image"
+                          onerror="this.classList.add('image-fallback-frame__image--hidden')"
+                          decoding="async"
+                        >
+                    </div>
                     {% else %}
-                    <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/></svg>
+                    <div class="image-fallback-frame image-fallback-frame--{{ issue_pattern }} rounded-top">
+                        <svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="transparent"/></svg>
+                    </div>
                     {% endif %}
 
                     <div class="card-body">

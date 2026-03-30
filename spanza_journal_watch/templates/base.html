@@ -36,32 +36,12 @@
     <!-- Your stuff: Third-party CSS libraries go here -->
 
     <style>
-      .main-feature { position: relative; overflow: hidden; }
-      .transparent-overlay {
-        position: absolute;
-        inset: 0;
-        z-index: 1;
-        background: linear-gradient(60deg, #e9ecef 0%, #e9ecef 100%);
-        opacity: 0.8;
-      }
-      [data-bs-theme='dark'] .transparent-overlay {
-        background: linear-gradient(to top, #09203f 0%, rgba(33, 37, 41, 0.75) 100%);
-      }
-      .feature-image {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        filter: blur(0.2rem);
-      }
-      .feature-content { position: relative; z-index: 2; }
       .blog-header-logo {
         font-family: 'Fugaz One', 'Arial Black', 'Franklin Gothic Heavy', 'Impact', sans-serif;
-        font-size: 2rem;
+        font-size: 2.5rem;
       }
       @media (min-width: 768px) {
-        .blog-header-logo { font-size: 4rem; }
+        .blog-header-logo { font-size: 4.9rem; }
       }
       h1, h2, h3, h4, h5, h6 {
         font-family: 'Baloo', 'Trebuchet MS', 'Arial Rounded MT Bold', 'Avenir Next Rounded', system-ui, sans-serif;
@@ -116,7 +96,7 @@
 
   </head>
 
-  <body>
+  <body class="public-site">
     <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
       <symbol id="check2" viewBox="0 0 16 16">
         <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
@@ -163,6 +143,9 @@
       <symbol id="chevron-right" viewBox="0 0 16 16">
         <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
       </symbol>
+      <symbol id="icon-star-fill" viewBox="0 0 16 16">
+        <path fill="currentColor" d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.33-.314-.158-.888.283-.95l4.898-.696 2.13-4.327c.197-.4.73-.4.927 0l2.13 4.327 4.898.696c.441.062.613.636.283.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/>
+      </symbol>
     </svg>
 
     <!-- Container for HTMX messages -->
@@ -190,7 +173,7 @@
             </div>
           </div>
           <div class="col-sm-4 order-2 order-sm-2 pb-2 pb-sm-0 text-center">
-            <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}">Journal Watch</a>
+            <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text">Journal Watch</span></a>
           </div>
           <div class="col-sm-4 d-flex order-1 order-sm-1 justify-content-center justify-content-sm-start align-items-center">
             <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer" class="d-inline-block py-3">
@@ -222,15 +205,26 @@
       </div>
 
       {% if frontend_banner %}
-        <div class="alert alert-{{ frontend_banner.tone|default:'primary' }} d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 border-0 shadow-sm" role="status">
-          <div>
-            {% if frontend_banner.title %}<div class="fw-semibold">{{ frontend_banner.title }}</div>{% endif %}
-            {% if frontend_banner.text %}<div>{{ frontend_banner.text }}</div>{% endif %}
+        {% if frontend_banner.link_url %}
+          <a class="frontend-ticker frontend-ticker--linked text-decoration-none" href="{{ frontend_banner.link_url }}">
+            <div class="frontend-ticker__eyebrow">Newsfeed</div>
+            <div class="frontend-ticker__content">
+              {% if frontend_banner.title %}<div class="frontend-ticker__title">{{ frontend_banner.title }}</div>{% endif %}
+              {% if frontend_banner.text %}<div class="frontend-ticker__text">{{ frontend_banner.text }}</div>{% endif %}
+            </div>
+            {% if frontend_banner.link_text %}
+              <span class="frontend-ticker__link">{{ frontend_banner.link_text }}</span>
+            {% endif %}
+          </a>
+        {% else %}
+          <div class="frontend-ticker" role="status">
+            <div class="frontend-ticker__eyebrow">Newsfeed</div>
+            <div class="frontend-ticker__content">
+              {% if frontend_banner.title %}<div class="frontend-ticker__title">{{ frontend_banner.title }}</div>{% endif %}
+              {% if frontend_banner.text %}<div class="frontend-ticker__text">{{ frontend_banner.text }}</div>{% endif %}
+            </div>
           </div>
-          {% if frontend_banner.link_url and frontend_banner.link_text %}
-            <a class="btn btn-sm btn-outline-dark align-self-start align-self-md-center" href="{{ frontend_banner.link_url }}">{{ frontend_banner.link_text }}</a>
-          {% endif %}
-        </div>
+        {% endif %}
       {% endif %}
     </div>
 
@@ -269,41 +263,6 @@
     </main>
 
     {% block modal %}{% endblock modal %}
-
-    <div class="dropdown bd-mode-toggle d-none d-md-block px-3 px-lg-5">
-      <button class="btn btn-bd-primary py-2 my-3 dropdown-toggle d-flex align-items-center"
-              id="bd-theme"
-              type="button"
-              aria-expanded="false"
-              data-bs-toggle="dropdown"
-              aria-label="Toggle theme (auto)">
-        <svg class="bi my-1 theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
-        <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
-        <li>
-          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
-            <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
-            Light
-            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-          </button>
-        </li>
-        <li>
-          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
-            <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
-            Dark
-            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-          </button>
-        </li>
-        <li>
-          <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
-            <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
-            Auto
-            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-          </button>
-        </li>
-      </ul>
-    </div>
 
     <div class="sticky-mobile-toolbar d-md-none" aria-label="Quick navigation">
       <div class="sticky-mobile-toolbar__inner">
@@ -344,6 +303,40 @@
 
     <div class="sticky-desktop-toolbar d-none d-md-block">
       <div class="sticky-desktop-toolbar__inner">
+        <div class="sticky-desktop-toolbar__theme dropup">
+          <button class="btn btn-bd-primary dropdown-toggle d-flex align-items-center gap-2"
+                  id="bd-theme"
+                  type="button"
+                  aria-expanded="false"
+                  data-bs-toggle="dropdown"
+                  aria-label="Toggle theme (auto)">
+            <svg class="bi theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
+            <span class="small fw-semibold" id="bd-theme-text">Theme</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+            <li>
+              <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                Light
+                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                Dark
+                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                Auto
+                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+              </button>
+            </li>
+          </ul>
+        </div>
         <div class="sticky-desktop-toolbar__actions" id="desktop-action-dock-slot">
           {% block desktop_action_dock %}{% endblock desktop_action_dock %}
         </div>

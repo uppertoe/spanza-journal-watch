@@ -1,36 +1,68 @@
-{% load responsive_images %}
-{% if content.light_gradient or content.dark_gradient %}
-<style>
-    {% if content.light_gradient %}
-    .transparent-overlay{
-        {{ content.light_gradient }}
-    }
+{% with route_name=request.resolver_match.url_name|default:'' %}
+  <section class="abstract-header abstract-header--page
+    {% if header_theme %}
+      abstract-header--{{ header_theme }}
+    {% elif route_name == 'home' %}
+      abstract-header--home
+    {% elif route_name == 'issue_list' %}
+      abstract-header--issues
+    {% elif route_name == 'issue_detail' or route_name == 'issue_latest' %}
+      abstract-header--issue-detail
+    {% elif route_name == 'journal_list' %}
+      abstract-header--journals
+    {% elif route_name == 'search' %}
+      abstract-header--search
+    {% elif route_name == 'about' or route_name == 'author_detail' %}
+      abstract-header--about
+    {% elif route_name == 'review_detail' %}
+      abstract-header--review
+    {% elif route_name == 'tag_list' or route_name == 'tag_detail' %}
+      abstract-header--tags
+    {% else %}
+      abstract-header--default
     {% endif %}
-    {% if content.dark_gradient %}
-    [data-bs-theme='dark'] .transparent-overlay{
-        {{ content.dark_gradient }}
-    }
+    {% if header_pattern %}
+      abstract-header--pattern-{{ header_pattern }}
+    {% elif route_name == 'home' %}
+      abstract-header--pattern-ripple
+    {% elif route_name == 'issue_list' %}
+      abstract-header--pattern-stack
+    {% elif route_name == 'issue_detail' or route_name == 'issue_latest' %}
+      abstract-header--pattern-arc
+    {% elif route_name == 'journal_list' %}
+      abstract-header--pattern-shelf
+    {% elif route_name == 'search' %}
+      abstract-header--pattern-band
+    {% elif route_name == 'about' or route_name == 'author_detail' %}
+      abstract-header--pattern-halo
+    {% elif route_name == 'review_detail' %}
+      abstract-header--pattern-ribbon
+    {% elif route_name == 'tag_list' or route_name == 'tag_detail' %}
+      abstract-header--pattern-crest
+    {% else %}
+      abstract-header--pattern-band
     {% endif %}
-</style>
-{% endif %}
-<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary main-feature">
-    {% if content.image %}
-    <div class="transparent-overlay"></div>
-    <img
-      src="{{ content.image|image_variant_url:480 }}"
-      srcset="{% image_variant_srcset content.image 240 480 %}"
-      sizes="(min-width: 768px) 736px, 100vw"
-      alt="Feature Image"
-      class="feature-image"
-      fetchpriority="high"
-      {% if content.image_width_safe %}width="{{ content.image_width_safe }}"{% endif %}
-      {% if content.image_height_safe %}height="{{ content.image_height_safe }}"{% endif %}
-    >
-    {% endif %}
-    <div class="row">
-    <div class="col-lg-8 feature-content">
-        <h1 class="display-4 fst-italic">{{ content.title|capfirst }}</h1>
-        <div class="lead my-3">{{ content.body|capfirst }}</div>
-      </div>
+  ">
+    <div class="abstract-header__veil"></div>
+    <div class="abstract-header__spark abstract-header__spark--one"></div>
+    <div class="abstract-header__spark abstract-header__spark--two"></div>
+    <div class="abstract-header__grid"></div>
+    <div class="abstract-header__content">
+      {% if header_kicker %}
+        <p class="abstract-header__kicker mb-2">{{ header_kicker }}</p>
+      {% endif %}
+      <h1 class="abstract-header__title">
+        {% if title %}
+          {{ title|capfirst }}
+        {% else %}
+          {{ content.title|capfirst }}
+        {% endif %}
+      </h1>
+      {% if body %}
+        <div class="abstract-header__body">{{ body|capfirst }}</div>
+      {% elif content.body %}
+        <div class="abstract-header__body">{{ content.body|capfirst }}</div>
+      {% endif %}
     </div>
-</div>
+  </section>
+{% endwith %}

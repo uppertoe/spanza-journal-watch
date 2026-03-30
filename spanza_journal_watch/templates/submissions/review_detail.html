@@ -14,12 +14,7 @@
 {% if share_image_url %}<meta name="twitter:image" content="{{ share_image_url }}">{% endif %}
 {% endblock head_meta %}
 {% block main-feature %}
-    <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-        <div class="col-lg-8 px-0">
-            <h1 class="display-4 fst-italic">Review</h1>
-            <div class="lead my-3">A review of a journal article created by a Journal Watch contributor</div>
-        </div>
-    </div>
+    {% include "fragments/main_feature.html" with title=review.article.get_title body="A contributor review of a paper from the paediatric anaesthesia literature." header_theme="review" header_pattern="arc" header_kicker="Editorial review" %}
 {% endblock main-feature %}
 
 {% block article-block %}
@@ -33,7 +28,7 @@
 </div>
 <div class="d-flex mt-auto justify-content-between align-items-center">
     <div class="btn-group">
-        <a role="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</a>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-custom-class="journalwatch-popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</button>
         <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" data-analytics-full-text>View full text article</a>
     </div>
 </div>

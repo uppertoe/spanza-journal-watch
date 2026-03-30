@@ -10,15 +10,18 @@
                 role="button"
                 aria-label="Open review for {{ article.get_title|capfirst }}">
                 {% if review.feature_image %}
-                <img
-                  src="{{ review.feature_image|image_variant_url:480 }}"
-                  srcset="{% image_variant_srcset review.feature_image 240 480 %}"
-                  sizes="(min-width: 1200px) 360px, (min-width: 768px) 330px, 100vw"
-                  height="225"
-                  alt=""
-                  class="w-100 center-thumbnail object-fit-cover rounded-top"
-                  decoding="async"
-                >
+                <div class="image-fallback-frame image-fallback-frame--{{ tag_pattern }} rounded-top">
+                    <img
+                      src="{{ review.feature_image|image_variant_url:480 }}"
+                      srcset="{% image_variant_srcset review.feature_image 240 480 %}"
+                      sizes="(min-width: 1200px) 360px, (min-width: 768px) 330px, 100vw"
+                      height="225"
+                      alt=""
+                      class="w-100 center-thumbnail object-fit-cover rounded-top image-fallback-frame__image"
+                      onerror="this.classList.add('image-fallback-frame__image--hidden')"
+                      decoding="async"
+                    >
+                </div>
                 {% endif %}
                 <div class="d-flex card-body flex-column">
                     <h5 class="card-title">{{ article.get_title|capfirst }}</h5>

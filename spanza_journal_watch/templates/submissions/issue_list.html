@@ -2,14 +2,9 @@
 
 {% block main-feature %}
 {% if page_header %}
-    {% with page_header as content %} {% include "fragments/main_feature.html" %} {% endwith %}
+    {% with page_header as content %} {% include "fragments/main_feature.html" with header_kicker="Archive" %} {% endwith %}
     {% else %}
-    <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-        <div class="col-lg-8 px-0">
-            <h1 class="display-4 fst-italic">Issues</h1>
-            <p class="lead my-3">The Journal Watch community publishes a collection of reviews every few months. These publications are available below.</p>
-        </div>
-    </div>
+    {% include "fragments/main_feature.html" with title="Issues" body="The Journal Watch community publishes a collection of reviews every few months. These publications are available below." header_theme="issues" header_pattern="stack" header_kicker="Archive" %}
 {% endif %}
 {% endblock main-feature %}
 

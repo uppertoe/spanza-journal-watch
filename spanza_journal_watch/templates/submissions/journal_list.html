@@ -1,77 +1,103 @@
 {% extends "base.html" %}
 
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+{% block sidebar %}{% endblock sidebar %}
+{% block main-feature %}
+  <div class="container">
+    {% include "fragments/main_feature.html" with title="Browse the shelf, then drill into a month." body="Explore cached PubMed articles from watched journals, then narrow by month, metadata, and free text." header_theme="journals" header_pattern="shelf" header_kicker="Journal browser" %}
+  </div>
+{% endblock main-feature %}
+
 {% block content %}
-  <div class="container pb-5">
-    <div class="row g-4 align-items-start">
-      <div class="col-12 col-lg-4">
-        <div class="card shadow-sm border-0">
-          <div class="card-body">
-            <p class="text-uppercase small fw-semibold text-primary mb-2">Journal browser</p>
-            <h1 class="h2 mb-3">Browse watched journals by month</h1>
-            <p class="text-muted mb-4">
-              Explore cached PubMed articles, filter by metadata, and save the papers you want to return to.
+  <section class="journal-browser-page pb-5">
+    <div class="container">
+      <form
+        hx-get="{% url 'submissions:journal_list' %}"
+        hx-target="#journal-browser-results"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="journal-browser-form"
+      >
+        <section class="journal-shelf-card mb-4">
+          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-3">
+            <div>
+              <p class="text-uppercase small fw-semibold text-primary mb-1">Pick journals</p>
+              <h2 class="h4 mb-0">Your shelf</h2>
+            </div>
+            <p class="text-muted small mb-0">
+              {% if request.user.is_authenticated %}
+                Your saved journals are preselected. You can mix and match any shelf title below.
+              {% else %}
+                Start with one or more watched journals, then refine the article list below.
+              {% endif %}
             </p>
-            <form
-              hx-get="{% url 'submissions:journal_list' %}"
-              hx-target="#journal-browser-results"
-              hx-swap="innerHTML"
-              hx-push-url="true"
-              class="row g-3"
-            >
-              <div class="col-12">
-                <label class="form-label fw-semibold" for="journal-month">Month</label>
-                <input id="journal-month" type="month" name="month" value="{{ selected_month|date:'Y-m' }}" class="form-control">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold" for="journal-search">Free text</label>
-                <input id="journal-search" type="search" name="q" value="{{ query }}" class="form-control" placeholder="Title, abstract, DOI, PMID">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold" for="journal-publication-type">Article type</label>
-                <select id="journal-publication-type" name="publication_type" class="form-select">
-                  <option value="">All types</option>
-                  {% for item in available_publication_types %}
-                    <option value="{{ item }}" {% if publication_type == item %}selected{% endif %}>{{ item }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold" for="journal-subject">Subject metadata</label>
-                <input id="journal-subject" type="search" name="subject" value="{{ subject }}" class="form-control" placeholder="e.g. sepsis, pain, newborn">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-semibold">Journals</label>
-                <div class="border rounded p-3 bg-body-tertiary" style="max-height: 18rem; overflow-y: auto;">
-                  {% for journal in active_journals %}
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input"
-                        type="checkbox"
-                        name="journal"
-                        value="{{ journal.pk }}"
-                        id="journal-{{ journal.pk }}"
-                        {% if journal.pk in selected_journal_ids %}checked{% endif %}
-                      >
-                      <label class="form-check-label" for="journal-{{ journal.pk }}">{{ journal.name }}</label>
-                    </div>
-                  {% empty %}
-                    <p class="text-muted small mb-0">No watched journals have been configured yet.</p>
-                  {% endfor %}
-                </div>
-              </div>
-              <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Apply filters</button>
-                <a href="{% url 'submissions:journal_list' %}" class="btn btn-outline-secondary">Reset</a>
-              </div>
-            </form>
           </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-8">
-        <div id="journal-browser-results">
-          {% include "submissions/fragments/journal_article_list.html" %}
-        </div>
+
+          <div class="journal-shelf-grid">
+            {% for journal in active_journals %}
+              {% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as book_pattern silent %}
+              <div class="journal-book journal-book--{{ journal.shelf_tone }} journal-book--pattern-{{ book_pattern }}">
+                <input
+                  class="journal-book__input"
+                  type="checkbox"
+                  name="journal"
+                  value="{{ journal.pk }}"
+                  id="journal-{{ journal.pk }}"
+                  {% if journal.pk in selected_journal_ids %}checked{% endif %}
+                >
+                <label class="journal-book__label" for="journal-{{ journal.pk }}">
+                  <span class="journal-book__bookmark" aria-hidden="true"></span>
+                  <span class="journal-book__pattern journal-book__pattern--one" aria-hidden="true"></span>
+                  <span class="journal-book__pattern journal-book__pattern--two" aria-hidden="true"></span>
+                  <span class="journal-book__pattern journal-book__pattern--three" aria-hidden="true"></span>
+                  <span class="journal-book__spine"></span>
+                  <span class="journal-book__title">{{ journal.name }}</span>
+                </label>
+              </div>
+            {% empty %}
+              <div class="journal-browser-empty">
+                <h2 class="h5 mb-2">No watched journals yet</h2>
+                <p class="text-muted mb-0">Add watched journals in the backend settings to start building this shelf.</p>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="journal-filter-bar mb-4">
+          <div class="journal-filter-bar__fields">
+            <div class="journal-filter-bar__field journal-filter-bar__field--month">
+              <label class="form-label fw-semibold mb-1" for="journal-month">Month</label>
+              <input id="journal-month" type="month" name="month" value="{{ selected_month|date:'Y-m' }}" class="form-control">
+            </div>
+            <div class="journal-filter-bar__field journal-filter-bar__field--search">
+              <label class="form-label fw-semibold mb-1" for="journal-search">Free text</label>
+              <input id="journal-search" type="search" name="q" value="{{ query }}" class="form-control" placeholder="Title, abstract, DOI, PMID">
+            </div>
+            <div class="journal-filter-bar__field">
+              <label class="form-label fw-semibold mb-1" for="journal-publication-type">Article type</label>
+              <select id="journal-publication-type" name="publication_type" class="form-select">
+                <option value="">All types</option>
+                {% for item in available_publication_types %}
+                  <option value="{{ item }}" {% if publication_type == item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="journal-filter-bar__field">
+              <label class="form-label fw-semibold mb-1" for="journal-subject">Subject metadata</label>
+              <input id="journal-subject" type="search" name="subject" value="{{ subject }}" class="form-control" placeholder="Sepsis, pain, newborn">
+            </div>
+          </div>
+          <div class="journal-filter-bar__actions">
+            <button type="submit" class="btn btn-primary">Apply</button>
+            <a href="{% url 'submissions:journal_list' %}" class="btn btn-outline-secondary">Reset</a>
+          </div>
+        </section>
+      </form>
+
+      <div id="journal-browser-results">
+        {% include "submissions/fragments/journal_article_list.html" %}
       </div>
     </div>
-  </div>
+  </section>
 {% endblock content %}

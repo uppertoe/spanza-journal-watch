@@ -1,5 +1,5 @@
 {% load static %}
-<div class="modal fade pb-5" id="modal-{{ review.slug }}" tabindex="-1" aria-labelledby="modal-label-{{ review.slug }}" aria-hidden="true">
+<div class="modal fade" id="modal-{{ review.slug }}" tabindex="-1" aria-labelledby="modal-label-{{ review.slug }}" aria-hidden="true">
     <div class="modal-dialog modal-xl">
     <div class="modal-content">
         <div class="modal-header">
@@ -12,17 +12,9 @@
                 </div>
             <div class="container p-2 px-md-5" id="container-{{ review.slug }}" data-review-modal-container></div>
         </div>
-        <div class="modal-footer sticky-modal-footer">
-            <div class="sticky-modal-footer__inner">
-                <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
     </div>
     </div>
 </div>
-
 <template data-review-modal-dock-template="modal-{{ review.slug }}">
     {% include "fragments/sticky_pager_actions.html" with is_modal_navigation=True modal_id="modal-"|add:review.slug aria_label="Review modal navigation" %}
 </template>

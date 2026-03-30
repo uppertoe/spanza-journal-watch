@@ -6,15 +6,10 @@
 {% block main-feature %}
 {% if page_header %}
     {% with page_header as content %}
-    {% include "fragments/main_feature.html" %}
+    {% include "fragments/main_feature.html" with header_kicker="Current issue" %}
     {% endwith %}
 {% else %}
-    <div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-        <div class="col-lg-8 px-0">
-            <h1 class="display-4 fst-italic">Welcome to Journal Watch</h1>
-            <p class="lead my-3">Find reviews of the latest journal articles in the paediatric anaesthesia literature below</p>
-        </div>
-    </div>
+    {% include "fragments/main_feature.html" with title="Welcome to Journal Watch" body="Catch up on notable papers from the paediatric anaesthesia literature, chosen and reviewed by the community." header_theme="home" header_pattern="ripple" header_kicker="Current issue" %}
 {% endif %}
 {% endblock main-feature %}
 
@@ -22,7 +17,8 @@
 {% if card_features %}
 <div class="row mb-2">
 {% for feature in card_features %}
-{% include "layout/fragments/card_feature.html" with shared_review_modal="home-review-modal" %}
+{% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as feature_pattern silent %}
+{% include "layout/fragments/card_feature.html" with shared_review_modal="home-review-modal" pattern_variant=feature_pattern %}
 {% endfor %}
 </div>
 {% endif %}
@@ -52,7 +48,7 @@
 {% endblock desktop_action_dock %}
 
 {% block modal %}
-<div class="modal fade pb-5" id="home-review-modal" tabindex="-1" aria-labelledby="home-review-modal-label" aria-hidden="true">
+<div class="modal fade" id="home-review-modal" tabindex="-1" aria-labelledby="home-review-modal-label" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
@@ -65,17 +61,9 @@
                 </div>
                 <div class="container p-2 px-md-5" id="home-review-modal-container" data-review-modal-container data-shared-review-modal-container></div>
             </div>
-            <div class="modal-footer sticky-modal-footer">
-                <div class="sticky-modal-footer__inner">
-                    <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
-
 <template data-review-modal-dock-template="home-review-modal">
     {% include "fragments/sticky_pager_actions.html" with is_modal_navigation=True modal_id="home-review-modal" aria_label="Review modal navigation" %}
 </template>

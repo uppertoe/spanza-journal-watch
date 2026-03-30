@@ -8,7 +8,11 @@ const popoverTriggerList = document.querySelectorAll(
 );
 
 const popoverList = [...popoverTriggerList].map(
-  (popoverTriggerEl) => new Popover(popoverTriggerEl),
+  (popoverTriggerEl) =>
+    new Popover(popoverTriggerEl, {
+      trigger: popoverTriggerEl.dataset.bsTrigger || 'focus',
+      customClass: popoverTriggerEl.dataset.bsCustomClass || '',
+    }),
 );
 
 const contentsListGroup = document.getElementById('contents-list-group');
@@ -451,10 +455,12 @@ const rememberDefaultDockMarkup = () => {
 
   if (mobileSlot && mobileDockDefaultMarkup === null) {
     mobileDockDefaultMarkup = mobileSlot.innerHTML;
+    mobileSlot.dataset.defaultDockMarkup = mobileDockDefaultMarkup;
   }
 
   if (desktopSlot && desktopDockDefaultMarkup === null) {
     desktopDockDefaultMarkup = desktopSlot.innerHTML;
+    desktopSlot.dataset.defaultDockMarkup = desktopDockDefaultMarkup;
   }
 };
 
@@ -464,18 +470,30 @@ const snapshotCurrentDockMarkup = () => {
 
   mobileDockDefaultMarkup = mobileSlot ? mobileSlot.innerHTML : null;
   desktopDockDefaultMarkup = desktopSlot ? desktopSlot.innerHTML : null;
+
+  if (mobileSlot && mobileDockDefaultMarkup !== null) {
+    mobileSlot.dataset.defaultDockMarkup = mobileDockDefaultMarkup;
+  }
+
+  if (desktopSlot && desktopDockDefaultMarkup !== null) {
+    desktopSlot.dataset.defaultDockMarkup = desktopDockDefaultMarkup;
+  }
 };
 
 const restoreDefaultDockMarkup = () => {
   const mobileSlot = mobileDockSlot();
   const desktopSlot = desktopDockSlot();
+  const mobileDefaultMarkup =
+    mobileSlot?.dataset.defaultDockMarkup ?? mobileDockDefaultMarkup ?? '';
+  const desktopDefaultMarkup =
+    desktopSlot?.dataset.defaultDockMarkup ?? desktopDockDefaultMarkup ?? '';
 
-  if (mobileSlot && mobileDockDefaultMarkup !== null) {
-    mobileSlot.innerHTML = mobileDockDefaultMarkup;
+  if (mobileSlot) {
+    mobileSlot.innerHTML = mobileDefaultMarkup;
   }
 
-  if (desktopSlot && desktopDockDefaultMarkup !== null) {
-    desktopSlot.innerHTML = desktopDockDefaultMarkup;
+  if (desktopSlot) {
+    desktopSlot.innerHTML = desktopDefaultMarkup;
   }
 
   updateMobileToolbarState();
@@ -483,17 +501,17 @@ const restoreDefaultDockMarkup = () => {
 };
 
 const syncModalDockMarkup = (modal) => {
-  if (activeDockModalId === modal.id) {
-    updateMobileToolbarState();
-    return;
-  }
+  if (!modal?.id) return;
 
   const template = document.querySelector(
     `[data-review-modal-dock-template="${modal.id}"]`,
   );
-  if (!template) return;
+  const markup = template?.innerHTML?.trim();
+  if (!markup) {
+    restoreDefaultDockMarkup();
+    return;
+  }
 
-  const markup = template.innerHTML.trim();
   const mobileSlot = mobileDockSlot();
   const desktopSlot = desktopDockSlot();
 
@@ -505,8 +523,8 @@ const syncModalDockMarkup = (modal) => {
     desktopSlot.innerHTML = markup;
   }
 
-  updateMobileToolbarState();
   activeDockModalId = modal.id;
+  updateMobileToolbarState();
 };
 
 const updateMobileToolbarState = () => {
@@ -527,6 +545,11 @@ const getReviewModalIds = () =>
   );
 
 const updateReviewModalNavigator = (modal) => {
+  const compactPositionLabel = (current, total) =>
+    window.matchMedia('(max-width: 575.98px)').matches
+      ? `${current}/${total}`
+      : `Review ${current} of ${total}`;
+
   const sharedTriggers = getSharedReviewModalTriggers(modal.id);
   if (sharedTriggers.length) {
     const index = sharedReviewModalIndices.get(modal.id) ?? -1;
@@ -553,7 +576,10 @@ const updateReviewModalNavigator = (modal) => {
     });
 
     positions.forEach((position) => {
-      position.textContent = `Review ${index + 1} of ${sharedTriggers.length}`;
+      position.textContent = compactPositionLabel(
+        index + 1,
+        sharedTriggers.length,
+      );
     });
 
     return;
@@ -584,13 +610,17 @@ const updateReviewModalNavigator = (modal) => {
   });
 
   positions.forEach((position) => {
-    position.textContent = `Review ${index + 1} of ${modalIds.length}`;
+    position.textContent = compactPositionLabel(index + 1, modalIds.length);
   });
 };
 
 const cleanupModalArtifacts = () => {
   const anyOpenModal = document.querySelector('.modal.show');
   if (anyOpenModal) return;
+
+  if (activeDockModalId) {
+    restoreDefaultDockMarkup();
+  }
 
   document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
   document.body.classList.remove('modal-open');
@@ -616,7 +646,6 @@ document.addEventListener('show.bs.modal', (event) => {
     syncReviewModalShareControls(modal);
   }
 
-  rememberDefaultDockMarkup();
   syncModalDockMarkup(modal);
   updateReviewModalNavigator(modal);
 
@@ -626,6 +655,14 @@ document.addEventListener('show.bs.modal', (event) => {
       '',
       window.location.href,
     );
+  }
+});
+
+document.addEventListener('hide.bs.modal', (event) => {
+  const modal = event.target;
+  if (pendingModalTargetId) return;
+  if (modal?.id && activeDockModalId === modal.id) {
+    restoreDefaultDockMarkup();
   }
 });
 
@@ -640,6 +677,13 @@ window.addEventListener('popstate', () => {
   window.setTimeout(cleanupModalArtifacts, 400);
 });
 
+window.addEventListener('resize', () => {
+  const openModalEl = document.querySelector('.modal.show');
+  if (openModalEl) {
+    updateReviewModalNavigator(openModalEl);
+  }
+});
+
 document.addEventListener('hidden.bs.modal', (event) => {
   const modal = event.target;
   const currentReviewElement = modal.querySelector(
@@ -649,7 +693,6 @@ document.addEventListener('hidden.bs.modal', (event) => {
     flushReviewSession(currentReviewElement);
   }
   if (!modal.id) {
-    restoreDefaultDockMarkup();
     cleanupModalArtifacts();
     return;
   }
@@ -695,7 +738,10 @@ document.addEventListener('hidden.bs.modal', (event) => {
     syncReviewModalShareControls(modal);
   }
 
-  restoreDefaultDockMarkup();
+  if (activeDockModalId === modal.id) {
+    restoreDefaultDockMarkup();
+  }
+
   cleanupModalArtifacts();
 });
 
@@ -929,6 +975,19 @@ document.addEventListener('click', async (event) => {
   currentInstance.hide();
 });
 
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-review-modal-close]');
+  if (!button) return;
+
+  const currentModalId = button.dataset.currentModalId;
+  if (!currentModalId) return;
+
+  const currentModal = document.getElementById(currentModalId);
+  if (!currentModal) return;
+
+  Modal.getOrCreateInstance(currentModal).hide();
+});
+
 document.addEventListener('pointerdown', (event) => {
   const button = event.target.closest('[data-review-modal-nav]');
   if (!button || button.disabled) return;
@@ -944,7 +1003,7 @@ window.addEventListener('scroll', scheduleIssueReviewNavigatorUpdate, {
 window.addEventListener('load', scheduleIssueReviewNavigatorUpdate);
 
 document.body.addEventListener('htmx:afterSettle', () => {
-  if (!document.querySelector('.modal.show')) {
+  if (!document.querySelector('.modal.show') && !activeDockModalId) {
     snapshotCurrentDockMarkup();
   }
 
