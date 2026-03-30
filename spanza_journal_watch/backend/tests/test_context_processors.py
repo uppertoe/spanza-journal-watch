@@ -17,8 +17,8 @@ import pytest
 from django.contrib.auth.models import Permission
 from django.test import RequestFactory
 
-from spanza_journal_watch.backend.context_processors import selected_issue
-from spanza_journal_watch.backend.models import IssueContributor
+from spanza_journal_watch.backend.context_processors import frontend_banner, selected_issue
+from spanza_journal_watch.backend.models import BackendPreference, IssueContributor
 from spanza_journal_watch.submissions.models import Issue
 from spanza_journal_watch.users.tests.factories import UserFactory
 
@@ -236,3 +236,23 @@ class TestSessionSelectedIssue:
         ctx = selected_issue(request)
         assert "session_selected_issue" not in ctx
         assert "selected_issue_id" not in request.session
+
+
+class TestFrontendBanner:
+    def test_returns_none_when_banner_disabled(self):
+        request = make_request(UserFactory())
+        assert frontend_banner(request) == {"frontend_banner": None}
+
+    def test_returns_banner_payload_when_enabled(self):
+        BackendPreference.objects.create(
+            frontend_banner_enabled=True,
+            frontend_banner_title="New journals browser",
+            frontend_banner_text="Browse cached journal articles by month.",
+            frontend_banner_link_text="Explore journals",
+            frontend_banner_link_url="/journals",
+            frontend_banner_tone=BackendPreference.BannerTone.PRIMARY,
+        )
+        request = make_request(UserFactory())
+        ctx = frontend_banner(request)
+        assert ctx["frontend_banner"]["title"] == "New journals browser"
+        assert ctx["frontend_banner"]["link_url"] == "/journals"

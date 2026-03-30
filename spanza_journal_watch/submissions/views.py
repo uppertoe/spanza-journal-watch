@@ -1,17 +1,31 @@
+import datetime
 import json
 from urllib.parse import urlencode
 
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.functional import cached_property
+from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent, PageView
+from spanza_journal_watch.backend.models import (
+    PubmedArticle,
+    PubmedArticleUserState,
+    WatchedJournal,
+    WatchedJournalArticle,
+    can_recommend_pubmed_articles,
+)
+from spanza_journal_watch.backend.pubmed_cache import article_metadata_list
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
@@ -747,3 +761,207 @@ class HealthServiceListView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, ListVi
         context["sort"] = (self.request.GET.get("sort") or "contributors").strip()
         context["service_count"] = context["health_services"].count()
         return context
+
+
+def _parse_journal_month(value):
+    text = (value or "").strip()
+    if not text:
+        return timezone.now().date().replace(day=1)
+    try:
+        return datetime.datetime.strptime(text, "%Y-%m").date().replace(day=1)
+    except ValueError:
+        return timezone.now().date().replace(day=1)
+
+
+def _journal_month_options():
+    months = list(
+        WatchedJournalArticle.objects.exclude(publication_month__isnull=True)
+        .values_list("publication_month", flat=True)
+        .distinct()
+        .order_by("-publication_month")[:24]
+    )
+    current_month = timezone.now().date().replace(day=1)
+    if current_month not in months:
+        months.insert(0, current_month)
+    return months
+
+
+def _journal_article_matches_subject(article, subject_query):
+    subject_query = (subject_query or "").strip().lower()
+    if not subject_query:
+        return True
+    metadata_values = article_metadata_list(article, "mesh_terms") + article_metadata_list(article, "keywords")
+    metadata_text = " ".join(metadata_values).lower()
+    return subject_query in metadata_text
+
+
+def _available_publication_types(journal_links):
+    publication_types = set()
+    seen_article_ids = set()
+    for link in journal_links:
+        if link.article_id in seen_article_ids:
+            continue
+        seen_article_ids.add(link.article_id)
+        publication_types.update(article_metadata_list(link.article, "publication_types"))
+    return sorted(publication_types)
+
+
+def _journal_browser_rows(request):
+    active_journals = list(WatchedJournal.objects.filter(active=True).order_by("name", "pk"))
+    selected_month = _parse_journal_month(request.GET.get("month"))
+    selected_journal_ids = [int(value) for value in request.GET.getlist("journal") if str(value).isdigit()]
+    if not selected_journal_ids and request.user.is_authenticated:
+        selected_journal_ids = list(request.user.watched_journals.filter(active=True).values_list("pk", flat=True))
+    if not selected_journal_ids:
+        selected_journal_ids = [journal.pk for journal in active_journals]
+
+    query = (request.GET.get("q") or "").strip()
+    publication_type = (request.GET.get("publication_type") or "").strip()
+    subject = (request.GET.get("subject") or "").strip()
+    article_links = (
+        WatchedJournalArticle.objects.filter(publication_month=selected_month)
+        .select_related("article", "watched_journal")
+        .annotate(
+            recommendation_count=Count(
+                "article__user_states",
+                filter=Q(article__user_states__recommended_at__isnull=False),
+                distinct=True,
+            )
+        )
+        .order_by(
+            "-article__publication_date",
+            "-article__publication_month",
+            "article__title",
+            "watched_journal__name",
+        )
+    )
+    if selected_journal_ids:
+        article_links = article_links.filter(watched_journal_id__in=selected_journal_ids)
+    if query:
+        article_links = article_links.filter(
+            Q(article__title__icontains=query)
+            | Q(article__abstract__icontains=query)
+            | Q(article__doi__icontains=query)
+            | Q(article__pmid__icontains=query)
+        )
+
+    article_links = list(article_links)
+    available_publication_types = _available_publication_types(article_links)
+    user_state_map = {}
+    if request.user.is_authenticated:
+        user_state_map = {
+            state.article_id: state
+            for state in PubmedArticleUserState.objects.filter(
+                user=request.user, article_id__in=[link.article_id for link in article_links]
+            )
+        }
+
+    rows = []
+    seen_article_ids = set()
+    for link in article_links:
+        if link.article_id in seen_article_ids:
+            continue
+        seen_article_ids.add(link.article_id)
+        if publication_type and publication_type not in article_metadata_list(link.article, "publication_types"):
+            continue
+        if not _journal_article_matches_subject(link.article, subject):
+            continue
+
+        link.user_state = user_state_map.get(link.article_id)
+        link.publication_types = article_metadata_list(link.article, "publication_types")
+        link.mesh_terms = article_metadata_list(link.article, "mesh_terms")
+        link.keywords = article_metadata_list(link.article, "keywords")
+        rows.append(link)
+
+    return {
+        "rows": rows,
+        "active_journals": active_journals,
+        "selected_journal_ids": selected_journal_ids,
+        "selected_month": selected_month,
+        "month_options": _journal_month_options(),
+        "query": query,
+        "publication_type": publication_type,
+        "subject": subject,
+        "available_publication_types": available_publication_types,
+        "can_recommend": can_recommend_pubmed_articles(request.user),
+    }
+
+
+def _journal_article_actions_context(request, article):
+    user_state = None
+    if request.user.is_authenticated:
+        user_state = PubmedArticleUserState.objects.filter(user=request.user, article=article).first()
+    return {
+        "article": article,
+        "user_state": user_state,
+        "recommendation_count": article.user_states.filter(recommended_at__isnull=False).count(),
+        "can_recommend": can_recommend_pubmed_articles(request.user),
+        "next_url": request.POST.get("next") or request.GET.get("next") or request.get_full_path(),
+    }
+
+
+class JournalListView(TemplateView):
+    template_name = "submissions/journal_list.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        browser_context = _journal_browser_rows(self.request)
+        context.update(browser_context)
+        context["page_title"] = "Journals | Journal Watch"
+        context["page_meta_description"] = (
+            "Browse cached PubMed articles from watched journals by month, with filters and community recommendations."
+        )
+        context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:journal_list"))
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": "Journal browser",
+                "url": context["canonical_url"],
+                "description": context["page_meta_description"],
+            }
+        )
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("HX-Request") == "true":
+            return render(self.request, "submissions/fragments/journal_article_list.html", context, **response_kwargs)
+        return super().render_to_response(context, **response_kwargs)
+
+
+@login_required
+@require_POST
+def journal_article_toggle_star(request, article_id):
+    article = get_object_or_404(PubmedArticle, pk=article_id)
+    state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
+    state.starred_at = None if state.starred_at else timezone.now()
+    state.save(update_fields=["starred_at", "modified"])
+
+    if request.headers.get("HX-Request") == "true":
+        return render(
+            request,
+            "submissions/fragments/journal_article_actions.html",
+            _journal_article_actions_context(request, article),
+        )
+    return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+
+
+@login_required
+@require_POST
+def journal_article_toggle_recommend(request, article_id):
+    article = get_object_or_404(PubmedArticle, pk=article_id)
+    if not can_recommend_pubmed_articles(request.user):
+        messages.error(request, "You do not have permission to recommend articles yet.")
+        return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+
+    state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
+    state.recommended_at = None if state.recommended_at else timezone.now()
+    state.save(update_fields=["recommended_at", "modified"])
+
+    if request.headers.get("HX-Request") == "true":
+        return render(
+            request,
+            "submissions/fragments/journal_article_actions.html",
+            _journal_article_actions_context(request, article),
+        )
+    return redirect(request.POST.get("next") or reverse("submissions:journal_list"))

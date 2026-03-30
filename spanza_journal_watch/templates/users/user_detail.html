@@ -9,9 +9,10 @@
   <div class="row">
     <div class="col-sm-12">
 
-      <h2>{{ object.name }}</h2>
-      {% if object.name %}
-        <p>{{ object.name }}</p>
+      <h2>{{ object.name|default:object.email }}</h2>
+      <p class="text-muted mb-1">{{ object.email }}</p>
+      {% if object.watched_journals.all %}
+        <p class="mb-0"><strong>Watched journals:</strong> {{ object.watched_journals.all|join:", " }}</p>
       {% endif %}
     </div>
   </div>

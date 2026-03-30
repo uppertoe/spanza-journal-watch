@@ -606,14 +606,70 @@ class WatchedJournal(TimeStampedModel):
         return self.name
 
 
+class WatchedJournalArticle(TimeStampedModel):
+    watched_journal = models.ForeignKey(WatchedJournal, on_delete=models.CASCADE, related_name="journal_articles")
+    article = models.ForeignKey("backend.PubmedArticle", on_delete=models.CASCADE, related_name="journal_links")
+    publication_month = models.DateField(blank=True, null=True)
+    first_seen_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-publication_month", "-last_seen_at")
+        indexes = [
+            models.Index(fields=["publication_month"], name="backend_wja_pub_month_idx"),
+            models.Index(fields=["watched_journal", "publication_month"], name="backend_wja_journal_month_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["watched_journal", "article"], name="uniq_watched_journal_article")
+        ]
+
+    def __str__(self):
+        return f"{self.watched_journal} → {self.article}"
+
+
+class PubmedArticleUserState(TimeStampedModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pubmed_article_states")
+    article = models.ForeignKey("backend.PubmedArticle", on_delete=models.CASCADE, related_name="user_states")
+    starred_at = models.DateTimeField(blank=True, null=True)
+    recommended_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["article", "recommended_at"], name="backend_paus_article_rec_idx"),
+            models.Index(fields=["user", "starred_at"], name="backend_paus_user_star_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "article"], name="uniq_pubmed_article_user_state"),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.article_id}"
+
+
 class BackendPreference(TimeStampedModel):
     DEFAULT_INBOX_FROM_NAME = "Journal Watch Admin"
     DEFAULT_INBOX_FROM_ADDRESS = "admin@journalwatch.org.au"
+
+    class BannerTone(models.TextChoices):
+        INFO = "info", "Information"
+        SUCCESS = "success", "Success"
+        WARNING = "warning", "Warning"
+        PRIMARY = "primary", "Primary"
 
     singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     default_watched_journals = models.ManyToManyField(WatchedJournal, blank=True, related_name="backend_preferences")
     inbox_from_name = models.CharField(max_length=255, blank=True, default="")
     inbox_from_address = models.EmailField(blank=True, default="")
+    frontend_banner_enabled = models.BooleanField(default=False)
+    frontend_banner_title = models.CharField(max_length=120, blank=True, default="")
+    frontend_banner_text = models.TextField(blank=True, default="")
+    frontend_banner_link_text = models.CharField(max_length=80, blank=True, default="")
+    frontend_banner_link_url = models.CharField(max_length=500, blank=True, default="")
+    frontend_banner_tone = models.CharField(
+        max_length=16,
+        choices=BannerTone.choices,
+        default=BannerTone.PRIMARY,
+    )
 
     class Meta:
         verbose_name = "Backend Preference"
@@ -634,6 +690,23 @@ class BackendPreference(TimeStampedModel):
 
     def get_inbox_from_email(self):
         return formataddr((self.get_inbox_from_name(), self.get_inbox_from_address()))
+
+    def get_frontend_banner(self):
+        if not self.frontend_banner_enabled:
+            return None
+
+        text = (self.frontend_banner_text or "").strip()
+        title = (self.frontend_banner_title or "").strip()
+        if not text and not title:
+            return None
+
+        return {
+            "title": title,
+            "text": text,
+            "link_text": (self.frontend_banner_link_text or "").strip(),
+            "link_url": (self.frontend_banner_link_url or "").strip(),
+            "tone": (self.frontend_banner_tone or self.BannerTone.PRIMARY).strip(),
+        }
 
 
 class PubmedImportBatch(TimeStampedModel):
@@ -737,3 +810,7 @@ class PubmedBatchArticle(TimeStampedModel):
 
     def __str__(self):
         return f"{self.batch_id}: {self.article}"
+
+
+def can_recommend_pubmed_articles(user):
+    return bool(getattr(user, "is_authenticated", False))

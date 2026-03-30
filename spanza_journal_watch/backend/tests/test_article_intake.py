@@ -24,6 +24,8 @@ from spanza_journal_watch.backend.models import (
     PubmedArticle,
     PubmedBatchArticle,
     PubmedImportBatch,
+    WatchedJournal,
+    WatchedJournalArticle,
 )
 from spanza_journal_watch.submissions.models import Issue
 from spanza_journal_watch.users.tests.factories import UserFactory
@@ -86,6 +88,32 @@ def _sample_payload(pmid="12345678"):
 
 
 class TestArticleIntakeAddArticle:
+    def test_import_batch_builds_from_cached_watched_journal_articles(self):
+        client, user = _make_manager()
+        batch = _make_batch(user)
+        watched = WatchedJournal.objects.create(name="Cache Journal", active=True)
+        batch.watched_journals.add(watched)
+        article = PubmedArticle.objects.create(
+            pmid="77777777",
+            doi="10.1234/test.77777777",
+            title="Cached Article",
+            publication_date=batch.from_month,
+            publication_month=batch.from_month,
+        )
+        WatchedJournalArticle.objects.create(
+            watched_journal=watched,
+            article=article,
+            publication_month=batch.from_month,
+        )
+
+        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+            from spanza_journal_watch.backend.views import _import_pubmed_batch
+
+            _import_pubmed_batch(batch, [watched])
+
+        mock_build.assert_not_called()
+        assert PubmedBatchArticle.objects.filter(batch=batch, article=article).exists()
+
     def test_add_article_creates_pubmed_article_and_batch_link(self):
         client, user = _make_manager()
         batch = _make_batch(user)

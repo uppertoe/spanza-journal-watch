@@ -59,6 +59,7 @@ urlpatterns = [
     ),
     path("settings", views.backend_settings, name="backend_settings"),
     path("settings/inbox-sender", views.save_inbox_sender_settings, name="save_inbox_sender_settings"),
+    path("settings/frontend-banner", views.save_frontend_banner_settings, name="save_frontend_banner_settings"),
     path("issues/builder", views.issue_builder, name="issue_builder"),
     path("issues/reviewers", views.issue_reviewers, name="issue_reviewers"),
     path("issues/reviews", views.issue_reviews_edit, name="issue_reviews_edit"),

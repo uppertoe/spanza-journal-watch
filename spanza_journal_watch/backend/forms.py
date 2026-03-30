@@ -18,6 +18,7 @@ from .models import (
     InboundEmail,
     IssueContributor,
     PlankaBoardBackgroundAsset,
+    PubmedArticleUserState,
     SubscriberCSV,
     WatchedJournal,
 )
@@ -706,6 +707,58 @@ class BackendPreferenceInboxSettingsForm(forms.ModelForm):
         name = (raw_name or "").strip() or BackendPreference.DEFAULT_INBOX_FROM_NAME
         address = (raw_address or "").strip() or BackendPreference.DEFAULT_INBOX_FROM_ADDRESS
         return f"{name} <{address}>"
+
+
+class BackendPreferenceFrontendBannerForm(forms.ModelForm):
+    class Meta:
+        model = BackendPreference
+        fields = [
+            "frontend_banner_enabled",
+            "frontend_banner_title",
+            "frontend_banner_text",
+            "frontend_banner_link_text",
+            "frontend_banner_link_url",
+            "frontend_banner_tone",
+        ]
+        labels = {
+            "frontend_banner_enabled": "Show frontend banner",
+            "frontend_banner_title": "Banner title",
+            "frontend_banner_text": "Banner text",
+            "frontend_banner_link_text": "Link text",
+            "frontend_banner_link_url": "Link URL",
+            "frontend_banner_tone": "Banner style",
+        }
+        help_texts = {
+            "frontend_banner_text": "Shown below the main navigation on public pages.",
+            "frontend_banner_link_url": "Optional. Use a full URL or internal path.",
+        }
+
+    def clean_frontend_banner_title(self):
+        return (self.cleaned_data.get("frontend_banner_title") or "").strip()
+
+    def clean_frontend_banner_text(self):
+        return (self.cleaned_data.get("frontend_banner_text") or "").strip()
+
+    def clean_frontend_banner_link_text(self):
+        return (self.cleaned_data.get("frontend_banner_link_text") or "").strip()
+
+    def clean_frontend_banner_link_url(self):
+        return (self.cleaned_data.get("frontend_banner_link_url") or "").strip()
+
+
+class UserJournalPreferenceForm(forms.Form):
+    watched_journals = forms.ModelMultipleChoiceField(
+        queryset=WatchedJournal.objects.filter(active=True).order_by("name"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple(),
+        help_text="Pick the journals you want highlighted by default in the journals browser.",
+    )
+
+
+class PubmedArticleUserStateForm(forms.ModelForm):
+    class Meta:
+        model = PubmedArticleUserState
+        fields = []
 
 
 class HealthServiceForm(forms.ModelForm):

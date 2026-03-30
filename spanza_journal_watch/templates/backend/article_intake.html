@@ -5,7 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Article Intake</h1>
 </div>
-<p class="text-muted">Fetch monthly article lists from PubMed for watched journals, then select candidate articles for Planka.</p>
+<p class="text-muted">Build intake batches from the cached PubMed journal feed, then stage candidate articles for Planka.</p>
 
 <div id="article-intake-page">
 
@@ -25,7 +25,7 @@
 <div class="alert alert-light border mb-3">
   <div class="fw-semibold mb-1">Workflow</div>
   <ol class="mb-0 small">
-    <li><strong>Pull articles</strong>: choose month range + watched journals, then fetch.</li>
+    <li><strong>Build intake batch</strong>: choose month range + watched journals, then load cached articles.</li>
     <li><strong>Stage articles</strong>: filter list and mark rows as staged.</li>
     <li><strong>Push to Planka</strong>: send staged rows to Candidates.</li>
   </ol>
@@ -33,7 +33,7 @@
 
 {% if selected_issue %}
 <div class="card mb-3">
-  <div class="card-header">Step 1 · Pull articles</div>
+  <div class="card-header">Step 1 · Build from cached articles</div>
   <div class="card-body">
     <form method="post" class="row g-3" hx-post="{% url "backend:article_intake" %}" hx-target="#article-intake-page" hx-select="#article-intake-page" hx-swap="outerHTML" hx-push-url="true">
       {% csrf_token %}
@@ -100,7 +100,7 @@
         </div>
       </div>
       <div class="col-12">
-        <button type="submit" class="btn btn-primary">Fetch from PubMed</button>
+        <button type="submit" class="btn btn-primary">Load cached articles</button>
       </div>
     </form>
   </div>
@@ -108,7 +108,7 @@
 
 {% if batch %}
   <div class="card mb-3">
-    <div class="card-header">Step 2 · Stage and review fetched articles</div>
+    <div class="card-header">Step 2 · Stage and review cached articles</div>
     <div class="card-body">
       <div class="mb-2">
         <strong>Range:</strong> {{ batch.from_month|date:"F Y" }} to {{ batch.to_month|date:"F Y" }}
@@ -120,7 +120,7 @@
         <form method="post" action="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
           {% csrf_token %}
           <input type="hidden" name="async" value="1">
-          <button type="submit" class="btn btn-outline-secondary">Refresh current batch</button>
+          <button type="submit" class="btn btn-outline-secondary">Rebuild current batch from cache</button>
         </form>
       </div>
 

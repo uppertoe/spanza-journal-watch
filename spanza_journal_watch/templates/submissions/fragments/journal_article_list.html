@@ -1,0 +1,74 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <p class="text-uppercase small fw-semibold text-primary mb-1">{{ selected_month|date:"F Y" }}</p>
+    <h2 class="h4 mb-0">{{ rows|length }} article{{ rows|length|pluralize }}</h2>
+  </div>
+  {% if request.user.is_authenticated %}
+    <p class="small text-muted mb-0">Signed-in users can star and recommend articles for review.</p>
+  {% endif %}
+</div>
+
+{% if rows %}
+  <div class="d-grid gap-3">
+    {% for row in rows %}
+      <article class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <span class="badge text-bg-primary-subtle text-primary-emphasis">{{ row.watched_journal.name }}</span>
+            {% if row.article.publication_date %}
+              <span class="text-muted small">{{ row.article.publication_date|date:"j M Y" }}</span>
+            {% elif row.article.publication_month %}
+              <span class="text-muted small">{{ row.article.publication_month|date:"F Y" }}</span>
+            {% endif %}
+            {% if row.recommendation_count %}
+              <span class="badge text-bg-success">{{ row.recommendation_count }} recommended</span>
+            {% endif %}
+          </div>
+          <h3 class="h5 mb-2">{{ row.article.title|default:"Untitled article" }}</h3>
+          <p class="text-muted small mb-2">
+            {% if row.article.source_journal_name %}{{ row.article.source_journal_name }}{% endif %}
+            {% if row.article.doi %} · DOI {{ row.article.doi }}{% endif %}
+            {% if row.article.pmid %} · PMID {{ row.article.pmid }}{% endif %}
+          </p>
+          {% if row.article.abstract %}
+            <p class="mb-3">{{ row.article.abstract|truncatechars:380 }}</p>
+          {% else %}
+            <p class="text-muted mb-3">No abstract available.</p>
+          {% endif %}
+
+          {% if row.publication_types or row.mesh_terms or row.keywords %}
+            <div class="d-flex flex-wrap gap-2 small mb-3">
+              {% for item in row.publication_types|slice:":4" %}
+                <span class="badge text-bg-light border">{{ item }}</span>
+              {% endfor %}
+              {% for item in row.mesh_terms|slice:":3" %}
+                <span class="badge text-bg-light border">{{ item }}</span>
+              {% endfor %}
+              {% for item in row.keywords|slice:":3" %}
+                <span class="badge text-bg-light border">{{ item }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            {% include "submissions/fragments/journal_article_actions.html" with article=row.article user_state=row.user_state recommendation_count=row.recommendation_count next_url=request.get_full_path %}
+            {% if row.article.article_url %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ row.article.article_url }}" target="_blank" rel="noopener noreferrer">Full text</a>
+            {% elif row.article.doi %}
+              <a class="btn btn-sm btn-outline-primary" href="https://doi.org/{{ row.article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>
+            {% elif row.article.pubmed_url %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ row.article.pubmed_url }}" target="_blank" rel="noopener noreferrer">PubMed</a>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h2 class="h5 mb-2">No articles matched those filters</h2>
+      <p class="text-muted mb-0">Try a different month, broaden the journal selection, or remove one of the metadata filters.</p>
+    </div>
+  </div>
+{% endif %}

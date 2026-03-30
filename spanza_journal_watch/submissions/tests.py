@@ -6,6 +6,12 @@ from django.test import TestCase
 from django.urls import reverse
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent
+from spanza_journal_watch.backend.models import (
+    PubmedArticle,
+    PubmedArticleUserState,
+    WatchedJournal,
+    WatchedJournalArticle,
+)
 from spanza_journal_watch.layout.models import FeatureArticle, PageHeader
 
 from .models import Article, Author, Comment, Hit, Issue, Journal, Review, Tag
@@ -253,3 +259,56 @@ class ReviewHumanHitsTestCase(TestCase):
         Hit.objects.create(content_object=self.review, count=7)
 
         self.assertEqual(self.review.get_hits(), 7)
+
+
+class JournalBrowserTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="journals@example.com", password="testpass123")
+        self.watched = WatchedJournal.objects.create(name="Paediatric Anaesthesia", active=True)
+        self.article = PubmedArticle.objects.create(
+            pmid="98765432",
+            doi="10.1001/example.98765432",
+            title="Regional anaesthesia in children",
+            abstract="A useful abstract about paediatric regional anaesthesia.",
+            source_journal_name="Paediatric Anaesthesia",
+            publication_date=datetime.date(2026, 3, 12),
+            publication_month=datetime.date(2026, 3, 1),
+            metadata_json={
+                "publication_types": ["Review"],
+                "mesh_terms": ["Child", "Analgesia"],
+                "keywords": ["regional anaesthesia"],
+            },
+        )
+        WatchedJournalArticle.objects.create(
+            watched_journal=self.watched,
+            article=self.article,
+            publication_month=datetime.date(2026, 3, 1),
+        )
+
+    def test_journal_browser_lists_cached_articles(self):
+        response = self.client.get(
+            reverse("submissions:journal_list"),
+            {"month": "2026-03", "journal": [self.watched.pk], "publication_type": "Review"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Regional anaesthesia in children")
+        self.assertContains(response, "Review")
+
+    def test_logged_in_user_can_star_and_recommend_article(self):
+        self.client.force_login(self.user)
+
+        star_response = self.client.post(
+            reverse("submissions:journal_article_toggle_star", kwargs={"article_id": self.article.pk}),
+            {"next": reverse("submissions:journal_list")},
+        )
+        recommend_response = self.client.post(
+            reverse("submissions:journal_article_toggle_recommend", kwargs={"article_id": self.article.pk}),
+            {"next": reverse("submissions:journal_list")},
+        )
+
+        self.assertEqual(star_response.status_code, 302)
+        self.assertEqual(recommend_response.status_code, 302)
+        state = PubmedArticleUserState.objects.get(user=self.user, article=self.article)
+        self.assertIsNotNone(state.starred_at)
+        self.assertIsNotNone(state.recommended_at)

@@ -41,6 +41,7 @@ from .forms import (
     ArticleIntakeAssignIssueForm,
     ArticleIntakeFetchForm,
     AuthorForm,
+    BackendPreferenceFrontendBannerForm,
     BackendPreferenceInboxSettingsForm,
     HeaderForm,
     HealthServiceForm,
@@ -75,7 +76,25 @@ from .models import (
     WatchedJournal,
 )
 from .planka import PlankaAPIError, PlankaClient
-from .pubmed import PubmedAPIError, PubmedClient
+from .pubmed import PubmedAPIError
+from .pubmed_cache import (
+    article_matches_metadata as _article_matches_metadata,
+)
+from .pubmed_cache import (
+    article_matches_topic as _article_matches_topic,
+)
+from .pubmed_cache import (
+    build_pubmed_client as _build_pubmed_client,
+)
+from .pubmed_cache import (
+    fill_missing_article_metadata as _fill_missing_article_metadata,
+)
+from .pubmed_cache import (
+    populate_pubmed_batch_from_cache,
+)
+from .pubmed_cache import (
+    shift_month as _shift_month,
+)
 from .tasks import process_subscriber_csv, run_pubmed_batch_import_task, run_pubmed_batch_push_task
 
 logger = logging.getLogger(__name__)
@@ -499,7 +518,7 @@ def _get_inbox_from_email():
     return BackendPreference().get_inbox_from_email()
 
 
-def _build_backend_settings_context(request, *, inbox_settings_form=None):
+def _build_backend_settings_context(request, *, inbox_settings_form=None, frontend_banner_form=None):
     from oauth2_provider.models import Application as OAuthApplication
 
     pubmed_credential = _get_pubmed_integration_credential()
@@ -512,6 +531,8 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None):
 
     if inbox_settings_form is None:
         inbox_settings_form = BackendPreferenceInboxSettingsForm(instance=backend_preference)
+    if frontend_banner_form is None:
+        frontend_banner_form = BackendPreferenceFrontendBannerForm(instance=backend_preference)
 
     planka_connected = False
     planka_connection_user = None
@@ -546,40 +567,8 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None):
         "watched_journals": watched_items,
         "inbox_settings_form": inbox_settings_form,
         "inbox_settings_preview": inbox_settings_form.get_preview_value(),
+        "frontend_banner_form": frontend_banner_form,
     }
-
-
-def _build_pubmed_client(api_key=None):
-    key = (api_key or "").strip()
-    if not key:
-        credential = _get_pubmed_integration_credential()
-        key = credential.get_api_key() if credential else ""
-    return PubmedClient(
-        api_key=key,
-        timeout=int(getattr(settings, "PUBMED_TIMEOUT_SECONDS", 20)),
-        tool=str(getattr(settings, "PUBMED_TOOL_NAME", "spanza-journal-watch")),
-        email=str(
-            getattr(
-                settings,
-                "PUBMED_CONTACT_EMAIL",
-                getattr(settings, "DEFAULT_FROM_EMAIL", "queries@journalwatch.org.au"),
-            )
-        ),
-    )
-
-
-def _build_pubmed_term(watched_journal):
-    issn_terms = []
-    if watched_journal.issn_print:
-        issn_terms.append(f'"{watched_journal.issn_print.strip()}"[ISSN]')
-    if watched_journal.issn_electronic:
-        issn_terms.append(f'"{watched_journal.issn_electronic.strip()}"[ISSN]')
-    if issn_terms:
-        journal_term = "(" + " OR ".join(issn_terms) + ")"
-    else:
-        journal_term = f'"{watched_journal.name.strip()}"[Journal]'
-
-    return journal_term
 
 
 PAEDIATRIC_MESH_TERMS = {
@@ -639,136 +628,8 @@ def _param_enabled(params, key, default=False):
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _article_metadata_list(article, key):
-    data = article.metadata_json or {}
-    values = data.get(key) or []
-    if not isinstance(values, list):
-        return []
-    return [str(value).strip() for value in values if str(value or "").strip()]
-
-
-def _article_matches_metadata(article, key, accepted_values):
-    accepted_lower = {item.lower() for item in accepted_values}
-    values_lower = {item.lower() for item in _article_metadata_list(article, key)}
-    return bool(values_lower.intersection(accepted_lower))
-
-
-def _article_matches_text(article, accepted_terms):
-    text = " ".join(
-        [
-            (article.title or ""),
-            (article.abstract or ""),
-            " ".join(_article_metadata_list(article, "keywords")),
-            " ".join(_article_metadata_list(article, "mesh_terms")),
-        ]
-    ).lower()
-    return any(term.lower() in text for term in accepted_terms)
-
-
-def _article_matches_topic(article, *, mesh_terms=None, text_terms=None):
-    mesh_terms = mesh_terms or set()
-    text_terms = text_terms or set()
-    return _article_matches_metadata(article, "mesh_terms", mesh_terms) or _article_matches_text(article, text_terms)
-
-
-def _fill_missing_article_metadata(article, payload):
-    changed = False
-    fields = (
-        "title",
-        "abstract",
-        "source_journal_name",
-        "publication_date",
-        "publication_month",
-        "article_url",
-        "pubmed_url",
-    )
-
-    for field in fields:
-        incoming = payload.get(field)
-        current = getattr(article, field)
-        if field in {"publication_date", "publication_month"}:
-            if incoming and incoming != current:
-                setattr(article, field, incoming)
-                changed = True
-            continue
-
-        if (not current) and incoming:
-            setattr(article, field, incoming)
-            changed = True
-
-    if not article.doi and payload.get("doi"):
-        article.doi = payload.get("doi")
-        changed = True
-
-    incoming_metadata = payload.get("metadata_json") or {}
-    existing_metadata = article.metadata_json or {}
-    if incoming_metadata:
-        for key in ("mesh_terms", "keywords", "publication_types"):
-            existing_values = existing_metadata.get(key) or []
-            incoming_values = incoming_metadata.get(key) or []
-            if not existing_values and incoming_values:
-                existing_metadata[key] = incoming_values
-                changed = True
-        if changed:
-            article.metadata_json = existing_metadata
-
-    if changed:
-        article.save()
-
-
 def _import_pubmed_batch(batch, watched_journals):
-    client = _build_pubmed_client()
-    seen_pmids = set()
-
-    for watched_journal in watched_journals:
-        term = _build_pubmed_term(watched_journal)
-        history = client.search_pmids_history(term, batch.from_month, batch.to_month)
-        for payload in client.fetch_articles_history(history["webenv"], history["query_key"], history["count"]):
-            pmid = (payload.get("pmid") or "").strip()
-            doi = (payload.get("doi") or "").strip().lower() or None
-            if not pmid or pmid in seen_pmids:
-                continue
-            seen_pmids.add(pmid)
-
-            article = None
-            if doi:
-                article = PubmedArticle.objects.filter(doi=doi).first()
-            if not article:
-                article = PubmedArticle.objects.filter(pmid=pmid).first()
-
-            if not article:
-                article = PubmedArticle.objects.create(
-                    pmid=pmid,
-                    doi=doi,
-                    title=payload.get("title") or "",
-                    abstract=payload.get("abstract") or "",
-                    source_journal_name=payload.get("source_journal_name") or "",
-                    publication_date=payload.get("publication_date"),
-                    publication_month=payload.get("publication_month"),
-                    article_url=payload.get("article_url") or "",
-                    pubmed_url=payload.get("pubmed_url") or "",
-                    metadata_json=payload.get("metadata_json") or {},
-                )
-            else:
-                _fill_missing_article_metadata(article, payload)
-
-            link, created = PubmedBatchArticle.objects.get_or_create(
-                batch=batch,
-                article=article,
-                defaults={
-                    "watched_journal": watched_journal,
-                    "issue": batch.issue,
-                },
-            )
-            if not created and not link.issue_id and batch.issue_id:
-                link.issue_id = batch.issue_id
-                link.save(update_fields=["issue", "modified"])
-
-    result_count = batch.batch_articles.count()
-    selected_count = batch.batch_articles.filter(is_selected=True).count()
-    batch.result_count = result_count
-    batch.selected_count = selected_count
-    batch.save(update_fields=["result_count", "selected_count", "modified"])
+    populate_pubmed_batch_from_cache(batch, watched_journals)
 
 
 def _build_article_intake_queryset(batch, params):
@@ -784,9 +645,16 @@ def _build_article_intake_queryset(batch, params):
     cardiac_only = _param_enabled(params, "cardiac_only", default=False)
     neonatal_only = _param_enabled(params, "neonatal_only", default=False)
 
-    rows = batch.batch_articles.select_related("article", "watched_journal", "issue").order_by(
-        "-article__publication_date",
-        "article__title",
+    rows = (
+        batch.batch_articles.select_related("article", "watched_journal", "issue")
+        .annotate(
+            recommendation_count=Count(
+                "article__user_states",
+                filter=Q(article__user_states__recommended_at__isnull=False),
+                distinct=True,
+            )
+        )
+        .order_by("-article__publication_date", "article__title")
     )
 
     if query:
@@ -902,6 +770,31 @@ def _article_intake_results_context(batch, params):
     page_obj = paginator.get_page(params.get("page") or 1)
     visible_rows = list(page_obj.object_list)
     all_visible_selected = bool(visible_rows) and all(row.is_selected for row in visible_rows)
+    staged_rows = list(
+        batch.batch_articles.select_related("article", "watched_journal", "issue")
+        .annotate(
+            recommendation_count=Count(
+                "article__user_states",
+                filter=Q(article__user_states__recommended_at__isnull=False),
+                distinct=True,
+            )
+        )
+        .filter(is_selected=True)
+        .order_by("-modified")[:200]
+    )
+    recommended_rows = list(
+        batch.batch_articles.select_related("article", "watched_journal", "issue")
+        .annotate(
+            recommendation_count=Count(
+                "article__user_states",
+                filter=Q(article__user_states__recommended_at__isnull=False),
+                distinct=True,
+            )
+        )
+        .filter(article__user_states__recommended_at__isnull=False)
+        .order_by("-recommendation_count", "-article__publication_date", "article__title")
+        .distinct()[:50]
+    )
 
     return {
         "batch": batch,
@@ -909,11 +802,8 @@ def _article_intake_results_context(batch, params):
         "result_rows": visible_rows,
         "all_visible_selected": all_visible_selected,
         "all_journals_count": len(tab_rows),
-        "staged_rows": list(
-            batch.batch_articles.select_related("article", "watched_journal", "issue")
-            .filter(is_selected=True)
-            .order_by("-modified")[:200]
-        ),
+        "staged_rows": staged_rows,
+        "recommended_rows": recommended_rows,
         "result_total": len(rows),
         "selected_total": batch.batch_articles.filter(is_selected=True).count(),
         "pushed_total": batch.batch_articles.exclude(planka_card_id="").count(),
@@ -1011,13 +901,6 @@ def _parse_month_parts(value, fallback_date):
                 pass
 
     return fallback_date.year, fallback_date.month
-
-
-def _shift_month(date_value, delta_months):
-    month_index = (date_value.year * 12 + (date_value.month - 1)) + int(delta_months)
-    year = month_index // 12
-    month = (month_index % 12) + 1
-    return datetime.date(year, month, 1)
 
 
 def _get_issue_planka_candidates_list(batch, *, require_candidates_list=True):
@@ -1451,16 +1334,16 @@ def article_intake(request):
                 _queue_batch_task(
                     batch,
                     action="fetch",
-                    note="Queued PubMed fetch.",
+                    note="Queued intake batch build from cached journal articles.",
                     task_callable=run_pubmed_batch_import_task,
                     task_args=[batch.pk],
                 )
             else:
                 try:
                     _import_pubmed_batch(batch, watched_journals)
-                    messages.success(request, f"PubMed fetch complete. {batch.result_count} article(s) loaded.")
+                    messages.success(request, f"Loaded {batch.result_count} cached article(s) into the intake batch.")
                 except PubmedAPIError as error:
-                    messages.error(request, f"PubMed fetch failed: {_safe_planka_error(error)}")
+                    messages.error(request, f"Could not build batch from cache: {_safe_planka_error(error)}")
 
                     return redirect(f"{reverse('backend:article_intake')}?issue={selected_issue.pk}&batch={batch.pk}")
 
@@ -1919,7 +1802,7 @@ def article_intake_refresh_batch(request, batch_id):
         _queue_batch_task(
             batch,
             action="refresh",
-            note="Queued PubMed refresh.",
+            note="Queued rebuild from cached journal articles.",
             task_callable=run_pubmed_batch_import_task,
             task_args=[batch.pk],
         )
@@ -1929,9 +1812,9 @@ def article_intake_refresh_batch(request, batch_id):
 
     try:
         _import_pubmed_batch(batch, watched_journals)
-        messages.success(request, f"Batch refreshed. {batch.result_count} article(s) now in this batch.")
+        messages.success(request, f"Batch rebuilt from cache. {batch.result_count} article(s) now in this batch.")
     except PubmedAPIError as error:
-        messages.error(request, f"PubMed refresh failed: {_safe_planka_error(error)}")
+        messages.error(request, f"Could not rebuild batch from cache: {_safe_planka_error(error)}")
 
     if request.headers.get("HX-Request") == "true":
         return _render_article_intake_results_response(request, batch, request.POST)
@@ -3898,6 +3781,25 @@ def save_inbox_sender_settings(request):
         return redirect(reverse("backend:backend_settings"))
 
     context = _build_backend_settings_context(request, inbox_settings_form=form)
+    response = render(request, "backend/settings.html", context)
+    response.status_code = 400
+    return response
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def save_frontend_banner_settings(request):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    preference = _get_backend_preference() or BackendPreference(singleton=1)
+    form = BackendPreferenceFrontendBannerForm(request.POST, instance=preference)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Frontend banner settings saved.")
+        return redirect(reverse("backend:backend_settings"))
+
+    context = _build_backend_settings_context(request, frontend_banner_form=form)
     response = render(request, "backend/settings.html", context)
     response.status_code = 400
     return response

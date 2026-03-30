@@ -4,7 +4,12 @@
 {% block title %}{{ user.name }}{% endblock %}
 
 {% block content %}
-  <h1>{{ user.name }}</h1>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">{{ user.name|default:user.email }}</h1>
+  </div>
+  <p class="text-muted">
+    Save your display name and the journals you want preselected on the public journals browser.
+  </p>
   <form class="form-horizontal" method="post" action="{% url 'users:update' %}">
     {% csrf_token %}
     {{ form|crispy }}

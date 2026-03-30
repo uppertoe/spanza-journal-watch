@@ -1,4 +1,5 @@
 import csv
+import datetime
 import io
 import logging
 from pathlib import Path
@@ -7,6 +8,7 @@ from django import forms
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.utils import timezone
 
 from config.celery_app import app as celery_app
 
@@ -216,7 +218,8 @@ def process_subscriber_csv(subscriber_csv_pk):
 def run_pubmed_batch_import_task(self, batch_id):
     from .models import PubmedImportBatch
     from .pubmed import PubmedAPIError
-    from .views import _import_pubmed_batch, _safe_planka_error
+    from .pubmed_cache import populate_pubmed_batch_from_cache
+    from .views import _safe_planka_error
 
     batch = PubmedImportBatch.objects.get(pk=batch_id)
     batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
@@ -232,9 +235,9 @@ def run_pubmed_batch_import_task(self, batch_id):
         return {"status": "error", "note": batch.task_note}
 
     try:
-        _import_pubmed_batch(batch, watched_journals)
+        populate_pubmed_batch_from_cache(batch, watched_journals)
         batch.task_state = PubmedImportBatch.TASK_STATE_SUCCESS
-        batch.task_note = f"PubMed fetch complete. {batch.result_count} article(s) loaded."
+        batch.task_note = f"Loaded {batch.result_count} cached article(s) into the intake batch."
         batch.save(update_fields=["task_state", "task_note", "modified"])
         return {"status": "success", "count": batch.result_count}
     except PubmedAPIError as error:
@@ -243,6 +246,31 @@ def run_pubmed_batch_import_task(self, batch_id):
         batch.save(update_fields=["task_state", "task_note", "modified"])
         logger.error("PubMed import batch %s failed: %s", batch_id, error)
         return {"status": "error", "note": batch.task_note}
+
+
+@celery_app.task(bind=True)
+def refresh_pubmed_journal_cache_task(self, from_month=None, to_month=None):
+    from .pubmed_cache import default_pubmed_cache_window, refresh_pubmed_journal_cache
+
+    if from_month and to_month:
+        from_month_value = datetime.date.fromisoformat(from_month)
+        to_month_value = datetime.date.fromisoformat(to_month)
+    else:
+        from_month_value, to_month_value = default_pubmed_cache_window(timezone.now().date())
+
+    stats = refresh_pubmed_journal_cache(from_month=from_month_value, to_month=to_month_value)
+    logger.info(
+        "Refreshed PubMed journal cache for %s to %s across %s journals",
+        from_month_value,
+        to_month_value,
+        stats["journal_count"],
+    )
+    return {
+        "status": "success",
+        "from_month": from_month_value.isoformat(),
+        "to_month": to_month_value.isoformat(),
+        **stats,
+    }
 
 
 @celery_app.task(bind=True)

@@ -221,6 +221,7 @@ TEMPLATES = [
                 "spanza_journal_watch.users.context_processors.allauth_settings",
                 "spanza_journal_watch.utils.context_processors.content_cache_version",
                 "spanza_journal_watch.backend.context_processors.selected_issue",
+                "spanza_journal_watch.backend.context_processors.frontend_banner",
             ],
             "builtins": [
                 "spanza_journal_watch.submissions.templatetags.wrapchars",  # Add your app's templatetags module here
@@ -377,7 +378,7 @@ CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_TASK_SEND_SENT_EVENT = True
 # django-allauth
 # ------------------------------------------------------------------------------
-ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", False)
+ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_LOGIN_METHODS = {"email"}
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
@@ -387,7 +388,7 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 # "optional": users can log in without verifying — appropriate for an invite-based internal tool
 # where the invite link already proves email ownership.
-ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_ADAPTER = "spanza_journal_watch.users.adapters.AccountAdapter"
 # https://django-allauth.readthedocs.io/en/latest/forms.html

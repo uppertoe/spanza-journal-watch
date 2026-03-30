@@ -98,3 +98,12 @@ def selected_issue(request):
             request.session.pop("selected_issue_id", None)
 
     return result
+
+
+def frontend_banner(_request):
+    from spanza_journal_watch.backend.models import BackendPreference
+
+    preference = BackendPreference.get_solo()
+    return {
+        "frontend_banner": preference.get_frontend_banner() if preference else None,
+    }

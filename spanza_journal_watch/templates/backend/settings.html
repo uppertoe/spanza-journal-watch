@@ -33,6 +33,27 @@
 </div>
 
 <div class="card mb-4">
+  <div class="card-header">Frontend banner</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      This reusable banner appears below the public site navigation. Use it to highlight the journals browser now, and other site-wide notices later.
+    </p>
+    <form method="post" action="{% url "backend:save_frontend_banner_settings" %}" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12">{{ frontend_banner_form.frontend_banner_enabled|as_crispy_field }}</div>
+      <div class="col-12 col-lg-6">{{ frontend_banner_form.frontend_banner_title|as_crispy_field }}</div>
+      <div class="col-12 col-lg-6">{{ frontend_banner_form.frontend_banner_tone|as_crispy_field }}</div>
+      <div class="col-12">{{ frontend_banner_form.frontend_banner_text|as_crispy_field }}</div>
+      <div class="col-12 col-lg-6">{{ frontend_banner_form.frontend_banner_link_text|as_crispy_field }}</div>
+      <div class="col-12 col-lg-6">{{ frontend_banner_form.frontend_banner_link_url|as_crispy_field }}</div>
+      <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">Save banner</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>PubMed API key</span>
     {% if pubmed_credential and pubmed_credential.get_api_key %}

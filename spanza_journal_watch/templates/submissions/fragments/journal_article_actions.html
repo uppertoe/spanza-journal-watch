@@ -1,0 +1,22 @@
+<div id="journal-article-actions-{{ article.pk }}" class="d-flex flex-wrap gap-2">
+  {% if request.user.is_authenticated %}
+    <form method="post" action="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <button type="submit" class="btn btn-sm {% if user_state and user_state.starred_at %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+        {% if user_state and user_state.starred_at %}Starred{% else %}Star{% endif %}
+      </button>
+    </form>
+    <form method="post" action="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <button type="submit" class="btn btn-sm {% if user_state and user_state.recommended_at %}btn-success{% else %}btn-outline-success{% endif %}" {% if not can_recommend %}disabled{% endif %}>
+        {% if user_state and user_state.recommended_at %}Recommended{% else %}Recommend for review{% endif %}
+      </button>
+    </form>
+    <span class="badge rounded-pill text-bg-light border align-self-center">{{ recommendation_count }} recommendation{{ recommendation_count|pluralize }}</span>
+  {% else %}
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'account_login' %}?next={{ next_url|urlencode }}">Log in to star or recommend</a>
+    <span class="badge rounded-pill text-bg-light border align-self-center">{{ recommendation_count }} recommendation{{ recommendation_count|pluralize }}</span>
+  {% endif %}
+</div>
