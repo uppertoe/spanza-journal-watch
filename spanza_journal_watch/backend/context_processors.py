@@ -42,8 +42,6 @@ ISSUE_PAGE_URL_NAMES = frozenset(
         "final_newsletter",
         "send_final_newsletter",
         "send_test_newsletter",
-        "newsletter_stats_list",
-        "newsletter_stats_detail",
     ]
 )
 

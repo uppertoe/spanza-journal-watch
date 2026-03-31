@@ -22,6 +22,7 @@ CHIEF_EDITOR_PERMISSIONS = [
     "backend.manage_subscriber_csv",
     "backend.send_newsletters",
     "backend.view_newsletter_stats",
+    "backend.view_site_analytics",
 ]
 
 

@@ -31,6 +31,7 @@ class SubscriberCSV(models.Model):
             ("manage_subscriber_csv", "Can create and edit CSV subscriber lists"),
             ("send_newsletters", "Can send out newsletters to all subscribers"),
             ("view_newsletter_stats", "Can view newsletter open and click statistics"),
+            ("view_site_analytics", "Can view site analytics (overview, content, traffic, search, journals)"),
         ]
         verbose_name = "Subscriber list CSV"
 

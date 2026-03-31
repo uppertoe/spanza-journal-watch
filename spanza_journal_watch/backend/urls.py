@@ -1,5 +1,7 @@
 from django.urls import path
 
+from spanza_journal_watch.backend import analytics_views
+
 from . import views
 
 app_name = "backend"
@@ -160,9 +162,15 @@ urlpatterns = [
         name="enable_newsletter_resend",
     ),
     path("newsletter/send/confirm/<str:send_token>", views.send_final_newsletter, name="send_final_newsletter"),
-    path("newsletter/stats", views.newsletter_stats_list, name="newsletter_stats_list"),
+    path("newsletter/stats", views.newsletter_stats_list_redirect, name="newsletter_stats_list"),
     path("newsletter/stats/<int:pk>", views.newsletter_stats_detail, name="newsletter_stats_detail"),
-    path("analytics", views.site_analytics, name="site_analytics"),
+    path("analytics", views.analytics_redirect, name="site_analytics"),
+    path("analytics/overview/", analytics_views.analytics_overview, name="analytics_overview"),
+    path("analytics/content/", analytics_views.analytics_content, name="analytics_content"),
+    path("analytics/traffic/", analytics_views.analytics_traffic, name="analytics_traffic"),
+    path("analytics/email/", analytics_views.analytics_email, name="analytics_email"),
+    path("analytics/search/", analytics_views.analytics_search, name="analytics_search"),
+    path("analytics/journals/", analytics_views.analytics_journals, name="analytics_journals"),
     path("settings/run/planka-oidc", views.planka_run_setup_oidc, name="planka_run_setup_oidc"),
     path("settings/run/planka-api-key", views.planka_run_setup_api_key, name="planka_run_setup_api_key"),
     path(

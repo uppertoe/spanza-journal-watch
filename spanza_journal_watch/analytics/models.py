@@ -6,11 +6,24 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.db import models
 from django.template.loader import render_to_string
 
-from spanza_journal_watch.analytics.utils import classify_event_confidence, is_probable_automated_event
+from spanza_journal_watch.analytics.utils import (
+    categorize_referrer,
+    classify_event_confidence,
+    is_probable_automated_event,
+)
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.utils.functions import get_domain_url
 
 logger = logging.getLogger(__name__)
+
+REFERRER_CHOICES = [
+    ("newsletter", "Newsletter"),
+    ("search", "Search engine"),
+    ("social", "Social media"),
+    ("direct", "Direct"),
+    ("internal", "Internal"),
+    ("other", "Other"),
+]
 
 
 class NewsletterOpen(models.Model):
@@ -75,6 +88,8 @@ class PageView(models.Model):
         choices=HumanConfidence.choices,
         default=HumanConfidence.PROBABLE_HUMAN,
     )
+    visitor_id = models.UUIDField(null=True, blank=True, db_index=True)
+    referrer_category = models.CharField(max_length=16, blank=True, default="", choices=REFERRER_CHOICES)
 
     class Meta:
         indexes = [
@@ -114,12 +129,16 @@ class PageView(models.Model):
         user_agent = ""
         automated = False
         session_key = ""
+        visitor_id = None
+        referrer_category = ""
         if request is not None:
             if not request.session.session_key:
                 request.session.create()
             user_agent = request.headers.get("user-agent", "")
             automated = is_probable_automated_event(request)
             session_key = request.session.session_key or ""
+            visitor_id = getattr(request, "analytics_visitor_id", None) or None
+            referrer_category = categorize_referrer(request)
         human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         view = cls(
@@ -130,6 +149,8 @@ class PageView(models.Model):
             automated=automated,
             session_key=session_key,
             human_confidence=human_confidence,
+            visitor_id=visitor_id,
+            referrer_category=referrer_category,
         )
         view.save()
 
@@ -151,6 +172,9 @@ class AnalyticsEvent(models.Model):
         REVIEW_SHARE_FACEBOOK = "review_share_facebook", "Review shared via Facebook"
         SEARCH = "search", "Search performed"
         SEARCH_RESULT_CLICK = "search_result_click", "Search result clicked"
+        PAGE_VISIT = "page_visit", "Page visit"
+        JOURNAL_BROWSER_VISIT = "journal_browser_visit", "Journal browser visit"
+        JOURNAL_ARTICLE_INTERACT = "journal_article_interact", "Journal article interaction"
 
     class HumanConfidence(models.TextChoices):
         SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
@@ -175,6 +199,8 @@ class AnalyticsEvent(models.Model):
         choices=HumanConfidence.choices,
         default=HumanConfidence.PROBABLE_HUMAN,
     )
+    visitor_id = models.UUIDField(null=True, blank=True, db_index=True)
+    referrer_category = models.CharField(max_length=16, blank=True, default="", choices=REFERRER_CHOICES)
 
     class Meta:
         indexes = [
@@ -202,10 +228,14 @@ class AnalyticsEvent(models.Model):
         user_agent = ""
         automated = False
         session_key = ""
+        visitor_id = None
+        referrer_category = ""
         if request is not None:
             user_agent = request.headers.get("user-agent", "")
             automated = is_probable_automated_event(request)
             session_key = request.session.session_key or ""
+            visitor_id = getattr(request, "analytics_visitor_id", None) or None
+            referrer_category = categorize_referrer(request)
         human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         content_type = None
@@ -230,6 +260,8 @@ class AnalyticsEvent(models.Model):
             automated=automated,
             session_key=session_key,
             human_confidence=human_confidence,
+            visitor_id=visitor_id,
+            referrer_category=referrer_category,
         )
 
     def __str__(self):

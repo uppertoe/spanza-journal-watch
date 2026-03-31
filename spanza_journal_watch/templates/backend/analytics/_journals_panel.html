@@ -1,0 +1,41 @@
+<div class="mb-4">
+  <h1 class="h3 mb-1">Journals Browser</h1>
+  <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}</p>
+</div>
+
+<div class="alert alert-info small mb-4">
+  Baseline data only — journals browser analytics will be expanded in a future update.
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Browser visits</h6>
+      <p class="display-6 mb-0">{{ total_visits }}</p>
+    </div></div>
+  </div>
+  <div class="col-6">
+    <div class="card h-100 border-primary-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Article interactions</h6>
+      <p class="display-6 mb-0">{{ total_interactions }}</p>
+    </div></div>
+  </div>
+</div>
+
+{% if interaction_breakdown %}
+<div class="card">
+  <div class="card-header">Interaction types</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Action</th><th>Count</th></tr></thead>
+      <tbody>
+        {% for item in interaction_breakdown %}
+        <tr><td class="text-capitalize small">{{ item.label }}</td><td>{{ item.count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<p class="text-muted small">No interaction data yet in this date range.</p>
+{% endif %}

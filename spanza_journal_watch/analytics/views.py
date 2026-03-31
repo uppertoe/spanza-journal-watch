@@ -13,6 +13,7 @@ from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClic
 from spanza_journal_watch.analytics.utils import (
     is_probable_automated_event,
     is_probable_automated_newsletter_event,
+    set_newsletter_referrer_in_session,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Review
@@ -105,6 +106,7 @@ def track_newsletter_link(request, newsletter_token):
 
         # Identify the subscriber in the session
         request.session["subscriber_id"] = subscriber.pk
+        set_newsletter_referrer_in_session(request)
 
     return _get_next_url(request, next)
 
@@ -138,6 +140,7 @@ def track_email_click(request):
     try:
         subscriber = Subscriber.objects.get(email=email)
         request.session["subscriber_id"] = subscriber.pk
+        set_newsletter_referrer_in_session(request)
     except Subscriber.DoesNotExist:
         subscriber = None
         logger.warning("No subscriber by this email: %s", email)

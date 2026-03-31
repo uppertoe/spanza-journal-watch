@@ -14,6 +14,10 @@ module.exports = {
       __dirname,
       '../spanza_journal_watch/static/js/vendors',
     ),
+    analytics_backend: path.resolve(
+      __dirname,
+      '../spanza_journal_watch/static/js/analytics_backend',
+    ),
   },
   output: {
     path: path.resolve(

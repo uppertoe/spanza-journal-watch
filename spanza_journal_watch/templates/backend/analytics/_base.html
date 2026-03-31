@@ -1,0 +1,68 @@
+{% extends "backend/backend_base.html" %}
+{% load render_bundle from webpack_loader %}
+{% block javascript %}
+{{ block.super }}
+{% render_bundle 'analytics_backend' 'js' attrs='defer' %}
+{% endblock javascript %}
+{% block content %}
+<div class="row g-0 g-lg-4">
+  <div class="col-lg-2">
+    <div class="sticky-top pt-3 pb-4" style="top: 4rem;">
+      <h6 class="text-uppercase text-muted fw-semibold mb-3 px-2" style="font-size:0.7rem;letter-spacing:.06em">Analytics</h6>
+      <nav class="nav flex-column gap-1 mb-4">
+        {% url 'backend:analytics_overview' as url_overview %}
+        {% url 'backend:analytics_content' as url_content %}
+        {% url 'backend:analytics_traffic' as url_traffic %}
+        {% url 'backend:analytics_search' as url_search %}
+        {% url 'backend:analytics_journals' as url_journals %}
+        {% with qs=request.GET.urlencode %}
+        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'overview' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_overview }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_overview }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Overview</a>
+        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'content' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Content</a>
+        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'traffic' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Traffic</a>
+        {% if perms.backend.view_newsletter_stats %}
+        {% url 'backend:analytics_email' as url_email %}
+        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'email' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Email</a>
+        {% endif %}
+        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'search' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Search</a>
+        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'journals' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Journals</a>
+        {% endwith %}
+      </nav>
+      <div class="border-top pt-3">
+        <p class="small text-muted mb-2">Date range</p>
+        <form method="get" action="">
+          <div class="mb-2">
+            <label class="form-label x-small text-muted mb-1">From</label>
+            <input class="form-control form-control-sm" type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+          </div>
+          <div class="mb-2">
+            <label class="form-label x-small text-muted mb-1">To</label>
+            <input class="form-control form-control-sm" type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+          </div>
+          <button class="btn btn-sm btn-outline-secondary w-100" type="submit">Apply</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-10" id="analytics-content">
+    {% block analytics_content %}{% endblock %}
+  </div>
+</div>
+{% endblock content %}
