@@ -1,26 +1,6 @@
-import '../sass/project.scss';
-
 /* Project specific Javascript goes here. */
-const { Popover, ScrollSpy, Modal } = window.bootstrap;
-
-const popoverTriggerList = document.querySelectorAll(
-  '[data-bs-toggle="popover"]',
-);
-
-const popoverList = [...popoverTriggerList].map(
-  (popoverTriggerEl) =>
-    new Popover(popoverTriggerEl, {
-      trigger: popoverTriggerEl.dataset.bsTrigger || 'focus',
-      customClass: popoverTriggerEl.dataset.bsCustomClass || '',
-    }),
-);
-
-const contentsListGroup = document.getElementById('contents-list-group');
-var scrollSpy = contentsListGroup
-  ? new ScrollSpy(document.body, {
-      target: '#contents-list-group',
-    })
-  : null;
+const { Popover, Modal } = window.bootstrap;
+const popoverInstances = new WeakMap();
 
 const isInteractiveElement = (element) =>
   !!element.closest(
@@ -95,10 +75,12 @@ const analyticsEndpoint = '/reader/action';
 const reviewSessionThresholdMs = 5000;
 const reviewSessions = new Map();
 let reviewSessionCounter = 0;
-let issueNavigatorFrame = null;
 let cachedIssueReviewArticles = [];
 let cachedIssuePrevButtons = [];
 let cachedIssueNextButtons = [];
+let cachedIssueContentsLinks = [];
+let activeIssueReviewIndex = -1;
+let issueReviewObserver = null;
 const getSharedReviewModalTriggers = (modalId) =>
   Array.from(
     document.querySelectorAll(
@@ -336,6 +318,22 @@ const observeAnalyticsReviewElements = (root = document) => {
     element.dataset.analyticsObserved = 'true';
     reviewVisibilityObserver.observe(element);
   });
+};
+
+const getOrCreatePopover = (element) => {
+  if (!element) return null;
+
+  if (!popoverInstances.has(element)) {
+    popoverInstances.set(
+      element,
+      new Popover(element, {
+        trigger: element.dataset.bsTrigger || 'focus',
+        customClass: element.dataset.bsCustomClass || '',
+      }),
+    );
+  }
+
+  return popoverInstances.get(element);
 };
 
 const syncReviewModalShareControls = (modal) => {
@@ -624,6 +622,8 @@ const cleanupModalArtifacts = () => {
 
   document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
   document.body.classList.remove('modal-open');
+  document.body.classList.remove('jw-modal-open');
+  document.documentElement.classList.remove('jw-modal-open');
   document.body.style.removeProperty('overflow');
   document.body.style.removeProperty('padding-right');
 };
@@ -631,6 +631,8 @@ const cleanupModalArtifacts = () => {
 document.addEventListener('show.bs.modal', (event) => {
   const modal = event.target;
   if (!modal.id || closingModalFromPopStateId) return;
+  document.body.classList.add('jw-modal-open');
+  document.documentElement.classList.add('jw-modal-open');
 
   if (getSharedReviewModalTriggers(modal.id).length) {
     const trigger = event.relatedTarget;
@@ -770,6 +772,9 @@ const refreshIssueReviewNavigatorCache = () => {
   cachedIssueNextButtons = Array.from(
     document.querySelectorAll('[data-issue-review-nav="next"]'),
   );
+  cachedIssueContentsLinks = Array.from(
+    document.querySelectorAll('#list-reviews a[href^="#list-item-"]'),
+  );
 };
 
 const getIssueReviewArticles = () => cachedIssueReviewArticles;
@@ -777,31 +782,22 @@ const getIssueReviewArticles = () => cachedIssueReviewArticles;
 const hasIssueReviewNavigator = () =>
   cachedIssuePrevButtons.length > 0 || cachedIssueNextButtons.length > 0;
 
-const getCurrentIssueReviewIndex = () => {
-  const reviews = getIssueReviewArticles();
-  if (!reviews.length) return -1;
-
-  const offset = 140;
-  const currentScroll = window.scrollY + offset;
-  let currentIndex = 0;
-
-  reviews.forEach((review, index) => {
-    if (review.offsetTop <= currentScroll) {
-      currentIndex = index;
-    }
+const updateContentsListActiveState = (index) => {
+  cachedIssueContentsLinks.forEach((link, linkIndex) => {
+    const isActive = linkIndex === index;
+    link.classList.toggle('active', isActive);
+    link.setAttribute('aria-current', isActive ? 'true' : 'false');
   });
-
-  return currentIndex;
 };
 
-const updateIssueReviewNavigator = () => {
-  issueNavigatorFrame = null;
-
+const updateIssueReviewNavigator = (index = activeIssueReviewIndex) => {
   if (!hasIssueReviewNavigator()) return;
 
   const reviews = getIssueReviewArticles();
-  const index = getCurrentIssueReviewIndex();
-  if (!reviews.length || index === -1) return;
+  if (!reviews.length) return;
+  if (index < 0 || index >= reviews.length) return;
+
+  activeIssueReviewIndex = index;
 
   cachedIssuePrevButtons.forEach((button) => {
     const shouldDisable = index <= 0;
@@ -824,13 +820,52 @@ const updateIssueReviewNavigator = () => {
       button.dataset.targetIndex = targetIndex;
     }
   });
+
+  updateContentsListActiveState(index);
 };
 
-const scheduleIssueReviewNavigatorUpdate = () => {
-  if (issueNavigatorFrame !== null) return;
-  issueNavigatorFrame = window.requestAnimationFrame(
-    updateIssueReviewNavigator,
+const setupIssueReviewObserver = () => {
+  if (issueReviewObserver) {
+    issueReviewObserver.disconnect();
+    issueReviewObserver = null;
+  }
+
+  const reviews = getIssueReviewArticles();
+  if (!reviews.length) return;
+
+  issueReviewObserver = new window.IntersectionObserver(
+    (entries) => {
+      const visibleEntries = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort(
+          (left, right) =>
+            Math.abs(left.boundingClientRect.top) -
+            Math.abs(right.boundingClientRect.top),
+        );
+
+      const nextEntry = visibleEntries[0];
+      if (!nextEntry) return;
+
+      const nextIndex = reviews.indexOf(nextEntry.target);
+      if (nextIndex === -1 || nextIndex === activeIssueReviewIndex) return;
+
+      updateIssueReviewNavigator(nextIndex);
+    },
+    {
+      root: null,
+      rootMargin: '-18% 0px -62% 0px',
+      threshold: 0,
+    },
   );
+
+  reviews.forEach((review) => issueReviewObserver.observe(review));
+
+  const firstVisibleIndex = reviews.findIndex((review) => {
+    const rect = review.getBoundingClientRect();
+    return rect.top >= 0 && rect.top < window.innerHeight * 0.45;
+  });
+
+  updateIssueReviewNavigator(firstVisibleIndex === -1 ? 0 : firstVisibleIndex);
 };
 
 document.addEventListener('click', async (event) => {
@@ -936,7 +971,6 @@ document.addEventListener('click', async (event) => {
     const targetReview = reviews[targetIndex];
     if (targetReview) {
       targetReview.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.setTimeout(scheduleIssueReviewNavigatorUpdate, 150);
     }
     return;
   }
@@ -989,18 +1023,33 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('pointerdown', (event) => {
+  const popoverTrigger = event.target.closest('[data-bs-toggle="popover"]');
+  if (popoverTrigger) {
+    getOrCreatePopover(popoverTrigger);
+  }
+
   const button = event.target.closest('[data-review-modal-nav]');
   if (!button || button.disabled) return;
 
   event.preventDefault();
 });
 
-refreshIssueReviewNavigatorCache();
-
-window.addEventListener('scroll', scheduleIssueReviewNavigatorUpdate, {
-  passive: true,
+document.addEventListener('focusin', (event) => {
+  const popoverTrigger = event.target.closest('[data-bs-toggle="popover"]');
+  if (popoverTrigger) {
+    getOrCreatePopover(popoverTrigger);
+  }
 });
-window.addEventListener('load', scheduleIssueReviewNavigatorUpdate);
+
+document.addEventListener('mouseover', (event) => {
+  const popoverTrigger = event.target.closest('[data-bs-toggle="popover"]');
+  if (popoverTrigger) {
+    getOrCreatePopover(popoverTrigger);
+  }
+});
+
+refreshIssueReviewNavigatorCache();
+setupIssueReviewObserver();
 
 document.body.addEventListener('htmx:afterSettle', () => {
   if (!document.querySelector('.modal.show') && !activeDockModalId) {
@@ -1009,12 +1058,9 @@ document.body.addEventListener('htmx:afterSettle', () => {
 
   updateMobileToolbarState();
   refreshIssueReviewNavigatorCache();
-  scheduleIssueReviewNavigatorUpdate();
+  setupIssueReviewObserver();
   syncNativeShareButtons();
   observeAnalyticsReviewElements();
-  if (scrollSpy && typeof scrollSpy.refresh === 'function') {
-    scrollSpy.refresh();
-  }
 });
 
 document.body.addEventListener('htmx:afterSwap', (event) => {

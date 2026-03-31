@@ -36,13 +36,6 @@
     <!-- Your stuff: Third-party CSS libraries go here -->
 
     <style>
-      .blog-header-logo {
-        font-family: 'Fugaz One', 'Arial Black', 'Franklin Gothic Heavy', 'Impact', sans-serif;
-        font-size: 2.5rem;
-      }
-      @media (min-width: 768px) {
-        .blog-header-logo { font-size: 4.9rem; }
-      }
       h1, h2, h3, h4, h5, h6 {
         font-family: 'Baloo', 'Trebuchet MS', 'Arial Rounded MT Bold', 'Avenir Next Rounded', system-ui, sans-serif;
       }
@@ -76,8 +69,7 @@
     <link rel="preload" href="{% static 'fonts/Baloo2-700-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
 
     <!-- This file stores project-specific CSS -->
-    {% render_bundle 'project' 'css' %}
-    <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+    {% render_bundle 'public' 'css' %}
     {% endblock %}
     <!-- Le javascript
     ================================================== -->
@@ -172,7 +164,7 @@
               {% endif %}
             </div>
           </div>
-          <div class="col-sm-4 order-2 order-sm-2 pb-2 pb-sm-0 text-center">
+          <div class="col-sm-4 order-2 order-sm-2 pb-2 pb-sm-0 d-flex justify-content-center">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text">Journal Watch</span></a>
           </div>
           <div class="col-sm-4 d-flex order-1 order-sm-1 justify-content-center justify-content-sm-start align-items-center">
@@ -180,6 +172,7 @@
               <img
                 src="{% static "images/logo/spanza-logo-blue.png" %}"
                 alt="SPANZA Logo"
+                class="site-brand-mark"
                 width="200"
                 height="124"
                 decoding="async"

@@ -15,7 +15,7 @@
 
 {% block card-feature %}
 {% if card_features %}
-<div class="row mb-2">
+<div class="row home-feature-grid">
 {% for feature in card_features %}
 {% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as feature_pattern silent %}
 {% include "layout/fragments/card_feature.html" with shared_review_modal="home-review-modal" pattern_variant=feature_pattern %}
@@ -25,10 +25,10 @@
 {% endblock card-feature %}
 
 {% block article-title %}
-<h3 class="mb-4 fst-italic">More in this issue:</h3>
+<h3 class="home-article-title fst-italic">More in this issue:</h3>
 {% endblock article-title %}
 {% block article-block %}
-<div id="article-block">
+<div id="article-block" class="home-article-block">
 {% block articles %}
 {% include "layout/fragments/articles.html" with card_modal_click=True shared_review_modal="home-review-modal" %}
 {% endblock articles %}

@@ -46,8 +46,10 @@
             {% endif %}
             {% endwith %}
 
-            {% if review.headline %}
-                <blockquote class="blockquote mb-0">"{{ review.headline|safe }}"</blockquote>
+            {% if not is_browse_mode and review.headline %}
+                <blockquote class="blockquote mb-2">"{{ review.headline|safe }}"</blockquote>
+            {% else %}
+                <p class="mb-0 text-body-secondary">{{ review.get_truncated_body }}</p>
             {% endif %}
         </div>
     {% endfor %}

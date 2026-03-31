@@ -6,6 +6,14 @@ module.exports = {
   target: 'web',
   context: path.join(__dirname, '../'),
   entry: {
+    public: path.resolve(
+      __dirname,
+      '../spanza_journal_watch/static/js/public_styles',
+    ),
+    backend: path.resolve(
+      __dirname,
+      '../spanza_journal_watch/static/js/backend_styles',
+    ),
     project: path.resolve(
       __dirname,
       '../spanza_journal_watch/static/js/project',

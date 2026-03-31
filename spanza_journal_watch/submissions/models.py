@@ -26,8 +26,8 @@ from django.utils.text import slugify
 from markdownx.models import MarkdownxField
 from markdownx.utils import markdownify
 
-from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.cache import get_content_cache_version
+from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text
 from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
@@ -359,7 +359,7 @@ class Review(TimeStampedModel):
 
     @classmethod
     def search(cls, query):
-        PLACEHOLDER = " FRAGDELIM "
+        PLACEHOLDER = "JWFRAGDELIM"
 
         results = (
             cls.objects.exclude(active=False)
@@ -374,17 +374,20 @@ class Review(TimeStampedModel):
                 | Q(search_vector=SearchQuery(query))  # Exact matches
                 | Q(author_similarity__gt=cls.author_similarity)
             )
-            .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter=" FRAGDELIM "))
+            .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter=PLACEHOLDER))
             .order_by("-title_similarity", "-rank", "-author_similarity", "-created")
             .select_related("article__journal", "author")
         )
 
         # Post-process each result:
         for r in results:
-            # 1) strip _all_ HTML tags
-            text = strip_tags(markdownify(r.headline))
-            # 2) restore your real delimiter
-            r.headline = text.replace(PLACEHOLDER, "...<p></p>...")
+            html = markdownify(r.headline or "")
+            html = cls.heading_tag_re.sub(" ", html)
+            text = strip_tags(html)
+            text = re.sub(r"(?m)(^|\n)\s{0,3}#{1,6}\s*", " ", text)
+            text = text.replace(PLACEHOLDER, " ... ")
+            text = re.sub(r"\s+", " ", text).strip()
+            r.headline = text
         return results
 
     def __str__(self):
@@ -489,9 +492,9 @@ class Issue(TimeStampedModel):
         cache_key = f"issue:header_feature_article:v{cache_version}:{issue_key}"
 
         def resolve_feature_article():
-            headers = PageHeader.objects.filter(page_type=PageHeader.PageType.ISSUE_DETAIL, active=True).select_related(
-                "feature_article"
-            )
+            headers = PageHeader.objects.filter(
+                page_type=PageHeader.PageType.ISSUE_DETAIL, active=True
+            ).select_related("feature_article")
 
             issue_slug = (self.slug or "").strip()
             issue_name = (self.name or "").strip()
@@ -500,12 +503,16 @@ class Issue(TimeStampedModel):
             if issue_slug:
                 header = headers.filter(feature_article__slug__iexact=issue_slug).order_by("-modified").first()
                 if not header:
-                    header = headers.filter(feature_article__slug__istartswith=issue_slug).order_by("-modified").first()
+                    header = (
+                        headers.filter(feature_article__slug__istartswith=issue_slug).order_by("-modified").first()
+                    )
 
             if not header and issue_name:
                 header = headers.filter(feature_article__title__iexact=issue_name).order_by("-modified").first()
                 if not header:
-                    header = headers.filter(feature_article__title__istartswith=issue_name).order_by("-modified").first()
+                    header = (
+                        headers.filter(feature_article__title__istartswith=issue_name).order_by("-modified").first()
+                    )
 
             if not header and self.date:
                 month_year = self.date.strftime("%B %Y")

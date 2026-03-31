@@ -1,5 +1,15 @@
 import '@popperjs/core';
-import * as bootstrap from 'bootstrap';
+import Collapse from 'bootstrap/js/dist/collapse';
+import Dropdown from 'bootstrap/js/dist/dropdown';
+import Modal from 'bootstrap/js/dist/modal';
+import Offcanvas from 'bootstrap/js/dist/offcanvas';
+import Popover from 'bootstrap/js/dist/popover';
 import 'htmx.org';
 
-window.bootstrap = bootstrap;
+window.bootstrap = {
+  Collapse,
+  Dropdown,
+  Modal,
+  Offcanvas,
+  Popover,
+};

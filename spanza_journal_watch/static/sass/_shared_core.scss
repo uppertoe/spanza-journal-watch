@@ -1,0 +1,50 @@
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 200ms ease-in;
+}
+
+.autocomplete-items {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 99;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #d4d4d4;
+  border-top: none;
+  border-bottom: none;
+}
+
+.autocomplete-items div {
+  padding: 10px;
+  cursor: pointer;
+  background-color: #fff;
+  border-bottom: 1px solid #d4d4d4;
+}
+
+.autocomplete-items div:hover {
+  background-color: #e9e9e9;
+}
+
+.autocomplete-active {
+  background-color: rgba(13, 110, 253, 1) !important;
+  color: #fff;
+}
+
+.bi {
+  vertical-align: -0.125em;
+  fill: currentColor;
+}
+
+.bd-placeholder-img {
+  font-size: 1.125rem;
+  text-anchor: middle;
+  user-select: none;
+}
+
+@media (min-width: 768px) {
+  .bd-placeholder-img-lg {
+    font-size: 3.5rem;
+  }
+}
