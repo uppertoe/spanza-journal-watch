@@ -2485,19 +2485,6 @@ def send_final_newsletter(request, send_token):
 
 @login_required
 @permission_required("backend.view_newsletter_stats", raise_exception=True)  # Prevents login loop
-def newsletter_stats_list(request):
-    newsletters = Newsletter.objects.filter(is_sent=True)
-    context = {"newsletters": newsletters}
-    template = "backend/newsletter_stats_list.html"
-    return render(request, template, context)
-
-
-def newsletter_stats_list_redirect(request):
-    return HttpResponseRedirect(reverse("backend:analytics_email"))
-
-
-@login_required
-@permission_required("backend.view_newsletter_stats", raise_exception=True)  # Prevents login loop
 def newsletter_stats_detail(request, pk):
     newsletter = get_object_or_404(Newsletter, pk=pk)
 

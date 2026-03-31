@@ -163,7 +163,6 @@ urlpatterns = [
         name="enable_newsletter_resend",
     ),
     path("newsletter/send/confirm/<str:send_token>", views.send_final_newsletter, name="send_final_newsletter"),
-    path("newsletter/stats", views.newsletter_stats_list_redirect, name="newsletter_stats_list"),
     path("newsletter/stats/<int:pk>", views.newsletter_stats_detail, name="newsletter_stats_detail"),
     path("analytics", views.analytics_redirect, name="site_analytics"),
     path("analytics/overview/", analytics_views.analytics_overview, name="analytics_overview"),

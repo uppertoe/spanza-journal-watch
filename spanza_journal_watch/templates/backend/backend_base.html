@@ -232,7 +232,7 @@
 
               {% if perms.backend.view_newsletter_stats %}
               <li class="nav-item">
-                <a class="nav-link{% if current == 'site_analytics' or current == 'newsletter_stats_list' or current == 'newsletter_stats_detail' or current == 'analytics_overview' or current == 'analytics_content' or current == 'analytics_traffic' or current == 'analytics_email' or current == 'analytics_search' or current == 'analytics_journals' %} active{% endif %}" href="{% url "backend:site_analytics" %}">Analytics</a>
+                <a class="nav-link{% if current == 'site_analytics' or current == 'newsletter_stats_detail' or current == 'analytics_overview' or current == 'analytics_content' or current == 'analytics_traffic' or current == 'analytics_email' or current == 'analytics_search' or current == 'analytics_journals' %} active{% endif %}" href="{% url "backend:site_analytics" %}">Analytics</a>
               </li>
               {% endif %}
 
@@ -262,7 +262,7 @@
     {% with cur=request.resolver_match.url_name %}
     {% if cur == 'article_intake' %}{% url 'backend:article_intake' as issue_nav_base %}
     {% elif cur == 'issue_planka_import' %}{% url 'backend:issue_planka_import' as issue_nav_base %}
-    {% elif cur == 'newsletter_release_list' or cur == 'create_newsletter' or cur == 'final_newsletter' or cur == 'send_final_newsletter' or cur == 'send_test_newsletter' or cur == 'newsletter_stats_list' or cur == 'newsletter_stats_detail' %}{% url 'backend:newsletter_release_list' as issue_nav_base %}
+    {% elif cur == 'newsletter_release_list' or cur == 'create_newsletter' or cur == 'final_newsletter' or cur == 'send_final_newsletter' or cur == 'send_test_newsletter' or cur == 'newsletter_stats_detail' %}{% url 'backend:newsletter_release_list' as issue_nav_base %}
     {% elif cur == 'issue_reviewers' %}{% url 'backend:issue_reviewers' as issue_nav_base %}
     {% elif cur == 'issue_reviews_edit' %}{% url 'backend:issue_reviews_edit' as issue_nav_base %}
     {% elif cur == 'issue_publish' %}{% url 'backend:issue_publish' as issue_nav_base %}

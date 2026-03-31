@@ -337,12 +337,6 @@ class TestNewsletterAuthGuards:
         _redirect_to_login(anon().get(url))
         _forbidden(user_without_perm().get(url))
 
-    def test_newsletter_stats_list(self):
-        # @login_required + @permission_required: anonymous → 302 redirect, no-perm → 403
-        url = reverse("backend:newsletter_stats_list")
-        _redirect_to_login(anon().get(url))
-        _forbidden(user_without_perm().get(url))
-
 
 # ---------------------------------------------------------------------------
 # 7. Verify permissioned users ARE admitted (spot-check)

@@ -74,7 +74,6 @@ class TestBackendRoutes:
             reverse("backend:dashboard"),
             reverse("backend:upload_subscribers"),
             reverse("backend:final_newsletter", kwargs={"send_token": newsletter.send_token}),
-            reverse("backend:newsletter_stats_list"),
             reverse("backend:newsletter_stats_detail", kwargs={"pk": newsletter.pk}),
         ]
 
@@ -115,10 +114,6 @@ class TestBackendRoutes:
         assert final_response.status_code == 200
         final_body = final_response.content.decode("utf-8", errors="ignore")
         assert "Newsletter release check" in final_body
-
-        stats_list_response = route_client.get(reverse("backend:newsletter_stats_list"))
-        assert stats_list_response.status_code == 200
-        assert "Newsletter statistics" in stats_list_response.content.decode("utf-8", errors="ignore")
 
         stats_detail_response = route_client.get(
             reverse("backend:newsletter_stats_detail", kwargs={"pk": newsletter.pk})
