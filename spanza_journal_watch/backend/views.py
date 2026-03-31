@@ -20,7 +20,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Avg, Count, Q
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -2492,6 +2492,10 @@ def newsletter_stats_list(request):
     return render(request, template, context)
 
 
+def newsletter_stats_list_redirect(request):
+    return HttpResponseRedirect(reverse("backend:analytics_email"))
+
+
 @login_required
 @permission_required("backend.view_newsletter_stats", raise_exception=True)  # Prevents login loop
 def newsletter_stats_detail(request, pk):
@@ -2905,6 +2909,10 @@ def site_analytics(request):
         "content_opportunities": content_opportunities,
     }
     return render(request, "backend/site_analytics.html", context)
+
+
+def analytics_redirect(request):
+    return HttpResponseRedirect(reverse("backend:analytics_overview"))
 
 
 def _bool_from_value(value):

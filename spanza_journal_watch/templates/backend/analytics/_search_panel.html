@@ -1,0 +1,112 @@
+<div class="mb-4">
+  <h1 class="h3 mb-1">Search</h1>
+  <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}</p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Total searches</h6>
+      <p class="display-6 mb-0">{{ total_searches }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card h-100 border-primary-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Result clicks</h6>
+      <p class="display-6 mb-0">{{ search_click_count }}</p>
+      <p class="small text-muted mb-0">{{ search_ctr }} CTR</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card h-100 border-warning-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Zero-result queries</h6>
+      <p class="display-6 mb-0">{{ zero_result_queries|length }}</p>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Search volume — last 26 weeks</div>
+  <div class="card-body">
+    <canvas id="search-trend-chart" height="80"></canvas>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-7">
+    <div class="card h-100">
+      <div class="card-header">Top queries</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Query</th><th>Searches</th><th>Clicks</th><th>CTR</th><th>Zero results</th></tr></thead>
+          <tbody>
+            {% for item in search_insights %}
+            <tr>
+              <td class="small">{{ item.label }}</td>
+              <td>{{ item.searches }}</td>
+              <td>{{ item.result_clicks }}</td>
+              <td>{{ item.click_through_rate }}</td>
+              <td>{% if item.zero_results %}<span class="badge text-bg-warning text-dark">{{ item.zero_results }}</span>{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted small">No search data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-5">
+    <div class="card h-100">
+      <div class="card-header">Content gaps — zero-result queries</div>
+      {% if zero_result_queries %}
+      <div class="list-group list-group-flush">
+        {% for item in zero_result_queries %}
+        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+          <span class="small">{{ item.label }}</span>
+          <span class="badge text-bg-secondary">{{ item.zero_results }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body"><p class="text-muted mb-0 small">No zero-result queries in this period.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const labels = [{% for b in weekly_searches %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  const data = [{% for b in weekly_searches %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  function waitForChart(cb) {
+    if (window.Chart) { cb(); } else { setTimeout(function () { waitForChart(cb); }, 50); }
+  }
+  waitForChart(function () {
+    const ctx = document.getElementById("search-trend-chart");
+    if (!ctx) return;
+    new window.Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Searches",
+          data: data,
+          backgroundColor: "rgba(var(--bs-warning-rgb), 0.3)",
+          borderColor: "rgba(var(--bs-warning-rgb), 0.8)",
+          borderWidth: 1,
+          borderRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+        },
+      },
+    });
+  });
+})();
+</script>

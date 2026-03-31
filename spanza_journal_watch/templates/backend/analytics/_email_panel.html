@@ -1,0 +1,50 @@
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h1 class="h3 mb-1">Email &amp; Newsletters</h1>
+    <p class="text-muted mb-0 small">All sent newsletters</p>
+  </div>
+  <div class="text-end small text-muted">
+    <div>{{ total_subscribers }} active subscribers</div>
+    <div>{{ total_sent }} newsletters sent</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Newsletter performance</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Newsletter</th>
+          <th>Sent</th>
+          <th>Emails</th>
+          <th>Human opens</th>
+          <th>Open rate</th>
+          <th>CTR</th>
+          <th>Auto share</th>
+          <th>7-day site traffic</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in newsletter_rows %}
+        <tr>
+          <td class="small fw-semibold">{{ row.newsletter }}</td>
+          <td class="small text-muted">{{ row.newsletter.send_date|date:"j M Y"|default:"—" }}</td>
+          <td class="small">{{ row.emails_sent }}</td>
+          <td class="small">{{ row.human_opens }}</td>
+          <td class="small">{{ row.human_open_rate }}</td>
+          <td class="small">{{ row.human_ctr }}</td>
+          <td class="small text-muted">{{ row.automated_share }}</td>
+          <td class="small">{{ row.post_send_traffic }} <span class="text-muted">engaged</span></td>
+          <td class="text-end">
+            <a href="{{ row.newsletter.get_stats_absolute_url }}" class="btn btn-sm btn-outline-secondary">Full stats</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-muted small p-3">No newsletters sent yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

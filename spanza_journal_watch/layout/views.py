@@ -37,6 +37,17 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         subscriber_id = self.request.session.get("subscriber_id")
         PageView.record_view(homepage, subscriber_id, request=self.request)
 
+        try:
+            from spanza_journal_watch.analytics.models import AnalyticsEvent
+
+            AnalyticsEvent.record_event(
+                event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+                request=self.request,
+                metadata={"page": "home"},
+            )
+        except Exception:
+            pass
+
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)
             .select_related(
@@ -63,7 +74,8 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         context["show_default_action_dock"] = False
         context["action_dock_aria_label"] = "Homepage quick navigation"
         context["page_meta_description"] = (
-            "Review highlights from the paediatric anaesthesia literature curated by the SPANZA Journal Watch community."
+            "Review highlights from the paediatric anaesthesia literature"
+            " curated by the SPANZA Journal Watch community."
         )
         context["canonical_url"] = self.request.build_absolute_uri(self.request.path)
         context["structured_data"] = json.dumps(

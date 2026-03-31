@@ -1,0 +1,155 @@
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h1 class="h3 mb-1">Overview</h1>
+    <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}</p>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  {% with items=total_opens,total_engaged,average_dwell_seconds,total_full_text,total_shares,search_count %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Review opens</h6>
+      <p class="display-6 mb-0">{{ total_opens }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card h-100 border-primary-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Engaged views</h6>
+      <p class="display-6 mb-0">{{ total_engaged }}</p>
+      <p class="small text-muted mb-0">{{ engaged_rate }} of opens</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card h-100 border-success-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Avg dwell</h6>
+      <p class="display-6 mb-0">{{ average_dwell_seconds }}s</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Full text CTR</h6>
+      <p class="display-6 mb-0">{{ full_text_ctr }}</p>
+      <p class="small text-muted mb-0">{{ total_full_text }} clicks</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Shares</h6>
+      <p class="display-6 mb-0">{{ total_shares }}</p>
+      <p class="small text-muted mb-0">{{ share_rate }} of opens</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Searches</h6>
+      <p class="display-6 mb-0">{{ search_count }}</p>
+    </div></div>
+  </div>
+  {% endwith %}
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Engaged views — last 26 weeks</span>
+    {% if newsletter_sends %}<span class="small text-muted">Newsletter sends marked ▾</span>{% endif %}
+  </div>
+  <div class="card-body">
+    <canvas id="weekly-trend-chart" height="80"></canvas>
+  </div>
+</div>
+
+{% if newsletter_lift %}
+<div class="card mb-4">
+  <div class="card-header">Newsletter impact (7-day window)</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for item in newsletter_lift %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="card bg-body-tertiary h-100">
+          <div class="card-body">
+            <div class="small text-muted mb-1">{{ item.newsletter.send_date|date:"j M Y" }}</div>
+            <div class="fw-semibold small mb-2">{{ item.newsletter }}</div>
+            <div class="d-flex gap-3 small mb-1">
+              <span class="text-muted">Before: {{ item.before }}</span>
+              <span>After: {{ item.after }}</span>
+            </div>
+            {% if item.lift_pct is not None %}
+            <span class="badge {% if item.lift_pct >= 0 %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+              {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-body">
+    <div class="row g-2 text-center">
+      <div class="col-6">
+        <div class="small text-muted">Known subscriber activity</div>
+        <div class="fw-semibold">{{ subscriber_events }} <span class="text-muted small fw-normal">({{ subscriber_share }})</span></div>
+      </div>
+      <div class="col-6">
+        <div class="small text-muted">Total human-filtered events</div>
+        <div class="fw-semibold">{{ human_event_count }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const labels = [{% for b in weekly_trend %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  const data = [{% for b in weekly_trend %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  const sendDates = [{% for s in newsletter_sends %}"{{ s.date }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  const weekStarts = [{% for b in weekly_trend %}"{{ b.week_start }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+
+  function waitForChart(cb) {
+    if (window.Chart) { cb(); } else { setTimeout(function () { waitForChart(cb); }, 50); }
+  }
+
+  waitForChart(function () {
+    const ctx = document.getElementById("weekly-trend-chart");
+    if (!ctx) return;
+    new window.Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Engaged views",
+          data: data,
+          backgroundColor: "rgba(var(--bs-primary-rgb), 0.2)",
+          borderColor: "rgba(var(--bs-primary-rgb), 0.7)",
+          borderWidth: 1,
+          borderRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: function(ctx) {
+                const ws = weekStarts[ctx.dataIndex];
+                const match = sendDates.find(function(d) { return d >= ws && (weekStarts[ctx.dataIndex + 1] === undefined || d < weekStarts[ctx.dataIndex + 1]); });
+                return match ? "Newsletter sent " + match : "";
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+        },
+      },
+    });
+  });
+})();
+</script>
