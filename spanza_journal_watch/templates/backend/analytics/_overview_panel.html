@@ -6,7 +6,6 @@
 </div>
 
 <div class="row g-3 mb-4">
-  {% with items=total_opens,total_engaged,average_dwell_seconds,total_full_text,total_shares,search_count %}
   <div class="col-6 col-md-4 col-xl-2">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Review opens</h6>
@@ -46,7 +45,7 @@
       <p class="display-6 mb-0">{{ search_count }}</p>
     </div></div>
   </div>
-  {% endwith %}
+
 </div>
 
 <div class="card mb-4">

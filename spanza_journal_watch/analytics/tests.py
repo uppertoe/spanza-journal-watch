@@ -86,6 +86,7 @@ def test_track_event_records_review_share_event(client):
             "metadata": {"query": "airway"},
         },
         content_type="application/json",
+        HTTP_USER_AGENT="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     )
 
     assert response.status_code == 200
@@ -113,6 +114,7 @@ def test_track_event_with_subscriber_session_records_known_subscriber_confidence
             "source": "review_detail",
         },
         content_type="application/json",
+        HTTP_USER_AGENT="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     )
 
     assert response.status_code == 200
