@@ -32,12 +32,25 @@
 </div>
 
 <div class="row g-4 mb-4">
-  <div class="col-12 col-xl-8">
+  <div class="col-12">
     <div class="card h-100">
-      <div class="card-header">Top reviews by engagement</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Top reviews by engagement</span>
+        {% if share_attributed_visits %}<span class="badge text-bg-info">{{ share_attributed_visits }} visit{{ share_attributed_visits|pluralize }} from shares</span>{% endif %}
+      </div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Review</th><th>Opens</th><th>Engaged</th><th>Full text</th><th>Score</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Review</th>
+              <th>Opens</th>
+              <th>Engaged</th>
+              <th>Full text</th>
+              <th>Scroll</th>
+              <th>Score</th>
+              <th title="Engagement score per week since publication — normalises for age">Velocity</th>
+            </tr>
+          </thead>
           <tbody>
             {% for item in top_reviews %}
             <tr>
@@ -48,22 +61,36 @@
               <td class="small">{{ item.opens }}</td>
               <td class="small">{{ item.engaged_views }}<div class="text-muted" style="font-size:0.72rem">{{ item.engaged_rate }}</div></td>
               <td class="small">{{ item.full_text_clicks }}</td>
+              <td class="small">{% if item.avg_scroll_depth is not None %}{{ item.avg_scroll_depth }}%{% else %}&mdash;{% endif %}</td>
               <td><span class="badge text-bg-primary">{{ item.engagement_score }}</span></td>
+              <td class="small">{% if item.velocity is not None %}{{ item.velocity }}<div class="text-muted" style="font-size:0.72rem">{{ item.weeks_since }}w</div>{% else %}<span class="text-muted">—</span>{% endif %}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="text-muted small">No data in this date range.</td></tr>
+            <tr><td colspan="7" class="text-muted small">No data in this date range.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
   </div>
-  <div class="col-12 col-xl-4">
+</div>
+
+<div class="card bg-body-tertiary mb-4">
+  <div class="card-body py-2 small text-muted">
+    <strong>Score</strong> = Opens + (Engaged reads &times; 3) + (Full text clicks &times; 4) + (Shares &times; 5)
+    &nbsp;&bull;&nbsp;
+    <strong>Velocity</strong> = Score &divide; weeks since publication
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-5">
     <div class="card mb-3">
       <div class="card-header">Featured vs standard</div>
+      <div class="card-body small text-muted mb-2">Are featured reviews actually more engaging, or just more visible?</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Type</th><th>Opens</th><th>Engaged</th><th>Shares</th></tr></thead>
+          <thead><tr><th>Type</th><th>Opens</th><th>Engaged rate</th><th>Share rate</th></tr></thead>
           <tbody>
             {% for item in review_type_breakdown %}
             <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged_rate }}</td><td>{{ item.share_rate }}</td></tr>
@@ -90,40 +117,66 @@
       </div>
     </div>
   </div>
-</div>
-
-<div class="row g-4">
-  <div class="col-12 col-xl-6">
+  <div class="col-12 col-lg-7">
     <div class="card h-100">
-      <div class="card-header">Top journals</div>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Journal</th><th>Opens</th><th>Engaged</th><th>Score</th></tr></thead>
-          <tbody>
-            {% for item in top_journals %}
-            <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged }}</td><td><span class="badge text-bg-secondary">{{ item.score }}</span></td></tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-muted small">No data yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="card-header p-0 border-bottom-0">
+        <ul class="nav nav-pills card-header-pills px-3 pt-2" role="tablist">
+          <li class="nav-item"><button class="nav-link active small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-topics" type="button" role="tab">By topic</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-journals" type="button" role="tab">By journal</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-tags" type="button" role="tab">By tag</button></li>
+        </ul>
       </div>
-    </div>
-  </div>
-  <div class="col-12 col-xl-6">
-    <div class="card h-100">
-      <div class="card-header">Top tags</div>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Tag</th><th>Opens</th><th>Engaged</th><th>Score</th></tr></thead>
-          <tbody>
-            {% for item in top_tags %}
-            <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged }}</td><td><span class="badge text-bg-secondary">{{ item.score }}</span></td></tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-muted small">No data yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-topics" role="tabpanel">
+          {% if tag_type_breakdown %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Topic</th><th>Opens</th><th>Engaged rate</th><th>Full text CTR</th><th>Score</th></tr></thead>
+              <tbody>
+                {% for item in tag_type_breakdown %}
+                <tr>
+                  <td class="small">{{ item.label }}</td>
+                  <td>{{ item.opens }}</td>
+                  <td>{{ item.engaged_rate }}</td>
+                  <td>{{ item.full_text_ctr }}</td>
+                  <td><span class="badge text-bg-secondary">{{ item.score }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="card-body"><p class="text-muted mb-0 small">No tag data yet.</p></div>
+          {% endif %}
+        </div>
+        <div class="tab-pane fade" id="tab-journals" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Journal</th><th>Opens</th><th>Engaged</th><th>Score</th></tr></thead>
+              <tbody>
+                {% for item in top_journals %}
+                <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged }}</td><td><span class="badge text-bg-secondary">{{ item.score }}</span></td></tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted small">No data yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-tags" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Tag</th><th>Opens</th><th>Engaged</th><th>Score</th></tr></thead>
+              <tbody>
+                {% for item in top_tags %}
+                <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged }}</td><td><span class="badge text-bg-secondary">{{ item.score }}</span></td></tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted small">No data yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>

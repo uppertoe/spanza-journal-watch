@@ -6,6 +6,7 @@ readers interact with the site.
 """
 
 import datetime
+import json
 from collections import Counter, defaultdict
 
 from django.contrib.auth.decorators import login_required, permission_required
@@ -22,6 +23,14 @@ from spanza_journal_watch.backend.views import (
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Review
+
+
+def _pct_change(current, previous):
+    """Return percentage change as an integer, or None if no previous data."""
+    if not previous:
+        return None
+    return round((current - previous) / previous * 100)
+
 
 VIEW_SITE_ANALYTICS = "backend.view_site_analytics"
 VIEW_NEWSLETTER_STATS = "backend.view_newsletter_stats"
@@ -69,6 +78,32 @@ def _weekly_buckets(qs, timestamp_field="timestamp", weeks=26):
     return buckets
 
 
+def _weekly_visitors_by_referrer(qs, categories, weeks=26):
+    """Return weekly labels and {category: [count, ...]} of unique visitors."""
+    today = timezone.localdate()
+    labels = []
+    series = {cat: [] for cat in categories}
+    for i in range(weeks - 1, -1, -1):
+        week_start = today - datetime.timedelta(days=today.weekday() + 7 * i)
+        week_end = week_start + datetime.timedelta(days=6)
+        start_ts = timezone.make_aware(datetime.datetime.combine(week_start, datetime.time.min))
+        end_ts = timezone.make_aware(datetime.datetime.combine(week_end, datetime.time.max))
+        week_qs = qs.filter(timestamp__gte=start_ts, timestamp__lte=end_ts).exclude(visitor_id=None)
+        labels.append(week_start.strftime("%-d %b"))
+        for cat in categories:
+            if cat == "other":
+                count = (
+                    week_qs.exclude(referrer_category__in=[c for c in categories if c != "other"])
+                    .values("visitor_id")
+                    .distinct()
+                    .count()
+                )
+            else:
+                count = week_qs.filter(referrer_category=cat).values("visitor_id").distinct().count()
+            series[cat].append(count)
+    return labels, series
+
+
 def _newsletter_send_weeks(weeks=26):
     today = timezone.localdate()
     cutoff = today - datetime.timedelta(weeks=weeks)
@@ -81,6 +116,54 @@ def _newsletter_send_weeks(weeks=26):
         .values("send_date", "id")
     )
     return [{"date": n["send_date"].date().isoformat(), "id": n["id"]} for n in newsletters]
+
+
+_FLOW_LABELS = {
+    "review_open": "View review",
+    "review_engaged": "Read review",
+    "review_full_text_click": "Full text",
+    "review_share_copy_link": "Share (copy)",
+    "review_share_email": "Share (email)",
+    "review_share_native": "Share (native)",
+    "review_share_bluesky": "Share (Bluesky)",
+    "review_share_x": "Share (X)",
+    "review_share_facebook": "Share (Facebook)",
+    "search": "Search",
+    "search_result_click": "Search click",
+    "page_visit": "Page visit",
+    "journal_browser_visit": "Journals browser",
+    "journal_article_interact": "Journal article",
+}
+
+
+def _compute_top_flows(human_events, start_ts, end_ts):
+    """Return the top 8 two-step transitions across sessions."""
+    pairs = (
+        human_events.filter(session_sequence__gte=1, session_sequence__lte=10)
+        .values("session_key", "event_type", "session_sequence")
+        .order_by("session_key", "session_sequence")
+    )
+    events_by_session = defaultdict(list)
+    for row in pairs:
+        events_by_session[row["session_key"]].append(row["event_type"])
+
+    transition_counter = Counter()
+    for _session_key, event_types in events_by_session.items():
+        seen = set()
+        for i in range(len(event_types) - 1):
+            pair = (event_types[i], event_types[i + 1])
+            if pair not in seen:
+                transition_counter[pair] += 1
+                seen.add(pair)
+
+    return [
+        {
+            "from": _FLOW_LABELS.get(a, a),
+            "to": _FLOW_LABELS.get(b, b),
+            "count": count,
+        }
+        for (a, b), count in transition_counter.most_common(8)
+    ]
 
 
 @login_required
@@ -112,6 +195,39 @@ def analytics_overview(request):
         or 0
     )
     search_count = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH).count()
+    avg_scroll = (
+        review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
+        .exclude(scroll_depth=None)
+        .aggregate(avg=Avg("scroll_depth"))["avg"]
+    )
+    avg_scroll_depth = round(avg_scroll) if avg_scroll is not None else None
+
+    # Previous period for comparison
+    period_days = (end_date - start_date).days
+    prev_end = start_date - datetime.timedelta(days=1)
+    prev_start = prev_end - datetime.timedelta(days=period_days)
+    prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
+    prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+
+    prev_human = AnalyticsEvent.objects.filter(
+        timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
+    )
+    prev_review = prev_human.filter(content_type=review_ct)
+    prev_opens = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN).count()
+    prev_engaged = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).count()
+    prev_dwell_ms = (
+        prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).aggregate(avg=Avg("duration_ms"))["avg"]
+        or 0
+    )
+    prev_full_text = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK).count()
+    prev_shares = prev_review.filter(event_type__in=share_event_types).count()
+    prev_searches = prev_human.filter(event_type=AnalyticsEvent.EventType.SEARCH).count()
+    prev_scroll = (
+        prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
+        .exclude(scroll_depth=None)
+        .aggregate(avg=Avg("scroll_depth"))["avg"]
+    )
+    prev_scroll_depth = round(prev_scroll) if prev_scroll is not None else None
 
     engaged_qs = AnalyticsEvent.objects.filter(
         event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
@@ -169,12 +285,21 @@ def analytics_overview(request):
         "total_shares": total_shares,
         "share_rate": _safe_percentage(total_shares, total_opens),
         "search_count": search_count,
+        "avg_scroll_depth": avg_scroll_depth,
         "weekly_trend": weekly_trend,
         "newsletter_sends": newsletter_sends,
         "newsletter_lift": newsletter_lift,
         "human_event_count": human_event_count,
         "subscriber_events": subscriber_events,
         "subscriber_share": _safe_percentage(subscriber_events, human_event_count),
+        "delta_opens": _pct_change(total_opens, prev_opens),
+        "delta_engaged": _pct_change(total_engaged, prev_engaged),
+        "delta_dwell": _pct_change(avg_dwell_ms, prev_dwell_ms),
+        "delta_full_text": _pct_change(total_full_text, prev_full_text),
+        "delta_shares": _pct_change(total_shares, prev_shares),
+        "delta_searches": _pct_change(search_count, prev_searches),
+        "delta_scroll": _pct_change(avg_scroll_depth or 0, prev_scroll_depth or 0) if avg_scroll_depth else None,
+        "comparison_label": f"vs {prev_start.strftime('%-d %b')} – {prev_end.strftime('%-d %b')}",
         "active_tab": "overview",
     }
     return _render_analytics(
@@ -210,6 +335,7 @@ def analytics_content(request):
             opens=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)),
             engaged_views=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
             avg_dwell_ms=Avg("duration_ms", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
+            avg_scroll=Avg("scroll_depth", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
             full_text_clicks=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)),
             total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
         )
@@ -245,6 +371,7 @@ def analytics_content(request):
                 "engaged_rate": _safe_percentage(row["engaged_views"], row["opens"]),
                 "share_rate": _safe_percentage(row["total_shares"], row["opens"]),
                 "full_text_ctr": _safe_percentage(row["full_text_clicks"], row["opens"]),
+                "avg_scroll_depth": round(row["avg_scroll"]) if row["avg_scroll"] is not None else None,
             }
         )
         journal = review.article.journal.name if review.article and review.article.journal else "Unknown"
@@ -260,6 +387,19 @@ def analytics_content(request):
             tag_totals[label]["shares"] += row["total_shares"]
             tag_totals[label]["full_text"] += row["full_text_clicks"]
             tag_totals[label]["score"] += score
+
+    # Engagement velocity — score per week since publication
+    today = timezone.localdate()
+    for item in top_reviews:
+        review = item["review"]
+        if review.publish_date:
+            days_since = max((today - review.publish_date).days, 1)
+            weeks_since = max(days_since / 7, 0.5)
+            item["velocity"] = round(item["engagement_score"] / weeks_since, 1)
+            item["weeks_since"] = round(weeks_since, 1)
+        else:
+            item["velocity"] = None
+            item["weeks_since"] = None
 
     top_reviews = sorted(top_reviews, key=lambda x: x["engagement_score"], reverse=True)[:15]
     top_journals = sorted(
@@ -299,6 +439,28 @@ def analytics_content(request):
     }
     share_breakdown = [{"label": k, "count": v} for k, v in share_counts.items() if v]
 
+    # Share-to-visit attribution — count downstream visits from share tokens
+    share_token_events = human_events.exclude(share_token="").values("share_token").distinct()
+    share_attributed_visits = share_token_events.count()
+
+    # Tag-based content type breakdown — shows what topics resonate
+    tag_type_breakdown = sorted(
+        (
+            {
+                "label": k,
+                "opens": v["opens"],
+                "engaged": v["engaged"],
+                "engaged_rate": _safe_percentage(v["engaged"], v["opens"]),
+                "full_text": v["full_text"],
+                "full_text_ctr": _safe_percentage(v["full_text"], v["opens"]),
+                "score": v["score"],
+            }
+            for k, v in tag_totals.items()
+        ),
+        key=lambda x: x["score"],
+        reverse=True,
+    )[:10]
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -312,11 +474,13 @@ def analytics_content(request):
         "top_reviews": top_reviews,
         "top_journals": top_journals,
         "top_tags": top_tags,
+        "tag_type_breakdown": tag_type_breakdown,
         "review_type_breakdown": [
             _group_summary("Featured reviews", featured_rows),
             _group_summary("Standard reviews", standard_rows),
         ],
         "share_breakdown": share_breakdown,
+        "share_attributed_visits": share_attributed_visits,
         "active_tab": "content",
     }
     return _render_analytics(
@@ -360,6 +524,15 @@ def analytics_traffic(request):
         for row in referrer_rows
     ]
 
+    # Top referrer domains for "Other" traffic
+    other_domains = list(
+        human_events.filter(referrer_category="other")
+        .exclude(referrer_domain="")
+        .values("referrer_domain")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:10]
+    )
+
     visitor_ids_in_period = set(human_events.exclude(visitor_id=None).values_list("visitor_id", flat=True).distinct())
     returning_count = 0
     new_count = 0
@@ -394,24 +567,60 @@ def analytics_traffic(request):
 
     journal_visits = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT).count()
 
-    weekly_opens = _weekly_buckets(
-        AnalyticsEvent.objects.filter(
-            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
-            automated=False,
-        )
+    traffic_categories = ["newsletter", "search", "social", "direct", "other"]
+    traffic_chart_labels, traffic_chart_series = _weekly_visitors_by_referrer(
+        AnalyticsEvent.objects.filter(automated=False),
+        categories=traffic_categories,
     )
+
+    # Landing page distribution — first event per session
+    landing_counts = Counter()
+    landing_rows = list(
+        human_events.filter(session_sequence=1).exclude(landing_page="").values_list("landing_page", flat=True)
+    )
+    for path in landing_rows:
+        landing_counts[path] += 1
+    landing_breakdown = [{"path": path, "visits": count} for path, count in landing_counts.most_common(10)]
+
+    # UTM campaign breakdown
+    utm_rows = list(
+        human_events.filter(metadata__utm_source__isnull=False)
+        .exclude(metadata__utm_source="")
+        .values_list("metadata", flat=True)
+    )
+    campaign_counts = Counter()
+    for meta in utm_rows:
+        source = (meta or {}).get("utm_source", "")
+        medium = (meta or {}).get("utm_medium", "")
+        campaign = (meta or {}).get("utm_campaign", "")
+        if source:
+            label = source
+            if medium:
+                label += f" / {medium}"
+            if campaign:
+                label += f" / {campaign}"
+            campaign_counts[label] += 1
+    campaign_breakdown = [{"label": label, "events": count} for label, count in campaign_counts.most_common(10)]
+
+    # Top session flows — most common 2-step transitions
+    flow_counts = _compute_top_flows(human_events, start_ts, end_ts)
 
     context = {
         "start_date": start_date,
         "end_date": end_date,
         "referrer_breakdown": referrer_breakdown,
+        "other_domains": other_domains,
         "new_visitors": new_count,
         "returning_visitors": returning_count,
         "total_visitors": len(visitor_ids_in_period),
         "returning_rate": _safe_percentage(returning_count, len(visitor_ids_in_period)),
         "page_breakdown": page_breakdown,
         "journal_visits": journal_visits,
-        "weekly_opens": weekly_opens,
+        "traffic_chart_labels_json": json.dumps(traffic_chart_labels),
+        "traffic_chart_series_json": json.dumps(traffic_chart_series),
+        "landing_breakdown": landing_breakdown,
+        "campaign_breakdown": campaign_breakdown,
+        "top_flows": flow_counts,
         "active_tab": "traffic",
     }
     return _render_analytics(
@@ -424,7 +633,13 @@ def analytics_traffic(request):
 def analytics_email(request):
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request, default_days=180)
 
-    newsletters = list(Newsletter.objects.filter(is_sent=True).order_by("-send_date"))
+    newsletters = list(
+        Newsletter.objects.filter(
+            is_sent=True,
+            send_date__date__gte=start_date,
+            send_date__date__lte=end_date,
+        ).order_by("-send_date")
+    )
 
     newsletter_rows = []
     for nl in newsletters:
@@ -443,6 +658,18 @@ def analytics_email(request):
                 timestamp__lte=nl.send_date + datetime.timedelta(days=7),
             ).count()
 
+        # Per-link click breakdown for this newsletter
+        link_clicks = list(
+            clicks_qs.filter(automated=False)
+            .exclude(destination_url="")
+            .values("destination_url")
+            .annotate(
+                clicks=Count("id"),
+                unique_subscribers=Count("subscriber", distinct=True),
+            )
+            .order_by("-clicks")[:8]
+        )
+
         newsletter_rows.append(
             {
                 "newsletter": nl,
@@ -455,11 +682,47 @@ def analytics_email(request):
                 if total_opens
                 else "0%",
                 "post_send_traffic": post_traffic,
+                "link_clicks": link_clicks,
             }
         )
 
     total_subscribers = Subscriber.objects.filter(subscribed=True).count()
     total_sent = Newsletter.objects.filter(is_sent=True).count()
+
+    # Subscriber engagement segmentation (always uses most recent sends, not date-filtered)
+    recent_newsletters = list(Newsletter.objects.filter(is_sent=True).order_by("-send_date")[:10])
+    recent_nl_ids = [nl.id for nl in recent_newsletters]
+    segment_counts = {"highly_engaged": 0, "occasional": 0, "dormant": 0}
+
+    if recent_nl_ids:
+        active_subscribers = list(Subscriber.objects.filter(subscribed=True).values_list("id", flat=True))
+        nl_count = len(recent_nl_ids)
+
+        opens_per_sub = dict(
+            NewsletterOpen.objects.filter(newsletter_id__in=recent_nl_ids, automated=False)
+            .values("subscriber_id")
+            .annotate(newsletters_opened=Count("newsletter_id", distinct=True))
+            .values_list("subscriber_id", "newsletters_opened")
+        )
+        clicks_per_sub = dict(
+            NewsletterClick.objects.filter(newsletter_id__in=recent_nl_ids, automated=False)
+            .values("subscriber_id")
+            .annotate(newsletters_clicked=Count("newsletter_id", distinct=True))
+            .values_list("subscriber_id", "newsletters_clicked")
+        )
+
+        for sub_id in active_subscribers:
+            opened = opens_per_sub.get(sub_id, 0)
+            clicked = clicks_per_sub.get(sub_id, 0)
+            open_rate = opened / nl_count if nl_count else 0
+            click_rate = clicked / nl_count if nl_count else 0
+
+            if open_rate >= 0.7 and click_rate >= 0.3:
+                segment_counts["highly_engaged"] += 1
+            elif open_rate >= 0.3 or clicked >= 1:
+                segment_counts["occasional"] += 1
+            else:
+                segment_counts["dormant"] += 1
 
     context = {
         "start_date": start_date,
@@ -467,6 +730,8 @@ def analytics_email(request):
         "newsletter_rows": newsletter_rows,
         "total_subscribers": total_subscribers,
         "total_sent": total_sent,
+        "segment_counts": segment_counts,
+        "segment_newsletter_count": len(recent_nl_ids),
         "active_tab": "email",
     }
     return _render_analytics(request, "backend/analytics/email.html", context, "backend/analytics/_email_panel.html")

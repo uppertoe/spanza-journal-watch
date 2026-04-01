@@ -79,8 +79,11 @@
 (function () {
   const labels = [{% for b in weekly_searches %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
   const data = [{% for b in weekly_searches %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
-  function waitForChart(cb) {
-    if (window.Chart) { cb(); } else { setTimeout(function () { waitForChart(cb); }, 50); }
+  function waitForChart(cb, retries) {
+    if (typeof retries === "undefined") retries = 100;
+    if (window.Chart) { cb(); }
+    else if (retries > 0) { setTimeout(function () { waitForChart(cb, retries - 1); }, 50); }
+    else { console.warn("Chart.js did not load within 5 seconds"); }
   }
   waitForChart(function () {
     const ctx = document.getElementById("search-trend-chart");

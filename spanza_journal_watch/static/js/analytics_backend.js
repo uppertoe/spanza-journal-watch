@@ -1,3 +1,4 @@
 import { Chart, registerables } from 'chart.js';
-Chart.register(...registerables);
+import annotationPlugin from 'chartjs-plugin-annotation';
+Chart.register(...registerables, annotationPlugin);
 window.Chart = Chart;

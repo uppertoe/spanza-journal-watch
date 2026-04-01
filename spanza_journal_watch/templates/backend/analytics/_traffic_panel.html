@@ -32,7 +32,7 @@
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Review opens — last 26 weeks</div>
+  <div class="card-header">Unique visitors by source — last 26 weeks</div>
   <div class="card-body">
     <canvas id="traffic-trend-chart" height="80"></canvas>
   </div>
@@ -82,35 +82,127 @@
   </div>
 </div>
 
+<div class="row g-4 mb-4">
+  {% if landing_breakdown %}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Top landing pages</div>
+      <div class="card-body small text-muted mb-2">The first page visitors see when they arrive.</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Path</th><th>Sessions</th></tr></thead>
+          <tbody>
+            {% for item in landing_breakdown %}
+            <tr><td class="small text-break"><code>{{ item.path }}</code></td><td>{{ item.visits }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if campaign_breakdown %}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Campaigns (UTM)</div>
+      <div class="card-body small text-muted mb-2">Traffic from links with UTM parameters (source / medium / campaign).</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Campaign</th><th>Events</th></tr></thead>
+          <tbody>
+            {% for item in campaign_breakdown %}
+            <tr><td class="small">{{ item.label }}</td><td>{{ item.events }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if other_domains %}
+<div class="card mb-4">
+  <div class="card-header">Top "Other" referrer domains</div>
+  <div class="card-body small text-muted mb-2">External domains that aren't search engines or social media — could be institutional portals, partner sites, etc.</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Domain</th><th>Events</th></tr></thead>
+      <tbody>
+        {% for item in other_domains %}
+        <tr><td class="small"><code>{{ item.referrer_domain }}</code></td><td>{{ item.count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if top_flows %}
+<div class="card mb-4">
+  <div class="card-header">Common user journeys</div>
+  <div class="card-body small text-muted mb-2">Most frequent two-step transitions within a session — shows how users move through the site.</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Step 1</th><th></th><th>Step 2</th><th>Sessions</th></tr></thead>
+      <tbody>
+        {% for flow in top_flows %}
+        <tr>
+          <td class="small">{{ flow.from }}</td>
+          <td class="text-muted small">&rarr;</td>
+          <td class="small">{{ flow.to }}</td>
+          <td>{{ flow.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <script>
 (function () {
-  const labels = [{% for b in weekly_opens %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
-  const data = [{% for b in weekly_opens %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
-  function waitForChart(cb) {
-    if (window.Chart) { cb(); } else { setTimeout(function () { waitForChart(cb); }, 50); }
+  const labels = {{ traffic_chart_labels_json|safe }};
+  const series = {{ traffic_chart_series_json|safe }};
+  const categoryMeta = {
+    "newsletter": {label: "Newsletter", bg: "rgba(13,110,253,0.4)", border: "rgba(13,110,253,0.8)"},
+    "search":     {label: "Search",     bg: "rgba(25,135,84,0.4)",  border: "rgba(25,135,84,0.8)"},
+    "social":     {label: "Social",     bg: "rgba(111,66,193,0.4)", border: "rgba(111,66,193,0.8)"},
+    "direct":     {label: "Direct",     bg: "rgba(255,193,7,0.4)",  border: "rgba(255,193,7,0.8)"},
+    "other":      {label: "Other",      bg: "rgba(108,117,125,0.4)", border: "rgba(108,117,125,0.8)"},
+  };
+  const datasets = Object.keys(series).map(function(cat) {
+    var meta = categoryMeta[cat] || {label: cat, bg: "rgba(0,0,0,0.2)", border: "rgba(0,0,0,0.5)"};
+    return {
+      label: meta.label,
+      data: series[cat],
+      backgroundColor: meta.bg,
+      borderColor: meta.border,
+      borderWidth: 1,
+      borderRadius: 2,
+    };
+  });
+  function waitForChart(cb, retries) {
+    if (typeof retries === "undefined") retries = 100;
+    if (window.Chart) { cb(); }
+    else if (retries > 0) { setTimeout(function () { waitForChart(cb, retries - 1); }, 50); }
+    else { console.warn("Chart.js did not load within 5 seconds"); }
   }
   waitForChart(function () {
     const ctx = document.getElementById("traffic-trend-chart");
     if (!ctx) return;
     new window.Chart(ctx, {
       type: "bar",
-      data: {
-        labels: labels,
-        datasets: [{
-          label: "Review opens",
-          data: data,
-          backgroundColor: "rgba(var(--bs-primary-rgb), 0.2)",
-          borderColor: "rgba(var(--bs-primary-rgb), 0.7)",
-          borderWidth: 1,
-          borderRadius: 2,
-        }],
-      },
+      data: { labels: labels, datasets: datasets },
       options: {
         responsive: true,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: true, position: "bottom", labels: { boxWidth: 12, padding: 15 } },
+        },
         scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, ticks: { precision: 0 } },
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
         },
       },
     });

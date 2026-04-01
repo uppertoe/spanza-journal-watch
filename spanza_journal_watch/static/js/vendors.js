@@ -4,6 +4,7 @@ import Dropdown from 'bootstrap/js/dist/dropdown';
 import Modal from 'bootstrap/js/dist/modal';
 import Offcanvas from 'bootstrap/js/dist/offcanvas';
 import Popover from 'bootstrap/js/dist/popover';
+import Tab from 'bootstrap/js/dist/tab';
 import 'htmx.org';
 
 window.bootstrap = {
@@ -12,4 +13,5 @@ window.bootstrap = {
   Modal,
   Offcanvas,
   Popover,
+  Tab,
 };

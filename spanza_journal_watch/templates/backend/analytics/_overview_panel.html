@@ -5,48 +5,61 @@
   </div>
 </div>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-4 col-xl-2">
+<div class="row g-3 mb-2">
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Review opens</h6>
       <p class="display-6 mb-0">{{ total_opens }}</p>
+      {% if delta_opens is not None %}<p class="small mb-0 {% if delta_opens >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_opens > 0 %}+{% endif %}{{ delta_opens }}%</p>{% endif %}
     </div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100 border-primary-subtle"><div class="card-body">
       <h6 class="text-muted mb-1 small">Engaged views</h6>
       <p class="display-6 mb-0">{{ total_engaged }}</p>
       <p class="small text-muted mb-0">{{ engaged_rate }} of opens</p>
+      {% if delta_engaged is not None %}<p class="small mb-0 {% if delta_engaged >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_engaged > 0 %}+{% endif %}{{ delta_engaged }}%</p>{% endif %}
     </div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100 border-success-subtle"><div class="card-body">
       <h6 class="text-muted mb-1 small">Avg dwell</h6>
       <p class="display-6 mb-0">{{ average_dwell_seconds }}s</p>
+      {% if delta_dwell is not None %}<p class="small mb-0 {% if delta_dwell >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_dwell > 0 %}+{% endif %}{{ delta_dwell }}%</p>{% endif %}
     </div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Full text CTR</h6>
       <p class="display-6 mb-0">{{ full_text_ctr }}</p>
       <p class="small text-muted mb-0">{{ total_full_text }} clicks</p>
+      {% if delta_full_text is not None %}<p class="small mb-0 {% if delta_full_text >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_full_text > 0 %}+{% endif %}{{ delta_full_text }}%</p>{% endif %}
     </div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Shares</h6>
       <p class="display-6 mb-0">{{ total_shares }}</p>
       <p class="small text-muted mb-0">{{ share_rate }} of opens</p>
+      {% if delta_shares is not None %}<p class="small mb-0 {% if delta_shares >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_shares > 0 %}+{% endif %}{{ delta_shares }}%</p>{% endif %}
     </div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Searches</h6>
       <p class="display-6 mb-0">{{ search_count }}</p>
+      {% if delta_searches is not None %}<p class="small mb-0 {% if delta_searches >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_searches > 0 %}+{% endif %}{{ delta_searches }}%</p>{% endif %}
     </div></div>
   </div>
-
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Avg scroll depth</h6>
+      <p class="display-6 mb-0">{% if avg_scroll_depth is not None %}{{ avg_scroll_depth }}%{% else %}&mdash;{% endif %}</p>
+      {% if delta_scroll is not None %}<p class="small mb-0 {% if delta_scroll >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_scroll > 0 %}+{% endif %}{{ delta_scroll }}%</p>{% endif %}
+    </div></div>
+  </div>
 </div>
+<p class="text-muted mb-4" style="font-size:0.7rem">{{ comparison_label }}</p>
 
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -109,9 +122,30 @@
   const sendDates = [{% for s in newsletter_sends %}"{{ s.date }}"{% if not forloop.last %},{% endif %}{% endfor %}];
   const weekStarts = [{% for b in weekly_trend %}"{{ b.week_start }}"{% if not forloop.last %},{% endif %}{% endfor %}];
 
-  function waitForChart(cb) {
-    if (window.Chart) { cb(); } else { setTimeout(function () { waitForChart(cb); }, 50); }
+  function waitForChart(cb, retries) {
+    if (typeof retries === "undefined") retries = 100;
+    if (window.Chart) { cb(); }
+    else if (retries > 0) { setTimeout(function () { waitForChart(cb, retries - 1); }, 50); }
+    else { console.warn("Chart.js did not load within 5 seconds"); }
   }
+
+  // Build annotation lines for newsletter send dates
+  var annotations = {};
+  sendDates.forEach(function(d, i) {
+    var barIdx = weekStarts.findIndex(function(ws, j) {
+      return d >= ws && (weekStarts[j + 1] === undefined || d < weekStarts[j + 1]);
+    });
+    if (barIdx >= 0) {
+      annotations["send" + i] = {
+        type: "line",
+        xMin: barIdx,
+        xMax: barIdx,
+        borderColor: "rgba(220, 53, 69, 0.45)",
+        borderWidth: 1,
+        borderDash: [4, 4],
+      };
+    }
+  });
 
   waitForChart(function () {
     const ctx = document.getElementById("weekly-trend-chart");
@@ -133,6 +167,7 @@
         responsive: true,
         plugins: {
           legend: { display: false },
+          annotation: { annotations: annotations },
           tooltip: {
             callbacks: {
               afterLabel: function(ctx) {

@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-start mb-4">
   <div>
     <h1 class="h3 mb-1">Email &amp; Newsletters</h1>
-    <p class="text-muted mb-0 small">All sent newsletters</p>
+    <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}</p>
   </div>
   <div class="text-end small text-muted">
     <div>{{ total_subscribers }} active subscribers</div>
@@ -9,7 +9,34 @@
   </div>
 </div>
 
-<div class="card">
+{% if segment_counts %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card h-100 border-success-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Highly engaged</h6>
+      <p class="display-6 mb-0">{{ segment_counts.highly_engaged }}</p>
+      <p class="small text-muted mb-0">Opens 70%+, clicks 30%+</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Occasional</h6>
+      <p class="display-6 mb-0">{{ segment_counts.occasional }}</p>
+      <p class="small text-muted mb-0">Opens 30%+ or any clicks</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card h-100 border-warning-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Dormant</h6>
+      <p class="display-6 mb-0">{{ segment_counts.dormant }}</p>
+      <p class="small text-muted mb-0">Rarely open, no clicks</p>
+    </div></div>
+  </div>
+</div>
+<p class="text-muted small mb-4">Segments based on the last {{ segment_newsletter_count }} newsletter{{ segment_newsletter_count|pluralize }}. "Highly engaged" subscribers are your core audience.</p>
+{% endif %}
+
+<div class="card mb-4">
   <div class="card-header">Newsletter performance</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
@@ -41,10 +68,35 @@
             <a href="{{ row.newsletter.get_stats_absolute_url }}" class="btn btn-sm btn-outline-secondary">Full stats</a>
           </td>
         </tr>
+        {% if row.link_clicks %}
+        <tr>
+          <td colspan="9" class="p-0">
+            <div class="px-3 py-2 bg-body-tertiary">
+              <div class="small fw-semibold text-muted mb-1">Most clicked links</div>
+              <table class="table table-sm table-borderless mb-0" style="font-size:0.8rem">
+                <thead><tr><th>URL</th><th>Clicks</th><th>Unique</th></tr></thead>
+                <tbody>
+                  {% for link in row.link_clicks %}
+                  <tr>
+                    <td class="text-break"><code>{{ link.destination_url|truncatechars:60 }}</code></td>
+                    <td>{{ link.clicks }}</td>
+                    <td>{{ link.unique_subscribers }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
         {% empty %}
         <tr><td colspan="9" class="text-muted small p-3">No newsletters sent yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="alert alert-info small mb-0">
+  <strong>Note on open rates:</strong> Apple Mail Privacy Protection pre-fetches tracking pixels through proxy servers, which can inflate open counts. The bot filter catches many automated opens, but Apple's proxy uses standard user agents. Treat open rates as directional rather than exact. Click-through rates are more reliable.
 </div>
