@@ -31,6 +31,13 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-header">Review opens — last 26 weeks</div>
+  <div class="card-body">
+    <canvas id="traffic-trend-chart" height="80"></canvas>
+  </div>
+</div>
+
 <div class="row g-4 mb-4">
   <div class="col-12 col-xl-7">
     <div class="card h-100">
@@ -74,6 +81,42 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  const labels = [{% for b in weekly_opens %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  const data = [{% for b in weekly_opens %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  function waitForChart(cb) {
+    if (window.Chart) { cb(); } else { setTimeout(function () { waitForChart(cb); }, 50); }
+  }
+  waitForChart(function () {
+    const ctx = document.getElementById("traffic-trend-chart");
+    if (!ctx) return;
+    new window.Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Review opens",
+          data: data,
+          backgroundColor: "rgba(var(--bs-primary-rgb), 0.2)",
+          borderColor: "rgba(var(--bs-primary-rgb), 0.7)",
+          borderWidth: 1,
+          borderRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+        },
+      },
+    });
+  });
+})();
+</script>
 
 <div class="alert alert-info small mb-0">
   <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means the visitor's ID appeared before the selected date range.

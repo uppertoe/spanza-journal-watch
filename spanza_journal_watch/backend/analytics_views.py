@@ -394,6 +394,13 @@ def analytics_traffic(request):
 
     journal_visits = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT).count()
 
+    weekly_opens = _weekly_buckets(
+        AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            automated=False,
+        )
+    )
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -404,6 +411,7 @@ def analytics_traffic(request):
         "returning_rate": _safe_percentage(returning_count, len(visitor_ids_in_period)),
         "page_breakdown": page_breakdown,
         "journal_visits": journal_visits,
+        "weekly_opens": weekly_opens,
         "active_tab": "traffic",
     }
     return _render_analytics(

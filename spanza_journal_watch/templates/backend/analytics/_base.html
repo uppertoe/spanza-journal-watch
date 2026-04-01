@@ -16,30 +16,30 @@
         {% url 'backend:analytics_search' as url_search %}
         {% url 'backend:analytics_journals' as url_journals %}
         {% with qs=request.GET.urlencode %}
-        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'overview' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'overview' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_overview }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_overview }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Overview</a>
-        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'content' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'content' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Content</a>
-        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'traffic' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'traffic' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Traffic</a>
         {% if perms.backend.view_newsletter_stats %}
         {% url 'backend:analytics_email' as url_email %}
-        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'email' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'email' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Email</a>
         {% endif %}
-        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'search' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'search' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Search</a>
-        <a class="nav-link rounded px-2 py-1 small{% if active_tab == 'journals' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'journals' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Journals</a>
@@ -66,3 +66,21 @@
   </div>
 </div>
 {% endblock content %}
+{% block inline_javascript %}
+{{ block.super }}
+<script>
+(function () {
+  function updateAnalyticsNav() {
+    var path = window.location.pathname.replace(/\/$/, "");
+    document.querySelectorAll(".analytics-sidebar-link").forEach(function (el) {
+      var href = el.getAttribute("href").split("?")[0].replace(/\/$/, "");
+      var isActive = path === href;
+      el.classList.toggle("bg-primary-subtle", isActive);
+      el.classList.toggle("text-primary", isActive);
+      el.classList.toggle("fw-semibold", isActive);
+    });
+  }
+  document.addEventListener("htmx:afterSettle", updateAnalyticsNav);
+})();
+</script>
+{% endblock inline_javascript %}
