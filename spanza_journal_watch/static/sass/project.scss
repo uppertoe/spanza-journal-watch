@@ -2620,7 +2620,7 @@ body.jw-modal-open {
 
 /* ── Truncated expandable abstract ───────────────────── */
 
-.jw-abstract-clamp__text {
+.jw-abstract-clamp__preview {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -2629,13 +2629,30 @@ body.jw-modal-open {
   color: var(--bs-secondary-color);
 }
 
+.jw-abstract-clamp__full {
+  display: none;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+
+  p {
+    margin-bottom: 0.5em;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
 .jw-abstract-clamp__less {
   display: none;
 }
 
-.jw-abstract-clamp--expanded .jw-abstract-clamp__text {
-  -webkit-line-clamp: unset;
-  overflow: visible;
+.jw-abstract-clamp--expanded .jw-abstract-clamp__preview {
+  display: none;
+}
+
+.jw-abstract-clamp--expanded .jw-abstract-clamp__full {
+  display: block;
 }
 
 .jw-abstract-clamp--expanded .jw-abstract-clamp__more {

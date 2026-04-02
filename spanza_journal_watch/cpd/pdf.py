@@ -30,8 +30,21 @@ def _fmt_date(d: date) -> str:
 
 
 def _escape_md(text: str) -> str:
-    """Escape fpdf2 markdown markers in user-supplied text."""
-    return text.replace("**", "").replace("__", "")
+    """Escape fpdf2 markdown markers and replace non-latin-1 chars."""
+    text = text.replace("**", "").replace("__", "")
+    # Replace smart quotes and other common Unicode with latin-1 equivalents
+    text = (
+        text.replace("\u2018", "'")
+        .replace("\u2019", "'")
+        .replace("\u201c", '"')
+        .replace("\u201d", '"')
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+        .replace("\u2026", "...")
+        .replace("\u00b7", ".")
+    )
+    # Strip any remaining non-latin-1 characters
+    return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
 def format_vancouver_authors(authors: list[dict], max_authors: int = 6) -> str:
@@ -47,8 +60,8 @@ def format_vancouver_authors(authors: list[dict], max_authors: int = 6) -> str:
     return ", ".join(parts)
 
 
-def format_vancouver_citation(article) -> tuple[str, str]:
-    """Return (title, rest_of_citation) for separate styling."""
+def format_vancouver_citation(article) -> str:
+    """Return full Vancouver-style citation with bold title (fpdf2 markdown)."""
     meta = article.metadata_json or {}
     authors = meta.get("authors") or []
     author_str = format_vancouver_authors(authors)
@@ -63,9 +76,10 @@ def format_vancouver_citation(article) -> tuple[str, str]:
     if article.publication_date:
         year = str(article.publication_date.year)
 
-    rest_parts = []
+    parts = []
     if author_str:
-        rest_parts.append(f"{_escape_md(author_str)}.")
+        parts.append(f"{_escape_md(author_str)}.")
+    parts.append(f"**{title}.**")
     if iso_abbrev:
         journal_part = _escape_md(iso_abbrev)
         if year:
@@ -76,15 +90,15 @@ def format_vancouver_citation(article) -> tuple[str, str]:
             journal_part += f"({issue})"
         if pages:
             journal_part += f":{pages}"
-        rest_parts.append(f"{journal_part}.")
+        parts.append(f"{journal_part}.")
 
     if article.doi:
-        rest_parts.append(f"doi: {article.doi}")
+        parts.append(f"doi: {article.doi}")
     pmid = getattr(article, "pmid", "") or ""
     if pmid:
-        rest_parts.append(f"PMID: {pmid}")
+        parts.append(f"PMID: {pmid}")
 
-    return title, " ".join(rest_parts)
+    return " ".join(parts)
 
 
 def generate_cpd_pdf(
@@ -198,16 +212,11 @@ def generate_cpd_pdf(
     else:
         num_w = 8
         for i, article in enumerate(articles, 1):
-            title, rest = format_vancouver_citation(article)
+            citation_md = format_vancouver_citation(article)
             y_start = pdf.get_y()
 
             # Light alternating row background
-            if i % 2 == 0:
-                pdf.set_fill_color(245, 247, 250)
-                # We'll draw the background after measuring height
-                bg = True
-            else:
-                bg = False
+            bg = i % 2 == 0
 
             # Number
             pdf.set_font("Helvetica", "", 8)
@@ -215,8 +224,7 @@ def generate_cpd_pdf(
             x_left = pdf.get_x()
             pdf.cell(num_w, 4.5, f"{i}.", new_x="RIGHT")
 
-            # Title (bold) + rest of citation
-            citation_md = f"**{title}.** {rest}"
+            # Full Vancouver citation with bold title
             pdf.set_font("Helvetica", "", 8.5)
             pdf.set_text_color(*BODY_TEXT)
             pdf.multi_cell(page_w - num_w, 4.5, citation_md, markdown=True)

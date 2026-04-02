@@ -1,3 +1,4 @@
+{% load format_abstract %}
 {# OOB swap for month nav — only on HTMX requests to avoid doubling on initial load #}
 {% if is_htmx %}
   {% include "submissions/fragments/journal_month_nav.html" with hx_swap_oob="true" %}
@@ -45,7 +46,8 @@
               </p>
               {% if row.article.abstract %}
                 <div class="jw-abstract-clamp mb-3" tabindex="0">
-                  <p class="jw-abstract-clamp__text journal-article-card__abstract mb-0">{{ row.article.abstract }}</p>
+                  <p class="jw-abstract-clamp__preview journal-article-card__abstract mb-0">{{ row.article.abstract|strip_abstract_labels }}</p>
+                  <div class="jw-abstract-clamp__full journal-article-card__abstract mb-0">{{ row.article.abstract|format_abstract }}</div>
                   <button type="button" class="jw-abstract-clamp__toggle btn btn-sm btn-link text-decoration-none p-0">
                     <span class="jw-abstract-clamp__more">More</span>
                     <span class="jw-abstract-clamp__less">Less</span>

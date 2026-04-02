@@ -98,7 +98,12 @@ from .pubmed_cache import (
 from .pubmed_cache import (
     shift_month as _shift_month,
 )
-from .tasks import process_subscriber_csv, run_pubmed_batch_import_task, run_pubmed_batch_push_task
+from .tasks import (
+    process_subscriber_csv,
+    refresh_pubmed_journal_cache_task,
+    run_pubmed_batch_import_task,
+    run_pubmed_batch_push_task,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1931,6 +1936,34 @@ def article_intake_refresh_batch(request, batch_id):
         messages.success(request, f"Batch rebuilt from cache. {batch.result_count} article(s) now in this batch.")
     except PubmedAPIError as error:
         messages.error(request, f"Could not rebuild batch from cache: {_safe_planka_error(error)}")
+
+    if request.headers.get("HX-Request") == "true":
+        return _render_article_intake_results_response(request, batch, request.POST)
+
+    return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def article_intake_refresh_cache(request, batch_id):
+    """Trigger a PubMed API cache refresh for the batch's journals and date range."""
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
+
+    from_month = batch.from_month.isoformat() if batch.from_month else None
+    to_month = batch.to_month.isoformat() if batch.to_month else None
+
+    if not from_month or not to_month:
+        messages.error(request, "Batch has no date range set.")
+    else:
+        refresh_pubmed_journal_cache_task.delay(from_month=from_month, to_month=to_month)
+        messages.success(
+            request,
+            f"PubMed cache refresh queued for {batch.from_month:%b %Y} - {batch.to_month:%b %Y}. "
+            "Use 'Rebuild current batch from cache' once complete to load new articles.",
+        )
 
     if request.headers.get("HX-Request") == "true":
         return _render_article_intake_results_response(request, batch, request.POST)

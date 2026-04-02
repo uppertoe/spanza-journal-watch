@@ -120,7 +120,11 @@
         <form method="post" action="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
           {% csrf_token %}
           <input type="hidden" name="async" value="1">
-          <button type="submit" class="btn btn-outline-secondary">Rebuild current batch from cache</button>
+          <button type="submit" class="btn btn-outline-secondary" title="Reload batch articles from the local cache (no API call)">Rebuild batch from cache</button>
+        </form>
+        <form method="post" action="{% url "backend:article_intake_refresh_cache" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_cache" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-primary" title="Fetch new articles from PubMed API for this date range, then rebuild from cache">Fetch from PubMed</button>
         </form>
       </div>
 

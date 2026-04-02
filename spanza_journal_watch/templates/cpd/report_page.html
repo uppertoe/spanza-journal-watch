@@ -58,7 +58,13 @@
         <div class="col-sm-4">
           <p class="mb-1 text-muted small">Articles in range</p>
           <p class="fw-bold mb-2" id="cpd-article-count">{{ article_count }}</p>
-          <button type="submit" class="btn btn-primary btn-sm w-100">Generate PDF</button>
+          <button type="submit" class="btn btn-primary btn-sm w-100" id="cpd-generate-btn">
+            <span class="cpd-generate-label">Generate PDF</span>
+            <span class="cpd-generate-spinner d-none">
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              Generating...
+            </span>
+          </button>
         </div>
       </div>
     </form>
@@ -75,6 +81,23 @@
 
 <script>
 (function () {
+  var btn = document.getElementById('cpd-generate-btn');
+  if (btn) {
+    var form = btn.closest('form');
+    if (form) {
+      form.addEventListener('htmx:beforeRequest', function () {
+        btn.disabled = true;
+        btn.querySelector('.cpd-generate-label').classList.add('d-none');
+        btn.querySelector('.cpd-generate-spinner').classList.remove('d-none');
+      });
+      form.addEventListener('htmx:afterRequest', function () {
+        btn.disabled = false;
+        btn.querySelector('.cpd-generate-label').classList.remove('d-none');
+        btn.querySelector('.cpd-generate-spinner').classList.add('d-none');
+      });
+    }
+  }
+
   var listEl = document.getElementById('cpd-report-list');
   var pollUrl = '{% url "cpd:report_status" %}';
   var timer = null;

@@ -50,6 +50,11 @@ urlpatterns = [
         name="article_intake_refresh_batch",
     ),
     path(
+        "articles/intake/<int:batch_id>/refresh-cache",
+        views.article_intake_refresh_cache,
+        name="article_intake_refresh_cache",
+    ),
+    path(
         "articles/intake/<int:batch_id>/push-to-planka",
         views.article_intake_push_to_planka,
         name="article_intake_push_to_planka",

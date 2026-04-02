@@ -1,3 +1,4 @@
+{% load format_abstract %}
 <article class="card shadow-sm border-0 journal-reading-list__card" id="reading-list-card-{{ item.article.pk }}">
   <div class="card-body p-4">
     <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
@@ -27,7 +28,8 @@
     {# Truncated expandable abstract #}
     {% if item.article.abstract %}
       <div class="jw-abstract-clamp mb-3" tabindex="0">
-        <p class="jw-abstract-clamp__text journal-article-card__abstract mb-0">{{ item.article.abstract }}</p>
+        <p class="jw-abstract-clamp__preview journal-article-card__abstract mb-0">{{ item.article.abstract|strip_abstract_labels }}</p>
+        <div class="jw-abstract-clamp__full journal-article-card__abstract mb-0">{{ item.article.abstract|format_abstract }}</div>
         <button type="button" class="jw-abstract-clamp__toggle btn btn-sm btn-link text-decoration-none p-0">
           <span class="jw-abstract-clamp__more">More</span>
           <span class="jw-abstract-clamp__less">Less</span>
