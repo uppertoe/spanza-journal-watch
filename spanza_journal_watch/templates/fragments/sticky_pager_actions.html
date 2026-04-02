@@ -7,7 +7,7 @@
       <button type="button" class="btn btn-secondary" data-review-modal-close data-current-modal-id="{{ modal_id }}">Close</button>
     {% elif is_issue_review_navigation %}
       <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="prev">Previous</button>
-      <a class="btn btn-primary" href="#top" data-issue-review-top>Back to top</a>
+      <span class="badge text-bg-secondary" data-issue-review-position>Review</span>
       <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="next">Next</button>
     {% else %}
       {% if page_obj.has_previous %}

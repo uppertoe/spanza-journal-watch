@@ -150,6 +150,7 @@ let cachedIssueReviewArticles = [];
 let cachedIssuePrevButtons = [];
 let cachedIssueNextButtons = [];
 let cachedIssueContentsLinks = [];
+let cachedIssuePositionBadges = [];
 let activeIssueReviewIndex = -1;
 let issueReviewObserver = null;
 const getSharedReviewModalTriggers = (modalId) =>
@@ -849,6 +850,9 @@ const refreshIssueReviewNavigatorCache = () => {
   cachedIssueContentsLinks = Array.from(
     document.querySelectorAll('#list-reviews a[href^="#list-item-"]'),
   );
+  cachedIssuePositionBadges = Array.from(
+    document.querySelectorAll('[data-issue-review-position]'),
+  );
 };
 
 const getIssueReviewArticles = () => cachedIssueReviewArticles;
@@ -893,6 +897,12 @@ const updateIssueReviewNavigator = (index = activeIssueReviewIndex) => {
     if (button.dataset.targetIndex !== targetIndex) {
       button.dataset.targetIndex = targetIndex;
     }
+  });
+
+  var total = reviews.length;
+  var label = String(index + 1) + ' / ' + String(total);
+  cachedIssuePositionBadges.forEach(function (badge) {
+    badge.textContent = label;
   });
 
   updateContentsListActiveState(index);
@@ -1524,23 +1534,39 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   const threshold = 300;
   let visible = false;
 
+  let modalOpen = false;
+
+  function updateVisibility() {
+    var show = visible && !modalOpen;
+    if (fab) fab.classList.toggle('back-to-top-fab--visible', show);
+    if (mobileBtn)
+      mobileBtn.style.setProperty(
+        'display',
+        show ? 'flex' : 'none',
+        'important',
+      );
+  }
+
   window.addEventListener(
     'scroll',
     () => {
       const shouldShow = window.scrollY > threshold;
       if (shouldShow !== visible) {
         visible = shouldShow;
-        if (fab) fab.classList.toggle('back-to-top-fab--visible', visible);
-        if (mobileBtn)
-          mobileBtn.style.setProperty(
-            'display',
-            visible ? 'flex' : 'none',
-            'important',
-          );
+        updateVisibility();
       }
     },
     { passive: true },
   );
+
+  document.addEventListener('show.bs.modal', function () {
+    modalOpen = true;
+    updateVisibility();
+  });
+  document.addEventListener('hidden.bs.modal', function () {
+    modalOpen = false;
+    updateVisibility();
+  });
 
   allBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
