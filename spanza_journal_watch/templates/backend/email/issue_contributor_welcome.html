@@ -1,46 +1,50 @@
 {% load mjml %}
 {% mjml %}
 <mjml>
-  <mj-body background-color="#f6f7fb">
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
+      <mj-text line-height="1.6" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f2f4f7">
 
-    <mj-section padding-bottom="0">
+    <mj-section padding="28px 0 0">
       <mj-column>
-        <mj-text font-size="12px" color="#888888" align="center" letter-spacing="0.08em" font-weight="600">
-          JOURNAL WATCH
+        <mj-text align="center" font-size="11px" color="#8a96a2" letter-spacing="0.14em" font-weight="700" text-transform="uppercase">
+          SPANZA Journal Watch
         </mj-text>
       </mj-column>
     </mj-section>
 
-    <mj-section background-color="#ffffff" border-radius="8px" padding="32px 24px">
+    <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
       <mj-column>
-        <mj-text font-size="22px" font-weight="700" color="#152b3b" padding-bottom="8px">
+        <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
           Your access is now active
         </mj-text>
-        <mj-text font-size="15px" color="#444444" line-height="1.6" padding-bottom="20px">
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="24px">
           {% if contributor.name %}Hello {{ contributor.name }},<br><br>{% endif %}
-          Thank you for agreeing to contribute to <strong>{{ issue.name }}</strong>.
-          Your account is set up and you now have access to the review board.
+          Thank you for agreeing to contribute to <strong>{{ issue.name }}</strong>. Your account is set up and you now have access to the review board.
         </mj-text>
         {% if planka_url %}
-        <mj-button href="{{ planka_url }}" background-color="#0d6efd" border-radius="6px" font-size="15px" padding="12px 24px">
+        <mj-button href="{{ planka_url }}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
           Open review board
         </mj-button>
         {% endif %}
         {% if docs_url %}
         <mj-text font-size="14px" color="#444444" padding-top="20px" line-height="1.6">
-          Not sure where to start? The <a href="{{ docs_url }}user-guide/reviewer.html" style="color:#0d6efd;">reviewer guide</a>
-          explains how to claim a card, write your review, and submit it when you're done.
+          Not sure where to start? The <a href="{{ docs_url }}user-guide/reviewer.html" style="color:#2f5a80;">reviewer guide</a> explains how to claim a card, write your review, and submit it when you're done.
         </mj-text>
         {% endif %}
-        <mj-text font-size="13px" color="#888888" padding-top="16px">
+        <mj-text font-size="13px" color="#8a96a2" padding-top="16px">
           If you have any questions, reply to this email or contact your issue coordinator.
         </mj-text>
       </mj-column>
     </mj-section>
 
-    <mj-section padding-top="16px">
+    <mj-section padding="20px 20px 28px">
       <mj-column>
-        <mj-text font-size="12px" color="#aaaaaa" align="center">
+        <mj-text align="center" font-size="12px" color="#8a96a2">
           SPANZA Journal Watch &mdash; paediatric anaesthesia literature review
         </mj-text>
       </mj-column>

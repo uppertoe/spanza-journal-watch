@@ -196,9 +196,22 @@
     <!-- /container -->
 
     <div class="container">
-      <header class="border-bottom lh-1 py-3">
-        <div class="row align-items-center">
-          <div class="col-sm-4 d-flex order-3 order-sm-3 justify-content-center justify-content-sm-end align-items-center gap-2">
+      <header class="jw-masthead border-bottom lh-1 py-3">
+        <div class="d-flex align-items-center justify-content-between gap-3">
+          <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer" class="jw-masthead__logo flex-shrink-0">
+            <img
+              src="{% static "images/logo/spanza-logo-blue.png" %}"
+              alt="SPANZA Logo"
+              class="site-brand-mark"
+              width="120"
+              height="74"
+              decoding="async"
+            >
+          </a>
+          <div class="text-center flex-grow-1">
+            <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text">Journal Watch</span></a>
+          </div>
+          <div class="flex-shrink-0">
             <button class="jw-profile-btn" type="button"
                     data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
                     aria-controls="user-profile-drawer" aria-label="User menu">
@@ -208,21 +221,6 @@
               <span class="jw-profile-btn__label d-none d-md-inline small fw-semibold">Profile</span>
               <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
             </button>
-          </div>
-          <div class="col-sm-4 order-2 order-sm-2 pb-2 pb-sm-0 d-flex justify-content-center">
-            <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text">Journal Watch</span></a>
-          </div>
-          <div class="col-sm-4 d-flex order-1 order-sm-1 justify-content-center justify-content-sm-start align-items-center">
-            <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer" class="d-inline-block py-3">
-              <img
-                src="{% static "images/logo/spanza-logo-blue.png" %}"
-                alt="SPANZA Logo"
-                class="site-brand-mark"
-                width="200"
-                height="124"
-                decoding="async"
-              >
-            </a>
           </div>
         </div>
       </header>

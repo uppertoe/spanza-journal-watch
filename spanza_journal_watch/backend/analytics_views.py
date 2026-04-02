@@ -797,26 +797,133 @@ def analytics_search(request):
 @login_required
 @permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
 def analytics_journals(request):
+    from spanza_journal_watch.backend.models import PubmedArticleUserState, WatchedJournal
+    from spanza_journal_watch.cpd.models import CPDReport
+
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
 
     human_events = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
 
+    # ── Headline metrics ────────────────────────────────────────────
+    journal_events = human_events.filter(
+        event_type__in=[
+            AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT,
+            AnalyticsEvent.EventType.JOURNAL_ARTICLE_INTERACT,
+            AnalyticsEvent.EventType.JOURNAL_FULL_TEXT_CLICK,
+            AnalyticsEvent.EventType.JOURNAL_STAR,
+            AnalyticsEvent.EventType.JOURNAL_SELECT,
+        ]
+    )
     total_visits = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT).count()
+    unique_visitors = journal_events.exclude(visitor_id=None).values("visitor_id").distinct().count()
+    returning_visitors = (
+        journal_events.exclude(visitor_id=None)
+        .values("visitor_id")
+        .annotate(visit_count=Count("id"))
+        .filter(visit_count__gte=2)
+        .count()
+    )
+    returning_rate = _safe_percentage(returning_visitors, unique_visitors) if unique_visitors else "–"
 
-    article_interactions = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_ARTICLE_INTERACT)
-    total_interactions = article_interactions.count()
+    # ── User actions (from PubmedArticleUserState, within date range) ─
+    states_in_range = PubmedArticleUserState.objects.all()
+    total_stars = states_in_range.filter(starred_at__gte=start_ts, starred_at__lte=end_ts).count()
+    total_archives = states_in_range.filter(read_at__gte=start_ts, read_at__lte=end_ts).count()
+    total_recommends = states_in_range.filter(recommended_at__gte=start_ts, recommended_at__lte=end_ts).count()
+    total_full_text = states_in_range.filter(
+        full_text_clicked_at__gte=start_ts, full_text_clicked_at__lte=end_ts
+    ).count()
 
-    action_counter = Counter()
-    for meta in article_interactions.values_list("metadata", flat=True):
-        action = (meta or {}).get("action", "unknown")
-        action_counter[action] += 1
+    # ── CPD reports ─────────────────────────────────────────────────
+    cpd_reports = CPDReport.objects.filter(created__gte=start_ts, created__lte=end_ts)
+    cpd_generated = cpd_reports.count()
+    cpd_users = cpd_reports.values("user").distinct().count()
+
+    # ── Engagement funnel ───────────────────────────────────────────
+    # visits → stars → archives → full text → recommends
+    funnel = [
+        {"label": "Browser visits", "count": total_visits, "color": "secondary"},
+        {"label": "Articles starred", "count": total_stars, "color": "warning"},
+        {"label": "Articles archived", "count": total_archives, "color": "secondary"},
+        {"label": "Full text clicked", "count": total_full_text, "color": "success"},
+        {"label": "Recommended for review", "count": total_recommends, "color": "primary"},
+    ]
+    funnel_max = max((f["count"] for f in funnel), default=1) or 1
+
+    # ── Top journals by engagement ──────────────────────────────────
+    journal_select_events = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_SELECT)
+    journal_counter = Counter()
+    journal_id_map = {}
+    for meta in journal_select_events.values_list("metadata", flat=True):
+        jid = (meta or {}).get("journal_id")
+        jname = (meta or {}).get("journal_name", "")
+        if jid:
+            journal_counter[jid] += 1
+            if jname:
+                journal_id_map[jid] = jname
+
+    # Enrich with WatchedJournal names for IDs we haven't seen names for
+    missing_ids = [jid for jid in journal_counter if jid not in journal_id_map]
+    if missing_ids:
+        for wj in WatchedJournal.objects.filter(pk__in=missing_ids).values("pk", "name"):
+            journal_id_map[wj["pk"]] = wj["name"]
+
+    top_journals = [
+        {"name": journal_id_map.get(jid, f"Journal {jid}"), "views": count}
+        for jid, count in journal_counter.most_common(10)
+    ]
+
+    # ── Active reading list users ───────────────────────────────────
+    active_users_qs = (
+        states_in_range.filter(starred_at__gte=start_ts, starred_at__lte=end_ts)
+        .values("user__email", "user__name")
+        .annotate(
+            star_count=Count("id", filter=Q(starred_at__gte=start_ts, starred_at__lte=end_ts)),
+            archive_count=Count("id", filter=Q(read_at__gte=start_ts, read_at__lte=end_ts)),
+            recommend_count=Count("id", filter=Q(recommended_at__gte=start_ts, recommended_at__lte=end_ts)),
+        )
+        .order_by("-star_count")[:10]
+    )
+    active_users = list(active_users_qs)
+
+    # ── Weekly trend ────────────────────────────────────────────────
+    visit_events = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT)
+    star_events = human_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_STAR)
+    visit_buckets = _weekly_buckets(visit_events)
+    star_buckets = _weekly_buckets(star_events)
+    trend_labels = json.dumps([b["label"] for b in visit_buckets])
+    trend_visits = json.dumps([b["count"] for b in visit_buckets])
+    trend_stars = json.dumps([b["count"] for b in star_buckets])
+
+    # ── Cumulative reading list stats (all-time) ────────────────────
+    total_reading_list_users = states_in_range.filter(starred_at__isnull=False).values("user").distinct().count()
+    total_items_starred_alltime = states_in_range.filter(starred_at__isnull=False).count()
+    avg_items_per_user = (
+        round(total_items_starred_alltime / total_reading_list_users, 1) if total_reading_list_users else 0
+    )
 
     context = {
         "start_date": start_date,
         "end_date": end_date,
         "total_visits": total_visits,
-        "total_interactions": total_interactions,
-        "interaction_breakdown": [{"label": label, "count": count} for label, count in action_counter.most_common()],
+        "unique_visitors": unique_visitors,
+        "returning_visitors": returning_visitors,
+        "returning_rate": returning_rate,
+        "total_stars": total_stars,
+        "total_archives": total_archives,
+        "total_recommends": total_recommends,
+        "total_full_text": total_full_text,
+        "cpd_generated": cpd_generated,
+        "cpd_users": cpd_users,
+        "funnel": funnel,
+        "funnel_max": funnel_max,
+        "top_journals": top_journals,
+        "active_users": active_users,
+        "trend_labels": trend_labels,
+        "trend_visits": trend_visits,
+        "trend_stars": trend_stars,
+        "total_reading_list_users": total_reading_list_users,
+        "avg_items_per_user": avg_items_per_user,
         "active_tab": "journals",
     }
     return _render_analytics(

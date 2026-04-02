@@ -1159,6 +1159,8 @@ def journal_article_toggle_star(request, article_id):
             star_target_id = request.POST.get("star_target_id", "")
             star_count = PubmedArticleUserState.objects.filter(article=article, starred_at__isnull=False).count()
             ctx = {"pubmed_article": article, "star_count": star_count}
+            if request.POST.get("hide_star_count"):
+                ctx["hide_star_count"] = True
             if star_target_id:
                 ctx["star_target_id"] = star_target_id
             if request.user.is_authenticated:

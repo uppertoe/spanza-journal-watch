@@ -1433,25 +1433,40 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     showDots();
   });
 
-  // Update star count badges after HTMX swaps in an actions div with data-star-count
+  // Update star count badges after HTMX swaps
   document.body.addEventListener('htmx:afterSettle', function (e) {
     var target = e.detail.elt || e.target;
-    var actionsDiv =
+    var articleId;
+    var count;
+
+    // Find star count data from swapped content (data-star-count attr or badge)
+    var starSource =
       target.matches && target.matches('[data-star-count]')
         ? target
         : target.querySelector && target.querySelector('[data-star-count]');
-    if (!actionsDiv) return;
+    if (starSource && starSource.dataset.articleId) {
+      articleId = starSource.dataset.articleId;
+      count = Number(starSource.dataset.starCount) || 0;
+    }
+    if (!articleId) {
+      var swappedBadge =
+        target.querySelector && target.querySelector('.jw-star-count-badge');
+      if (swappedBadge && swappedBadge.dataset.articleId) {
+        articleId = swappedBadge.dataset.articleId;
+        var val = swappedBadge.querySelector('.jw-star-count-value');
+        count = val ? Number(val.textContent) || 0 : 0;
+      }
+    }
 
-    var match = (actionsDiv.id || '').match(/journal-article-actions-(\d+)/);
-    if (!match) return;
-    var articleId = match[1];
-    var count = Number(actionsDiv.dataset.starCount) || 0;
+    if (!articleId) return;
 
     document
       .querySelectorAll(
         '.jw-star-count-badge[data-article-id="' + articleId + '"]',
       )
       .forEach(function (badge) {
+        // Skip badges inside the swapped content (already correct)
+        if (target.contains && target.contains(badge)) return;
         var val = badge.querySelector('.jw-star-count-value');
         if (val) val.textContent = count;
         badge.classList.toggle('d-none', count === 0);
@@ -1463,28 +1478,36 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     showDots();
   }
 
-  // Clear dots when reading list is viewed
+  // Clear dots when reading list is viewed (any reading list button)
+  var scrollPending = false;
+
+  function clearDotsOnReadingListClick() {
+    sessionStorage.removeItem(DOT_KEY);
+    hideDots();
+    scrollPending = true;
+  }
+
   var rlBtn = document.getElementById('reading-list-btn');
   if (rlBtn) {
-    var scrollPending = false;
-
-    rlBtn.addEventListener('click', function () {
-      sessionStorage.removeItem(DOT_KEY);
-      hideDots();
-      scrollPending = true;
-    });
-
-    // After HTMX swap, scroll to the reading list area
-    document.body.addEventListener('htmx:afterSettle', function (event) {
-      if (scrollPending && event.target.id === 'journal-browser-results') {
-        scrollPending = false;
-        var target = document.getElementById('journal-browser-results');
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
-    });
+    rlBtn.addEventListener('click', clearDotsOnReadingListClick);
   }
+
+  // Also clear dots when any bottom/desktop nav reading list button is clicked
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-journal-nav="reading_list"]');
+    if (btn) clearDotsOnReadingListClick();
+  });
+
+  // After HTMX swap, scroll to the reading list area
+  document.body.addEventListener('htmx:afterSettle', function (event) {
+    if (scrollPending && event.target.id === 'journal-browser-results') {
+      scrollPending = false;
+      var target = document.getElementById('journal-browser-results');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  });
 })();
 
 /* ── Site-wide back to top ────────────────────────────────── */
