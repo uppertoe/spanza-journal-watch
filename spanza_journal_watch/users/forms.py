@@ -42,11 +42,36 @@ class UserSignupForm(SignupForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["name"] = forms.CharField(label=_("Full name"), required=False, max_length=255)
+        self.fields["subscribe_to_newsletter"] = forms.BooleanField(
+            label=_("Subscribe to the Journal Watch newsletter"),
+            required=False,
+            initial=True,
+        )
 
     def save(self, request):
         user = super().save(request)
         user.name = (self.cleaned_data.get("name") or user.name or "").strip()
         user.save(update_fields=["name"])
+
+        # Optionally subscribe to newsletter
+        if self.cleaned_data.get("subscribe_to_newsletter"):
+            from spanza_journal_watch.newsletter.models import Subscriber
+
+            subscriber, created = Subscriber.objects.get_or_create(
+                email__iexact=user.email,
+                defaults={"email": user.email},
+            )
+            if not created and not subscriber.subscribed:
+                subscriber.subscribed = True
+                subscriber.save(update_fields=["subscribed", "modified"])
+            request.session["subscribed"] = True
+            request.session["subscriber_id"] = subscriber.pk
+
+        # Migrate session-based starred articles to this new user
+        from spanza_journal_watch.users.utils import migrate_session_stars_to_user
+
+        migrate_session_stars_to_user(request.session, user)
+
         return user
 
 

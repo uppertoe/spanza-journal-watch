@@ -47,7 +47,13 @@ urlpatterns = [
     path("reader/action", analytics_views.track_event, name="reader_action"),
     path("analytics/", include("spanza_journal_watch.analytics.urls")),
     path("editorial/", include("spanza_journal_watch.backend.urls")),
+    path("cpd/", include("spanza_journal_watch.cpd.urls")),
     path("invites/issue/<str:token>/", backend_views.issue_invite_accept, name="issue_invite_accept"),
+    path(
+        "invites/chief-editor/<str:token>/",
+        backend_views.chief_editor_invite_accept,
+        name="chief_editor_invite_accept",
+    ),
     # OAuth2 / OIDC provider (Django acts as IdP for Planka)
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     # Third party urls

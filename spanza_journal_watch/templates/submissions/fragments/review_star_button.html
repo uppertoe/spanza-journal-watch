@@ -1,0 +1,71 @@
+{% load static %}
+{% if star_count %}<span class="badge text-bg-warning-subtle text-warning-emphasis me-1"><svg class="bi me-1" width="0.8em" height="0.8em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>{{ star_count }}</span>{% endif %}
+{% if request.user.is_authenticated %}
+  {% if pubmed_user_state and pubmed_user_state.starred_at %}
+    <form method="post" class="d-inline"
+      action="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-post="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-target="#{{ star_target_id|default:'review-star-actions' }}"
+      hx-swap="innerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="source" value="review">
+      {% if star_target_id %}<input type="hidden" name="star_target_id" value="{{ star_target_id }}">{% endif %}
+      <button type="submit" class="btn btn-sm btn-warning d-inline-flex align-items-center gap-1">
+        <svg class="bi" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+        In reading list
+      </button>
+    </form>
+  {% else %}
+    <form method="post" class="d-inline"
+      action="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-post="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-target="#{{ star_target_id|default:'review-star-actions' }}"
+      hx-swap="innerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="source" value="review">
+      {% if star_target_id %}<input type="hidden" name="star_target_id" value="{{ star_target_id }}">{% endif %}
+      <button type="submit" class="btn btn-sm btn-outline-warning d-inline-flex align-items-center gap-1">
+        <svg class="bi" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+        Add to reading list
+      </button>
+    </form>
+  {% endif %}
+{% else %}
+  {% if pubmed_session_starred %}
+    <form method="post" class="d-inline"
+      action="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-post="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-target="#{{ star_target_id|default:'review-star-actions' }}"
+      hx-swap="innerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="source" value="review">
+      {% if star_target_id %}<input type="hidden" name="star_target_id" value="{{ star_target_id }}">{% endif %}
+      <button type="submit" class="btn btn-sm btn-warning d-inline-flex align-items-center gap-1">
+        <svg class="bi" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+        In reading list
+      </button>
+    </form>
+  {% else %}
+    <form method="post" class="d-inline"
+      action="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-post="{% url 'submissions:journal_article_toggle_star' pubmed_article.pk %}"
+      hx-target="#{{ star_target_id|default:'review-star-actions' }}"
+      hx-swap="innerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="source" value="review">
+      {% if star_target_id %}<input type="hidden" name="star_target_id" value="{{ star_target_id }}">{% endif %}
+      <button type="submit" class="btn btn-sm btn-outline-warning d-inline-flex align-items-center gap-1">
+        <svg class="bi" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+        Add to reading list
+      </button>
+    </form>
+  {% endif %}
+{% endif %}

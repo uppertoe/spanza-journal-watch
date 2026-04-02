@@ -34,7 +34,7 @@ from PIL import Image, UnidentifiedImageError
 from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
-from spanza_journal_watch.submissions.models import Article, Author, HealthService, Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Author, HealthService, Issue, Journal, Review
 from spanza_journal_watch.utils.cache import bump_content_cache_version
 
 from .forms import (
@@ -61,6 +61,8 @@ from .forms import (
 )
 from .models import (
     BackendPreference,
+    ChiefEditorInvite,
+    FetchLog,
     IssueContributor,
     IssueContributorInvite,
     PlankaBoardBackgroundAsset,
@@ -69,6 +71,7 @@ from .models import (
     PlankaIntegrationCredential,
     PlankaIssueBinding,
     PubmedArticle,
+    PubmedArticleUserState,
     PubmedBatchArticle,
     PubmedImportBatch,
     PubmedIntegrationCredential,
@@ -472,35 +475,159 @@ def dashboard(request):
 @permission_required("backend.manage_subscriber_csv", raise_exception=True)
 def subscriber_list(request):
     query = (request.GET.get("q") or "").strip()
-    subscribed = (request.GET.get("subscribed") or "").strip()
-    bounced = (request.GET.get("bounced") or "").strip()
-    complained = (request.GET.get("complained") or "").strip()
+    subscribed_filter = (request.GET.get("subscribed") or "").strip()
+    role_filter = (request.GET.get("role") or "").strip()
+    view_mode = request.GET.get("view", "users")  # "users" or "subscribers"
 
-    subscribers = Subscriber.objects.select_related("from_csv").order_by("-modified", "-pk")
-    if query:
-        subscribers = subscribers.filter(Q(email__icontains=query) | Q(from_csv__name__icontains=query))
-    if subscribed in {"true", "false"}:
-        subscribers = subscribers.filter(subscribed=(subscribed == "true"))
-    if bounced in {"true", "false"}:
-        subscribers = subscribers.filter(bounced=(bounced == "true"))
-    if complained in {"true", "false"}:
-        subscribers = subscribers.filter(complained=(complained == "true"))
+    User = get_user_model()
 
-    context = {
-        "subscribers": subscribers[:300],
-        "subscriber_filters": {
-            "q": query,
-            "subscribed": subscribed,
-            "bounced": bounced,
-            "complained": complained,
-        },
-        "subscriber_total": subscribers.count(),
-    }
+    if view_mode == "subscribers":
+        # Legacy subscriber-only view
+        subscribers = Subscriber.objects.select_related("from_csv", "user").order_by("-modified", "-pk")
+        if query:
+            subscribers = subscribers.filter(Q(email__icontains=query) | Q(from_csv__name__icontains=query))
+        if subscribed_filter in {"true", "false"}:
+            subscribers = subscribers.filter(subscribed=(subscribed_filter == "true"))
+        context = {
+            "subscribers": subscribers[:300],
+            "subscriber_filters": {
+                "q": query,
+                "subscribed": subscribed_filter,
+                "view": view_mode,
+                "role": role_filter,
+            },
+            "subscriber_total": subscribers.count(),
+            "view_mode": view_mode,
+        }
+    else:
+        # Users view: show User accounts with linked Subscriber data
+        users = (
+            User.objects.select_related("subscriber")
+            .prefetch_related("user_permissions")
+            .order_by("-last_login", "-date_joined")
+        )
+        if query:
+            users = users.filter(Q(email__icontains=query) | Q(name__icontains=query))
+        if subscribed_filter == "true":
+            users = users.filter(subscriber__subscribed=True)
+        elif subscribed_filter == "false":
+            users = users.filter(Q(subscriber__isnull=True) | Q(subscriber__subscribed=False))
+        if role_filter == "staff":
+            users = users.filter(is_staff=True)
+        elif role_filter == "can_recommend":
+            from django.contrib.auth.models import Permission
+
+            perm = Permission.objects.filter(content_type__app_label="submissions", codename="can_recommend").first()
+            if perm:
+                users = users.filter(user_permissions=perm)
+        elif role_filter == "locked":
+            users = users.filter(is_active=False)
+
+        user_list = list(users[:300])
+        # Pre-compute permission flags from prefetched permissions
+        for u in user_list:
+            perms = {p.codename for p in u.user_permissions.all()}
+            u.has_perm_can_recommend = "can_recommend" in perms
+            u.has_perm_chief_editor = "chief_editor" in perms
+
+        context = {
+            "user_list": user_list,
+            "subscriber_filters": {
+                "q": query,
+                "subscribed": subscribed_filter,
+                "view": view_mode,
+                "role": role_filter,
+            },
+            "user_total": users.count(),
+            "view_mode": view_mode,
+        }
 
     if request.headers.get("HX-Request") == "true":
         return render(request, "backend/_subscriber_list_results.html", context)
 
     return render(request, "backend/subscriber_list.html", context)
+
+
+@login_required
+@permission_required("backend.manage_subscriber_csv", raise_exception=True)
+@require_POST
+def user_toggle_recommend(request, user_id):
+    """Toggle the can_recommend permission for a user."""
+    from django.contrib.auth.models import Permission as DjangoPerm
+
+    User = get_user_model()
+    target_user = get_object_or_404(User, pk=user_id)
+    perm = DjangoPerm.objects.get(content_type__app_label="submissions", codename="can_recommend")
+    if target_user.has_perm("submissions.can_recommend"):
+        target_user.user_permissions.remove(perm)
+        messages.success(request, f"Removed recommend permission from {target_user.email}")
+    else:
+        target_user.user_permissions.add(perm)
+        messages.success(request, f"Granted recommend permission to {target_user.email}")
+    return redirect(reverse("backend:subscriber_list") + "?view=users")
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+@require_POST
+def user_toggle_chief_editor(request, user_id):
+    """Promote/demote a user to/from chief editor with full permission bundle."""
+    from django.contrib.auth.models import Permission as DjangoPerm
+
+    User = get_user_model()
+    target_user = get_object_or_404(User, pk=user_id)
+    if target_user == request.user:
+        messages.error(request, "You cannot modify your own chief editor status.")
+        return redirect(reverse("backend:subscriber_list") + "?view=users")
+
+    is_chief = target_user.has_perm("submissions.chief_editor")
+
+    if is_chief:
+        # Demote: remove only chief_editor
+        perm = DjangoPerm.objects.get(content_type__app_label="submissions", codename="chief_editor")
+        target_user.user_permissions.remove(perm)
+        messages.success(request, f"Removed chief editor role from {target_user.email}")
+    else:
+        # Promote: grant full bundle
+        perm_specs = [
+            ("submissions", "chief_editor"),
+            ("submissions", "manage_issue_builder"),
+            ("submissions", "regional_coordinator"),
+            ("submissions", "can_recommend"),
+            ("backend", "manage_subscriber_csv"),
+            ("backend", "send_newsletters"),
+            ("backend", "view_newsletter_stats"),
+            ("backend", "view_site_analytics"),
+        ]
+        for app_label, codename in perm_specs:
+            try:
+                perm = DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename)
+                target_user.user_permissions.add(perm)
+            except DjangoPerm.DoesNotExist:
+                pass
+        if not target_user.is_staff:
+            target_user.is_staff = True
+            target_user.save(update_fields=["is_staff"])
+        messages.success(request, f"Promoted {target_user.email} to chief editor")
+
+    return redirect(reverse("backend:subscriber_list") + "?view=users")
+
+
+@login_required
+@permission_required("backend.manage_subscriber_csv", raise_exception=True)
+@require_POST
+def user_toggle_active(request, user_id):
+    """Toggle is_active (lock/unlock) for a user."""
+    User = get_user_model()
+    target_user = get_object_or_404(User, pk=user_id)
+    if target_user == request.user:
+        messages.error(request, "You cannot lock your own account.")
+        return redirect(reverse("backend:subscriber_list") + "?view=users")
+    target_user.is_active = not target_user.is_active
+    target_user.save(update_fields=["is_active"])
+    status = "unlocked" if target_user.is_active else "locked"
+    messages.success(request, f"{target_user.email} has been {status}.")
+    return redirect(reverse("backend:subscriber_list") + "?view=users")
 
 
 def _get_pubmed_integration_credential():
@@ -553,7 +680,10 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
                 planka_credential.last_error = planka_connection_error
                 planka_credential.save(update_fields=["last_error", "modified"])
 
+    chief_editor_invites = ChiefEditorInvite.objects.order_by("-created")[:10]
+
     return {
+        "now": timezone.now(),
         "pubmed_credential": pubmed_credential,
         "pubmed_api_key_form": PubmedApiKeyForm(),
         "planka_credential": planka_credential,
@@ -563,6 +693,7 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
         "planka_connection_user": planka_connection_user,
         "planka_connection_error": planka_connection_error,
         "chief_editor_planka_user": chief_editor_planka_user,
+        "chief_editor_invites": chief_editor_invites,
         "watched_journal_form": WatchedJournalForm(),
         "watched_journals": watched_items,
         "inbox_settings_form": inbox_settings_form,
@@ -782,20 +913,6 @@ def _article_intake_results_context(batch, params):
         .filter(is_selected=True)
         .order_by("-modified")[:200]
     )
-    recommended_rows = list(
-        batch.batch_articles.select_related("article", "watched_journal", "issue")
-        .annotate(
-            recommendation_count=Count(
-                "article__user_states",
-                filter=Q(article__user_states__recommended_at__isnull=False),
-                distinct=True,
-            )
-        )
-        .filter(article__user_states__recommended_at__isnull=False)
-        .order_by("-recommendation_count", "-article__publication_date", "article__title")
-        .distinct()[:50]
-    )
-
     return {
         "batch": batch,
         "page_obj": page_obj,
@@ -803,7 +920,6 @@ def _article_intake_results_context(batch, params):
         "all_visible_selected": all_visible_selected,
         "all_journals_count": len(tab_rows),
         "staged_rows": staged_rows,
-        "recommended_rows": recommended_rows,
         "result_total": len(rows),
         "selected_total": batch.batch_articles.filter(is_selected=True).count(),
         "pushed_total": batch.batch_articles.exclude(planka_card_id="").count(),
@@ -2193,6 +2309,103 @@ def article_intake_task_status(request, batch_id):
 
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
+def article_intake_recommended(request):
+    """HTMX partial: recommended articles panel for the intake page."""
+    from_month = request.GET.get("from_month", "")
+    to_month = request.GET.get("to_month", "")
+    show_all = request.GET.get("show_all") == "1"
+    show_hidden = request.GET.get("show_hidden") == "1"
+    batch_id = request.GET.get("batch_id", "")
+
+    qs = (
+        PubmedArticle.objects.filter(
+            user_states__recommended_at__isnull=False,
+            recommendation_hidden=show_hidden,
+        )
+        .annotate(
+            recommendation_count=Count(
+                "user_states",
+                filter=Q(user_states__recommended_at__isnull=False),
+                distinct=True,
+            ),
+        )
+        .distinct()
+    )
+
+    if not show_all and from_month and to_month:
+        try:
+            from_date = datetime.date.fromisoformat(from_month + "-01")
+            to_date = datetime.date.fromisoformat(to_month + "-01")
+            # Include the entire to_month
+            to_date_end = _shift_month(to_date, 1) - datetime.timedelta(days=1)
+            qs = qs.filter(publication_date__gte=from_date, publication_date__lte=to_date_end)
+        except (ValueError, TypeError):
+            pass
+
+    recommended_articles = list(qs.order_by("-recommendation_count", "-publication_date", "title")[:100])
+
+    # Attach staged/review indicators
+    article_ids = [a.pk for a in recommended_articles]
+    staged_ids = set()
+    if batch_id.isdigit():
+        staged_ids = set(
+            PubmedBatchArticle.objects.filter(
+                batch_id=int(batch_id),
+                article_id__in=article_ids,
+                is_selected=True,
+            ).values_list("article_id", flat=True)
+        )
+    reviewed_ids = set(
+        Review.objects.filter(article_id__in=article_ids).values_list("article_id", flat=True).distinct()
+    )
+
+    # Attach recommender names
+    recommender_map = {}
+    for state in PubmedArticleUserState.objects.filter(
+        article_id__in=article_ids,
+        recommended_at__isnull=False,
+    ).select_related("user"):
+        recommender_map.setdefault(state.article_id, []).append(str(state.user))
+
+    for article in recommended_articles:
+        article.is_staged = article.pk in staged_ids
+        article.has_review = article.pk in reviewed_ids
+        article.recommenders = recommender_map.get(article.pk, [])
+
+    context = {
+        "recommended_articles": recommended_articles,
+        "show_all": show_all,
+        "show_hidden": show_hidden,
+        "from_month": from_month,
+        "to_month": to_month,
+        "batch_id": batch_id,
+    }
+    return render(request, "backend/_article_intake_recommended.html", context)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@require_POST
+def article_intake_toggle_recommendation_hidden(request, article_id):
+    """Toggle recommendation_hidden on a PubmedArticle, then re-render the panel."""
+    article = get_object_or_404(PubmedArticle, pk=article_id)
+    article.recommendation_hidden = not article.recommendation_hidden
+    PubmedArticle.objects.filter(pk=article.pk).update(recommendation_hidden=article.recommendation_hidden)
+
+    # Build GET params from the POST data for re-rendering
+    from django.http import QueryDict
+
+    params = QueryDict(mutable=True)
+    for key in ("from_month", "to_month", "show_all", "show_hidden", "batch_id"):
+        val = request.POST.get(key, "")
+        if val:
+            params[key] = val
+    request.GET = params
+    return article_intake_recommended(request)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def watched_journals(request):
     form = WatchedJournalForm()
 
@@ -2232,6 +2445,12 @@ def watched_journal_search(request):
     return JsonResponse({"results": journals})
 
 
+def _watched_journals_table_response(request):
+    """Return just the watched journals table partial for HTMX updates."""
+    watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
+    return render(request, "backend/_watched_journals_table.html", {"watched_journals": watched_items})
+
+
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
 def watched_journal_toggle_active(request, watched_journal_id):
@@ -2242,6 +2461,25 @@ def watched_journal_toggle_active(request, watched_journal_id):
     watched.active = not watched.active
     watched.save(update_fields=["active", "modified"])
     messages.success(request, f"{watched.name}: {'active' if watched.active else 'inactive'}")
+    if request.POST.get("next") == "htmx":
+        return _watched_journals_table_response(request)
+    if request.POST.get("next") == "settings":
+        return redirect(reverse("backend:backend_settings"))
+    return redirect(reverse("backend:watched_journals"))
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def watched_journal_toggle_frontend(request, watched_journal_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    watched = get_object_or_404(WatchedJournal, pk=watched_journal_id)
+    watched.visible_on_frontend = not watched.visible_on_frontend
+    watched.save(update_fields=["visible_on_frontend", "modified"])
+    messages.success(request, f"{watched.name}: {'visible' if watched.visible_on_frontend else 'hidden'} on frontend")
+    if request.POST.get("next") == "htmx":
+        return _watched_journals_table_response(request)
     if request.POST.get("next") == "settings":
         return redirect(reverse("backend:backend_settings"))
     return redirect(reverse("backend:watched_journals"))
@@ -2898,6 +3136,7 @@ def site_analytics(request):
     return render(request, "backend/site_analytics.html", context)
 
 
+@login_required
 def analytics_redirect(request):
     return HttpResponseRedirect(reverse("backend:analytics_overview"))
 
@@ -3757,6 +3996,50 @@ def issue_planka_import(request):
 
 @login_required
 @permission_required("submissions.chief_editor", raise_exception=True)
+def fetch_monitoring(request):
+    """Dashboard showing NIH/PubMed fetch history and status."""
+    logs = FetchLog.objects.all()[:50]
+    recent_success = FetchLog.objects.filter(status=FetchLog.STATUS_SUCCESS).order_by("-finished_at").first()
+    recent_error = FetchLog.objects.filter(status=FetchLog.STATUS_ERROR).order_by("-finished_at").first()
+
+    # Stats for last 7 days
+    seven_days_ago = timezone.now() - datetime.timedelta(days=7)
+    recent_logs = FetchLog.objects.filter(started_at__gte=seven_days_ago)
+    stats = {
+        "total": recent_logs.count(),
+        "success": recent_logs.filter(status=FetchLog.STATUS_SUCCESS).count(),
+        "error": recent_logs.filter(status=FetchLog.STATUS_ERROR).count(),
+        "avg_duration": recent_logs.filter(duration_seconds__isnull=False).aggregate(avg=Avg("duration_seconds"))[
+            "avg"
+        ],
+    }
+
+    # Get next scheduled run from django-celery-beat
+    next_scheduled = None
+    try:
+        from django_celery_beat.models import PeriodicTask
+
+        task = PeriodicTask.objects.filter(
+            task="spanza_journal_watch.backend.tasks.refresh_pubmed_journal_cache_task",
+            enabled=True,
+        ).first()
+        if task and task.last_run_at:
+            next_scheduled = task.last_run_at + datetime.timedelta(hours=12)
+    except Exception:
+        pass
+
+    context = {
+        "fetch_logs": logs,
+        "recent_success": recent_success,
+        "recent_error": recent_error,
+        "stats": stats,
+        "next_scheduled": next_scheduled,
+    }
+    return render(request, "backend/fetch_monitoring.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
 def backend_settings(request):
     context = _build_backend_settings_context(request)
     return render(request, "backend/settings.html", context)
@@ -3798,6 +4081,175 @@ def save_frontend_banner_settings(request):
     response = render(request, "backend/settings.html", context)
     response.status_code = 400
     return response
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+@require_POST
+def send_chief_editor_invite(request):
+    """Send an email invitation to become chief editor."""
+    email = (request.POST.get("email") or "").strip()
+    name = (request.POST.get("name") or "").strip()
+
+    if not email:
+        messages.error(request, "Email address is required.")
+        return redirect(reverse("backend:backend_settings"))
+
+    # Revoke any active invites for this email
+    now = timezone.now()
+    ChiefEditorInvite.objects.filter(
+        email__iexact=email,
+        consumed_at__isnull=True,
+        expires_at__gt=now,
+    ).update(consumed_at=now)
+
+    raw_token = ChiefEditorInvite.generate_raw_token()
+    token_hash = ChiefEditorInvite.hash_token(raw_token)
+    expires_at = now + datetime.timedelta(days=180)
+
+    invite = ChiefEditorInvite.objects.create(
+        email=email,
+        name=name,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        created_by=request.user,
+    )
+
+    accept_url = request.build_absolute_uri(reverse("chief_editor_invite_accept", kwargs={"token": raw_token}))
+    context = {
+        "invite": invite,
+        "invited_by": request.user,
+        "accept_url": accept_url,
+    }
+
+    subject = "Invitation to become a Chief Editor on SPANZA Journal Watch"
+    text_body = render_to_string("backend/email/chief_editor_invite.txt", context)
+    html_body = render_to_string("backend/email/chief_editor_invite.html", context)
+
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=None,
+        to=[email],
+        reply_to=[settings.CONTACT_EMAIL],
+    )
+    message.attach_alternative(html_body, "text/html")
+    message.metadata = {"type": "chief_editor_invite"}
+    message.tags = ["chief-editor-invite"]
+    message.send()
+
+    invite.sent_at = timezone.now()
+    invite.save(update_fields=["sent_at", "modified"])
+
+    messages.success(request, f"Chief editor invitation sent to {email}.")
+    return redirect(reverse("backend:backend_settings"))
+
+
+def chief_editor_invite_accept(request, token):
+    """Accept a chief editor invitation."""
+    token_hash = ChiefEditorInvite.hash_token(token)
+    invite = ChiefEditorInvite.objects.filter(token_hash=token_hash).first()
+
+    context = {
+        "invite": invite,
+        "status": "invalid",
+        "status_message": "This invite link is invalid.",
+    }
+    template = "backend/invites/accept_chief_editor_invite.html"
+
+    if not invite:
+        return render(request, template, context)
+
+    now = timezone.now()
+
+    if invite.expires_at <= now:
+        context["status"] = "expired"
+        return render(request, template, context)
+
+    if not request.user.is_authenticated:
+        User = get_user_model()
+        account_exists = User.objects.filter(email__iexact=invite.email).exists()
+        invite_path = request.get_full_path()
+        request.session["_pending_invite_token"] = token
+        request.session["pending_invite_email"] = invite.email
+        context["status"] = "unauthenticated"
+        context["invited_email"] = invite.email
+        context["account_exists"] = account_exists
+        context["login_url"] = f"{reverse('account_login')}?next={invite_path}"
+        context["signup_url"] = f"{reverse('account_signup')}?next={invite_path}"
+        return render(request, template, context)
+
+    expected_email = (invite.email or "").strip().lower()
+    user_email = (request.user.email or "").strip().lower()
+
+    if expected_email != user_email:
+        from django.contrib.auth import logout as auth_logout
+
+        auth_logout(request)
+        messages.info(
+            request,
+            f"You've been signed out. Please sign in or create an account"
+            f" with {invite.email} to accept this invite.",
+        )
+        return redirect(request.get_full_path())
+
+    if invite.consumed_at and invite.accepted_by == request.user:
+        context["status"] = "accepted"
+        context["status_message"] = "Invite already accepted."
+        return render(request, template, context)
+
+    with transaction.atomic():
+        invite.consumed_at = now
+        invite.accepted_by = request.user
+        invite.save(update_fields=["consumed_at", "accepted_by", "modified"])
+
+        # Update user name from invite if not set
+        invite_name = (invite.name or "").strip()
+        if invite_name and not (getattr(request.user, "name", "") or "").strip():
+            request.user.name = invite_name
+            request.user.save(update_fields=["name"])
+
+        # Grant chief editor permission bundle
+        from django.contrib.auth.models import Permission as DjangoPerm
+
+        perm_specs = [
+            ("submissions", "chief_editor"),
+            ("submissions", "manage_issue_builder"),
+            ("submissions", "regional_coordinator"),
+            ("submissions", "can_recommend"),
+            ("backend", "manage_subscriber_csv"),
+            ("backend", "send_newsletters"),
+            ("backend", "view_newsletter_stats"),
+            ("backend", "view_site_analytics"),
+        ]
+        for app_label, codename in perm_specs:
+            try:
+                perm = DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename)
+                request.user.user_permissions.add(perm)
+            except DjangoPerm.DoesNotExist:
+                logger.error("Permission %s.%s not found during chief editor invite acceptance.", app_label, codename)
+
+        if not request.user.is_staff:
+            request.user.is_staff = True
+            request.user.save(update_fields=["is_staff"])
+
+        # Clear permission cache
+        for attr in ("_perm_cache", "_user_perm_cache"):
+            request.user.__dict__.pop(attr, None)
+
+    # Mark email as verified
+    from allauth.account.models import EmailAddress
+
+    EmailAddress.objects.update_or_create(
+        user=request.user,
+        email=request.user.email,
+        defaults={"verified": True, "primary": True},
+    )
+    request.session.pop("_pending_invite_token", None)
+    request.session.pop("pending_invite_email", None)
+
+    context["status"] = "accepted"
+    return render(request, template, context)
 
 
 def _run_management_command(command_name, **kwargs):
@@ -4522,37 +4974,43 @@ def issue_invite_accept(request, token):
             request.user.name = contributor_name
             request.user.save(update_fields=["name"])
 
-        # Coordinators get backend access (regional_coordinator + manage_issue_builder permissions + is_staff)
+        # Grant permissions based on contributor role
+        import logging
+
+        from django.contrib.auth.models import Permission as DjangoPerm
+
+        logger = logging.getLogger(__name__)
+
+        # All accepted contributors can recommend articles
+        perms_to_grant = [
+            ("submissions", "can_recommend"),
+        ]
+        # Coordinators also get backend access
         if contributor.role == IssueContributor.Role.COORDINATOR:
-            import logging
-
-            from django.contrib.auth.models import Permission as DjangoPerm
-
-            logger = logging.getLogger(__name__)
-            perms_to_grant = [
+            perms_to_grant += [
                 ("submissions", "regional_coordinator"),
                 ("submissions", "manage_issue_builder"),
             ]
-            granted_count = 0
-            for app_label, codename in perms_to_grant:
-                try:
-                    perm = DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename)
-                    request.user.user_permissions.add(perm)
-                    granted_count += 1
-                except DjangoPerm.DoesNotExist:
-                    logger.error(
-                        "Permission %s.%s not found when accepting coordinator invite — "
-                        "run migrations to create it.",
-                        app_label,
-                        codename,
-                    )
-            # Clear Django's per-request permission cache so subsequent has_perm() calls
-            # in this same request see the newly granted permissions.
-            for attr in ("_perm_cache", "_user_perm_cache"):
-                request.user.__dict__.pop(attr, None)
-            if granted_count and not request.user.is_staff:
-                request.user.is_staff = True
-                request.user.save(update_fields=["is_staff"])
+
+        granted_count = 0
+        for app_label, codename in perms_to_grant:
+            try:
+                perm = DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename)
+                request.user.user_permissions.add(perm)
+                granted_count += 1
+            except DjangoPerm.DoesNotExist:
+                logger.error(
+                    "Permission %s.%s not found when accepting invite — " "run migrations to create it.",
+                    app_label,
+                    codename,
+                )
+        # Clear Django's per-request permission cache so subsequent has_perm() calls
+        # in this same request see the newly granted permissions.
+        for attr in ("_perm_cache", "_user_perm_cache"):
+            request.user.__dict__.pop(attr, None)
+        if contributor.role == IssueContributor.Role.COORDINATOR and granted_count and not request.user.is_staff:
+            request.user.is_staff = True
+            request.user.save(update_fields=["is_staff"])
 
     # Mark the user's email as verified — the invite link is proof of email ownership.
     from allauth.account.models import EmailAddress
@@ -5135,12 +5593,12 @@ def _sync_planka_card_into_issue(*, request, issue, binding, selected):
     if journal_name:
         journal, _ = Journal.objects.get_or_create(name=journal_name)
 
-    article = Article.objects.create(
-        name=article_name,
+    article = PubmedArticle.objects.create(
+        title=article_name,
         journal=journal,
-        year=article_year,
+        publication_date=datetime.date(article_year, 1, 1),
         citation=article_citation,
-        url=article_url or None,
+        article_url=article_url or "",
         tags_string="",
         active=False,
     )

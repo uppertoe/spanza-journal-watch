@@ -216,7 +216,7 @@ def process_subscriber_csv(subscriber_csv_pk):
 
 @celery_app.task(bind=True)
 def run_pubmed_batch_import_task(self, batch_id):
-    from .models import PubmedImportBatch
+    from .models import FetchLog, PubmedImportBatch
     from .pubmed import PubmedAPIError
     from .pubmed_cache import populate_pubmed_batch_from_cache
     from .views import _safe_planka_error
@@ -227,11 +227,18 @@ def run_pubmed_batch_import_task(self, batch_id):
     batch.task_note = "Fetching articles from PubMed..."
     batch.save(update_fields=["task_state", "task_id", "task_note", "modified"])
 
+    fetch_log = FetchLog.objects.create(
+        task_type=FetchLog.TASK_BATCH_IMPORT,
+        celery_task_id=self.request.id or "",
+        details={"batch_id": batch_id},
+    )
+
     watched_journals = list(batch.watched_journals.filter(active=True))
     if not watched_journals:
         batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
         batch.task_note = "No active watched journals on this batch."
         batch.save(update_fields=["task_state", "task_note", "modified"])
+        fetch_log.finish(FetchLog.STATUS_ERROR, error_message=batch.task_note)
         return {"status": "error", "note": batch.task_note}
 
     try:
@@ -239,17 +246,25 @@ def run_pubmed_batch_import_task(self, batch_id):
         batch.task_state = PubmedImportBatch.TASK_STATE_SUCCESS
         batch.task_note = f"Loaded {batch.result_count} cached article(s) into the intake batch."
         batch.save(update_fields=["task_state", "task_note", "modified"])
+        fetch_log.finish(
+            FetchLog.STATUS_SUCCESS,
+            journal_count=len(watched_journals),
+            articles_created=batch.result_count,
+            details={"batch_id": batch_id, "result_count": batch.result_count},
+        )
         return {"status": "success", "count": batch.result_count}
     except PubmedAPIError as error:
         batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
         batch.task_note = f"PubMed fetch failed: {_safe_planka_error(error)}"
         batch.save(update_fields=["task_state", "task_note", "modified"])
         logger.error("PubMed import batch %s failed: %s", batch_id, error)
+        fetch_log.finish(FetchLog.STATUS_ERROR, error_message=str(error))
         return {"status": "error", "note": batch.task_note}
 
 
 @celery_app.task(bind=True)
 def refresh_pubmed_journal_cache_task(self, from_month=None, to_month=None):
+    from .models import FetchLog
     from .pubmed_cache import default_pubmed_cache_window, refresh_pubmed_journal_cache
 
     if from_month and to_month:
@@ -258,19 +273,41 @@ def refresh_pubmed_journal_cache_task(self, from_month=None, to_month=None):
     else:
         from_month_value, to_month_value = default_pubmed_cache_window(timezone.now().date())
 
-    stats = refresh_pubmed_journal_cache(from_month=from_month_value, to_month=to_month_value)
-    logger.info(
-        "Refreshed PubMed journal cache for %s to %s across %s journals",
-        from_month_value,
-        to_month_value,
-        stats["journal_count"],
+    fetch_log = FetchLog.objects.create(
+        task_type=FetchLog.TASK_CACHE_REFRESH,
+        celery_task_id=self.request.id or "",
+        details={"from_month": from_month_value.isoformat(), "to_month": to_month_value.isoformat()},
     )
-    return {
-        "status": "success",
-        "from_month": from_month_value.isoformat(),
-        "to_month": to_month_value.isoformat(),
-        **stats,
-    }
+
+    try:
+        stats = refresh_pubmed_journal_cache(from_month=from_month_value, to_month=to_month_value)
+        logger.info(
+            "Refreshed PubMed journal cache for %s to %s across %s journals",
+            from_month_value,
+            to_month_value,
+            stats["journal_count"],
+        )
+        fetch_log.finish(
+            FetchLog.STATUS_SUCCESS,
+            journal_count=stats.get("journal_count", 0),
+            articles_created=stats.get("created_links", 0),
+            articles_touched=stats.get("touched_links", 0),
+            details={
+                "from_month": from_month_value.isoformat(),
+                "to_month": to_month_value.isoformat(),
+                **stats,
+            },
+        )
+        return {
+            "status": "success",
+            "from_month": from_month_value.isoformat(),
+            "to_month": to_month_value.isoformat(),
+            **stats,
+        }
+    except Exception as exc:
+        logger.error("PubMed cache refresh failed: %s", exc)
+        fetch_log.finish(FetchLog.STATUS_ERROR, error_message=str(exc))
+        raise
 
 
 @celery_app.task(bind=True)

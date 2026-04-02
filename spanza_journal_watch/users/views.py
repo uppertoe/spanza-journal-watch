@@ -1,10 +1,13 @@
 from allauth.account.views import LoginView as AllauthLoginView
 from allauth.account.views import SignupView as AllauthSignupView
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
+from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, RedirectView, UpdateView
 
 from spanza_journal_watch.users.forms import UserPreferencesForm
@@ -49,6 +52,16 @@ class UserRedirectView(LoginRequiredMixin, RedirectView):
 
 
 user_redirect_view = UserRedirectView.as_view()
+
+
+@login_required
+@require_POST
+def update_profile_name(request):
+    """Update the user's display name from the profile drawer."""
+    name = (request.POST.get("name") or "").strip()[:255]
+    request.user.name = name
+    request.user.save(update_fields=["name"])
+    return render(request, "fragments/user_profile_name.html")
 
 
 def _invite_email_from_session(request):

@@ -25,6 +25,15 @@ class User(AbstractUser):
         blank=True,
         related_name="watching_users",
     )
+    last_viewed_journal = models.ForeignKey(
+        "backend.WatchedJournal",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="+",
+    )
+    cpd_tracking_enabled = models.BooleanField(default=False)
+    is_spanza_member = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

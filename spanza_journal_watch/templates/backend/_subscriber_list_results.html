@@ -1,10 +1,13 @@
 <div id="subscriber-list-results">
+{% if view_mode == 'subscribers' %}
+  {# ── Subscribers-only view ────────────────────── #}
   <div class="small text-muted mb-2">{{ subscriber_total }} subscribers matched</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle">
       <thead>
         <tr>
           <th>Email</th>
+          <th>Linked user</th>
           <th>Subscribed</th>
           <th>Bounced</th>
           <th>Complained</th>
@@ -16,6 +19,13 @@
       {% for subscriber in subscribers %}
         <tr>
           <td>{{ subscriber.email }}</td>
+          <td>
+            {% if subscriber.user %}
+              <span class="badge text-bg-info">{{ subscriber.user.email }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
           <td>{% if subscriber.subscribed %}<span class="badge text-bg-success">Yes</span>{% else %}<span class="badge text-bg-secondary">No</span>{% endif %}</td>
           <td>{% if subscriber.bounced %}<span class="badge text-bg-danger">Yes</span>{% else %}<span class="badge text-bg-light">No</span>{% endif %}</td>
           <td>{% if subscriber.complained %}<span class="badge text-bg-warning">Yes</span>{% else %}<span class="badge text-bg-light">No</span>{% endif %}</td>
@@ -24,10 +34,96 @@
         </tr>
       {% empty %}
         <tr>
-          <td colspan="6" class="text-muted">No subscribers found for current filters.</td>
+          <td colspan="7" class="text-muted">No subscribers found for current filters.</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
+
+{% else %}
+  {# ── Users view ───────────────────────────────── #}
+  <div class="small text-muted mb-2">{{ user_total }} users matched</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Subscribed</th>
+          <th>Permissions</th>
+          <th>Last login</th>
+          <th>Joined</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in user_list %}
+        <tr{% if not u.is_active %} class="table-secondary"{% endif %}>
+          <td>{{ u.name|default:"-" }}</td>
+          <td>{{ u.email }}</td>
+          <td>
+            {% if u.subscriber and u.subscriber.subscribed %}
+              <span class="badge text-bg-success">Yes</span>
+            {% else %}
+              <span class="badge text-bg-secondary">No</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_superuser %}
+              <span class="badge text-bg-dark">Superuser</span>
+            {% else %}
+              {% if u.is_staff %}<span class="badge text-bg-primary">Staff</span>{% endif %}
+              {% for perm in u.user_permissions.all %}
+                {% if perm.codename == "can_recommend" %}<span class="badge text-bg-warning">Recommend</span>{% endif %}
+                {% if perm.codename == "manage_issue_builder" %}<span class="badge text-bg-info">Editor</span>{% endif %}
+                {% if perm.codename == "regional_coordinator" %}<span class="badge text-bg-secondary">Coordinator</span>{% endif %}
+                {% if perm.codename == "chief_editor" %}<span class="badge text-bg-danger">Chief editor</span>{% endif %}
+              {% endfor %}
+            {% endif %}
+          </td>
+          <td class="text-muted small">{% if u.last_login %}{{ u.last_login|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+          <td class="text-muted small">{{ u.date_joined|date:"Y-m-d" }}</td>
+          <td>
+            {% if u.is_active %}
+              <span class="badge text-bg-success">Active</span>
+            {% else %}
+              <span class="badge text-bg-danger">Locked</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <form method="post" action="{% url 'backend:user_toggle_recommend' u.pk %}">
+                {% csrf_token %}
+                {% if u.has_perm_can_recommend %}
+                  <button type="submit" class="btn btn-sm btn-outline-warning py-0" title="Remove recommend permission">- Recommend</button>
+                {% else %}
+                  <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Grant recommend permission">+ Recommend</button>
+                {% endif %}
+              </form>
+
+
+              {% if u.pk != request.user.pk %}
+                <form method="post" action="{% url 'backend:user_toggle_active' u.pk %}">
+                  {% csrf_token %}
+                  {% if u.is_active %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0" title="Lock account">Lock</button>
+                  {% else %}
+                    <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Unlock account">Unlock</button>
+                  {% endif %}
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="8" class="text-muted">No users found for current filters.</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
 </div>

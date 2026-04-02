@@ -4,6 +4,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="mb-0">Settings</h1>
+
 </div>
 
 <div class="card mb-4">
@@ -56,11 +57,14 @@
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>PubMed API key</span>
-    {% if pubmed_credential and pubmed_credential.get_api_key %}
-      <span class="badge text-bg-success">Configured</span>
-    {% else %}
-      <span class="badge text-bg-warning">Not configured</span>
-    {% endif %}
+    <div class="d-flex gap-2 align-items-center">
+      <a href="{% url 'backend:fetch_monitoring' %}" class="btn btn-sm btn-outline-primary">Fetch monitoring</a>
+      {% if pubmed_credential and pubmed_credential.get_api_key %}
+        <span class="badge text-bg-success">Configured</span>
+      {% else %}
+        <span class="badge text-bg-warning">Not configured</span>
+      {% endif %}
+    </div>
   </div>
   <div class="card-body">
     <p class="text-muted small mb-3">
@@ -310,6 +314,67 @@
   </div>
 </div>
 
+{# ── Invite chief editor ────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">Chief editors</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Invite a new chief editor by entering their name and email address. They will receive an email
+      with a link to accept the invitation and gain full editorial access.
+    </p>
+    <form method="post" action="{% url 'backend:send_chief_editor_invite' %}" class="row g-3 mb-4">
+      {% csrf_token %}
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="chief-invite-name">Name</label>
+        <input type="text" id="chief-invite-name" name="name" class="form-control" placeholder="Jane Smith">
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="chief-invite-email">Email <span class="text-danger">*</span></label>
+        <input type="email" id="chief-invite-email" name="email" class="form-control" placeholder="jane@example.com" required>
+      </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Send invite</button>
+      </div>
+    </form>
+
+    {% if chief_editor_invites %}
+      <h6 class="text-muted small text-uppercase mb-2">Recent invitations</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Sent</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in chief_editor_invites %}
+              <tr>
+                <td class="small">{{ inv.email }}</td>
+                <td class="small">{{ inv.name|default:"-" }}</td>
+                <td class="small">{{ inv.sent_at|date:"j M Y H:i"|default:"Not sent" }}</td>
+                <td>
+                  {% if inv.consumed_at and inv.accepted_by %}
+                    <span class="badge text-bg-success">Accepted</span>
+                  {% elif inv.expires_at < now %}
+                    <span class="badge text-bg-secondary">Expired</span>
+                  {% elif inv.consumed_at %}
+                    <span class="badge text-bg-secondary">Revoked</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">Pending</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
 <div class="card mb-4">
   <div class="card-header">Watched journals</div>
   <div class="card-body">
@@ -337,52 +402,12 @@
       <div class="col-12">{{ watched_journal_form.name|as_crispy_field }}</div>
       <div class="col-12 col-md-6">{{ watched_journal_form.issn_print|as_crispy_field }}</div>
       <div class="col-12 col-md-6">{{ watched_journal_form.issn_electronic|as_crispy_field }}</div>
-      <div class="col-12">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.visible_on_frontend|as_crispy_field }}</div>
       <div class="col-12"><button type="submit" class="btn btn-primary">Add watched journal</button></div>
     </form>
 
-    {% if watched_journals %}
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>ISSN</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for watched in watched_journals %}
-              <tr>
-                <td>{{ watched.name }}</td>
-                <td>
-                  {% if watched.issn_print %}<div>Print: {{ watched.issn_print }}</div>{% endif %}
-                  {% if watched.issn_electronic %}<div>Electronic: {{ watched.issn_electronic }}</div>{% endif %}
-                  {% if not watched.issn_print and not watched.issn_electronic %}-{% endif %}
-                </td>
-                <td>
-                  {% if watched.active %}
-                    <span class="badge text-bg-success">Active</span>
-                  {% else %}
-                    <span class="badge text-bg-secondary">Inactive</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <form method="post" action="{% url "backend:watched_journal_toggle_active" watched.pk %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="settings">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">Toggle active</button>
-                  </form>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="alert alert-info mb-0">No watched journals yet.</div>
-    {% endif %}
+    {% include "backend/_watched_journals_table.html" %}
   </div>
 </div>
 

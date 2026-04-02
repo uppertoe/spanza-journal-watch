@@ -31,9 +31,10 @@ from spanza_journal_watch.backend.models import (
     PlankaCardRevision,
     PlankaIntegrationCredential,
     PlankaIssueBinding,
+    PubmedArticle,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
 from spanza_journal_watch.users.tests.factories import UserFactory
 
 User = get_user_model()
@@ -473,7 +474,9 @@ class TestStage6Publication:
     def _issue_with_review(self):
         journal = Journal.objects.create(name="NEJM", active=True)
         author = Author.objects.create(name="Dr Jane Smith")
-        article = Article.objects.create(name="Drug X RCT", year=2024, journal=journal, active=False)
+        article = PubmedArticle.objects.create(
+            title="Drug X RCT", publication_date=datetime.date(2024, 1, 1), journal=journal, active=False
+        )
         review = Review.objects.create(article=article, author=author, body="Review text.", active=False)
         issue = Issue.objects.create(name="March 2024", active=False, body="Issue body.")
         issue.reviews.add(review)
@@ -592,7 +595,9 @@ class TestStage8Frontend:
         issue = Issue.objects.create(name="March 2024", active=True, slug="march-2024", body="Body.")
         journal = Journal.objects.create(name="NEJM", active=True)
         author = Author.objects.create(name="Dr Jane Smith")
-        article = Article.objects.create(name="Drug X RCT", year=2024, journal=journal, active=True)
+        article = PubmedArticle.objects.create(
+            title="Drug X RCT", publication_date=datetime.date(2024, 1, 1), journal=journal, active=True
+        )
         review = Review.objects.create(article=article, author=author, body="Review text.", active=True)
         issue.reviews.add(review)
 
@@ -603,7 +608,9 @@ class TestStage8Frontend:
         issue = Issue.objects.create(name="March 2024", active=True, slug="march-2024", body="Body.")
         journal = Journal.objects.create(name="NEJM", active=True)
         author = Author.objects.create(name="Dr Jane Smith")
-        article = Article.objects.create(name="Drug X RCT", year=2024, journal=journal, active=True)
+        article = PubmedArticle.objects.create(
+            title="Drug X RCT", publication_date=datetime.date(2024, 1, 1), journal=journal, active=True
+        )
         review = Review.objects.create(article=article, author=author, body="Review text.", active=True)
         issue.reviews.add(review)
 

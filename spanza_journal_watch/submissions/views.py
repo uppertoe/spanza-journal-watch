@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -25,13 +25,100 @@ from spanza_journal_watch.backend.models import (
     WatchedJournalArticle,
     can_recommend_pubmed_articles,
 )
-from spanza_journal_watch.backend.pubmed_cache import article_metadata_list
+from spanza_journal_watch.backend.pubmed_cache import article_metadata_list, shift_month
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
-from .models import Article, Author, HealthService, Issue, Review, Tag
+from .models import Author, HealthService, Issue, Review, Tag
+
+# ---------------------------------------------------------------------------
+# Journal browser: section grouping for table-of-contents
+# ---------------------------------------------------------------------------
+
+JOURNAL_SECTIONS = [
+    ("Editorials", "editorials", {"Editorial", "Comment", "Published Erratum", "Introductory Journal Article"}),
+    (
+        "Reviews",
+        "reviews",
+        {"Review", "Systematic Review", "Meta-Analysis", "Scoping Review", "Network Meta-Analysis"},
+    ),
+    ("Guidelines", "guidelines", {"Practice Guideline", "Consensus Statement"}),
+    (
+        "Original Research",
+        "original-research",
+        {
+            "Randomized Controlled Trial",
+            "Clinical Trial",
+            "Clinical Trial, Phase I",
+            "Clinical Trial, Phase II",
+            "Clinical Trial, Phase III",
+            "Clinical Trial, Phase IV",
+            "Observational Study",
+            "Multicenter Study",
+            "Comparative Study",
+            "Equivalence Trial",
+            "Pragmatic Clinical Trial",
+            "Validation Study",
+        },
+    ),
+    ("Case Reports", "case-reports", {"Case Reports"}),
+    ("Letters", "letters", {"Letter"}),
+]
+
+IGNORED_PUBLICATION_TYPES = {
+    "Journal Article",
+    "Research Support, Non-U.S. Gov't",
+    "Research Support, U.S. Gov't, P.H.S.",
+    "Research Support, U.S. Gov't, Non-P.H.S.",
+    "Research Support, N.I.H., Extramural",
+    "Research Support, N.I.H., Intramural",
+    "Video-Audio Media",
+    "Historical Article",
+    "Lecture",
+}
+
+
+def _group_articles_by_section(rows):
+    """Group article rows into (section_name, section_slug, [rows]) tuples.
+
+    Each article is placed in the first matching section based on its
+    publication_types, with title-based heuristics as a fallback for articles
+    that PubMed only tags as "Journal Article".  Empty sections are omitted.
+    """
+    import re
+
+    # Title patterns that indicate correspondence (Comment/Reply at end of title)
+    _correspondence_re = re.compile(r":\s*(Comment|Reply|Response|Correspondence|Authors?\s*Reply)\.?\s*$", re.I)
+
+    buckets = {slug: [] for _, slug, _ in JOURNAL_SECTIONS}
+    buckets["articles"] = []  # fallback
+
+    for row in rows:
+        ptypes = set(row.publication_types) - IGNORED_PUBLICATION_TYPES
+        placed = False
+        for _name, slug, type_set in JOURNAL_SECTIONS:
+            if ptypes & type_set:
+                buckets[slug].append(row)
+                placed = True
+                break
+        if not placed:
+            # Title-based heuristic: articles ending with ": Comment." etc. go to Letters
+            title = row.article.title or ""
+            if _correspondence_re.search(title):
+                buckets["letters"].append(row)
+                placed = True
+        if not placed:
+            buckets["articles"].append(row)
+
+    sections = []
+    for name, slug, _ in JOURNAL_SECTIONS:
+        if buckets[slug]:
+            sections.append((name, slug, buckets[slug]))
+    if buckets["articles"]:
+        sections.append(("Articles", "articles", buckets["articles"]))
+    return sections
 
 
 def build_share_urls(
@@ -113,6 +200,40 @@ def attach_review_display_fields(reviews, *, issue=None, include_share_context=F
             review.facebook_share_url = review_share_context["facebook_share_url"]
             review.email_share_url = review_share_context["email_share_url"]
 
+    # Attach star state + star counts per review for star buttons
+    if request:
+        article_ids = [r.article_id for r in review_list]
+        # Star counts per article
+        star_count_map = {}
+        if article_ids:
+            star_counts = (
+                PubmedArticleUserState.objects.filter(
+                    article_id__in=article_ids,
+                    starred_at__isnull=False,
+                )
+                .values("article_id")
+                .annotate(count=Count("id"))
+            )
+            star_count_map = {row["article_id"]: row["count"] for row in star_counts}
+
+        if request.user.is_authenticated:
+            state_map = {
+                s.article_id: s
+                for s in PubmedArticleUserState.objects.filter(user=request.user, article_id__in=article_ids)
+            }
+            for review in review_list:
+                review.pubmed_user_state = state_map.get(review.article_id)
+                review.pubmed_session_starred = False
+                review.star_target_id = f"review-star-actions-{review.pk}"
+                review.star_count = star_count_map.get(review.article_id, 0)
+        else:
+            starred_ids = set(request.session.get("starred_article_ids", []))
+            for review in review_list:
+                review.pubmed_user_state = None
+                review.pubmed_session_starred = review.article_id in starred_ids
+                review.star_target_id = f"review-star-actions-{review.pk}"
+                review.star_count = star_count_map.get(review.article_id, 0)
+
     return review_list
 
 
@@ -184,6 +305,21 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         override = {"title": self.object.get_full_name()}
         header = PageHeader.get_active_for(PageHeader.PageType.REVIEW_DETAIL)
         context["page_header"] = header.collate_fields(**override) if header else override
+
+        # Star button context — review.article IS the PubmedArticle after merge
+        pubmed_article = self.object.article
+        context["pubmed_article"] = pubmed_article
+        context["star_count"] = PubmedArticleUserState.objects.filter(
+            article=pubmed_article, starred_at__isnull=False
+        ).count()
+        if self.request.user.is_authenticated:
+            context["pubmed_user_state"] = PubmedArticleUserState.objects.filter(
+                user=self.request.user, article=pubmed_article
+            ).first()
+        else:
+            context["pubmed_session_starred"] = pubmed_article.pk in self.request.session.get(
+                "starred_article_ids", []
+            )
 
         return context
 
@@ -416,7 +552,7 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
         Prefetch(
             "articles",
             queryset=(
-                Article.objects.select_related("journal").prefetch_related(
+                PubmedArticle.objects.select_related("journal").prefetch_related(
                     Prefetch(
                         "reviews",
                         queryset=Review.objects.filter(active=True)
@@ -789,6 +925,28 @@ def _parse_journal_month(value):
         return timezone.now().date().replace(day=1)
 
 
+def _best_default_month(journal_id, min_articles=10):
+    """Find the most recent month with at least `min_articles` for this journal.
+
+    Falls back to the most recent month with any articles, or the current month.
+    """
+    from django.db.models import Count as _Count
+
+    months = (
+        WatchedJournalArticle.objects.filter(watched_journal_id=journal_id)
+        .values("publication_month")
+        .annotate(article_count=_Count("id"))
+        .order_by("-publication_month")[:12]
+    )
+    fallback = None
+    for row in months:
+        if fallback is None:
+            fallback = row["publication_month"]
+        if row["article_count"] >= min_articles:
+            return row["publication_month"]
+    return fallback or timezone.now().date().replace(day=1)
+
+
 def _journal_month_options():
     months = list(
         WatchedJournalArticle.objects.exclude(publication_month__isnull=True)
@@ -802,80 +960,77 @@ def _journal_month_options():
     return months
 
 
-def _journal_article_matches_subject(article, subject_query):
-    subject_query = (subject_query or "").strip().lower()
-    if not subject_query:
-        return True
-    metadata_values = article_metadata_list(article, "mesh_terms") + article_metadata_list(article, "keywords")
-    metadata_text = " ".join(metadata_values).lower()
-    return subject_query in metadata_text
-
-
-def _available_publication_types(journal_links):
-    publication_types = set()
-    seen_article_ids = set()
-    for link in journal_links:
-        if link.article_id in seen_article_ids:
-            continue
-        seen_article_ids.add(link.article_id)
-        publication_types.update(article_metadata_list(link.article, "publication_types"))
-    return sorted(publication_types)
-
-
-def _journal_browser_rows(request):
-    active_journals = list(WatchedJournal.objects.filter(active=True).order_by("name", "pk"))
-    shelf_tones = [
-        "cobalt",
-        "sunset",
-        "sage",
-        "berry",
-        "ochre",
-        "marine",
-        "rose",
-        "slate",
-    ]
+def _journal_browser_context(request):
+    """Build context for the single-journal browsable view."""
+    active_journals = list(WatchedJournal.objects.filter(active=True, visible_on_frontend=True).order_by("name", "pk"))
+    shelf_tones = ["cobalt", "sunset", "sage", "berry", "ochre", "marine", "rose", "slate"]
     for journal in active_journals:
         journal.shelf_tone = shelf_tones[journal.pk % len(shelf_tones)]
 
-    selected_month = _parse_journal_month(request.GET.get("month"))
-    selected_journal_ids = [int(value) for value in request.GET.getlist("journal") if str(value).isdigit()]
-    if not selected_journal_ids and request.user.is_authenticated:
-        selected_journal_ids = list(request.user.watched_journals.filter(active=True).values_list("pk", flat=True))
-    if not selected_journal_ids:
-        selected_journal_ids = [journal.pk for journal in active_journals]
+    # --- Determine selected journal (single, not multi) ---
+    raw_journal = request.GET.get("journal")
+    selected_journal_id = int(raw_journal) if raw_journal and str(raw_journal).isdigit() else None
 
-    query = (request.GET.get("q") or "").strip()
-    publication_type = (request.GET.get("publication_type") or "").strip()
-    subject = (request.GET.get("subject") or "").strip()
+    if selected_journal_id is None:
+        if request.user.is_authenticated and getattr(request.user, "last_viewed_journal_id", None):
+            selected_journal_id = request.user.last_viewed_journal_id
+        else:
+            selected_journal_id = request.session.get("last_viewed_journal_id")
+
+    # Validate the ID exists among active journals
+    active_ids = {j.pk for j in active_journals}
+    if selected_journal_id not in active_ids:
+        selected_journal_id = active_journals[0].pk if active_journals else None
+
+    selected_journal = next((j for j in active_journals if j.pk == selected_journal_id), None)
+
+    # Persist last-viewed
+    if selected_journal_id:
+        request.session["last_viewed_journal_id"] = selected_journal_id
+        if request.user.is_authenticated and request.user.last_viewed_journal_id != selected_journal_id:
+            from django.contrib.auth import get_user_model
+
+            get_user_model().objects.filter(pk=request.user.pk).update(last_viewed_journal_id=selected_journal_id)
+
+    # --- Month selection + prev/next ---
+    raw_month = request.GET.get("month")
+    if raw_month:
+        selected_month = _parse_journal_month(raw_month)
+    else:
+        # Find the most recent month with a reasonable number of articles for this journal
+        selected_month = _best_default_month(selected_journal_id)
+    prev_month = shift_month(selected_month, -1)
+    next_month = shift_month(selected_month, 1)
+    has_prev_month = WatchedJournalArticle.objects.filter(
+        watched_journal_id=selected_journal_id, publication_month=prev_month
+    ).exists()
+    has_next_month = WatchedJournalArticle.objects.filter(
+        watched_journal_id=selected_journal_id, publication_month=next_month
+    ).exists()
+
+    # --- Fetch articles for this journal + month ---
     article_links = (
-        WatchedJournalArticle.objects.filter(publication_month=selected_month)
+        WatchedJournalArticle.objects.filter(
+            publication_month=selected_month,
+            watched_journal_id=selected_journal_id,
+        )
         .select_related("article", "watched_journal")
         .annotate(
             recommendation_count=Count(
                 "article__user_states",
                 filter=Q(article__user_states__recommended_at__isnull=False),
                 distinct=True,
-            )
+            ),
+            star_count=Count(
+                "article__user_states",
+                filter=Q(article__user_states__starred_at__isnull=False),
+                distinct=True,
+            ),
         )
-        .order_by(
-            "-article__publication_date",
-            "-article__publication_month",
-            "article__title",
-            "watched_journal__name",
-        )
+        .order_by("-article__publication_date", "-article__publication_month", "article__title")
     )
-    if selected_journal_ids:
-        article_links = article_links.filter(watched_journal_id__in=selected_journal_ids)
-    if query:
-        article_links = article_links.filter(
-            Q(article__title__icontains=query)
-            | Q(article__abstract__icontains=query)
-            | Q(article__doi__icontains=query)
-            | Q(article__pmid__icontains=query)
-        )
 
     article_links = list(article_links)
-    available_publication_types = _available_publication_types(article_links)
     user_state_map = {}
     if request.user.is_authenticated:
         user_state_map = {
@@ -885,45 +1040,63 @@ def _journal_browser_rows(request):
             )
         }
 
+    session_starred_ids = set()
+    if not request.user.is_authenticated:
+        session_starred_ids = set(request.session.get("starred_article_ids", []))
+
+    # Build PubmedArticle.pk → Review lookup for articles that have been reviewed
+    pubmed_ids = [link.article_id for link in article_links]
+    review_map = {}
+    if pubmed_ids:
+        reviewed = Review.objects.filter(active=True, article_id__in=pubmed_ids).only("slug", "article_id")
+        for rev in reviewed:
+            review_map.setdefault(rev.article_id, rev)
+
     rows = []
     seen_article_ids = set()
     for link in article_links:
         if link.article_id in seen_article_ids:
             continue
         seen_article_ids.add(link.article_id)
-        if publication_type and publication_type not in article_metadata_list(link.article, "publication_types"):
-            continue
-        if not _journal_article_matches_subject(link.article, subject):
-            continue
-
         link.user_state = user_state_map.get(link.article_id)
+        link.session_starred = link.article_id in session_starred_ids
         link.publication_types = article_metadata_list(link.article, "publication_types")
         link.mesh_terms = article_metadata_list(link.article, "mesh_terms")
         link.keywords = article_metadata_list(link.article, "keywords")
+        link.review = review_map.get(link.article_id)
         rows.append(link)
+
+    sections = _group_articles_by_section(rows)
 
     return {
         "rows": rows,
+        "sections": sections,
         "active_journals": active_journals,
-        "selected_journal_ids": selected_journal_ids,
+        "selected_journal_id": selected_journal_id,
+        "selected_journal": selected_journal,
         "selected_month": selected_month,
-        "month_options": _journal_month_options(),
-        "query": query,
-        "publication_type": publication_type,
-        "subject": subject,
-        "available_publication_types": available_publication_types,
+        "prev_month": prev_month,
+        "next_month": next_month,
+        "has_prev_month": has_prev_month,
+        "has_next_month": has_next_month,
         "can_recommend": can_recommend_pubmed_articles(request.user),
+        "session_starred_ids": session_starred_ids,
     }
 
 
 def _journal_article_actions_context(request, article):
     user_state = None
+    session_starred = False
     if request.user.is_authenticated:
         user_state = PubmedArticleUserState.objects.filter(user=request.user, article=article).first()
+    else:
+        session_starred = article.pk in request.session.get("starred_article_ids", [])
+    star_count = PubmedArticleUserState.objects.filter(article=article, starred_at__isnull=False).count()
     return {
         "article": article,
         "user_state": user_state,
-        "recommendation_count": article.user_states.filter(recommended_at__isnull=False).count(),
+        "session_starred": session_starred,
+        "star_count": star_count,
         "can_recommend": can_recommend_pubmed_articles(request.user),
         "next_url": request.POST.get("next") or request.GET.get("next") or request.get_full_path(),
     }
@@ -934,8 +1107,7 @@ class JournalListView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        browser_context = _journal_browser_rows(self.request)
-        context.update(browser_context)
+        context.update(_journal_browser_context(self.request))
         context["page_title"] = "Journals | Journal Watch"
         context["page_meta_description"] = (
             "Browse cached PubMed articles from watched journals by month, with filters and community recommendations."
@@ -954,24 +1126,65 @@ class JournalListView(TemplateView):
 
     def render_to_response(self, context, **response_kwargs):
         if self.request.headers.get("HX-Request") == "true":
+            context["is_htmx"] = True
             return render(self.request, "submissions/fragments/journal_article_list.html", context, **response_kwargs)
         return super().render_to_response(context, **response_kwargs)
 
 
-@login_required
 @require_POST
 def journal_article_toggle_star(request, article_id):
     article = get_object_or_404(PubmedArticle, pk=article_id)
-    state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
-    state.starred_at = None if state.starred_at else timezone.now()
-    state.save(update_fields=["starred_at", "modified"])
+
+    if request.user.is_authenticated:
+        state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
+        state.starred_at = None if state.starred_at else timezone.now()
+        state.save(update_fields=["starred_at", "modified"])
+    else:
+        starred = request.session.get("starred_article_ids", [])
+        if article.pk in starred:
+            starred.remove(article.pk)
+        else:
+            starred.append(article.pk)
+        request.session["starred_article_ids"] = starred
 
     if request.headers.get("HX-Request") == "true":
-        return render(
-            request,
-            "submissions/fragments/journal_article_actions.html",
-            _journal_article_actions_context(request, article),
-        )
+        source = request.POST.get("source", "")
+        triggers = {}
+
+        if source == "reading_list":
+            # Return empty response to remove the card via outerHTML swap
+            response = HttpResponse("")
+        elif source == "review":
+            # Return the review star button fragment
+            star_target_id = request.POST.get("star_target_id", "")
+            star_count = PubmedArticleUserState.objects.filter(article=article, starred_at__isnull=False).count()
+            ctx = {"pubmed_article": article, "star_count": star_count}
+            if star_target_id:
+                ctx["star_target_id"] = star_target_id
+            if request.user.is_authenticated:
+                ctx["pubmed_user_state"] = PubmedArticleUserState.objects.filter(
+                    user=request.user, article=article
+                ).first()
+            else:
+                ctx["pubmed_session_starred"] = article.pk in request.session.get("starred_article_ids", [])
+            response = render(request, "submissions/fragments/review_star_button.html", ctx)
+        else:
+            response = render(
+                request,
+                "submissions/fragments/journal_article_actions.html",
+                _journal_article_actions_context(request, article),
+            )
+
+        if not request.user.is_authenticated:
+            starred_count = len(request.session.get("starred_article_ids", []))
+            triggers["showLoginPrompt"] = {"count": starred_count}
+
+        # Notify reading list dot indicator
+        triggers["starChanged"] = True
+        if triggers:
+            response["HX-Trigger"] = json.dumps(triggers)
+
+        return response
     return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
 
 
@@ -994,3 +1207,193 @@ def journal_article_toggle_recommend(request, article_id):
             _journal_article_actions_context(request, article),
         )
     return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+
+
+def journal_search(request):
+    """Live search across all journals, rendered in the search drawer."""
+    query = (request.GET.get("q") or "").strip()
+    journal_filter = request.GET.get("journal") or ""
+    active_journals = list(WatchedJournal.objects.filter(active=True).order_by("name"))
+
+    results = []
+    if len(query) >= 2:
+        qs = (
+            WatchedJournalArticle.objects.select_related("article", "watched_journal")
+            .annotate(
+                recommendation_count=Count(
+                    "article__user_states",
+                    filter=Q(article__user_states__recommended_at__isnull=False),
+                    distinct=True,
+                )
+            )
+            .filter(
+                Q(article__title__icontains=query)
+                | Q(article__abstract__icontains=query)
+                | Q(article__doi__icontains=query)
+                | Q(article__pmid__icontains=query)
+            )
+            .order_by("-article__publication_date", "-article__publication_month", "article__title")
+        )
+        if journal_filter and str(journal_filter).isdigit():
+            qs = qs.filter(watched_journal_id=int(journal_filter))
+
+        seen = set()
+        for link in qs[:80]:
+            if link.article_id in seen:
+                continue
+            seen.add(link.article_id)
+            results.append(link)
+            if len(results) >= 50:
+                break
+
+    context = {
+        "query": query,
+        "results": results,
+        "active_journals": active_journals,
+        "journal_filter": journal_filter,
+    }
+    return render(request, "submissions/fragments/journal_search_results.html", context)
+
+
+def journal_reading_list(request):
+    """Full-width reading list with active/archived tabs, search, and journal filter."""
+    from itertools import groupby
+
+    tab = request.GET.get("tab", "active")
+    query = (request.GET.get("q") or "").strip()
+    journal_filter = (request.GET.get("journal") or "").strip()
+
+    active_count = 0
+    archived_count = 0
+    items = []
+    journal_names = set()
+
+    if request.user.is_authenticated:
+        base_qs = PubmedArticleUserState.objects.filter(user=request.user, starred_at__isnull=False).select_related(
+            "article"
+        )
+
+        active_count = base_qs.filter(read_at__isnull=True).count()
+        archived_count = base_qs.filter(read_at__isnull=False).count()
+
+        if tab == "archived":
+            qs = base_qs.filter(read_at__isnull=False).order_by("-read_at")
+        else:
+            qs = base_qs.filter(read_at__isnull=True).order_by("-starred_at")
+
+        if query:
+            qs = qs.filter(Q(article__title__icontains=query) | Q(article__abstract__icontains=query))
+        if journal_filter:
+            qs = qs.filter(article__source_journal_name=journal_filter)
+
+        for state in qs:
+            date_key = state.read_at if tab == "archived" else state.starred_at
+            items.append(
+                {
+                    "article": state.article,
+                    "state": state,
+                    "group_key": date_key.strftime("%B %Y") if date_key else "Unknown",
+                }
+            )
+            if state.article.source_journal_name:
+                journal_names.add(state.article.source_journal_name)
+
+        # Also get journal names from the full unfiltered set for the dropdown
+        all_names = base_qs.values_list("article__source_journal_name", flat=True).distinct().order_by()
+        journal_names = sorted(n for n in all_names if n)
+    else:
+        starred_ids = request.session.get("starred_article_ids", [])
+        if starred_ids:
+            articles_qs = PubmedArticle.objects.filter(pk__in=starred_ids)
+            if query:
+                articles_qs = articles_qs.filter(Q(title__icontains=query) | Q(abstract__icontains=query))
+            if journal_filter:
+                articles_qs = articles_qs.filter(source_journal_name=journal_filter)
+
+            articles_qs = articles_qs.order_by("-publication_date", "-publication_month")
+            active_count = len(starred_ids)
+
+            for article in articles_qs:
+                month = article.publication_month or article.publication_date
+                items.append(
+                    {
+                        "article": article,
+                        "state": None,
+                        "group_key": month.strftime("%B %Y") if month else "Unknown date",
+                    }
+                )
+                if article.source_journal_name:
+                    journal_names.add(article.source_journal_name)
+            journal_names = sorted(journal_names)
+
+    # Build star count + review lookup for reading list items
+    reading_list_pubmed_ids = [item["article"].pk for item in items]
+    star_count_map = {}
+    if reading_list_pubmed_ids:
+        star_counts = (
+            PubmedArticleUserState.objects.filter(
+                article_id__in=reading_list_pubmed_ids,
+                starred_at__isnull=False,
+            )
+            .values("article_id")
+            .annotate(count=Count("id"))
+        )
+        star_count_map = {row["article_id"]: row["count"] for row in star_counts}
+    for item in items:
+        item["star_count"] = star_count_map.get(item["article"].pk, 0)
+
+    review_map = {}
+    if reading_list_pubmed_ids:
+        reviewed = Review.objects.filter(active=True, article_id__in=reading_list_pubmed_ids).only(
+            "slug", "article_id"
+        )
+        for rev in reviewed:
+            review_map.setdefault(rev.article_id, rev)
+    for item in items:
+        item["review"] = review_map.get(item["article"].pk)
+
+    grouped = []
+    for key, group in groupby(items, key=lambda x: x["group_key"]):
+        grouped.append((key, list(group)))
+
+    context = {
+        "grouped_items": grouped,
+        "total_count": len(items),
+        "active_count": active_count,
+        "archived_count": archived_count,
+        "tab": tab,
+        "query": query,
+        "journal_filter": journal_filter,
+        "journal_names": journal_names,
+        "is_reading_list": True,
+        "can_recommend": can_recommend_pubmed_articles(request.user),
+    }
+    return render(request, "submissions/fragments/journal_reading_list.html", context)
+
+
+@login_required
+@require_POST
+def journal_article_toggle_archive(request, article_id):
+    """Toggle read_at (archive/unarchive) on a starred article."""
+    state = get_object_or_404(
+        PubmedArticleUserState, user=request.user, article_id=article_id, starred_at__isnull=False
+    )
+    state.read_at = None if state.read_at else timezone.now()
+    state.save(update_fields=["read_at", "modified"])
+
+    if request.headers.get("HX-Request") == "true":
+        # After toggle the card no longer belongs on the current tab — remove it.
+        # Also update the tab counts via OOB swap.
+        base_qs = PubmedArticleUserState.objects.filter(user=request.user, starred_at__isnull=False)
+        active_count = base_qs.filter(read_at__isnull=True).count()
+        archived_count = base_qs.filter(read_at__isnull=False).count()
+        oob_html = (
+            f'<span class="journal-reading-list__tab-count" '
+            f'id="reading-list-active-count" hx-swap-oob="innerHTML:#reading-list-active-count">'
+            f"{active_count}</span>"
+            f'<span class="journal-reading-list__tab-count" '
+            f'id="reading-list-archived-count" hx-swap-oob="innerHTML:#reading-list-archived-count">'
+            f"{archived_count}</span>"
+        )
+        return HttpResponse(oob_html)
+    return redirect(reverse("submissions:journal_list"))

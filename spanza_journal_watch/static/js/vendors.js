@@ -5,7 +5,9 @@ import Modal from 'bootstrap/js/dist/modal';
 import Offcanvas from 'bootstrap/js/dist/offcanvas';
 import Popover from 'bootstrap/js/dist/popover';
 import Tab from 'bootstrap/js/dist/tab';
-import 'htmx.org';
+import Toast from 'bootstrap/js/dist/toast';
+import htmx from 'htmx.org';
+window.htmx = htmx;
 
 window.bootstrap = {
   Collapse,
@@ -14,4 +16,5 @@ window.bootstrap = {
   Offcanvas,
   Popover,
   Tab,
+  Toast,
 };

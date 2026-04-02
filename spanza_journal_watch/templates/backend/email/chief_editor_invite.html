@@ -1,0 +1,54 @@
+{% load mjml %}
+{% mjml %}
+<mjml>
+  <mj-body background-color="#f6f7fb">
+
+    <mj-section padding-bottom="0">
+      <mj-column>
+        <mj-text font-size="12px" color="#888888" align="center" letter-spacing="0.08em" font-weight="600">
+          JOURNAL WATCH
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#ffffff" border-radius="8px" padding="32px 24px">
+      <mj-column>
+        <mj-text font-size="22px" font-weight="700" color="#152b3b" padding-bottom="8px">
+          You've been invited to become a Chief Editor
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.6" padding-bottom="20px">
+          {% if invite.name %}Hello {{ invite.name }},<br><br>{% endif %}
+          {{ invited_by.get_full_name|default:invited_by.email }} has invited you to become a
+          <strong>chief editor</strong> on SPANZA Journal Watch.
+          Chief editors have full access to the editorial backend, including managing issues,
+          contributors, newsletters, and site settings.
+          <br><br>
+          Click the button below to accept your invitation.
+        </mj-text>
+        <mj-button href="{{ accept_url }}" background-color="#0d6efd" border-radius="6px" font-size="15px" padding="12px 24px">
+          Accept invitation
+        </mj-button>
+        <mj-text font-size="13px" color="#888888" padding-top="20px">
+          This link expires on {{ invite.expires_at|date:"j M Y" }} and can only be used with the email address it was sent to.
+        </mj-text>
+        <mj-text font-size="12px" color="#aaaaaa" padding-top="20px">
+          If the button above doesn't work, paste this link into your browser:<br>
+          {{ accept_url }}
+        </mj-text>
+        <mj-text font-size="12px" color="#aaaaaa" padding-top="4px">
+          If you did not expect this invitation, you can safely ignore this email.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding-top="16px">
+      <mj-column>
+        <mj-text font-size="12px" color="#aaaaaa" align="center">
+          SPANZA Journal Watch &mdash; paediatric anaesthesia literature review
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+  </mj-body>
+</mjml>
+{% endmjml %}

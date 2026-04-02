@@ -25,8 +25,9 @@ from spanza_journal_watch.analytics.utils import (
     is_probable_automated_newsletter_event,
     set_newsletter_referrer_in_session,
 )
+from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
 
 pytestmark = pytest.mark.django_db
 
@@ -50,11 +51,11 @@ def test_newsletter_event_immediately_after_send_is_probably_automated():
 def _make_review():
     journal = Journal.objects.create(name="Analytics Journal")
     author = Author.objects.create(name="Analytics Author")
-    article = Article.objects.create(
-        name="Analytics Review Article",
+    article = PubmedArticle.objects.create(
+        title="Analytics Review Article",
         journal=journal,
         citation="Citation text",
-        url="https://example.com/full-text",
+        article_url="https://example.com/full-text",
         active=True,
     )
     review = Review(

@@ -1,0 +1,51 @@
+{% load static %}
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="user-profile-drawer" aria-labelledby="user-profile-drawer-label">
+  <div class="offcanvas-header border-bottom">
+    <h5 class="offcanvas-title" id="user-profile-drawer-label">Account</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    {% if request.user.is_authenticated %}
+      {# ── User info ─────────────────────────────────── #}
+      <div class="mb-4">
+        {% include "fragments/user_profile_name.html" %}
+      </div>
+
+      {# ── Newsletter subscription ───────────────────── #}
+      <div class="mb-4" id="profile-newsletter-toggle">
+        {% include "fragments/user_profile_newsletter_toggle.html" %}
+      </div>
+
+      {# ── CPD tracking ─────────────────────────────── #}
+      <div class="mb-4" id="profile-cpd-toggle">
+        {% include "fragments/cpd_tracking_toggle.html" with user=request.user %}
+      </div>
+
+      <hr>
+
+      {# ── Navigation links ──────────────────────────── #}
+      <div class="d-grid gap-2">
+        <a href="{% url 'cpd:report_page' %}" class="btn btn-outline-secondary">
+          <svg class="bi me-1" width="1em" height="1em"><use href="#icon-file-text"></use></svg>
+          CPD Report
+        </a>
+        {% if perms.submissions.manage_issue_builder %}
+          <a href="{% url 'backend:backend_go' %}" class="btn btn-outline-secondary">
+            <svg class="bi me-1" width="1em" height="1em"><use href="#icon-gear"></use></svg>
+            Editor
+          </a>
+        {% endif %}
+        <a href="{% url 'account_logout' %}" class="btn btn-outline-secondary">Log out</a>
+      </div>
+
+    {% else %}
+      {# ── Anonymous user ────────────────────────────── #}
+      <p class="text-muted mb-4">Create an account to subscribe to our newsletter and manage your reading list.</p>
+      <div class="d-grid gap-2 mb-4">
+        <a href="{% url 'account_login' %}" class="btn btn-outline-primary">Log in</a>
+        <a href="{% url 'account_signup' %}" class="btn btn-primary">Sign up</a>
+      </div>
+    {% endif %}
+  </div>
+</div>

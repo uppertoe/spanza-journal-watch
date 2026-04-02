@@ -1,0 +1,71 @@
+<div id="watched-journals-table">
+{% if watched_journals %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>ISSN</th>
+          <th>Status</th>
+          <th>Frontend</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for watched in watched_journals %}
+          <tr>
+            <td>{{ watched.name }}</td>
+            <td>
+              {% if watched.issn_print %}<div>Print: {{ watched.issn_print }}</div>{% endif %}
+              {% if watched.issn_electronic %}<div>Electronic: {{ watched.issn_electronic }}</div>{% endif %}
+              {% if not watched.issn_print and not watched.issn_electronic %}-{% endif %}
+            </td>
+            <td>
+              {% if watched.active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if watched.visible_on_frontend %}
+                <span class="badge text-bg-success">Visible</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Hidden</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <form method="post" action="{% url "backend:watched_journal_toggle_active" watched.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="settings">
+                  <button type="submit"
+                    class="btn btn-sm btn-outline-secondary"
+                    hx-post="{% url "backend:watched_journal_toggle_active" watched.pk %}"
+                    hx-target="#watched-journals-table"
+                    hx-swap="outerHTML"
+                    hx-vals='{"next": "htmx"}'
+                  >Toggle active</button>
+                </form>
+                <form method="post" action="{% url "backend:watched_journal_toggle_frontend" watched.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="settings">
+                  <button type="submit"
+                    class="btn btn-sm btn-outline-secondary"
+                    hx-post="{% url "backend:watched_journal_toggle_frontend" watched.pk %}"
+                    hx-target="#watched-journals-table"
+                    hx-swap="outerHTML"
+                    hx-vals='{"next": "htmx"}'
+                  >Toggle frontend</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-info mb-0">No watched journals yet.</div>
+{% endif %}
+</div>

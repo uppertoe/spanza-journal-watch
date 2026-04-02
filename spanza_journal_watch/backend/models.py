@@ -487,6 +487,96 @@ class IssueContributorInvite(TimeStampedModel):
         return f"Invite for {self.contributor.email} ({self.contributor.issue})"
 
 
+class ChiefEditorInvite(TimeStampedModel):
+    """Invitation to promote a user to chief editor."""
+
+    email = models.EmailField()
+    name = models.CharField(max_length=255, blank=True)
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="chief_editor_invite_accepted",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="chief_editor_invites_sent",
+    )
+    sent_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ("-created",)
+
+    @staticmethod
+    def generate_raw_token():
+        return secrets.token_urlsafe(32)
+
+    @staticmethod
+    def hash_token(raw_token):
+        return hashlib.sha256((raw_token or "").encode("utf-8")).hexdigest()
+
+    def is_active(self):
+        return not self.consumed_at and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"Chief editor invite for {self.email}"
+
+
+class FetchLog(TimeStampedModel):
+    """Records each NIH/PubMed fetch operation for monitoring."""
+
+    TASK_CACHE_REFRESH = "cache_refresh"
+    TASK_BATCH_IMPORT = "batch_import"
+    TASK_BATCH_PUSH = "batch_push"
+    TASK_TYPE_CHOICES = [
+        (TASK_CACHE_REFRESH, "Cache refresh"),
+        (TASK_BATCH_IMPORT, "Batch import"),
+        (TASK_BATCH_PUSH, "Batch push"),
+    ]
+
+    STATUS_RUNNING = "running"
+    STATUS_SUCCESS = "success"
+    STATUS_ERROR = "error"
+    STATUS_CHOICES = [
+        (STATUS_RUNNING, "Running"),
+        (STATUS_SUCCESS, "Success"),
+        (STATUS_ERROR, "Error"),
+    ]
+
+    task_type = models.CharField(max_length=24, choices=TASK_TYPE_CHOICES)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_RUNNING)
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(blank=True, null=True)
+    duration_seconds = models.FloatField(blank=True, null=True)
+    journal_count = models.PositiveIntegerField(default=0)
+    articles_created = models.PositiveIntegerField(default=0)
+    articles_touched = models.PositiveIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-started_at",)
+
+    def finish(self, status, **kwargs):
+        self.status = status
+        self.finished_at = timezone.now()
+        self.duration_seconds = (self.finished_at - self.started_at).total_seconds()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        self.save()
+
+    def __str__(self):
+        return f"{self.get_task_type_display()} ({self.status}) — {self.started_at:%Y-%m-%d %H:%M}"
+
+
 class PubmedIntegrationCredential(TimeStampedModel):
     singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     api_key = models.TextField(blank=True)
@@ -570,6 +660,10 @@ class PubmedIntegrationCredential(TimeStampedModel):
 
 
 class WatchedJournal(TimeStampedModel):
+    class Source(models.TextChoices):
+        PUBMED = "pubmed", "PubMed"
+        CROSSREF = "crossref", "CrossRef"
+
     name = models.CharField(max_length=255)
     journal = models.ForeignKey(
         "submissions.Journal",
@@ -580,7 +674,9 @@ class WatchedJournal(TimeStampedModel):
     )
     issn_print = models.CharField(max_length=32, blank=True)
     issn_electronic = models.CharField(max_length=32, blank=True)
+    source = models.CharField(max_length=16, choices=Source.choices, default=Source.PUBMED)
     active = models.BooleanField(default=True)
+    visible_on_frontend = models.BooleanField(default=True)
 
     class Meta:
         ordering = ("name",)
@@ -633,11 +729,15 @@ class PubmedArticleUserState(TimeStampedModel):
     article = models.ForeignKey("backend.PubmedArticle", on_delete=models.CASCADE, related_name="user_states")
     starred_at = models.DateTimeField(blank=True, null=True)
     recommended_at = models.DateTimeField(blank=True, null=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+    full_text_clicked_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         indexes = [
             models.Index(fields=["article", "recommended_at"], name="backend_paus_article_rec_idx"),
             models.Index(fields=["user", "starred_at"], name="backend_paus_user_star_idx"),
+            models.Index(fields=["user", "read_at"], name="backend_paus_user_read_idx"),
+            models.Index(fields=["user", "full_text_clicked_at"], name="backend_paus_user_ftclick_idx"),
         ]
         constraints = [
             models.UniqueConstraint(fields=["user", "article"], name="uniq_pubmed_article_user_state"),
@@ -757,7 +857,10 @@ class PubmedImportBatch(TimeStampedModel):
 
 
 class PubmedArticle(TimeStampedModel):
-    pmid = models.CharField(max_length=32, unique=True)
+    TRUNCATED_NAME_LENGTH = 50
+
+    # PubMed fields
+    pmid = models.CharField(max_length=32, unique=True, blank=True, null=True)
     doi = models.CharField(max_length=255, blank=True, null=True, unique=True)
     title = models.TextField(blank=True)
     abstract = models.TextField(blank=True)
@@ -768,16 +871,106 @@ class PubmedArticle(TimeStampedModel):
     pubmed_url = models.URLField(max_length=500, blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
 
+    # Editorial fields (merged from submissions.Article)
+    tags_string = models.TextField(blank=True, default="")
+    journal = models.ForeignKey(
+        "submissions.Journal", on_delete=models.SET_NULL, null=True, blank=True, related_name="articles"
+    )
+    citation = models.TextField(blank=True, default="")
+    active = models.BooleanField(default=False)
+    recommendation_hidden = models.BooleanField(default=False)
+
     class Meta:
         ordering = ("-publication_date", "-created")
+        indexes = [
+            models.Index(fields=["pmid"], name="backend_pa_pmid_idx"),
+        ]
 
     def save(self, *args, **kwargs):
         doi = (self.doi or "").strip().lower()
         self.doi = doi or None
+        # Normalise empty pmid to None for unique constraint
+        if not self.pmid:
+            self.pmid = None
         super().save(*args, **kwargs)
+        if self.tags_string:
+            current_tags = self.create_tag_objects()
+            self.prune_tag_objects(current_tags)
 
     def __str__(self):
         return self.title or f"PMID {self.pmid}"
+
+    # ── Compatibility properties (for templates using old Article field names) ──
+
+    @property
+    def name(self):
+        return self.title
+
+    @property
+    def url(self):
+        return self.article_url
+
+    @property
+    def year(self):
+        return self.publication_date.year if self.publication_date else None
+
+    # ── Title / subtitle helpers (ported from submissions.Article) ──
+
+    def get_title(self):
+        separators = [":", " - "]
+        for sep in separators:
+            if sep in self.title:
+                return self.title.split(sep, 1)[0].strip()
+        return self.title
+
+    def get_subtitle(self):
+        separators = [":", "-"]
+        for sep in separators:
+            if sep in self.title:
+                return self.title.split(sep, 1)[1].strip()
+        return ""
+
+    def get_truncated_name(self):
+        from spanza_journal_watch.utils.functions import shorten_text
+
+        return shorten_text(self.title, self.TRUNCATED_NAME_LENGTH)
+
+    def get_related_review(self):
+        return self.reviews.exclude(active=False).order_by("-created").first()
+
+    # ── Tag management (ported from submissions.Article) ──
+
+    def tags_list(self):
+        from django.utils.text import slugify
+
+        hashtag_list = []
+        for word in self.tags_string.split(" "):
+            if slugify(word) and word[0] == "#":
+                hashtag_list.append(slugify(word[:255]))
+        return list(set(hashtag_list))
+
+    def create_tag_objects(self):
+        from spanza_journal_watch.submissions.models import Tag
+
+        current_tags = []
+        for text in self.tags_list():
+            try:
+                tag = Tag.objects.get(text=text)
+            except Tag.DoesNotExist:
+                tag = Tag(text=text)
+                tag.save()
+            except Tag.MultipleObjectsReturned:
+                continue
+            current_tags.append(tag)
+            tag.articles.add(self)
+        return current_tags
+
+    def prune_tag_objects(self, current_tags):
+        tags = self.tags.all()
+        for tag in tags:
+            if tag not in current_tags:
+                tag.articles.remove(self)
+                tag.delete_if_orphaned()
 
 
 class PubmedBatchArticle(TimeStampedModel):
@@ -814,4 +1007,6 @@ class PubmedBatchArticle(TimeStampedModel):
 
 
 def can_recommend_pubmed_articles(user):
-    return bool(getattr(user, "is_authenticated", False))
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return user.has_perm("submissions.can_recommend")

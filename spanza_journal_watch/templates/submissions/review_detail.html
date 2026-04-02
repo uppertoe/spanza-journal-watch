@@ -26,11 +26,16 @@
 <div class="mb-3">
     {% include 'fragments/share_actions.html' with show_social_links=True %}
 </div>
-<div class="d-flex mt-auto justify-content-between align-items-center">
+<div class="d-flex mt-auto justify-content-between align-items-center flex-wrap gap-2">
     <div class="btn-group">
         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-custom-class="journalwatch-popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</button>
-        <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" data-analytics-full-text>View full text article</a>
+        <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" data-analytics-full-text data-cpd-article-id="{{ review.article.pk }}">View full text article</a>
     </div>
+    {% if pubmed_article %}
+      <div id="review-star-actions">
+        {% include "submissions/fragments/review_star_button.html" %}
+      </div>
+    {% endif %}
 </div>
 <p class="text-break">{{ review.get_markdown_body|safe }}</p>
 </article>

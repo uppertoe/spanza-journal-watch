@@ -1,0 +1,129 @@
+{# Hide month nav when reading list is displayed via OOB swap #}
+{% if is_reading_list %}
+<nav id="journal-month-nav" class="journal-month-nav mb-4 d-none" hx-swap-oob="outerHTML:#journal-month-nav"></nav>
+{% endif %}
+
+<div class="journal-reading-list">
+  <a href="{% url 'submissions:journal_list' %}" class="btn btn-sm btn-outline-secondary mb-3 d-inline-flex align-items-center gap-1">&larr; Back to shelf</a>
+
+  {# ── CPD tracking reminder ─────────────────────────────── #}
+  {% if request.user.is_authenticated and not request.user.cpd_tracking_enabled %}
+    <div class="alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3 small" role="alert">
+      <svg class="bi flex-shrink-0 mt-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-file-text"></use></svg>
+      <div>
+        <strong>Track your reading for CPD.</strong>
+        Enable CPD tracking in your <a href="#" data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer" class="alert-link">profile menu</a> to record full-text clicks for your ANZCA CPD submission.
+      </div>
+    </div>
+  {% endif %}
+
+  {# ── Header + filter bar ────────────────────────────────── #}
+  <div class="journal-reading-list__header mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+      <div>
+        <p class="text-uppercase small fw-semibold text-warning mb-1">
+          <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+          Reading list
+        </p>
+        <h2 class="h4 mb-0">{{ total_count }} article{{ total_count|pluralize }}</h2>
+      </div>
+      {% if request.user.is_authenticated %}
+        <p class="small text-muted mb-0">Star articles while browsing to add them here. Archive articles once you've read them.</p>
+      {% else %}
+        <p class="small text-muted mb-0">
+          <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}">Sign up</a> or
+          <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}">log in</a> to archive articles and keep your list permanently.
+        </p>
+      {% endif %}
+    </div>
+
+    <form class="journal-reading-list__filters" id="reading-list-filters">
+      {# Active / Archived tabs #}
+      {% if request.user.is_authenticated %}
+        <div class="journal-reading-list__tabs">
+          <button
+            type="button"
+            class="journal-reading-list__tab {% if tab == 'active' %}journal-reading-list__tab--active{% endif %}"
+            hx-get="{% url 'submissions:journal_reading_list' %}?tab=active"
+            hx-target="#journal-browser-results"
+            hx-swap="innerHTML"
+          >
+            Active <span class="journal-reading-list__tab-count" id="reading-list-active-count">{{ active_count }}</span>
+          </button>
+          <button
+            type="button"
+            class="journal-reading-list__tab {% if tab == 'archived' %}journal-reading-list__tab--active{% endif %}"
+            hx-get="{% url 'submissions:journal_reading_list' %}?tab=archived"
+            hx-target="#journal-browser-results"
+            hx-swap="innerHTML"
+          >
+            Archived <span class="journal-reading-list__tab-count" id="reading-list-archived-count">{{ archived_count }}</span>
+          </button>
+        </div>
+      {% endif %}
+
+      <input type="hidden" name="tab" value="{{ tab }}">
+
+      <div class="journal-reading-list__search-group">
+        <input
+          type="search"
+          name="q"
+          value="{{ query }}"
+          id="reading-list-search"
+          class="form-control form-control-sm"
+          placeholder="Search reading list..."
+          autocomplete="off"
+          hx-get="{% url 'submissions:journal_reading_list' %}"
+          hx-trigger="keyup changed delay:300ms, search"
+          hx-target="#journal-browser-results"
+          hx-swap="innerHTML show:none"
+          hx-include="#reading-list-filters"
+        >
+        <select
+          name="journal"
+          class="form-select form-select-sm"
+          hx-get="{% url 'submissions:journal_reading_list' %}"
+          hx-trigger="change"
+          hx-target="#journal-browser-results"
+          hx-swap="innerHTML"
+          hx-include="#reading-list-filters"
+        >
+          <option value="">All journals</option>
+          {% for name in journal_names %}
+            <option value="{{ name }}" {% if journal_filter == name %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+
+  {# ── Article groups ──────────────────────────────────────── #}
+  {% if grouped_items %}
+    {% for group_label, items in grouped_items %}
+      <div class="journal-reading-list__group mb-4">
+        <h3 class="journal-reading-list__group-header">{{ group_label }}</h3>
+        <div class="d-grid gap-3">
+          {% for item in items %}
+            {% include "submissions/fragments/journal_reading_list_card.html" %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="card shadow-sm border-0">
+      <div class="card-body text-center py-5">
+        {% if query or journal_filter %}
+          <h3 class="h5 mb-2">No matching articles</h3>
+          <p class="text-muted mb-0">Try adjusting your search or filter.</p>
+        {% elif tab == "archived" %}
+          <h3 class="h5 mb-2">No archived articles</h3>
+          <p class="text-muted mb-0">Articles you mark as read will appear here.</p>
+        {% else %}
+          <svg class="bi text-muted mb-3" width="2.5em" height="2.5em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+          <h3 class="h5 mb-2">Your reading list is empty</h3>
+          <p class="text-muted mb-0">Star articles while browsing journals to build your reading list.</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>

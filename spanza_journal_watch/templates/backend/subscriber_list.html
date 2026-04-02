@@ -1,8 +1,20 @@
 {% extends "backend/backend_base.html" %}
 
 {% block content %}
-<h1>Mailing List</h1>
-<p class="text-muted">Search and filter subscribers by status (subscribed, bounced, complained).</p>
+<h1>Users &amp; Subscribers</h1>
+<p class="text-muted">Manage user accounts, permissions, and newsletter subscriptions.</p>
+
+{# ── View mode tabs ──────────────────────────── #}
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if view_mode == 'users' %}active{% endif %}"
+       href="{% url 'backend:subscriber_list' %}?view=users">Users</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if view_mode == 'subscribers' %}active{% endif %}"
+       href="{% url 'backend:subscriber_list' %}?view=subscribers">Subscribers only</a>
+  </li>
+</ul>
 
 <form
   id="subscriber-filter-form"
@@ -13,12 +25,13 @@
   hx-target="#subscriber-list-results"
   hx-swap="outerHTML"
 >
+  <input type="hidden" name="view" value="{{ view_mode }}">
   <div class="col-md-4">
     <input
       type="text"
       name="q"
       class="form-control"
-      placeholder="Search email or upload name"
+      placeholder="{% if view_mode == 'users' %}Search name or email{% else %}Search email or upload name{% endif %}"
       value="{{ subscriber_filters.q }}"
       hx-trigger="input changed delay:300ms, search"
       hx-get="{% url "backend:subscriber_list" %}"
@@ -31,23 +44,25 @@
     <select class="form-select" name="subscribed">
       <option value="">Subscribed: any</option>
       <option value="true" {% if subscriber_filters.subscribed == "true" %}selected{% endif %}>Subscribed</option>
-      <option value="false" {% if subscriber_filters.subscribed == "false" %}selected{% endif %}>Unsubscribed</option>
+      <option value="false" {% if subscriber_filters.subscribed == "false" %}selected{% endif %}>Not subscribed</option>
     </select>
   </div>
-  <div class="col-md-2">
-    <select class="form-select" name="bounced">
-      <option value="">Bounced: any</option>
-      <option value="true" {% if subscriber_filters.bounced == "true" %}selected{% endif %}>Bounced</option>
-      <option value="false" {% if subscriber_filters.bounced == "false" %}selected{% endif %}>Not bounced</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <select class="form-select" name="complained">
-      <option value="">Complained: any</option>
-      <option value="true" {% if subscriber_filters.complained == "true" %}selected{% endif %}>Complained</option>
-      <option value="false" {% if subscriber_filters.complained == "false" %}selected{% endif %}>Not complained</option>
-    </select>
-  </div>
+  {% if view_mode == 'users' %}
+    <div class="col-md-2">
+      <select class="form-select" name="role">
+        <option value="">Role: any</option>
+        <option value="staff" {% if subscriber_filters.role == "staff" %}selected{% endif %}>Staff</option>
+        <option value="can_recommend" {% if subscriber_filters.role == "can_recommend" %}selected{% endif %}>Can recommend</option>
+        <option value="locked" {% if subscriber_filters.role == "locked" %}selected{% endif %}>Locked</option>
+      </select>
+    </div>
+  {% else %}
+    <div class="col-md-2">
+      <select class="form-select" name="bounced" disabled>
+        <option value="">Bounced: any</option>
+      </select>
+    </div>
+  {% endif %}
   <div class="col-md-2">
     <button type="submit" class="btn btn-outline-primary w-100">Apply filters</button>
   </div>

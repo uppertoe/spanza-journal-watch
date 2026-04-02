@@ -5,46 +5,77 @@
 {% block sidebar %}{% endblock sidebar %}
 {% block main-feature %}
   <div class="container">
-    {% include "fragments/main_feature.html" with title="Browse the shelf, then drill into a month." body="Explore cached PubMed articles from watched journals, then narrow by month, metadata, and free text." header_theme="journals" header_pattern="shelf" header_kicker="Journal browser" %}
+    {% include "fragments/main_feature.html" with title="Pick a journal and start browsing." body="Select a title from the shelf, then thumb through the issue month by month." header_theme="journals" header_pattern="shelf" header_kicker="Journal browser" %}
   </div>
 {% endblock main-feature %}
 
 {% block content %}
   <section class="journal-browser-page pb-5">
     <div class="container">
-      <form
-        hx-get="{% url 'submissions:journal_list' %}"
-        hx-target="#journal-browser-results"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-        class="journal-browser-form"
-      >
-        <section class="journal-shelf-card mb-4">
-          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-3">
-            <div>
-              <p class="text-uppercase small fw-semibold text-primary mb-1">Pick journals</p>
-              <h2 class="h4 mb-0">Your shelf</h2>
-            </div>
-            <p class="text-muted small mb-0">
-              {% if request.user.is_authenticated %}
-                Your saved journals are preselected. You can mix and match any shelf title below.
-              {% else %}
-                Start with one or more watched journals, then refine the article list below.
-              {% endif %}
-            </p>
-          </div>
 
-          <div class="journal-shelf-grid">
+      {# ── THE SHELF ───────────────────────────────────────────────── #}
+      <section class="journal-shelf-card mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-3">
+          <div>
+            <p class="text-uppercase small fw-semibold text-primary mb-1">The shelf</p>
+            <h2 class="h4 mb-0">Pick a journal</h2>
+          </div>
+          <div class="d-flex gap-2">
+            <button
+              class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+              type="button"
+              data-bs-toggle="offcanvas"
+              data-bs-target="#search-drawer"
+              aria-controls="search-drawer"
+            >
+              <svg class="bi" width="1em" height="1em" aria-hidden="true"><use href="#icon-search"></use></svg>
+              Search all journals
+            </button>
+            <button
+              id="reading-list-btn"
+              class="btn btn-sm btn-outline-warning d-inline-flex align-items-center gap-1 position-relative"
+              type="button"
+              hx-get="{% url 'submissions:journal_reading_list' %}"
+              hx-target="#journal-browser-results"
+              hx-swap="innerHTML"
+            >
+              <svg class="bi" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+              Reading list
+              <span class="jw-dot-indicator d-none" id="reading-list-dot"></span>
+            </button>
+          </div>
+        </div>
+
+        {# ── Hidden journals restore bar ──────────────────────── #}
+        <div id="shelf-hidden-bar" class="journal-shelf-hidden-bar d-none">
+          <span class="small text-muted">
+            <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-eye-slash"></use></svg>
+            <span id="shelf-hidden-count">0</span> journal(s) hidden
+          </span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="shelf-show-all-btn">Show all</button>
+        </div>
+
+        {# ── Shelf scroll wrapper ──────────────────────────────── #}
+        <div class="journal-shelf-scroll-wrapper">
+          <button type="button" class="journal-shelf-arrow journal-shelf-arrow--left d-none d-lg-flex" id="shelf-arrow-left" aria-label="Scroll left">
+            <svg class="bi" width="1.25em" height="1.25em"><use href="#icon-chevron-left"></use></svg>
+          </button>
+          <div class="journal-shelf-grid" id="journal-shelf-grid">
             {% for journal in active_journals %}
               {% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as book_pattern silent %}
-              <div class="journal-book journal-book--{{ journal.shelf_tone }} journal-book--pattern-{{ book_pattern }}">
+              <div class="journal-book journal-book--{{ journal.shelf_tone }} journal-book--pattern-{{ book_pattern }}" data-journal-id="{{ journal.pk }}">
                 <input
                   class="journal-book__input"
-                  type="checkbox"
-                  name="journal"
+                  type="radio"
+                  name="journal-select"
                   value="{{ journal.pk }}"
                   id="journal-{{ journal.pk }}"
-                  {% if journal.pk in selected_journal_ids %}checked{% endif %}
+                  {% if journal.pk == selected_journal_id %}checked{% endif %}
+                  hx-get="{% url 'submissions:journal_list' %}?journal={{ journal.pk }}&month={{ selected_month|date:'Y-m' }}"
+                  hx-target="#journal-browser-results"
+                  hx-swap="innerHTML"
+                  hx-trigger="change"
+                  hx-push-url="true"
                 >
                 <label class="journal-book__label" for="journal-{{ journal.pk }}">
                   <span class="journal-book__bookmark" aria-hidden="true"></span>
@@ -54,6 +85,9 @@
                   <span class="journal-book__spine"></span>
                   <span class="journal-book__title">{{ journal.name }}</span>
                 </label>
+                <button type="button" class="journal-book__hide-btn" aria-label="Hide {{ journal.name }} from shelf" data-hide-journal="{{ journal.pk }}">
+                  <svg class="bi" width="0.85em" height="0.85em"><use href="#icon-eye-slash"></use></svg>
+                </button>
               </div>
             {% empty %}
               <div class="journal-browser-empty">
@@ -62,42 +96,108 @@
               </div>
             {% endfor %}
           </div>
-        </section>
+          <button type="button" class="journal-shelf-arrow journal-shelf-arrow--right d-none d-lg-flex" id="shelf-arrow-right" aria-label="Scroll right">
+            <svg class="bi" width="1.25em" height="1.25em"><use href="#icon-chevron-right-sm"></use></svg>
+          </button>
+        </div>
 
-        <section class="journal-filter-bar mb-4">
-          <div class="journal-filter-bar__fields">
-            <div class="journal-filter-bar__field journal-filter-bar__field--month">
-              <label class="form-label fw-semibold mb-1" for="journal-month">Month</label>
-              <input id="journal-month" type="month" name="month" value="{{ selected_month|date:'Y-m' }}" class="form-control">
-            </div>
-            <div class="journal-filter-bar__field journal-filter-bar__field--search">
-              <label class="form-label fw-semibold mb-1" for="journal-search">Free text</label>
-              <input id="journal-search" type="search" name="q" value="{{ query }}" class="form-control" placeholder="Title, abstract, DOI, PMID">
-            </div>
-            <div class="journal-filter-bar__field">
-              <label class="form-label fw-semibold mb-1" for="journal-publication-type">Article type</label>
-              <select id="journal-publication-type" name="publication_type" class="form-select">
-                <option value="">All types</option>
-                {% for item in available_publication_types %}
-                  <option value="{{ item }}" {% if publication_type == item %}selected{% endif %}>{{ item }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="journal-filter-bar__field">
-              <label class="form-label fw-semibold mb-1" for="journal-subject">Subject metadata</label>
-              <input id="journal-subject" type="search" name="subject" value="{{ subject }}" class="form-control" placeholder="Sepsis, pain, newborn">
-            </div>
-          </div>
-          <div class="journal-filter-bar__actions">
-            <button type="submit" class="btn btn-primary">Apply</button>
-            <a href="{% url 'submissions:journal_list' %}" class="btn btn-outline-secondary">Reset</a>
-          </div>
-        </section>
-      </form>
+        {# ── Mobile page dots ──────────────────────────────────── #}
+        <div class="journal-shelf-dots d-lg-none" id="shelf-dots"></div>
+      </section>
 
+      {# ── MONTH NAVIGATION ────────────────────────────────────────── #}
+      {% include "submissions/fragments/journal_month_nav.html" %}
+
+      {# ── ARTICLE LIST (HTMX target) ──────────────────────────────── #}
       <div id="journal-browser-results">
         {% include "submissions/fragments/journal_article_list.html" %}
       </div>
+
     </div>
   </section>
+
+  {# ── SEARCH DRAWER ───────────────────────────────────────────────── #}
+  <div
+    class="offcanvas offcanvas-end journal-search-drawer"
+    tabindex="-1"
+    id="search-drawer"
+    aria-labelledby="search-drawer-label"
+  >
+    <div class="offcanvas-header border-bottom">
+      <h5 class="offcanvas-title" id="search-drawer-label">Search all journals</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form class="mb-3">
+        <input
+          type="search"
+          name="q"
+          class="form-control mb-2"
+          placeholder="Title, abstract, DOI, PMID..."
+          autocomplete="off"
+          hx-get="{% url 'submissions:journal_search' %}"
+          hx-trigger="keyup changed delay:300ms, search"
+          hx-target="#search-results"
+          hx-swap="innerHTML"
+          hx-include="closest form"
+        >
+        <select name="journal" class="form-select form-select-sm"
+          hx-get="{% url 'submissions:journal_search' %}"
+          hx-trigger="change"
+          hx-target="#search-results"
+          hx-swap="innerHTML"
+          hx-include="closest form"
+        >
+          <option value="">All journals</option>
+          {% for journal in active_journals %}
+            <option value="{{ journal.pk }}">{{ journal.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <div id="search-results">
+        <p class="text-muted small">Type at least 2 characters to search across all journals.</p>
+      </div>
+    </div>
+  </div>
+
+
+
 {% endblock content %}
+
+{% block mobile_action_dock %}
+  <div class="sticky-dock-panel">
+    {% include "submissions/fragments/journal_browser_nav.html" %}
+  </div>
+  {# Login prompt for anonymous users #}
+  {% if not request.user.is_authenticated %}
+    <div id="mobile-login-prompt" class="journal-mobile-login-prompt d-none w-100">
+      <div class="d-flex align-items-center gap-2 small">
+        <svg class="bi text-warning flex-shrink-0" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+        <span><strong data-star-count-mobile>0</strong> starred.</span>
+        <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}" class="fw-semibold text-decoration-none">Sign up</a>
+        <span class="text-muted">or</span>
+        <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}" class="fw-semibold text-decoration-none">log in</a>
+      </div>
+    </div>
+  {% endif %}
+{% endblock mobile_action_dock %}
+
+{% block desktop_action_dock %}
+  <div class="sticky-dock-panel">
+    {% include "submissions/fragments/journal_browser_nav.html" %}
+  </div>
+  {# Login prompt toast for anonymous users — desktop only #}
+  {% if not request.user.is_authenticated %}
+    <div id="login-prompt-toast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+          You have <strong data-star-count>0</strong> starred article(s).
+          <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}" class="text-white text-decoration-underline">Sign up</a> or
+          <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}" class="text-white text-decoration-underline">log in</a> to save them permanently.
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  {% endif %}
+{% endblock desktop_action_dock %}

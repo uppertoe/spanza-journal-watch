@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from spanza_journal_watch.analytics.utils import (
     categorize_referrer,
     classify_event_confidence,
+    extract_referrer_domain,
     is_probable_automated_event,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
@@ -26,12 +27,23 @@ REFERRER_CHOICES = [
 ]
 
 
+class HumanConfidence(models.TextChoices):
+    SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
+    PROBABLE_HUMAN = "probable_human", "Probable human"
+    KNOWN_SUBSCRIBER_HUMAN = "known_subscriber_human", "Known subscriber human"
+
+
 class NewsletterOpen(models.Model):
     newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
     subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
     user_agent = models.TextField(blank=True, default="")
     automated = models.BooleanField(default=False)
+    human_confidence = models.CharField(
+        max_length=32,
+        choices=HumanConfidence.choices,
+        default=HumanConfidence.PROBABLE_HUMAN,
+    )
 
     @staticmethod
     def render_tracking_pixel(email, token):
@@ -53,6 +65,12 @@ class NewsletterClick(models.Model):
     subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
     user_agent = models.TextField(blank=True, default="")
     automated = models.BooleanField(default=False)
+    human_confidence = models.CharField(
+        max_length=32,
+        choices=HumanConfidence.choices,
+        default=HumanConfidence.PROBABLE_HUMAN,
+    )
+    destination_url = models.URLField(max_length=512, blank=True, default="")
 
     @staticmethod
     def generate_tracking_link(email, token):
@@ -70,10 +88,7 @@ class NewsletterClick(models.Model):
 
 
 class PageView(models.Model):
-    class HumanConfidence(models.TextChoices):
-        SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
-        PROBABLE_HUMAN = "probable_human", "Probable human"
-        KNOWN_SUBSCRIBER_HUMAN = "known_subscriber_human", "Known subscriber human"
+    HumanConfidence = HumanConfidence  # backward-compatible alias
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -90,6 +105,7 @@ class PageView(models.Model):
     )
     visitor_id = models.UUIDField(null=True, blank=True, db_index=True)
     referrer_category = models.CharField(max_length=16, blank=True, default="", choices=REFERRER_CHOICES)
+    referrer_domain = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         indexes = [
@@ -131,6 +147,7 @@ class PageView(models.Model):
         session_key = ""
         visitor_id = None
         referrer_category = ""
+        referrer_domain = ""
         if request is not None:
             if not request.session.session_key:
                 request.session.create()
@@ -139,6 +156,7 @@ class PageView(models.Model):
             session_key = request.session.session_key or ""
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
             referrer_category = categorize_referrer(request)
+            referrer_domain = extract_referrer_domain(request)
         human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         view = cls(
@@ -151,6 +169,7 @@ class PageView(models.Model):
             human_confidence=human_confidence,
             visitor_id=visitor_id,
             referrer_category=referrer_category,
+            referrer_domain=referrer_domain,
         )
         view.save()
 
@@ -160,6 +179,8 @@ class PageView(models.Model):
 
 
 class AnalyticsEvent(models.Model):
+    HumanConfidence = HumanConfidence  # backward-compatible alias
+
     class EventType(models.TextChoices):
         REVIEW_OPEN = "review_open", "Review open"
         REVIEW_ENGAGED = "review_engaged", "Review engaged"
@@ -175,11 +196,9 @@ class AnalyticsEvent(models.Model):
         PAGE_VISIT = "page_visit", "Page visit"
         JOURNAL_BROWSER_VISIT = "journal_browser_visit", "Journal browser visit"
         JOURNAL_ARTICLE_INTERACT = "journal_article_interact", "Journal article interaction"
-
-    class HumanConfidence(models.TextChoices):
-        SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
-        PROBABLE_HUMAN = "probable_human", "Probable human"
-        KNOWN_SUBSCRIBER_HUMAN = "known_subscriber_human", "Known subscriber human"
+        JOURNAL_FULL_TEXT_CLICK = "journal_full_text_click", "Journal full text click"
+        JOURNAL_STAR = "journal_star", "Journal article starred"
+        JOURNAL_SELECT = "journal_select", "Journal selected"
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
     object_id = models.PositiveIntegerField(blank=True, null=True)
@@ -201,6 +220,11 @@ class AnalyticsEvent(models.Model):
     )
     visitor_id = models.UUIDField(null=True, blank=True, db_index=True)
     referrer_category = models.CharField(max_length=16, blank=True, default="", choices=REFERRER_CHOICES)
+    referrer_domain = models.CharField(max_length=255, blank=True, default="")
+    landing_page = models.CharField(max_length=512, blank=True, default="")
+    session_sequence = models.PositiveIntegerField(default=0)
+    js_verified = models.BooleanField(default=False)
+    share_token = models.CharField(max_length=32, blank=True, default="", db_index=True)
 
     class Meta:
         indexes = [
@@ -222,6 +246,7 @@ class AnalyticsEvent(models.Model):
         duration_ms=None,
         scroll_depth=None,
         metadata=None,
+        js_verified=False,
     ):
         subscriber = PageView._get_subscriber(subscriber_id, log_context="analytics event")
 
@@ -230,12 +255,22 @@ class AnalyticsEvent(models.Model):
         session_key = ""
         visitor_id = None
         referrer_category = ""
+        referrer_domain = ""
+        landing_page = ""
+        session_sequence = 0
+        share_token = ""
         if request is not None:
             user_agent = request.headers.get("user-agent", "")
             automated = is_probable_automated_event(request)
             session_key = request.session.session_key or ""
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
             referrer_category = categorize_referrer(request)
+            referrer_domain = extract_referrer_domain(request)
+            landing_page = request.session.get("analytics_landing_page", "")
+            seq = request.session.get("analytics_event_seq", 0) + 1
+            request.session["analytics_event_seq"] = seq
+            session_sequence = seq
+            share_token = request.session.get("analytics_share_token", "")
         human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         content_type = None
@@ -262,6 +297,11 @@ class AnalyticsEvent(models.Model):
             human_confidence=human_confidence,
             visitor_id=visitor_id,
             referrer_category=referrer_category,
+            referrer_domain=referrer_domain,
+            landing_page=landing_page,
+            session_sequence=session_sequence,
+            js_verified=js_verified,
+            share_token=share_token,
         )
 
     def __str__(self):

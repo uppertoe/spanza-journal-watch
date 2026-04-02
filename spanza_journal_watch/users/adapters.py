@@ -24,8 +24,20 @@ class AccountAdapter(DefaultAccountAdapter):
             ).exists()
         return False
 
+    def login(self, request, user):
+        """Migrate session stars and link any orphaned Subscriber on login."""
+        from spanza_journal_watch.newsletter.models import Subscriber
+        from spanza_journal_watch.users.utils import migrate_session_stars_to_user
+
+        migrate_session_stars_to_user(request.session, user)
+        Subscriber.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
+        return super().login(request, user)
+
     def get_login_redirect_url(self, request):
-        """Send editorial staff to the role-aware destination chooser."""
+        """Respect ?next= when present; otherwise staff→backend, others→journals."""
+        next_url = request.POST.get("next") or request.GET.get("next") or ""
+        if next_url:
+            return next_url
         if request.user.is_staff:
             return reverse("backend:backend_go")
-        return super().get_login_redirect_url(request)
+        return reverse("submissions:journal_list")

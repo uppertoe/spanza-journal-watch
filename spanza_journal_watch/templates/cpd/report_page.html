@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}CPD Report — SPANZA Journal Watch{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">CPD Activity Report</h1>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title">What is this?</h5>
+    <p class="card-text">
+      ANZCA requires Fellows and trainees to log reading activities as part of their
+      Continuing Professional Development (CPD) program. SPANZA Journal Watch can
+      track which journal articles you access the full text of and generate a
+      reference list for your CPD submission.
+    </p>
+    <p class="card-text mb-0">
+      To start tracking, enable <strong>CPD tracking</strong> in your profile menu.
+      Each time you click a "Full text" link, the article will be recorded. You can
+      then generate a PDF report covering any date range.
+    </p>
+  </div>
+</div>
+
+{% if not request.user.cpd_tracking_enabled %}
+  <div class="alert alert-warning">
+    <strong>CPD tracking is currently disabled.</strong>
+    Enable it in your profile menu (top right) to start recording full-text clicks.
+  </div>
+{% endif %}
+
+{# ── Generate report ──────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">Generate report</div>
+  <div class="card-body">
+    <form hx-post="{% url 'cpd:generate' %}" hx-target="#cpd-report-list" hx-swap="innerHTML">
+      {% csrf_token %}
+      <div class="row g-3 align-items-end">
+        <div class="col-sm-4">
+          <label for="cpd-date-from" class="form-label">From</label>
+          <input type="date" class="form-control" id="cpd-date-from" name="date_from"
+                 value="{{ default_from|date:'Y-m-d' }}"
+                 hx-get="{% url 'cpd:article_count' %}"
+                 hx-target="#cpd-article-count"
+                 hx-trigger="change"
+                 hx-include="#cpd-date-to"
+                 hx-swap="innerHTML">
+        </div>
+        <div class="col-sm-4">
+          <label for="cpd-date-to" class="form-label">To</label>
+          <input type="date" class="form-control" id="cpd-date-to" name="date_to"
+                 value="{{ default_to|date:'Y-m-d' }}"
+                 hx-get="{% url 'cpd:article_count' %}"
+                 hx-target="#cpd-article-count"
+                 hx-trigger="change"
+                 hx-include="#cpd-date-from"
+                 hx-swap="innerHTML">
+        </div>
+        <div class="col-sm-4">
+          <p class="mb-1 text-muted small">Articles in range</p>
+          <p class="fw-bold mb-2" id="cpd-article-count">{{ article_count }}</p>
+          <button type="submit" class="btn btn-primary btn-sm w-100">Generate PDF</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Previous reports ─────────────────────────────── #}
+<div class="card">
+  <div class="card-header">Previous reports</div>
+  <div class="card-body p-0" id="cpd-report-list">
+    {% include "cpd/_report_list.html" %}
+  </div>
+</div>
+
+<script>
+(function () {
+  var listEl = document.getElementById('cpd-report-list');
+  var pollUrl = '{% url "cpd:report_status" %}';
+  var timer = null;
+
+  function poll() {
+    if (!document.querySelector('.cpd-report-pending')) {
+      clearInterval(timer);
+      timer = null;
+      return;
+    }
+    window.fetch(pollUrl, {
+      credentials: 'same-origin',
+      headers: { 'HX-Request': 'true' },
+    })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        listEl.innerHTML = html;
+        htmx.process(listEl);
+        if (!document.querySelector('.cpd-report-pending') && timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      })
+      .catch(function () {});
+  }
+
+  function startPolling() {
+    if (timer) return;
+    if (document.querySelector('.cpd-report-pending')) {
+      timer = setInterval(poll, 2000);
+    }
+  }
+
+  startPolling();
+  var observer = new MutationObserver(function () { startPolling(); });
+  observer.observe(listEl, { childList: true, subtree: true });
+})();
+</script>
+{% endblock %}

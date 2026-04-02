@@ -19,6 +19,8 @@ Views tested:
   - Planka card revisions (manage_issue_builder)
 """
 
+import datetime
+
 import pytest
 from django.contrib.auth.models import Permission
 from django.test import Client
@@ -28,9 +30,10 @@ from spanza_journal_watch.backend.models import (
     IssueContributor,
     PlankaCardRevision,
     PlankaIssueBinding,
+    PubmedArticle,
     WatchedJournal,
 )
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Review
+from spanza_journal_watch.submissions.models import Author, Issue, Review
 from spanza_journal_watch.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -114,7 +117,7 @@ def author():
 
 @pytest.fixture()
 def article():
-    return Article.objects.create(name="Test Article", year=2024)
+    return PubmedArticle.objects.create(title="Test Article", publication_date=datetime.date(2024, 1, 1))
 
 
 @pytest.fixture()
