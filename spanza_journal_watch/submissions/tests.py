@@ -264,6 +264,10 @@ class ReviewHumanHitsTestCase(TestCase):
 class JournalBrowserTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="journals@example.com", password="testpass123")
+        from django.contrib.auth.models import Permission
+
+        perm = Permission.objects.get(codename="can_recommend")
+        self.user.user_permissions.add(perm)
         self.watched = WatchedJournal.objects.create(name="Paediatric Anaesthesia", active=True)
         self.article = PubmedArticle.objects.create(
             pmid="98765432",

@@ -1412,6 +1412,9 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     var navDot = document.getElementById('nav-journals-dot');
     if (rlDot) rlDot.classList.remove('d-none');
     if (navDot) navDot.classList.remove('d-none');
+    document.querySelectorAll('.jw-reading-list-dot').forEach(function (d) {
+      d.classList.remove('d-none');
+    });
   }
 
   function hideDots() {
@@ -1419,6 +1422,9 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     var navDot = document.getElementById('nav-journals-dot');
     if (rlDot) rlDot.classList.add('d-none');
     if (navDot) navDot.classList.add('d-none');
+    document.querySelectorAll('.jw-reading-list-dot').forEach(function (d) {
+      d.classList.add('d-none');
+    });
   }
 
   // On star change, persist dot, show it, and update star count badges
