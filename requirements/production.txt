@@ -59,6 +59,8 @@ cryptography==46.0.6
     # via
     #   -r requirements/base.in
     #   jwcrypto
+defusedxml==0.7.1
+    # via fpdf2
 django==6.0.3
     # via
     #   -r requirements/base.in
@@ -115,6 +117,10 @@ et-xmlfile==2.0.0
     # via openpyxl
 flower==2.0.1
     # via -r requirements/base.in
+fonttools==4.62.1
+    # via fpdf2
+fpdf2==2.8.7
+    # via -r requirements/base.in
 gunicorn==25.1.0
     # via -r requirements/production.in
 hiredis==3.3.0
@@ -147,6 +153,7 @@ pillow==12.1.1
     # via
     #   -r requirements/base.in
     #   django-markdownx
+    #   fpdf2
 prometheus-client==0.24.1
     # via flower
 prompt-toolkit==3.0.52
