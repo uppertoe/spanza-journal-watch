@@ -4,7 +4,7 @@
     hx-target="#journal-browser-results" hx-swap="innerHTML">
     <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-book-stack"></use></svg>Shelf
   </button>
-  <button type="button" class="btn btn-outline-warning btn-sm jw-journal-nav__btn" data-journal-nav="reading_list" data-nav-active="btn-warning" data-nav-inactive="btn-outline-warning"
+  <button type="button" class="btn btn-outline-warning btn-sm jw-journal-nav__btn position-relative" data-journal-nav="reading_list" data-nav-active="btn-warning" data-nav-inactive="btn-outline-warning"
     hx-get="{% url 'submissions:journal_reading_list' %}"
     hx-target="#journal-browser-results" hx-swap="innerHTML">
     <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>Reading list<span class="jw-dot-indicator jw-reading-list-dot d-none"></span>
