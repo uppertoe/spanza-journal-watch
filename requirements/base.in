@@ -29,3 +29,4 @@ django-view-breadcrumbs
 django-request-logging
 django-markdownx
 openpyxl
+fpdf2

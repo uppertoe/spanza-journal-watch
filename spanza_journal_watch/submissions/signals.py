@@ -1,13 +1,14 @@
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
+from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.utils.cache import bump_content_cache_version
 
-from .models import Article, Author, Issue, Review, Tag
+from .models import Author, Issue, Review, Tag
 
 
-@receiver(post_save, sender=Article)
-@receiver(post_delete, sender=Article)
+@receiver(post_save, sender=PubmedArticle)
+@receiver(post_delete, sender=PubmedArticle)
 @receiver(post_save, sender=Author)
 @receiver(post_delete, sender=Author)
 @receiver(post_save, sender=Issue)

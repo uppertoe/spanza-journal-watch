@@ -51,9 +51,9 @@ class PubmedClient:
             return None
 
         if retry_at.tzinfo is None:
-            retry_at = retry_at.replace(tzinfo=datetime.timezone.utc)
+            retry_at = retry_at.replace(tzinfo=datetime.UTC)
 
-        seconds = (retry_at - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        seconds = (retry_at - datetime.datetime.now(datetime.UTC)).total_seconds()
         return max(int(seconds), 0)
 
     def _request_text(self, endpoint, params):
@@ -314,6 +314,28 @@ class PubmedClient:
             if text:
                 publication_types.append(text)
 
+        authors = []
+        if article is not None:
+            for author_node in article.findall("AuthorList/Author"):
+                last_name = (author_node.findtext("LastName") or "").strip()
+                initials = (author_node.findtext("Initials") or "").strip()
+                if last_name:
+                    authors.append({"last_name": last_name, "initials": initials})
+
+        volume = ""
+        issue = ""
+        pages = ""
+        iso_abbreviation = ""
+        if article is not None:
+            journal_node = article.find("Journal")
+            if journal_node is not None:
+                journal_issue = journal_node.find("JournalIssue")
+                if journal_issue is not None:
+                    volume = (journal_issue.findtext("Volume") or "").strip()
+                    issue = (journal_issue.findtext("Issue") or "").strip()
+                iso_abbreviation = (journal_node.findtext("ISOAbbreviation") or "").strip()
+            pages = (article.findtext("Pagination/MedlinePgn") or "").strip()
+
         return {
             "pmid": pmid,
             "doi": doi,
@@ -328,6 +350,11 @@ class PubmedClient:
                 "mesh_terms": sorted(set(mesh_terms)),
                 "keywords": sorted(set(keywords)),
                 "publication_types": sorted(set(publication_types)),
+                "authors": authors,
+                "volume": volume,
+                "issue": issue,
+                "pages": pages,
+                "iso_abbreviation": iso_abbreviation,
             },
         }
 
@@ -451,3 +478,152 @@ class PubmedClient:
             "dec": 12,
         }
         return month_map.get(lower)
+
+
+def fetch_crossref_metadata(doi, timeout=15):
+    """Fetch article metadata from CrossRef by DOI.
+
+    Returns a dict compatible with our PubMed article payload shape,
+    or None if the DOI is not found.
+    """
+    url = f"https://api.crossref.org/works/{urllib.parse.quote(doi, safe='')}"
+    req = urllib.request.Request(url, headers={"User-Agent": "spanza-journal-watch/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+        return None
+
+    import html as html_mod
+
+    msg = data.get("message") or {}
+
+    title = html_mod.unescape((msg.get("title") or [""])[0].strip())
+    journal_name = html_mod.unescape((msg.get("container-title") or [""])[0].strip())
+    short_journal = html_mod.unescape((msg.get("short-container-title") or [""])[0].strip())
+    volume = str(msg.get("volume") or "").strip()
+    issue = str(msg.get("issue") or "").strip()
+    pages = str(msg.get("page") or "").strip()
+
+    authors = []
+    for a in msg.get("author") or []:
+        family = (a.get("family") or "").strip()
+        given = (a.get("given") or "").strip()
+        if family:
+            # Convert "John Michael" → "JM" for initials
+            initials = "".join(part[0].upper() for part in given.split() if part) if given else ""
+            authors.append({"last_name": family, "initials": initials})
+
+    pub_date = None
+    date_parts = (msg.get("published") or msg.get("published-print") or msg.get("published-online") or {}).get(
+        "date-parts", [[]]
+    )[0]
+    if date_parts:
+        year = date_parts[0] if len(date_parts) > 0 else None
+        month = date_parts[1] if len(date_parts) > 1 else 1
+        day = date_parts[2] if len(date_parts) > 2 else 1
+        if year:
+            pub_date = datetime.date(year, month, day)
+
+    return {
+        "doi": doi.lower(),
+        "title": title,
+        "source_journal_name": journal_name,
+        "publication_date": pub_date,
+        "publication_month": pub_date.replace(day=1) if pub_date else None,
+        "article_url": f"https://doi.org/{doi}",
+        "metadata_json": {
+            "authors": authors,
+            "volume": volume,
+            "issue": issue,
+            "pages": pages,
+            "iso_abbreviation": short_journal or journal_name,
+        },
+    }
+
+
+def fetch_crossref_journal_articles(issn, from_date, to_date, timeout=20, rows_per_page=100):
+    """Fetch articles from CrossRef by ISSN and date range.
+
+    Yields payload dicts compatible with upsert_pubmed_article().
+    """
+    import html as html_mod
+
+    cursor = "*"
+    total_yielded = 0
+
+    while True:
+        params = urllib.parse.urlencode(
+            {
+                "filter": f"issn:{issn},from-pub-date:{from_date:%Y-%m},until-pub-date:{to_date:%Y-%m}",
+                "rows": rows_per_page,
+                "cursor": cursor,
+                "sort": "published",
+                "order": "desc",
+            }
+        )
+        url = f"https://api.crossref.org/works?{params}"
+        req = urllib.request.Request(url, headers={"User-Agent": "spanza-journal-watch/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+            return
+
+        msg = data.get("message") or {}
+        items = msg.get("items") or []
+        if not items:
+            return
+
+        for item in items:
+            doi = (item.get("DOI") or "").strip()
+            if not doi:
+                continue
+
+            title = html_mod.unescape((item.get("title") or [""])[0].strip())
+            journal_name = html_mod.unescape((item.get("container-title") or [""])[0].strip())
+            short_journal = html_mod.unescape((item.get("short-container-title") or [""])[0].strip())
+            volume = str(item.get("volume") or "").strip()
+            issue = str(item.get("issue") or "").strip()
+            pages = str(item.get("page") or "").strip()
+
+            authors = []
+            for a in item.get("author") or []:
+                family = (a.get("family") or "").strip()
+                given = (a.get("given") or "").strip()
+                if family:
+                    initials = "".join(part[0].upper() for part in given.split() if part) if given else ""
+                    authors.append({"last_name": family, "initials": initials})
+
+            pub_date = None
+            date_parts = (
+                item.get("published") or item.get("published-print") or item.get("published-online") or {}
+            ).get("date-parts", [[]])[0]
+            if date_parts:
+                year = date_parts[0] if len(date_parts) > 0 else None
+                month = date_parts[1] if len(date_parts) > 1 else 1
+                day = date_parts[2] if len(date_parts) > 2 else 1
+                if year:
+                    pub_date = datetime.date(year, month, day)
+
+            yield {
+                "doi": doi.lower(),
+                "title": title,
+                "source_journal_name": journal_name,
+                "publication_date": pub_date,
+                "publication_month": pub_date.replace(day=1) if pub_date else None,
+                "article_url": f"https://doi.org/{doi}",
+                "metadata_json": {
+                    "authors": authors,
+                    "volume": volume,
+                    "issue": issue,
+                    "pages": pages,
+                    "iso_abbreviation": short_journal or journal_name,
+                },
+            }
+            total_yielded += 1
+
+        next_cursor = msg.get("next-cursor")
+        if not next_cursor or next_cursor == cursor or len(items) < rows_per_page:
+            return
+        cursor = next_cursor

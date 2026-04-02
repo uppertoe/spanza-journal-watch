@@ -170,8 +170,17 @@ class PubmedBatchArticleAdmin(admin.ModelAdmin):
 
 @admin.register(models.WatchedJournal)
 class WatchedJournalAdmin(admin.ModelAdmin):
-    list_display = ("name", "journal", "issn_print", "issn_electronic", "active", "modified")
-    list_filter = ("active",)
+    list_display = (
+        "name",
+        "journal",
+        "issn_print",
+        "issn_electronic",
+        "source",
+        "active",
+        "visible_on_frontend",
+        "modified",
+    )
+    list_filter = ("active", "source")
     search_fields = ("name", "issn_print", "issn_electronic", "journal__name")
     autocomplete_fields = ["journal"]
     readonly_fields = ("modified",)

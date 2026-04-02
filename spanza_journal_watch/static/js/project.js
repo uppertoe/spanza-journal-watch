@@ -1,6 +1,23 @@
 /* Project specific Javascript goes here. */
-const { Popover, Modal } = window.bootstrap;
+const { Popover, Modal, Toast } = window.bootstrap;
 const popoverInstances = new WeakMap();
+
+/* ── Auto-show Django message toasts ─────────────────────── */
+function showAllToasts(root) {
+  const toasts = (root || document).querySelectorAll(
+    '.jw-toast-stack .toast:not(.show)',
+  );
+  toasts.forEach(function (el) {
+    Toast.getOrCreateInstance(el).show();
+  });
+}
+showAllToasts();
+// After HTMX OOB swap delivers new messages
+document.body.addEventListener('htmx:oobAfterSwap', function (event) {
+  if (event.detail.target && event.detail.target.id === 'oob-message') {
+    showAllToasts(event.detail.target);
+  }
+});
 
 const isInteractiveElement = (element) =>
   !!element.closest(
@@ -75,6 +92,60 @@ const analyticsEndpoint = '/reader/action';
 const reviewSessionThresholdMs = 5000;
 const reviewSessions = new Map();
 let reviewSessionCounter = 0;
+
+const generateShareToken = () => {
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 8; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+};
+
+const appendShareToken = (url, token) => {
+  if (!url || !token) return url;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    parsed.searchParams.set('ref', token);
+    return parsed.toString();
+  } catch (_e) {
+    return url;
+  }
+};
+
+let pageScrollDepthMax = 0;
+let pageScrollDepthFlushed = false;
+
+const updateScrollDepth = () => {
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  if (docHeight <= 0) return;
+  const pct = Math.min(100, Math.round((window.scrollY / docHeight) * 100));
+  if (pct > pageScrollDepthMax) pageScrollDepthMax = pct;
+};
+
+const flushScrollDepth = () => {
+  if (pageScrollDepthFlushed || pageScrollDepthMax <= 0) return;
+  pageScrollDepthFlushed = true;
+  const pageMeta = document.querySelector('[data-analytics-page]');
+  const page = pageMeta ? pageMeta.dataset.analyticsPage : '';
+  if (!page) return;
+  sendAnalyticsEvent(
+    {
+      event_type: 'page_visit',
+      source: 'scroll_depth',
+      scroll_depth: pageScrollDepthMax,
+      metadata: { page },
+    },
+    { beacon: true },
+  );
+};
+
+window.addEventListener('scroll', updateScrollDepth, { passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushScrollDepth();
+});
+window.addEventListener('pagehide', flushScrollDepth);
 let cachedIssueReviewArticles = [];
 let cachedIssuePrevButtons = [];
 let cachedIssueNextButtons = [];
@@ -436,6 +507,9 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
     setSharedReviewModalLoading(modal, false);
   }
   window.requestAnimationFrame(() => {
+    if (window.htmx) {
+      window.htmx.process(container);
+    }
     syncReviewModalShareControls(modal);
     observeAnalyticsReviewElements(container);
     const nextReviewElement = container.querySelector(
@@ -871,10 +945,11 @@ const setupIssueReviewObserver = () => {
 document.addEventListener('click', async (event) => {
   const emailShareLink = event.target.closest('[data-share-email]');
   if (emailShareLink && !emailShareLink.classList.contains('disabled')) {
+    const token = generateShareToken();
     trackReviewAnalytics(
       emailShareLink,
       'review_share_email',
-      {},
+      { metadata: { share_token: token } },
       { beacon: true },
     );
     return;
@@ -893,7 +968,13 @@ document.addEventListener('click', async (event) => {
       eventType = 'review_share_facebook';
     }
     if (eventType) {
-      trackReviewAnalytics(socialShareLink, eventType, {}, { beacon: true });
+      const token = generateShareToken();
+      trackReviewAnalytics(
+        socialShareLink,
+        eventType,
+        { metadata: { share_token: token } },
+        { beacon: true },
+      );
     }
     return;
   }
@@ -926,12 +1007,18 @@ document.addEventListener('click', async (event) => {
 
   const copyButton = event.target.closest('[data-copy-share]');
   if (copyButton) {
-    const shareUrl = toAbsoluteUrl(copyButton.dataset.shareUrl);
+    const token = generateShareToken();
+    const shareUrl = appendShareToken(
+      toAbsoluteUrl(copyButton.dataset.shareUrl),
+      token,
+    );
     if (!shareUrl) return;
 
     const copied = await copyTextToClipboard(shareUrl);
     if (copied) {
-      trackReviewAnalytics(copyButton, 'review_share_copy_link');
+      trackReviewAnalytics(copyButton, 'review_share_copy_link', {
+        metadata: { share_token: token },
+      });
       const label = copyButton.querySelector('span');
       const originalText = label ? label.textContent : '';
       if (label) {
@@ -948,7 +1035,11 @@ document.addEventListener('click', async (event) => {
 
   const nativeShareButton = event.target.closest('[data-native-share]');
   if (nativeShareButton && window.navigator.share) {
-    const shareUrl = toAbsoluteUrl(nativeShareButton.dataset.shareUrl);
+    const token = generateShareToken();
+    const shareUrl = appendShareToken(
+      toAbsoluteUrl(nativeShareButton.dataset.shareUrl),
+      token,
+    );
     if (!shareUrl) return;
 
     try {
@@ -957,7 +1048,9 @@ document.addEventListener('click', async (event) => {
         text: nativeShareButton.dataset.shareText || '',
         url: shareUrl,
       });
-      trackReviewAnalytics(nativeShareButton, 'review_share_native');
+      trackReviewAnalytics(nativeShareButton, 'review_share_native', {
+        metadata: { share_token: token },
+      });
     } catch (_error) {
       // Treat cancelled share dialogs as a no-op.
     }
@@ -1070,3 +1163,615 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
   syncReviewModalShareControls(modal);
   observeAnalyticsReviewElements(event.target);
 });
+
+/* ── Journal browser: login prompt (desktop toast + mobile bar) ── */
+document.body.addEventListener('showLoginPrompt', (event) => {
+  const count = event.detail?.count || 0;
+
+  /* Desktop toast */
+  const toastEl = document.getElementById('login-prompt-toast');
+  if (toastEl) {
+    const countEl = toastEl.querySelector('[data-star-count]');
+    if (countEl) countEl.textContent = count;
+    const toast = window.bootstrap.Toast.getOrCreateInstance(toastEl, {
+      delay: 8000,
+    });
+    toast.show();
+  }
+
+  /* Mobile bar */
+  const mobileEl = document.getElementById('mobile-login-prompt');
+  if (mobileEl) {
+    const countEl = mobileEl.querySelector('[data-star-count-mobile]');
+    if (countEl) countEl.textContent = count;
+    mobileEl.classList.remove('d-none');
+  }
+});
+
+/* ── Journal browser: smooth scroll for TOC links ────────── */
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('.journal-toc__link');
+  if (!link) return;
+  const targetId = link.getAttribute('href');
+  if (!targetId || !targetId.startsWith('#')) return;
+  const target = document.querySelector(targetId);
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+/* ── Journal shelf: visibility toggling + horizontal scroll ────── */
+(function () {
+  var HIDDEN_KEY = 'jw_hidden_journals';
+  var grid = document.getElementById('journal-shelf-grid');
+  if (!grid) return;
+
+  var hiddenBar = document.getElementById('shelf-hidden-bar');
+  var hiddenCount = document.getElementById('shelf-hidden-count');
+  var showAllBtn = document.getElementById('shelf-show-all-btn');
+  var arrowLeft = document.getElementById('shelf-arrow-left');
+  var arrowRight = document.getElementById('shelf-arrow-right');
+  var dotsContainer = document.getElementById('shelf-dots');
+
+  function getHiddenIds() {
+    try {
+      return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHiddenIds(ids) {
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(ids));
+  }
+
+  function applyVisibility() {
+    var hidden = getHiddenIds();
+    var books = grid.querySelectorAll('.journal-book[data-journal-id]');
+    var hiddenTotal = 0;
+    books.forEach(function (book) {
+      var id = book.getAttribute('data-journal-id');
+      if (hidden.indexOf(id) !== -1) {
+        book.classList.add('journal-book--hidden');
+        hiddenTotal++;
+      } else {
+        book.classList.remove('journal-book--hidden');
+      }
+    });
+
+    if (hiddenBar) {
+      if (hiddenTotal > 0) {
+        hiddenBar.classList.remove('d-none');
+        hiddenCount.textContent = hiddenTotal;
+      } else {
+        hiddenBar.classList.add('d-none');
+      }
+    }
+    updateDots();
+    updateArrows();
+  }
+
+  // Hide a journal
+  grid.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-hide-journal]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var id = btn.getAttribute('data-hide-journal');
+    var hidden = getHiddenIds();
+    if (hidden.indexOf(id) === -1) {
+      hidden.push(id);
+      saveHiddenIds(hidden);
+    }
+    applyVisibility();
+  });
+
+  // Show all
+  if (showAllBtn) {
+    showAllBtn.addEventListener('click', function () {
+      localStorage.removeItem(HIDDEN_KEY);
+      applyVisibility();
+    });
+  }
+
+  // --- Horizontal scroll arrows (desktop) ---
+  function updateArrows() {
+    if (!arrowLeft || !arrowRight) return;
+    // Only relevant on lg+ when grid has overflow (shouldn't normally, but handle gracefully)
+    var isScrollable = grid.scrollWidth > grid.clientWidth + 2;
+    if (!isScrollable) {
+      arrowLeft.classList.add('shelf-arrow--hidden');
+      arrowRight.classList.add('shelf-arrow--hidden');
+      return;
+    }
+    arrowLeft.classList.toggle('shelf-arrow--hidden', grid.scrollLeft < 4);
+    arrowRight.classList.toggle(
+      'shelf-arrow--hidden',
+      grid.scrollLeft + grid.clientWidth >= grid.scrollWidth - 4,
+    );
+  }
+
+  if (arrowLeft) {
+    arrowLeft.addEventListener('click', function () {
+      grid.scrollBy({ left: -grid.clientWidth * 0.8, behavior: 'smooth' });
+    });
+  }
+  if (arrowRight) {
+    arrowRight.addEventListener('click', function () {
+      grid.scrollBy({ left: grid.clientWidth * 0.8, behavior: 'smooth' });
+    });
+  }
+
+  grid.addEventListener(
+    'scroll',
+    function () {
+      updateArrows();
+      updateActiveDot();
+    },
+    { passive: true },
+  );
+
+  // --- Mobile page dots ---
+  function getVisibleBooks() {
+    return Array.prototype.filter.call(
+      grid.querySelectorAll('.journal-book[data-journal-id]'),
+      function (b) {
+        return !b.classList.contains('journal-book--hidden');
+      },
+    );
+  }
+
+  function updateDots() {
+    if (!dotsContainer) return;
+    // Only show dots on mobile when there's overflow
+    var isScrollable = grid.scrollWidth > grid.clientWidth + 2;
+    if (!isScrollable) {
+      dotsContainer.innerHTML = '';
+      return;
+    }
+    var visible = getVisibleBooks();
+    var booksPerPage = Math.max(1, Math.floor(grid.clientWidth / 176)); // ~11rem
+    var pages = Math.ceil(visible.length / booksPerPage);
+    if (pages <= 1) {
+      dotsContainer.innerHTML = '';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < pages; i++) {
+      html +=
+        '<span class="journal-shelf-dot' +
+        (i === 0 ? ' active' : '') +
+        '" data-dot-page="' +
+        i +
+        '"></span>';
+    }
+    dotsContainer.innerHTML = html;
+    updateActiveDot();
+  }
+
+  function updateActiveDot() {
+    if (!dotsContainer) return;
+    var dots = dotsContainer.querySelectorAll('.journal-shelf-dot');
+    if (!dots.length) return;
+    var scrollRatio =
+      grid.scrollLeft / (grid.scrollWidth - grid.clientWidth || 1);
+    var activePage = Math.round(scrollRatio * (dots.length - 1));
+    dots.forEach(function (dot, i) {
+      dot.classList.toggle('active', i === activePage);
+    });
+  }
+
+  // Tap on dot to scroll
+  if (dotsContainer) {
+    dotsContainer.addEventListener('click', function (e) {
+      var dot = e.target.closest('.journal-shelf-dot');
+      if (!dot) return;
+      var page = parseInt(dot.getAttribute('data-dot-page'), 10);
+      var dots = dotsContainer.querySelectorAll('.journal-shelf-dot');
+      var targetScroll =
+        (page / (dots.length - 1 || 1)) * (grid.scrollWidth - grid.clientWidth);
+      grid.scrollTo({ left: targetScroll, behavior: 'smooth' });
+    });
+  }
+
+  // Init
+  applyVisibility();
+
+  // Re-check on resize
+  window.addEventListener(
+    'resize',
+    function () {
+      updateDots();
+      updateArrows();
+    },
+    { passive: true },
+  );
+})();
+
+/* ── Journal browser: restore focus after reading list HTMX swap ─ */
+document.body.addEventListener('htmx:afterSettle', (event) => {
+  const searchInput = document.getElementById('reading-list-search');
+  if (
+    searchInput &&
+    event.target.id === 'journal-browser-results' &&
+    searchInput.value
+  ) {
+    searchInput.focus();
+    // Move cursor to end of input
+    const len = searchInput.value.length;
+    searchInput.setSelectionRange(len, len);
+  }
+});
+
+/* ── Dot indicators: reading list button + nav link ──────── */
+(function () {
+  var DOT_KEY = 'jw_reading_list_dot';
+
+  function showDots() {
+    var rlDot = document.getElementById('reading-list-dot');
+    var navDot = document.getElementById('nav-journals-dot');
+    if (rlDot) rlDot.classList.remove('d-none');
+    if (navDot) navDot.classList.remove('d-none');
+    document.querySelectorAll('.jw-reading-list-dot').forEach(function (d) {
+      d.classList.remove('d-none');
+    });
+  }
+
+  function hideDots() {
+    var rlDot = document.getElementById('reading-list-dot');
+    var navDot = document.getElementById('nav-journals-dot');
+    if (rlDot) rlDot.classList.add('d-none');
+    if (navDot) navDot.classList.add('d-none');
+    document.querySelectorAll('.jw-reading-list-dot').forEach(function (d) {
+      d.classList.add('d-none');
+    });
+  }
+
+  // On star change, persist dot, show it, and update star count badges
+  document.body.addEventListener('starChanged', function () {
+    sessionStorage.setItem(DOT_KEY, '1');
+    showDots();
+  });
+
+  // Update star count badges after HTMX swaps
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    var target = e.detail.elt || e.target;
+    var articleId;
+    var count;
+
+    // Find star count data from swapped content (data-star-count attr or badge)
+    var starSource =
+      target.matches && target.matches('[data-star-count]')
+        ? target
+        : target.querySelector && target.querySelector('[data-star-count]');
+    if (starSource && starSource.dataset.articleId) {
+      articleId = starSource.dataset.articleId;
+      count = Number(starSource.dataset.starCount) || 0;
+    }
+    if (!articleId) {
+      var swappedBadge =
+        target.querySelector && target.querySelector('.jw-star-count-badge');
+      if (swappedBadge && swappedBadge.dataset.articleId) {
+        articleId = swappedBadge.dataset.articleId;
+        var val = swappedBadge.querySelector('.jw-star-count-value');
+        count = val ? Number(val.textContent) || 0 : 0;
+      }
+    }
+
+    if (!articleId) return;
+
+    document
+      .querySelectorAll(
+        '.jw-star-count-badge[data-article-id="' + articleId + '"]',
+      )
+      .forEach(function (badge) {
+        // Skip badges inside the swapped content (already correct)
+        if (target.contains && target.contains(badge)) return;
+        var val = badge.querySelector('.jw-star-count-value');
+        if (val) val.textContent = count;
+        badge.classList.toggle('d-none', count === 0);
+      });
+  });
+
+  // On page load, restore dot state from session
+  if (sessionStorage.getItem(DOT_KEY)) {
+    showDots();
+  }
+
+  // Clear dots when reading list is viewed (any reading list button)
+  var scrollPending = false;
+
+  function clearDotsOnReadingListClick() {
+    sessionStorage.removeItem(DOT_KEY);
+    hideDots();
+    scrollPending = true;
+  }
+
+  var rlBtn = document.getElementById('reading-list-btn');
+  if (rlBtn) {
+    rlBtn.addEventListener('click', clearDotsOnReadingListClick);
+  }
+
+  // Also clear dots when any bottom/desktop nav reading list button is clicked
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-journal-nav="reading_list"]');
+    if (btn) clearDotsOnReadingListClick();
+  });
+
+  // After HTMX swap, scroll to the reading list area
+  document.body.addEventListener('htmx:afterSettle', function (event) {
+    if (scrollPending && event.target.id === 'journal-browser-results') {
+      scrollPending = false;
+      var target = document.getElementById('journal-browser-results');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  });
+})();
+
+/* ── Site-wide back to top ────────────────────────────────── */
+(function () {
+  const allBtns = document.querySelectorAll('.js-back-to-top');
+  if (!allBtns.length) return;
+
+  // Desktop FAB visibility toggle
+  const fab = document.querySelector('.back-to-top-fab');
+  // Mobile toolbar button
+  const mobileBtn = document.querySelector(
+    '.sticky-mobile-toolbar .js-back-to-top',
+  );
+  const threshold = 300;
+  let visible = false;
+
+  window.addEventListener(
+    'scroll',
+    () => {
+      const shouldShow = window.scrollY > threshold;
+      if (shouldShow !== visible) {
+        visible = shouldShow;
+        if (fab) fab.classList.toggle('back-to-top-fab--visible', visible);
+        if (mobileBtn)
+          mobileBtn.style.setProperty(
+            'display',
+            visible ? 'flex' : 'none',
+            'important',
+          );
+      }
+    },
+    { passive: true },
+  );
+
+  allBtns.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+})();
+
+/* ── Truncated abstract expand/collapse ──────────────────── */
+(function () {
+  // Toggle expand/collapse on click
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.jw-abstract-clamp__toggle');
+    if (!btn) return;
+    var container = btn.closest('.jw-abstract-clamp');
+    if (container) {
+      container.classList.toggle('jw-abstract-clamp--expanded');
+    }
+  });
+
+  // Hide "More" button when abstract isn't actually clamped
+  function hideUnnecessaryToggles(root) {
+    var clamps = (root || document).querySelectorAll('.jw-abstract-clamp');
+    clamps.forEach(function (el) {
+      var text = el.querySelector('.jw-abstract-clamp__text');
+      var btn = el.querySelector('.jw-abstract-clamp__toggle');
+      if (text && btn) {
+        btn.style.display =
+          text.scrollHeight > text.clientHeight + 1 ? '' : 'none';
+      }
+    });
+  }
+
+  // Run on initial load and after HTMX swaps
+  hideUnnecessaryToggles();
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    hideUnnecessaryToggles(e.target);
+  });
+})();
+
+/* ── CPD tracking toggle → sync body attribute ──────────── */
+(function () {
+  document.body.addEventListener('cpdTrackingChanged', function () {
+    var checkbox = document.getElementById('cpd-tracking-toggle');
+    if (checkbox && checkbox.checked) {
+      document.body.setAttribute('data-cpd-tracking-enabled', '');
+    } else {
+      document.body.removeAttribute('data-cpd-tracking-enabled');
+    }
+  });
+})();
+
+/* ── CPD full-text click beacon + read checkmarks ────────── */
+(function () {
+  var cpdReadIds = new Set();
+
+  function addCheckSvg(container) {
+    if (container.querySelector('.jw-cpd-check')) return;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'bi me-1 jw-cpd-check');
+    svg.setAttribute('width', '0.85em');
+    svg.setAttribute('height', '0.85em');
+    svg.setAttribute('aria-hidden', 'true');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#icon-check');
+    svg.appendChild(use);
+    container.prepend(svg);
+  }
+
+  function markReadButtons(root) {
+    if (!document.body.hasAttribute('data-cpd-tracking-enabled')) return;
+    (root || document)
+      .querySelectorAll('[data-cpd-article-id]')
+      .forEach(function (link) {
+        var id = Number(link.dataset.cpdArticleId);
+        if (!id || !cpdReadIds.has(id)) return;
+        var label = link.querySelector('.jw-action-btn__label');
+        addCheckSvg(label || link);
+      });
+  }
+
+  // Fetch read IDs on page load
+  if (document.body.hasAttribute('data-cpd-tracking-enabled')) {
+    window
+      .fetch('/cpd/read-ids/', { credentials: 'same-origin' })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        (data.ids || []).forEach(function (id) {
+          cpdReadIds.add(id);
+        });
+        markReadButtons();
+      })
+      .catch(function () {});
+  }
+
+  // Re-mark after HTMX swaps
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    markReadButtons(e.target);
+  });
+
+  // Beacon + immediate checkmark on click
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('[data-cpd-article-id]');
+    if (!link) return;
+    if (!document.body.hasAttribute('data-cpd-tracking-enabled')) return;
+
+    var articleId = Number(link.dataset.cpdArticleId);
+    if (!articleId) return;
+
+    var blob = new Blob([JSON.stringify({ article_id: articleId })], {
+      type: 'application/json',
+    });
+    navigator.sendBeacon('/cpd/record-read/', blob);
+
+    // Mark this article as read and update all matching buttons on the page
+    cpdReadIds.add(articleId);
+    document
+      .querySelectorAll('[data-cpd-article-id="' + articleId + '"]')
+      .forEach(function (el) {
+        var label = el.querySelector('.jw-action-btn__label');
+        addCheckSvg(label || el);
+      });
+  });
+})();
+
+/* ── Journal browser analytics ───────────────────────────── */
+(function () {
+  var isJournalPage = !!document.getElementById('journal-shelf-grid');
+  if (!isJournalPage) return;
+
+  // Track journal selection via HTMX navigation
+  document.body.addEventListener('htmx:afterRequest', function (e) {
+    var path = (e.detail.pathInfo && e.detail.pathInfo.requestPath) || '';
+    if (path.indexOf('/journals') === -1) return;
+
+    // Journal selection — extract journal param from URL
+    var url = e.detail.xhr && e.detail.xhr.responseURL;
+    if (!url) return;
+    var params = new URL(url).searchParams;
+    var journalId = params.get('journal');
+    if (journalId) {
+      sendAnalyticsEvent({
+        event_type: 'journal_select',
+        metadata: { journal_id: Number(journalId) },
+      });
+    }
+  });
+
+  // Track full-text clicks in journal browser context
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest(
+      '#journal-article-list [data-cpd-article-id], #journal-reading-list [data-cpd-article-id]',
+    );
+    if (!link) return;
+
+    var articleId = link.dataset.cpdArticleId;
+    sendAnalyticsEvent(
+      {
+        event_type: 'journal_full_text_click',
+        metadata: { article_id: Number(articleId) || 0 },
+      },
+      { beacon: true },
+    );
+  });
+
+  // Track star toggles via HTMX
+  document.body.addEventListener('htmx:afterRequest', function (e) {
+    var path = (e.detail.pathInfo && e.detail.pathInfo.requestPath) || '';
+    if (path.indexOf('toggle-star') === -1) return;
+    if (e.detail.successful !== true) return;
+
+    var match = path.match(/\/journals\/(\d+)\/toggle-star/);
+    var articleId = match ? Number(match[1]) : 0;
+    sendAnalyticsEvent({
+      event_type: 'journal_star',
+      metadata: { article_id: articleId },
+    });
+  });
+})();
+
+/* ── Journal browser sticky nav active state ────────────── */
+(function () {
+  if (!document.getElementById('journal-shelf-grid')) return;
+
+  function setActiveNav(viewName) {
+    document.querySelectorAll('[data-journal-nav]').forEach(function (btn) {
+      var activeClass = btn.dataset.navActive;
+      var inactiveClass = btn.dataset.navInactive;
+      if (btn.dataset.journalNav === viewName) {
+        btn.classList.remove(inactiveClass);
+        btn.classList.add(activeClass);
+      } else {
+        btn.classList.remove(activeClass);
+        btn.classList.add(inactiveClass);
+      }
+    });
+  }
+
+  // Detect current view from #journal-browser-results content
+  function detectCurrentView() {
+    var results = document.getElementById('journal-browser-results');
+    if (!results) return;
+    var readingList = results.querySelector('.journal-reading-list');
+    if (readingList) {
+      var archivedTab = results.querySelector(
+        '.journal-reading-list__tab--active',
+      );
+      var isArchived =
+        archivedTab && archivedTab.textContent.trim().indexOf('Archived') === 0;
+      setActiveNav(isArchived ? 'archive' : 'reading_list');
+    } else {
+      setActiveNav('shelf');
+    }
+  }
+
+  // Update on nav button click
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-journal-nav]');
+    if (btn) setActiveNav(btn.dataset.journalNav);
+  });
+
+  // Also detect after any HTMX swap into the results area
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    if (e.detail.target && e.detail.target.id === 'journal-browser-results') {
+      detectCurrentView();
+    }
+  });
+
+  // Initial state
+  detectCurrentView();
+})();

@@ -1,41 +1,188 @@
+{% load humanize %}
 <div class="mb-4">
   <h1 class="h3 mb-1">Journals Browser</h1>
   <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}</p>
 </div>
 
-<div class="alert alert-info small mb-4">
-  Baseline data only — journals browser analytics will be expanded in a future update.
-</div>
-
+{# ── Headline metrics ──────────────────────────────────────────── #}
 <div class="row g-3 mb-4">
-  <div class="col-6">
+  <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Browser visits</h6>
-      <p class="display-6 mb-0">{{ total_visits }}</p>
+      <p class="display-6 mb-0">{{ total_visits|intcomma }}</p>
     </div></div>
   </div>
-  <div class="col-6">
-    <div class="card h-100 border-primary-subtle"><div class="card-body">
-      <h6 class="text-muted mb-1 small">Article interactions</h6>
-      <p class="display-6 mb-0">{{ total_interactions }}</p>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Unique visitors</h6>
+      <p class="display-6 mb-0">{{ unique_visitors|intcomma }}</p>
+      <p class="small text-muted mb-0">{{ returning_visitors }} returning ({{ returning_rate }})</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100 border-warning-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Articles starred</h6>
+      <p class="display-6 mb-0">{{ total_stars|intcomma }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100 border-success-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Full text clicks</h6>
+      <p class="display-6 mb-0">{{ total_full_text|intcomma }}</p>
     </div></div>
   </div>
 </div>
 
-{% if interaction_breakdown %}
-<div class="card">
-  <div class="card-header">Interaction types</div>
-  <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Action</th><th>Count</th></tr></thead>
-      <tbody>
-        {% for item in interaction_breakdown %}
-        <tr><td class="text-capitalize small">{{ item.label }}</td><td>{{ item.count }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{# ── Engagement funnel ─────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">User engagement funnel</div>
+  <div class="card-body">
+    {% if total_visits %}
+    <div class="d-flex flex-column gap-2">
+      {% for step in funnel %}
+      <div>
+        <div class="d-flex justify-content-between small mb-1">
+          <span>{{ step.label }}</span>
+          <span>{{ step.count|intcomma }}</span>
+        </div>
+        <div class="progress" style="height:8px">
+          <div class="progress-bar bg-{{ step.color }}" style="width:{% widthratio step.count funnel_max 100 %}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted mb-0 small">No journal browser visits in this date range.</p>
+    {% endif %}
   </div>
 </div>
-{% else %}
-<p class="text-muted small">No interaction data yet in this date range.</p>
-{% endif %}
+
+{# ── Weekly trend chart ────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">Weekly activity — last 26 weeks</div>
+  <div class="card-body">
+    <canvas id="journals-trend-chart" height="80"></canvas>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  {# ── Top journals ───────────────────────────────────────────── #}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Most browsed journals</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Journal</th><th>Selections</th></tr></thead>
+          <tbody>
+            {% for j in top_journals %}
+            <tr>
+              <td class="small">{{ j.name }}</td>
+              <td>{{ j.views }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="text-muted small">No journal selection data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ── Active reading list users ──────────────────────────────── #}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Most active reading list users</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>User</th><th>Starred</th><th>Archived</th><th>Recommended</th></tr></thead>
+          <tbody>
+            {% for u in active_users %}
+            <tr>
+              <td class="small">{{ u.user__name|default:u.user__email }}</td>
+              <td>{{ u.star_count }}</td>
+              <td>{{ u.archive_count }}</td>
+              <td>{{ u.recommend_count }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted small">No reading list activity in this date range.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── CPD & reading list summary ────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Articles archived</h6>
+      <p class="display-6 mb-0">{{ total_archives|intcomma }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100 border-primary-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Recommended for review</h6>
+      <p class="display-6 mb-0">{{ total_recommends|intcomma }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">CPD reports generated</h6>
+      <p class="display-6 mb-0">{{ cpd_generated }}</p>
+      <p class="small text-muted mb-0">{{ cpd_users }} user{{ cpd_users|pluralize }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Reading list users (all time)</h6>
+      <p class="display-6 mb-0">{{ total_reading_list_users }}</p>
+      <p class="small text-muted mb-0">Avg {{ avg_items_per_user }} items each</p>
+    </div></div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var ctx = document.getElementById('journals-trend-chart');
+  if (!ctx || typeof Chart === 'undefined') return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ trend_labels|safe }},
+      datasets: [
+        {
+          label: 'Visits',
+          data: {{ trend_visits|safe }},
+          backgroundColor: 'rgba(47, 90, 128, 0.6)',
+          borderRadius: 3,
+          order: 1,
+        },
+        {
+          label: 'Stars',
+          data: {{ trend_stars|safe }},
+          type: 'line',
+          borderColor: '#bf5e34',
+          backgroundColor: 'rgba(191, 94, 52, 0.1)',
+          pointRadius: 2,
+          tension: 0.3,
+          fill: true,
+          order: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12 } },
+      },
+    },
+  });
+});
+</script>

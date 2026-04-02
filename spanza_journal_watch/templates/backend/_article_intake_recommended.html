@@ -1,0 +1,109 @@
+<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <span>Recommended for review</span>
+  <div class="d-flex align-items-center gap-2">
+    <small class="text-muted">{{ recommended_articles|length }} article{{ recommended_articles|length|pluralize }}</small>
+    {% if show_hidden %}
+      <a href="#" class="btn btn-sm btn-outline-secondary"
+        hx-get="{% url 'backend:article_intake_recommended' %}?from_month={{ from_month }}&to_month={{ to_month }}&batch_id={{ batch_id }}{% if show_all %}&show_all=1{% endif %}"
+        hx-target="#article-intake-recommended"
+        hx-swap="innerHTML"
+      >Show visible</a>
+    {% else %}
+      <a href="#" class="btn btn-sm btn-outline-warning"
+        hx-get="{% url 'backend:article_intake_recommended' %}?from_month={{ from_month }}&to_month={{ to_month }}&batch_id={{ batch_id }}{% if show_all %}&show_all=1{% endif %}&show_hidden=1"
+        hx-target="#article-intake-recommended"
+        hx-swap="innerHTML"
+      >Show hidden</a>
+    {% endif %}
+    {% if show_all %}
+      <a href="#" class="btn btn-sm btn-outline-secondary"
+        hx-get="{% url 'backend:article_intake_recommended' %}?from_month={{ from_month }}&to_month={{ to_month }}&batch_id={{ batch_id }}{% if show_hidden %}&show_hidden=1{% endif %}"
+        hx-target="#article-intake-recommended"
+        hx-swap="innerHTML"
+      >Filter to date window</a>
+    {% else %}
+      <a href="#" class="btn btn-sm btn-outline-secondary"
+        hx-get="{% url 'backend:article_intake_recommended' %}?from_month={{ from_month }}&to_month={{ to_month }}&batch_id={{ batch_id }}&show_all=1{% if show_hidden %}&show_hidden=1{% endif %}"
+        hx-target="#article-intake-recommended"
+        hx-swap="innerHTML"
+      >View all dates</a>
+    {% endif %}
+  </div>
+</div>
+<div class="card-body">
+  {% if recommended_articles %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Article</th>
+            <th>Journal</th>
+            <th>Pub date</th>
+            <th>Recommendations</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for article in recommended_articles %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ article.title|default:"(Untitled)" }}</div>
+                {% if article.recommenders %}
+                  <div class="small text-muted">By: {{ article.recommenders|join:", " }}</div>
+                {% endif %}
+              </td>
+              <td>{{ article.source_journal_name|default:"-" }}</td>
+              <td>{% if article.publication_date %}{{ article.publication_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+              <td><span class="badge text-bg-warning">{{ article.recommendation_count }}</span></td>
+              <td>
+                {% if article.has_review %}
+                  <span class="badge text-bg-info">Has review</span>
+                {% endif %}
+                {% if article.is_staged %}
+                  <span class="badge text-bg-success">Staged</span>
+                {% endif %}
+                {% if not article.has_review and not article.is_staged %}
+                  <span class="text-muted small">-</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex gap-1 align-items-center">
+                  {% if article.article_url %}
+                    <a href="{{ article.article_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary py-0">Open</a>
+                  {% endif %}
+                  <form method="post"
+                    action="{% url 'backend:article_intake_toggle_recommendation_hidden' article.pk %}"
+                    hx-post="{% url 'backend:article_intake_toggle_recommendation_hidden' article.pk %}"
+                    hx-target="#article-intake-recommended"
+                    hx-swap="innerHTML"
+                  >
+                    {% csrf_token %}
+                    <input type="hidden" name="from_month" value="{{ from_month }}">
+                    <input type="hidden" name="to_month" value="{{ to_month }}">
+                    <input type="hidden" name="batch_id" value="{{ batch_id }}">
+                    {% if show_all %}<input type="hidden" name="show_all" value="1">{% endif %}
+                    {% if show_hidden %}<input type="hidden" name="show_hidden" value="1">{% endif %}
+                    {% if show_hidden %}
+                      <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Unhide recommendation">Unhide</button>
+                    {% else %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger py-0" title="Hide from recommendations">Hide</button>
+                    {% endif %}
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted mb-0">
+      {% if show_hidden %}
+        No hidden recommendations.
+      {% else %}
+        No community recommendations{% if not show_all %} for this date range{% endif %}.
+      {% endif %}
+    </p>
+  {% endif %}
+</div>

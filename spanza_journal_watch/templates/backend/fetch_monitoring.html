@@ -1,0 +1,145 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="mb-0">Fetch monitoring</h1>
+  <a href="{% url 'backend:backend_settings' %}" class="btn btn-sm btn-outline-secondary">Back to settings</a>
+</div>
+
+{# ── Summary cards ─────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="text-muted small text-uppercase">Last 7 days</div>
+        <div class="fs-3 fw-bold">{{ stats.total }}</div>
+        <div class="small text-muted">total fetches</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="text-muted small text-uppercase">Success</div>
+        <div class="fs-3 fw-bold text-success">{{ stats.success }}</div>
+        <div class="small text-muted">
+          {% if stats.error %}
+            <span class="text-danger">{{ stats.error }} error{{ stats.error|pluralize }}</span>
+          {% else %}
+            no errors
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="text-muted small text-uppercase">Avg duration</div>
+        <div class="fs-3 fw-bold">
+          {% if stats.avg_duration %}{{ stats.avg_duration|floatformat:1 }}s{% else %}&mdash;{% endif %}
+        </div>
+        <div class="small text-muted">per fetch</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="text-muted small text-uppercase">Next scheduled</div>
+        <div class="fs-5 fw-bold">
+          {% if next_scheduled %}{{ next_scheduled|date:"H:i" }}{% else %}&mdash;{% endif %}
+        </div>
+        <div class="small text-muted">
+          {% if next_scheduled %}{{ next_scheduled|date:"j M Y" }}{% else %}unknown{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Last success / error ──────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  {% if recent_success %}
+    <div class="col-12 col-lg-6">
+      <div class="card border-success">
+        <div class="card-header text-bg-success">Last successful fetch</div>
+        <div class="card-body">
+          <div class="small mb-1"><strong>Type:</strong> {{ recent_success.get_task_type_display }}</div>
+          <div class="small mb-1"><strong>Finished:</strong> {{ recent_success.finished_at|date:"j M Y H:i" }}</div>
+          <div class="small mb-1"><strong>Duration:</strong> {{ recent_success.duration_seconds|floatformat:1 }}s</div>
+          <div class="small mb-1"><strong>Journals:</strong> {{ recent_success.journal_count }}</div>
+          <div class="small"><strong>Articles:</strong> {{ recent_success.articles_created }} created, {{ recent_success.articles_touched }} touched</div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  {% if recent_error %}
+    <div class="col-12 col-lg-6">
+      <div class="card border-danger">
+        <div class="card-header text-bg-danger">Last error</div>
+        <div class="card-body">
+          <div class="small mb-1"><strong>Type:</strong> {{ recent_error.get_task_type_display }}</div>
+          <div class="small mb-1"><strong>Time:</strong> {{ recent_error.started_at|date:"j M Y H:i" }}</div>
+          <div class="small text-danger">{{ recent_error.error_message|truncatechars:200 }}</div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{# ── Fetch log table ──────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header">Fetch history</div>
+  <div class="card-body p-0">
+    {% if fetch_logs %}
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Journals</th>
+              <th>Created</th>
+              <th>Touched</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in fetch_logs %}
+              <tr>
+                <td class="small text-nowrap">{{ log.started_at|date:"j M H:i" }}</td>
+                <td class="small">{{ log.get_task_type_display }}</td>
+                <td>
+                  {% if log.status == "success" %}
+                    <span class="badge text-bg-success">OK</span>
+                  {% elif log.status == "error" %}
+                    <span class="badge text-bg-danger">Error</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">Running</span>
+                  {% endif %}
+                </td>
+                <td class="small">{% if log.duration_seconds %}{{ log.duration_seconds|floatformat:1 }}s{% else %}&mdash;{% endif %}</td>
+                <td class="small">{{ log.journal_count }}</td>
+                <td class="small">{{ log.articles_created }}</td>
+                <td class="small">{{ log.articles_touched }}</td>
+                <td class="small text-muted">
+                  {% if log.error_message %}
+                    <span class="text-danger" title="{{ log.error_message }}">{{ log.error_message|truncatechars:60 }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-4 text-center text-muted">
+        <p class="mb-0">No fetch logs yet. Logs will appear here after the next scheduled or manual PubMed fetch.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

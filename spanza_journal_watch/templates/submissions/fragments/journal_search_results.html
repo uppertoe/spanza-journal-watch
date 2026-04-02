@@ -1,0 +1,39 @@
+{% if query and results %}
+  <p class="small text-muted mb-3">{{ results|length }} result{{ results|length|pluralize }} for "{{ query }}"</p>
+  <div class="d-grid gap-2">
+    {% for link in results %}
+      <div class="card border-0 shadow-sm journal-search-result">
+        <div class="card-body p-3">
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+            <span class="badge text-bg-primary-subtle text-primary-emphasis small">{{ link.watched_journal.name }}</span>
+            {% if link.article.publication_date %}
+              <span class="text-muted small">{{ link.article.publication_date|date:"j M Y" }}</span>
+            {% elif link.article.publication_month %}
+              <span class="text-muted small">{{ link.article.publication_month|date:"F Y" }}</span>
+            {% endif %}
+          </div>
+          <h6 class="mb-1">{{ link.article.title|default:"Untitled" }}</h6>
+          {% if link.article.abstract %}
+            <p class="text-muted small mb-2" style="max-width: 60ch;">{{ link.article.abstract|truncatechars:200 }}</p>
+          {% endif %}
+          <div class="d-flex gap-2">
+            {% if link.article.article_url %}
+              <a class="btn btn-sm btn-outline-primary jw-action-btn--fulltext" href="{{ link.article.article_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ link.article.pk }}">
+                <span class="jw-action-btn__sizer" aria-hidden="true"><svg class="bi me-1" width="0.85em" height="0.85em"><use href="#icon-check"></use></svg>Full text</span>
+                <span class="jw-action-btn__label">Full text</span>
+              </a>
+            {% elif link.article.doi %}
+              <a class="btn btn-sm btn-outline-primary" href="https://doi.org/{{ link.article.doi }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ link.article.pk }}">DOI</a>
+            {% elif link.article.pubmed_url %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ link.article.pubmed_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ link.article.pk }}">PubMed</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% elif query %}
+  <p class="text-muted small">No results for "{{ query }}".</p>
+{% else %}
+  <p class="text-muted small">Type at least 2 characters to search across all journals.</p>
+{% endif %}

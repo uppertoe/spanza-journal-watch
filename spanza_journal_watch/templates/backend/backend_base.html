@@ -225,7 +225,7 @@
                 </a>
                 <ul class="dropdown-menu">
                   <li><a class="dropdown-item" href="{% url "backend:upload_subscribers" %}">Upload Subscribers</a></li>
-                  <li><a class="dropdown-item" href="{% url "backend:subscriber_list" %}">Mailing List</a></li>
+                  <li><a class="dropdown-item" href="{% url "backend:subscriber_list" %}">Users &amp; Subscribers</a></li>
                 </ul>
               </li>
               {% endif %}
@@ -252,9 +252,12 @@
               </li>
               {% endif %}
             </ul>
-            {% if planka_url and request.user.is_staff %}
-            <a class="btn btn-outline-secondary btn-sm ms-auto" href="{{ planka_url }}" rel="noopener noreferrer">Open Planka</a>
-            {% endif %}
+            <div class="d-flex gap-2 ms-auto">
+              <a class="btn btn-outline-primary btn-sm" href="{% url 'home' %}">Main site</a>
+              {% if planka_url and request.user.is_staff %}
+              <a class="btn btn-outline-secondary btn-sm" href="{{ planka_url }}" rel="noopener noreferrer">Open Planka</a>
+              {% endif %}
+            </div>
           </div>
         </div>
       </nav>

@@ -15,6 +15,7 @@ Covers the non-trivial view logic:
 11. toggle_review_active — cascade to Article / Issue
 """
 
+import datetime
 import json
 from unittest.mock import patch
 
@@ -23,8 +24,8 @@ from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
 
-from spanza_journal_watch.backend.models import IssueContributor, WatchedJournal
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
+from spanza_journal_watch.backend.models import IssueContributor, PubmedArticle, WatchedJournal
+from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
 from spanza_journal_watch.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -83,7 +84,9 @@ def author():
 
 @pytest.fixture()
 def article(journal):
-    return Article.objects.create(name="Test Article", year=2024, journal=journal)
+    return PubmedArticle.objects.create(
+        title="Test Article", publication_date=datetime.date(2024, 1, 1), journal=journal
+    )
 
 
 @pytest.fixture()
@@ -196,7 +199,7 @@ class TestAddIssueReview:
     def test_creates_new_article(self, issue):
         client, _ = editor_client()
         self._post(issue, client, article_name="Unique New Article")
-        assert Article.objects.filter(name="Unique New Article").exists()
+        assert PubmedArticle.objects.filter(title="Unique New Article").exists()
 
     def test_creates_new_author(self, issue):
         client, _ = editor_client()

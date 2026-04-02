@@ -1,23 +1,31 @@
-<div id="journal-article-actions-{{ article.pk }}" class="d-flex flex-wrap gap-2">
+<div id="journal-article-actions-{{ article.pk }}" class="d-flex flex-wrap gap-2" data-star-count="{{ star_count|default:0 }}" data-article-id="{{ article.pk }}">
   {% if request.user.is_authenticated %}
     <form method="post" action="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ next_url }}">
-      <button type="submit" class="btn btn-sm {% if user_state and user_state.starred_at %}btn-warning{% else %}btn-outline-primary{% endif %}">
+      <button type="submit" class="btn btn-sm {% if user_state and user_state.starred_at %}btn-warning{% else %}btn-outline-primary{% endif %} jw-action-btn--star">
         <svg class="bi me-1" width="0.95em" height="0.95em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
         {% if user_state and user_state.starred_at %}Starred{% else %}Star{% endif %}
       </button>
     </form>
-    <form method="post" action="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+    {% if can_recommend %}
+      <form method="post" action="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <button type="submit" class="btn btn-sm {% if user_state and user_state.recommended_at %}btn-success{% else %}btn-outline-success{% endif %} jw-action-btn--recommend">
+          <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
+          <span>{% if user_state and user_state.recommended_at %}Recommended{% else %}Recommend for review{% endif %}</span>
+        </button>
+      </form>
+    {% endif %}
+  {% else %}
+    <form method="post" action="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ next_url }}">
-      <button type="submit" class="btn btn-sm {% if user_state and user_state.recommended_at %}btn-success{% else %}btn-outline-success{% endif %}" {% if not can_recommend %}disabled{% endif %}>
-        {% if user_state and user_state.recommended_at %}Recommended{% else %}Recommend for review{% endif %}
+      <button type="submit" class="btn btn-sm {% if session_starred %}btn-warning{% else %}btn-outline-primary{% endif %} jw-action-btn--star">
+        <svg class="bi me-1" width="0.95em" height="0.95em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+        {% if session_starred %}Starred{% else %}Star{% endif %}
       </button>
     </form>
-    <span class="badge rounded-pill text-bg-light border align-self-center">{{ recommendation_count }} recommendation{{ recommendation_count|pluralize }}</span>
-  {% else %}
-    <a class="btn btn-sm btn-outline-primary" href="{% url 'account_login' %}?next={{ next_url|urlencode }}">Log in to star or recommend</a>
-    <span class="badge rounded-pill text-bg-light border align-self-center">{{ recommendation_count }} recommendation{{ recommendation_count|pluralize }}</span>
   {% endif %}
 </div>

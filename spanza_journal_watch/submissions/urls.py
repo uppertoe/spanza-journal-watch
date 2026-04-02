@@ -18,6 +18,13 @@ urlpatterns = [
         views.journal_article_toggle_recommend,
         name="journal_article_toggle_recommend",
     ),
+    path("journals/search/", views.journal_search, name="journal_search"),
+    path("journals/reading-list/", views.journal_reading_list, name="journal_reading_list"),
+    path(
+        "journals/articles/<int:article_id>/archive",
+        views.journal_article_toggle_archive,
+        name="journal_article_toggle_archive",
+    ),
     path("issues", views.IssueListView.as_view(), name="issue_list"),
     path("issues/latest", views.LatestIssueView.as_view(), name="issue_latest"),
     path("issues/<slug:slug>", views.IssueDetailView.as_view(), name="issue_detail"),

@@ -19,6 +19,13 @@ from spanza_journal_watch.utils.modelmethods import name_image
 
 
 class Subscriber(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="subscriber",
+    )
     email = models.EmailField(max_length=255)
     subscribed = models.BooleanField(default=True)
     tester = models.BooleanField(default=False)
@@ -99,7 +106,7 @@ class Subscriber(models.Model):
             "List-Unsubscribe": f"<{mailto}>, <{one_click_url}>",
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
             "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
-            "Precedence": "bulk",
+            "Precedence": "list",
             "Auto-Submitted": "auto-generated",
             "X-Auto-Response-Suppress": "All",
             "Feedback-ID": "journalwatch:newsletter:spanza",

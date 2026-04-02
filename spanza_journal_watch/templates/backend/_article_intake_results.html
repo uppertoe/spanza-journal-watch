@@ -298,45 +298,12 @@
   </div>
 </div>
 
-<div class="card mt-3">
-  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-    <span>Recommended for review</span>
-    <small class="text-muted">{{ recommended_rows|length }} article{{ recommended_rows|length|pluralize }} in this range</small>
-  </div>
-  <div class="card-body">
-    {% if recommended_rows %}
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Article</th>
-              <th>Journal</th>
-              <th>Recommendations</th>
-              <th>Stage status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in recommended_rows %}
-              <tr>
-                <td>{{ row.article.title|default:"(Untitled)" }}</td>
-                <td>{{ row.watched_journal.name|default:row.article.source_journal_name|default:"-" }}</td>
-                <td><span class="badge text-bg-warning">{{ row.recommendation_count }}</span></td>
-                <td>
-                  {% if row.is_selected %}
-                    <span class="badge text-bg-success">Staged</span>
-                  {% else %}
-                    <span class="text-muted small">Not staged</span>
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <p class="text-muted mb-0">No community recommendations yet for this month range.</p>
-    {% endif %}
-  </div>
+<div class="card mt-3" id="article-intake-recommended"
+  hx-get="{% url 'backend:article_intake_recommended' %}?from_month={{ batch.from_month|date:'Y-m' }}&to_month={{ batch.to_month|date:'Y-m' }}&batch_id={{ batch.pk }}"
+  hx-trigger="load"
+  hx-swap="innerHTML"
+>
+  <div class="card-header"><span class="text-muted">Loading recommendations...</span></div>
 </div>
 
 <div class="card mt-3">

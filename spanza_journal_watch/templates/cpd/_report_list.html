@@ -1,0 +1,44 @@
+{% if reports %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Date range</th>
+          <th>Articles</th>
+          <th>Requested</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for report in reports %}
+          <tr>
+            <td class="small">{{ report.date_from|date:"j M Y" }} &mdash; {{ report.date_to|date:"j M Y" }}</td>
+            <td class="small">{{ report.article_count }}</td>
+            <td class="small text-muted">{{ report.created|date:"j M Y H:i" }}</td>
+            <td>
+              {% if report.status == "ready" %}
+                <span class="badge text-bg-success">Ready</span>
+              {% elif report.status == "error" %}
+                <span class="badge text-bg-danger">Error</span>
+              {% elif report.status == "generating" %}
+                <span class="badge text-bg-info cpd-report-pending">Generating&hellip;</span>
+              {% else %}
+                <span class="badge text-bg-warning cpd-report-pending">Pending</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if report.status == "ready" and report.file %}
+                <a href="{% url 'cpd:download' report.pk %}" class="btn btn-sm btn-outline-primary">Download</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="p-4 text-center text-muted">
+    <p class="mb-0">No reports yet. Generate your first CPD report above.</p>
+  </div>
+{% endif %}

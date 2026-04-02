@@ -14,7 +14,7 @@ from spanza_journal_watch.backend.models import (
 )
 from spanza_journal_watch.layout.models import FeatureArticle, PageHeader
 
-from .models import Article, Author, Comment, Hit, Issue, Journal, Review, Tag
+from .models import Author, Comment, Hit, Issue, Journal, Review, Tag
 
 User = get_user_model()
 
@@ -35,9 +35,9 @@ class TagModelTest(TestCase):
 
     def test_all_tags_list(self):
         # Add articles with tags for testing
-        article1 = Article.objects.create(name="Article 1", journal=Journal.objects.create(name="Journal 1"))
+        article1 = PubmedArticle.objects.create(title="Article 1", journal=Journal.objects.create(name="Journal 1"))
         article1.tags.add(self.tag)
-        article2 = Article.objects.create(name="Article 2", journal=Journal.objects.create(name="Journal 2"))
+        article2 = PubmedArticle.objects.create(title="Article 2", journal=Journal.objects.create(name="Journal 2"))
         article2.tags.add(self.tag)
 
         # Exclude inactive tags and order by article count
@@ -51,7 +51,7 @@ class TagModelTest(TestCase):
         self.assertFalse(Tag.objects.filter(pk=tag.pk).exists())
 
         # Create a tag with an article
-        article = Article.objects.create(name="Article", journal=Journal.objects.create(name="Journal"))
+        article = PubmedArticle.objects.create(title="Article", journal=Journal.objects.create(name="Journal"))
         tag = Tag.objects.create(text="Used Tag")
         article.tags.add(tag)
         tag.delete_if_orphaned()
@@ -69,10 +69,10 @@ class JournalModelTest(TestCase):
         self.assertEqual(self.journal.slug, "test-journal")
 
 
-class ArticleModelTest(TestCase):
+class PubmedArticleModelTest(TestCase):
     def setUp(self):
         self.journal = Journal.objects.create(name="Test Journal")
-        self.article = Article.objects.create(name="Test Article", journal=self.journal)
+        self.article = PubmedArticle.objects.create(title="Test Article", journal=self.journal)
 
     def test_str_representation(self):
         self.assertEqual(str(self.article), self.article.get_truncated_name())
@@ -100,7 +100,7 @@ class ArticleModelTest(TestCase):
     def test_shortened_name(self):
         # Create an Article instance with a long name
         long_name = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed auctor eu sem id bibendum."
-        article = Article(name=long_name)
+        article = PubmedArticle(title=long_name)
 
         # Assert that the shortened name is truncated correctly
         shortened_name = article.get_truncated_name()
@@ -109,7 +109,7 @@ class ArticleModelTest(TestCase):
 
         # Update the name to exceed 200 characters
         long_name = "A" * (article.TRUNCATED_NAME_LENGTH + 1)
-        article.name = long_name
+        article.title = long_name
 
         # Assert that the new shortened name is truncated correctly
         shortened_name = article.get_truncated_name()
@@ -127,7 +127,7 @@ class ReviewModelTest(TestCase):
         self.user = User.objects.create_user(email="testuser@mail.com", password="testpassword")
         self.author = Author.objects.create(name="Test Author", user=self.user)
         self.journal = Journal.objects.create(name="Test Journal")
-        self.article = Article.objects.create(name="Test Article", journal=self.journal)
+        self.article = PubmedArticle.objects.create(title="Test Article", journal=self.journal)
         self.review = Review.objects.create(article=self.article, author=self.author, body="Test Body")
 
     def test_str_representation(self):
@@ -163,8 +163,8 @@ class IssueModelTest(TestCase):
 
     def test_get_card_features(self):
         # Create featured reviews for the issue
-        review1 = Review.objects.create(article=Article.objects.create(name="Article 1"), is_featured=True)
-        review2 = Review.objects.create(article=Article.objects.create(name="Article 2"), is_featured=True)
+        review1 = Review.objects.create(article=PubmedArticle.objects.create(title="Article 1"), is_featured=True)
+        review2 = Review.objects.create(article=PubmedArticle.objects.create(title="Article 2"), is_featured=True)
         self.issue.reviews.add(review1, review2)
 
         # Check that only featured reviews are returned
@@ -187,7 +187,7 @@ class CommentModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="testuser@mail.com", password="testpassword")
         self.journal = Journal.objects.create(name="Test Journal")
-        self.article = Article.objects.create(name="Test Article", journal=self.journal)
+        self.article = PubmedArticle.objects.create(title="Test Article", journal=self.journal)
         self.comment = Comment.objects.create(body="Test Body", article=self.article, author=self.user)
 
     def test_str_representation(self):
@@ -202,7 +202,7 @@ class CommentModelTest(TestCase):
 
 class HitTestCase(TestCase):
     def setUp(self):
-        self.article = Article.objects.create(name="Test Article")
+        self.article = PubmedArticle.objects.create(title="Test Article")
         self.hit = Hit.objects.create(content_object=self.article)
 
     def test_update_page_count(self):
@@ -219,7 +219,7 @@ class ReviewHumanHitsTestCase(TestCase):
     def setUp(self):
         self.journal = Journal.objects.create(name="Test Journal")
         self.author = Author.objects.create(name="Test Author")
-        self.article = Article.objects.create(name="Test Article", journal=self.journal)
+        self.article = PubmedArticle.objects.create(title="Test Article", journal=self.journal)
         self.review = Review.objects.create(article=self.article, author=self.author, body="Review body", active=True)
 
     def test_get_hits_prefers_distinct_human_review_open_events(self):
@@ -264,6 +264,10 @@ class ReviewHumanHitsTestCase(TestCase):
 class JournalBrowserTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="journals@example.com", password="testpass123")
+        from django.contrib.auth.models import Permission
+
+        perm = Permission.objects.get(codename="can_recommend")
+        self.user.user_permissions.add(perm)
         self.watched = WatchedJournal.objects.create(name="Paediatric Anaesthesia", active=True)
         self.article = PubmedArticle.objects.create(
             pmid="98765432",

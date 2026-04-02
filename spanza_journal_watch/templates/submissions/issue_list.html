@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 
+{% block analytics_page_attr %} data-analytics-page="issues"{% endblock analytics_page_attr %}
+
 {% block main-feature %}
 {% if page_header %}
     {% with page_header as content %} {% include "fragments/main_feature.html" with header_kicker="Archive" %} {% endwith %}

@@ -41,13 +41,13 @@ LOCALE_PATHS = [str(BASE_DIR / "locale")]
 
 # MESSAGES
 # ------------------------------------------------------------------------------
-# Convert Django messages to Bootstrap alert styles
+# Convert Django messages to Bootstrap toast styles
 MESSAGE_TAGS = {
-    messages.DEBUG: "alert-secondary",
-    messages.INFO: "alert-info",
-    messages.SUCCESS: "alert-success",
-    messages.WARNING: "alert-warning",
-    messages.ERROR: "alert-danger",
+    messages.DEBUG: "text-bg-secondary",
+    messages.INFO: "text-bg-primary",
+    messages.SUCCESS: "text-bg-success",
+    messages.WARNING: "text-bg-warning",
+    messages.ERROR: "text-bg-danger",
 }
 
 # DATABASES
@@ -88,7 +88,7 @@ DJANGO_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
-    # "django.contrib.humanize", # Handy template tags
+    "django.contrib.humanize",
     "django.contrib.admin",
     "django.forms",
     "django.contrib.sitemaps",
@@ -115,6 +115,7 @@ LOCAL_APPS = [
     "spanza_journal_watch.newsletter.apps.NewsletterConfig",
     "spanza_journal_watch.analytics.apps.AnalyticsConfig",
     "spanza_journal_watch.backend.apps.BackendConfig",
+    "spanza_journal_watch.cpd.apps.CpdConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

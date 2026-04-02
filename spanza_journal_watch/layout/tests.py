@@ -12,10 +12,11 @@ Covers:
 from http import HTTPStatus
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from spanza_journal_watch.submissions.models import Article, Issue, Review
+from spanza_journal_watch.backend.models import PubmedArticle
+from spanza_journal_watch.submissions.models import Issue, Review
 
 from .models import HOMEPAGE_CACHE_KEY, FeatureArticle, Homepage
 
@@ -52,6 +53,7 @@ class FeatureArticleModelTest(TestCase):
 # ---------------------------------------------------------------------------
 
 
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class HomepagePublishTest(TestCase):
     def setUp(self):
         cache.clear()
@@ -74,6 +76,7 @@ class HomepagePublishTest(TestCase):
         self.assertEqual(cache.get(HOMEPAGE_CACHE_KEY), hp2.pk)
 
 
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class HomepageGetCurrentTest(TestCase):
     def setUp(self):
         cache.clear()
@@ -129,9 +132,9 @@ class HomepageGetCardFeaturesTest(TestCase):
         self.homepage = _make_homepage(issue=self.issue)
 
     def test_returns_only_featured_active_reviews(self):
-        a1 = Article.objects.create(name="Article 1")
-        a2 = Article.objects.create(name="Article 2")
-        a3 = Article.objects.create(name="Article 3")
+        a1 = PubmedArticle.objects.create(title="Article 1")
+        a2 = PubmedArticle.objects.create(title="Article 2")
+        a3 = PubmedArticle.objects.create(title="Article 3")
         featured = Review.objects.create(article=a1, is_featured=True, active=True)
         Review.objects.create(article=a2, is_featured=False, active=True)  # not featured
         Review.objects.create(article=a3, is_featured=True, active=False)  # not active

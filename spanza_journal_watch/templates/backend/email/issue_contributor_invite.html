@@ -1,50 +1,55 @@
 {% load mjml %}
 {% mjml %}
 <mjml>
-  <mj-body background-color="#f6f7fb">
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
+      <mj-text line-height="1.6" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f2f4f7">
 
-    <mj-section padding-bottom="0">
+    <mj-section padding="28px 0 0">
       <mj-column>
-        <mj-text font-size="12px" color="#888888" align="center" letter-spacing="0.08em" font-weight="600">
-          JOURNAL WATCH
+        <mj-text align="center" font-size="11px" color="#8a96a2" letter-spacing="0.14em" font-weight="700" text-transform="uppercase">
+          SPANZA Journal Watch
         </mj-text>
       </mj-column>
     </mj-section>
 
-    <mj-section background-color="#ffffff" border-radius="8px" padding="32px 24px">
+    <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
       <mj-column>
-        <mj-text font-size="22px" font-weight="700" color="#152b3b" padding-bottom="8px">
+        <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
           You've been invited to contribute
         </mj-text>
-        <mj-text font-size="15px" color="#444444" line-height="1.6" padding-bottom="20px">
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="24px">
           {% if contributor.name %}Hello {{ contributor.name }},<br><br>{% endif %}
-          You have been invited to contribute to <strong>{{ issue.name }}</strong> on Journal Watch.
-          Click the button below to accept your invitation and get started.
+          You have been invited to contribute to <strong>{{ issue.name }}</strong> on Journal Watch. Click the button below to accept your invitation and get started.
         </mj-text>
-        <mj-button href="{{ accept_url }}" background-color="#0d6efd" border-radius="6px" font-size="15px" padding="12px 24px">
+        <mj-button href="{{ accept_url }}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
           Accept invitation
         </mj-button>
-        <mj-text font-size="13px" color="#888888" padding-top="20px">
+        <mj-text font-size="13px" color="#8a96a2" padding-top="24px">
           This link expires on {{ expires_at|date:"j M Y" }} and can only be used with the email address it was sent to.
         </mj-text>
         {% if docs_url %}
-        <mj-text font-size="13px" color="#444444" padding-top="12px">
-          New to Journal Watch? Read the <a href="{{ docs_url }}user-guide/reviewer.html" style="color:#0d6efd;">reviewer guide</a> to learn how the review workflow works.
+        <mj-text font-size="14px" color="#444444" padding-top="16px" line-height="1.6">
+          New to Journal Watch? Read the <a href="{{ docs_url }}user-guide/reviewer.html" style="color:#2f5a80;">reviewer guide</a> to learn how the review workflow works.
         </mj-text>
         {% endif %}
-        <mj-text font-size="12px" color="#aaaaaa" padding-top="20px">
-          If the button above doesn't work, paste this link into your browser:<br>
+        <mj-text font-size="12px" color="#8a96a2" padding-top="20px">
+          If the button doesn't work, paste this link into your browser:<br>
           {{ accept_url }}
         </mj-text>
-        <mj-text font-size="12px" color="#aaaaaa" padding-top="4px">
+        <mj-text font-size="12px" color="#8a96a2" padding-top="4px">
           If you did not expect this invitation, you can safely ignore this email.
         </mj-text>
       </mj-column>
     </mj-section>
 
-    <mj-section padding-top="16px">
+    <mj-section padding="20px 20px 28px">
       <mj-column>
-        <mj-text font-size="12px" color="#aaaaaa" align="center">
+        <mj-text align="center" font-size="12px" color="#8a96a2">
           SPANZA Journal Watch &mdash; paediatric anaesthesia literature review
         </mj-text>
       </mj-column>

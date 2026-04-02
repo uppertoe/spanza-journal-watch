@@ -12,12 +12,13 @@ from django.utils.safestring import mark_safe
 
 from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
-from ..submissions.models import Article, Author, HealthService, Issue, Journal, Review
+from ..submissions.models import Author, HealthService, Issue, Journal, Review
 from .models import (
     BackendPreference,
     InboundEmail,
     IssueContributor,
     PlankaBoardBackgroundAsset,
+    PubmedArticle,
     PubmedArticleUserState,
     SubscriberCSV,
     WatchedJournal,
@@ -303,8 +304,8 @@ class HomepageForm(forms.ModelForm):
 
 class ArticleForm(forms.ModelForm):
     class Meta:
-        model = Article
-        fields = ["name", "journal", "year", "citation", "url", "tags_string"]
+        model = PubmedArticle
+        fields = ["title", "journal", "citation", "article_url", "tags_string"]
 
 
 class ReviewForm(forms.ModelForm):
@@ -412,7 +413,7 @@ class IssueBuilderReviewForm(forms.Form):
 
     article_mode = forms.ChoiceField(choices=ARTICLE_MODE_CHOICES, initial=ARTICLE_MODE_NEW)
     existing_article = forms.ModelChoiceField(
-        queryset=Article.objects.order_by("name"),
+        queryset=PubmedArticle.objects.order_by("title"),
         required=False,
         help_text="Use an existing article instead of creating a new one.",
     )
@@ -495,12 +496,14 @@ class IssueBuilderReviewForm(forms.Form):
             article = self.cleaned_data["existing_article"]
         else:
             default_year = datetime.date.today().year
-            article = Article.objects.create(
-                name=self.cleaned_data["article_name"],
+            pub_year = self.cleaned_data.get("article_year") or default_year
+            article = PubmedArticle.objects.create(
+                title=self.cleaned_data["article_name"],
                 journal=self.cleaned_data.get("article_journal"),
-                year=self.cleaned_data.get("article_year") or default_year,
+                publication_date=datetime.date(pub_year, 1, 1),
+                publication_month=datetime.date(pub_year, 1, 1),
                 citation=self.cleaned_data.get("article_citation") or "",
-                url=self.cleaned_data.get("article_url"),
+                article_url=self.cleaned_data.get("article_url") or "",
                 tags_string=self.cleaned_data.get("article_tags_string") or "",
             )
 
@@ -661,7 +664,7 @@ class ArticleIntakeAssignIssueForm(forms.Form):
 class WatchedJournalForm(forms.ModelForm):
     class Meta:
         model = WatchedJournal
-        fields = ["name", "issn_print", "issn_electronic", "active"]
+        fields = ["name", "issn_print", "issn_electronic", "active", "visible_on_frontend"]
 
     def clean_name(self):
         return (self.cleaned_data.get("name") or "").strip()

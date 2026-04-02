@@ -36,8 +36,8 @@ from spanza_journal_watch.backend.forms import (
     WatchedJournalForm,
     peek_csv,
 )
-from spanza_journal_watch.backend.models import IssueContributor
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
+from spanza_journal_watch.backend.models import IssueContributor, PubmedArticle
+from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
 
 pytestmark = pytest.mark.django_db
 
@@ -66,7 +66,7 @@ def make_author(name="Dr Test"):
 
 
 def make_article(name="Test Article"):
-    return Article.objects.create(name=name, year=2024)
+    return PubmedArticle.objects.create(title=name, publication_date=datetime.date(2024, 1, 1))
 
 
 # ---------------------------------------------------------------------------

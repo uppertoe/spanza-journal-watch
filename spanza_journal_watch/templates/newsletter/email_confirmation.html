@@ -3,49 +3,54 @@
 <mjml>
   <mj-head>
     <mj-preview>Subscription confirmed for SPANZA Journal Watch. You will receive updates with each new issue.</mj-preview>
-    <mj-style inline="inline">
-      .link-nostyle { color: inherit; text-decoration: none; }
-      .link-inherit-color { color: inherit; }
-    </mj-style>
+    <mj-attributes>
+      <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
+      <mj-text line-height="1.6" />
+    </mj-attributes>
   </mj-head>
-  <mj-body>
-    <mj-section background-color="#152b3b" padding="0">
+  <mj-body background-color="#f2f4f7">
+
+    <mj-section padding="28px 0 0">
       <mj-column>
-        <mj-button background-color="#ec7800" align="right" inner-padding="5px 20px" href="{{ subscriber.get_unsubscribe_link }}">Unsubscribe</mj-button>
-      </mj-column>
-    </mj-section>
-    <mj-section>
-      <mj-column>
-        <mj-image width="300px" src="{{ image_domain }}{{ email_heading_url }}" href="{{ tracker }}/" alt="Journal Watch" />
-      </mj-column>
-    </mj-section>
-    <mj-section>
-      <mj-column>
-        <mj-divider border-color="#152b3b"></mj-divider>
-        <mj-text font-size="20px" color="#152b3b" font-family="helvetica">
-          <p>Thank you for subscribing to SPANZA Journal Watch.</p>
-          <p>You will receive updates with each issue of Journal Watch, which is published every two months.</p>
-          <p>You are receiving this email because you subscribed at <a href="{{ tracker }}/">journalwatch.org.au</a> using the email {{ subscriber.email }}</p>
-          <p>You can unsubscribe at any time by visiting this link: <a href="{{ subscriber.get_unsubscribe_link}}">unsubscribe now</a></p>
-          <p>Sincerely,</p>
-          <p>The SPANZA Journal Watch team</p>
+        <mj-text align="center" font-size="11px" color="#8a96a2" letter-spacing="0.14em" font-weight="700" text-transform="uppercase">
+          SPANZA Journal Watch
         </mj-text>
       </mj-column>
     </mj-section>
-    <!-- Icons -->
-    <mj-section background-color="#fbfbfb">
+
+    <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
       <mj-column>
-        <mj-image width="220px" src="{{ spanza_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" />
-      </mj-column>
-    </mj-section>
-    <mj-section background-color="#152b3b" padding="0">
-      <mj-column>
-        <mj-text color="#fff" font-size="10px" font-family="Helvetica Neue, Helvetica, Arial, Lucida Grande, sans-serif">
-          <p>You are receiving this email because you are a member of SPANZA, or after subscribing to <a href="{{ tracker }}/" class="link-inherit-color">journalwatch.org.au</a> using the email <a href="mailto:{{ subscriber.email }}" class="link-inherit-color">{{ subscriber.email }}</a></p>
-          <p><a href="{{ subscriber.get_unsubscribe_link }}" class="link-inherit-color">Unsubscribe by visiting this link</a></p>
+        <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
+          You're subscribed
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="8px">
+          Thank you for subscribing to SPANZA Journal Watch.
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="8px">
+          You will receive updates with each new issue, published every two months. Each issue features editorial reviews of notable articles from the paediatric anaesthesia literature.
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="20px">
+          In the meantime, you can browse previous issues and the journal shelf at <a href="{{ tracker }}/" style="color:#2f5a80;">journalwatch.org.au</a>
+        </mj-text>
+        <mj-text font-size="14px" color="#8a96a2" line-height="1.55">
+          Sincerely,<br>The SPANZA Journal Watch team
         </mj-text>
       </mj-column>
     </mj-section>
+
+    <mj-section padding="20px 20px 8px">
+      <mj-column>
+        <mj-image width="140px" src="{{ spanza_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" padding-bottom="8px" />
+      </mj-column>
+    </mj-section>
+    <mj-section padding="0 20px 28px">
+      <mj-column>
+        <mj-text align="center" font-size="12px" color="#8a96a2">
+          <a href="{{ subscriber.get_unsubscribe_link }}" style="color:#8a96a2;">Unsubscribe</a> &nbsp;&middot;&nbsp; {{ subscriber.email }}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
   </mj-body>
 </mjml>
 {% endmjml %}

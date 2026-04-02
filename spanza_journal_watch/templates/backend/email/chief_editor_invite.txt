@@ -1,0 +1,14 @@
+{% if invite.name %}Hello {{ invite.name }},{% else %}Hello,{% endif %}
+
+{{ invited_by.get_full_name|default:invited_by.email }} has invited you to become a chief editor on SPANZA Journal Watch.
+
+Chief editors have full access to the editorial backend, including managing issues, contributors, newsletters, and site settings.
+
+Accept your invitation:
+{{ accept_url }}
+
+This link expires on {{ invite.expires_at|date:"j M Y" }} and can only be used with the email address it was sent to.
+
+If you did not expect this invitation, you can safely ignore this email.
+
+SPANZA Journal Watch — paediatric anaesthesia literature review

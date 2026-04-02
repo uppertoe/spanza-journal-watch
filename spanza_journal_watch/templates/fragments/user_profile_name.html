@@ -1,0 +1,26 @@
+<div id="profile-name-section">
+  <div class="d-flex align-items-start justify-content-between mb-1">
+    <div>
+      <p class="fw-semibold mb-0" id="profile-display-name">{{ request.user.name|default:request.user.email }}</p>
+      {% if request.user.name %}
+        <p class="text-muted small mb-0">{{ request.user.email }}</p>
+      {% endif %}
+    </div>
+    <button type="button" class="btn btn-sm btn-link text-muted p-0 ms-2" onclick="this.closest('#profile-name-section').querySelector('.jw-profile-name-form').classList.toggle('d-none'); this.closest('#profile-name-section').querySelector('[name=name]').focus();" aria-label="Edit name">
+      <svg class="bi" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-gear"></use></svg>
+    </button>
+  </div>
+  <form class="jw-profile-name-form d-none mt-2"
+    method="post"
+    action="{% url 'users:update_name' %}"
+    hx-post="{% url 'users:update_name' %}"
+    hx-target="#profile-name-section"
+    hx-swap="outerHTML"
+  >
+    {% csrf_token %}
+    <div class="input-group input-group-sm">
+      <input type="text" name="name" value="{{ request.user.name }}" class="form-control" placeholder="Your name" maxlength="255">
+      <button type="submit" class="btn btn-outline-primary">Save</button>
+    </div>
+  </form>
+</div>

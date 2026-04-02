@@ -47,7 +47,7 @@
                                     hx-indicator="#{% if shared_review_modal %}{{ shared_review_modal }}-indicator{% else %}indicator-{{ review.slug }}{% endif %}"
                                     hx-target="#{% if shared_review_modal %}{{ shared_review_modal }}-container{% else %}container-{{ review.slug }}{% endif %}"
                                     >Review</a>
-                                    {% if article.url %}<a href="{{ article.url }}" type="button" class="btn btn-sm btn-outline-secondary">View full text article</a>{% endif %}
+                                    {% if article.url %}<a href="{{ article.url }}" type="button" class="btn btn-sm btn-outline-secondary" data-cpd-article-id="{{ article.pk }}">View full text article</a>{% endif %}
                                 </div>
                         </div>
                 </div>

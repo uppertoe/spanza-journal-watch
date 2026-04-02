@@ -1,7 +1,9 @@
 from io import BytesIO
 from pathlib import Path
+from sys import getsizeof
 
 from django.apps import apps
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image, ImageOps
@@ -201,11 +203,17 @@ def celery_resize_greyscale_contrast_image(self, path, size=600, aspect_ratio=21
                 new_width, new_height = resize_to_max_dimension(target_width, target_height, size)
                 img = img.resize((new_width, new_height))
 
-            # Convert the file to greyscale
-            img = img.convert("L")
+            # Tint and darken for white text readability in email hero
+            from PIL import ImageEnhance
 
-            # Correct contrast
-            img = ImageOps.autocontrast(img, cutoff=5)
+            img = img.convert("RGB")
+            img = ImageEnhance.Color(img).enhance(0.45)  # desaturate
+            img = ImageEnhance.Brightness(img).enhance(0.48)  # darken significantly
+            img = ImageEnhance.Contrast(img).enhance(1.2)  # lift contrast
+
+            # Blend with navy tint (site primary #2f5a80) for brand consistency
+            navy = Image.new("RGB", img.size, (47, 90, 128))
+            img = Image.blend(img, navy, alpha=0.35)
 
             # Create the new file
             output = BytesIO()

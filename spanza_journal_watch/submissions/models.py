@@ -1,4 +1,3 @@
-import datetime
 import logging
 import re
 
@@ -16,7 +15,6 @@ from django.contrib.postgres.search import (
     TrigramSimilarity,
 )
 from django.core.cache import cache
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
@@ -114,7 +112,7 @@ class Tag(models.Model):
     text = models.CharField(max_length=255, unique=True, blank=False, null=False)
     slug = models.SlugField(max_length=255, blank=True, unique=True)
     active = models.BooleanField(default=True)
-    articles = models.ManyToManyField("Article", related_name="tags")
+    articles = models.ManyToManyField("backend.PubmedArticle", related_name="tags")
 
     @classmethod
     def get_all_tags(cls):
@@ -159,98 +157,6 @@ class Journal(TimeStampedModel):
         return self.name
 
 
-class Article(TimeStampedModel):
-    TRUNCATED_NAME_LENGTH = 50
-
-    _original_tags_string = None  # Used to detect when tags_string has been changed on save()
-
-    name = models.TextField()
-    tags_string = models.TextField(blank=True, null=False, verbose_name="Add #hashtags that describe this article")
-    journal = models.ForeignKey(Journal, on_delete=models.CASCADE, null=True, blank=True)
-    year = models.IntegerField(
-        validators=[MinValueValidator(1900), MaxValueValidator(datetime.date.today().year + 1)],
-        default=datetime.date.today().year,
-    )
-    citation = models.TextField(null=True, blank=True)
-    url = models.URLField(max_length=255, null=True, blank=True)
-    active = models.BooleanField(default=False)
-
-    class Meta:
-        indexes = [GinIndex(name="gin_trgm_idx", fields=("name",), opclasses=("gin_trgm_ops",))]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._original_tags_string = self.tags_string
-
-    def __str__(self):
-        return self.get_truncated_name()
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.tags_string != self._original_tags_string:
-            current_tags = self.create_tag_objects()  # Creates new tags where necessary
-            self.prune_tag_objects(current_tags)
-
-    def get_related_review(self):
-        return self.reviews.exclude(active=False).order_by("-created")[0]
-
-    def get_truncated_name(self):
-        return shorten_text(self.name, self.TRUNCATED_NAME_LENGTH)
-
-    def get_title(self):
-        separators = [":", " - "]
-        for sep in separators:
-            if sep in self.name:
-                return self.name.split(sep, 1)[0].strip()
-        return self.name
-
-    def get_subtitle(self):
-        separators = [":", "-"]
-        for sep in separators:
-            if sep in self.name:
-                return self.name.split(sep, 1)[1].strip()
-        return ""
-
-    def tags_list(self):
-        """
-        Returns a list of unique 'hashtag' strings
-        """
-        hashtag_list = []
-        for word in self.tags_string.split(" "):
-            if slugify(word) and word[0] == "#":  # Ensure non-empty string after slugify
-                hashtag_list.append(slugify(word[:255]))
-        return list(set(hashtag_list))
-
-    def create_tag_objects(self):
-        """
-        Creates new Tag objects from the self.tags_string where these
-        do not already exist
-        Returns a list of Tags matching the tags_string
-        """
-        current_tags = []
-
-        for text in self.tags_list():
-            try:
-                tag = Tag.objects.get(text=text)
-            except Tag.DoesNotExist:
-                tag = Tag(text=text)
-                tag.save()
-            except Tag.MultipleObjectsReturned:
-                logger.warning("Multiple matching tags for %s", tag)
-                continue
-            current_tags.append(tag)
-            tag.articles.add(self)  # Will not duplicate relation, but triggers signals
-
-        return current_tags
-
-    def prune_tag_objects(self, current_tags):
-        tags = self.tags.all()
-        for tag in tags:
-            if tag not in current_tags:
-                tag.articles.remove(self)
-                tag.delete_if_orphaned()
-
-
 class Review(TimeStampedModel):
     TRUNCATED_BODY_LENGTH = 200
     MAX_LINE_CHARS = 50
@@ -260,7 +166,7 @@ class Review(TimeStampedModel):
     author_similarity = 0.3
     body_rank = 0.3
 
-    article = models.ForeignKey(Article, on_delete=models.CASCADE, blank=False, null=False, related_name="reviews")
+    article = models.ForeignKey("backend.PubmedArticle", on_delete=models.CASCADE, related_name="reviews")
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True, related_name="reviews")
     body = MarkdownxField()
@@ -364,7 +270,7 @@ class Review(TimeStampedModel):
         results = (
             cls.objects.exclude(active=False)
             .annotate(
-                title_similarity=TrigramSimilarity("article__name", query),
+                title_similarity=TrigramSimilarity("article__title", query),
                 author_similarity=TrigramSimilarity("author__name", query),
                 rank=SearchRank("search_vector", SearchQuery(query)),
             )
@@ -408,6 +314,7 @@ class Issue(TimeStampedModel):
             ("manage_issue_builder", "Can create and publish issue bundles in backend issue builder"),
             ("chief_editor", "Can edit reviews, publish issues, and access chief editor functions"),
             ("regional_coordinator", "Can edit assigned issues and reviews; cannot publish or manage newsletter"),
+            ("can_recommend", "Can recommend articles for review"),
         ]
 
     def get_card_features(self):
@@ -556,7 +463,7 @@ class Issue(TimeStampedModel):
 
 class Comment(TimeStampedModel):
     body = models.TextField()
-    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
+    article = models.ForeignKey("backend.PubmedArticle", on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
 
     def __str__(self):

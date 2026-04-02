@@ -37,19 +37,11 @@ class JournalAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
 
-@admin.register(models.Article)
-class ArticleAdmin(admin.ModelAdmin):
-    list_display = ("name", "journal", "year", "active")
-    list_filter = ("active", "year")
-    search_fields = ("name", "journal__name", "citation")
-    autocomplete_fields = ["journal"]
-
-
 @admin.register(models.Review)
 class ReviewAdmin(MarkdownxModelAdmin):
     list_display = ("article", "author", "active", "is_featured", "publish_date", "created")
     list_filter = ("active", "is_featured")
-    search_fields = ("article__name", "author__name")
+    search_fields = ("article__title", "author__name")
     autocomplete_fields = ["article", "author"]
     date_hierarchy = "created"
 
@@ -76,7 +68,7 @@ class IssueAdmin(admin.ModelAdmin):
 @admin.register(models.Comment)
 class CommentAdmin(admin.ModelAdmin):
     list_display = ("article", "author", "created")
-    search_fields = ("article__name", "author__email")
+    search_fields = ("article__title", "author__email")
     autocomplete_fields = ["article"]
     readonly_fields = ("author",)
 

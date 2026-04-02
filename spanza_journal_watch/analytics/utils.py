@@ -170,12 +170,31 @@ def _categorize_from_header(referer, own_domain=""):
     return REFERRER_OTHER
 
 
+_UTM_SOCIAL_SOURCES = frozenset(["twitter", "x", "facebook", "linkedin", "bluesky", "instagram", "reddit", "mastodon"])
+
+
+def _categorize_from_utm(request):
+    """Return a referrer category if utm_source is present, else None."""
+    utm_source = (request.GET.get("utm_source") or "").strip().lower()
+    if not utm_source:
+        return None
+    if "newsletter" in utm_source or "email" in utm_source:
+        return REFERRER_NEWSLETTER
+    if utm_source in _UTM_SOCIAL_SOURCES:
+        return REFERRER_SOCIAL
+    if "search" in utm_source or "google" in utm_source or "bing" in utm_source:
+        return REFERRER_SEARCH
+    return REFERRER_OTHER
+
+
 def categorize_referrer(request):
     """
     Return the referrer category for the current request.
 
-    Checks the session first (set when a subscriber follows a newsletter
-    tracking link). Falls back to the HTTP Referer header.
+    Priority:
+    1. Session override (set when a subscriber follows a newsletter link).
+    2. UTM parameters (utm_source in query string).
+    3. HTTP Referer header.
     Session entries expire at local midnight on the day they were set.
     """
     session_entry = (request.session.get(_REFERRER_SESSION_KEY) or {}) if hasattr(request, "session") else {}
@@ -187,9 +206,38 @@ def categorize_referrer(request):
         except (KeyError, ValueError):
             pass
 
+    utm_category = _categorize_from_utm(request)
+    if utm_category is not None:
+        return utm_category
+
     referer = request.headers.get("referer") or request.headers.get("referrer") or ""
     own_domain = _get_own_domain()
     return _categorize_from_header(referer, own_domain)
+
+
+def extract_referrer_domain(request):
+    """Return the bare domain from the HTTP Referer header, or empty string."""
+    referer = request.headers.get("referer") or request.headers.get("referrer") or ""
+    if not referer:
+        return ""
+    try:
+        parsed = urlparse(referer)
+        host = (parsed.netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host[:255]
+    except Exception:
+        return ""
+
+
+def extract_utm_params(request):
+    """Return a dict of utm_source/medium/campaign from the query string."""
+    params = {}
+    for key in ("utm_source", "utm_medium", "utm_campaign"):
+        value = (request.GET.get(key) or "").strip()
+        if value:
+            params[key] = value[:128]
+    return params
 
 
 def set_newsletter_referrer_in_session(request):

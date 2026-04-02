@@ -11,6 +11,7 @@ from spanza_journal_watch.backend.models import (
     BackendPreference,
     PlankaCardImport,
     PlankaIssueBinding,
+    PubmedArticle,
     PubmedBatchArticle,
     PubmedImportBatch,
     PubmedIntegrationCredential,
@@ -19,7 +20,7 @@ from spanza_journal_watch.backend.models import (
 )
 from spanza_journal_watch.backend.planka import PlankaAPIError
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.submissions.models import Article, Author, Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
 
 User = get_user_model()
 
@@ -472,9 +473,9 @@ class TestIssueBuilderWorkflow:
         if not author:
             author = Author.objects.create(name="Regression Author", title="Dr")
 
-        article_one = Article.objects.create(name="Featured One")
-        article_two = Article.objects.create(name="Featured Two")
-        article_three = Article.objects.create(name="Featured Three")
+        article_one = PubmedArticle.objects.create(title="Featured One")
+        article_two = PubmedArticle.objects.create(title="Featured Two")
+        article_three = PubmedArticle.objects.create(title="Featured Three")
 
         review_one = Review.objects.create(article=article_one, author=author, body="One", is_featured=True)
         review_two = Review.objects.create(article=article_two, author=author, body="Two", is_featured=True)
@@ -888,7 +889,7 @@ class TestIssueBuilderPlankaIntegration:
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Resync Blocked Issue", body="Issue body")
-        article = Article.objects.create(name="Local Article", url="https://example.test/local")
+        article = PubmedArticle.objects.create(title="Local Article", article_url="https://example.test/local")
         review = Review.objects.create(article=article, body="Local edited body", active=False)
         issue.reviews.add(review)
 

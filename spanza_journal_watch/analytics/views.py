@@ -11,6 +11,8 @@ from django.views.decorators.http import require_POST
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen, PageView
 from spanza_journal_watch.analytics.utils import (
+    classify_event_confidence,
+    extract_utm_params,
     is_probable_automated_event,
     is_probable_automated_newsletter_event,
     set_newsletter_referrer_in_session,
@@ -70,22 +72,30 @@ def track_email_open(request):
     subscriber = _get_subscriber(email)
 
     if newsletter and subscriber:
+        automated = is_probable_automated_newsletter_event(request, newsletter)
         tracker = NewsletterOpen(
             subscriber=subscriber,
             newsletter=newsletter,
             user_agent=request.headers.get("user-agent", ""),
-            automated=is_probable_automated_newsletter_event(request, newsletter),
+            automated=automated,
+            human_confidence=classify_event_confidence(automated=automated, subscriber=subscriber),
         )
         tracker.save()
 
         # Identify the subscriber in the session
         request.session["subscriber_id"] = subscriber.pk
 
-    pixel_path = finders.find("images/tracking/pixel.png")
-    with open(pixel_path, "rb") as f:
-        response = HttpResponse(f.read(), content_type="image/png")
-
+    response = HttpResponse(_get_tracking_pixel(), content_type="image/png")
     return response
+
+
+def _get_tracking_pixel():
+    """Return cached tracking pixel bytes (loaded once per process)."""
+    if not hasattr(_get_tracking_pixel, "_cache"):
+        pixel_path = finders.find("images/tracking/pixel.png")
+        with open(pixel_path, "rb") as f:
+            _get_tracking_pixel._cache = f.read()
+    return _get_tracking_pixel._cache
 
 
 def track_newsletter_link(request, newsletter_token):
@@ -96,11 +106,14 @@ def track_newsletter_link(request, newsletter_token):
     subscriber = _get_subscriber(email)
 
     if newsletter and subscriber:
+        automated = is_probable_automated_newsletter_event(request, newsletter)
         tracker = NewsletterClick(
             subscriber=subscriber,
             newsletter=newsletter,
             user_agent=request.headers.get("user-agent", ""),
-            automated=is_probable_automated_newsletter_event(request, newsletter),
+            automated=automated,
+            human_confidence=classify_event_confidence(automated=automated, subscriber=subscriber),
+            destination_url=(next or "")[:512],
         )
         tracker.save()
 
@@ -170,6 +183,12 @@ def track_event(request):
             return HttpResponseBadRequest("Invalid review")
 
     subscriber_id = request.session.get("subscriber_id")
+
+    event_metadata = payload.get("metadata") or {}
+    utm_params = extract_utm_params(request)
+    if utm_params:
+        event_metadata.update(utm_params)
+
     AnalyticsEvent.record_event(
         event_type=event_type,
         request=request,
@@ -178,6 +197,7 @@ def track_event(request):
         source=payload.get("source") or "",
         duration_ms=payload.get("duration_ms"),
         scroll_depth=payload.get("scroll_depth"),
-        metadata=payload.get("metadata") or {},
+        metadata=event_metadata,
+        js_verified=True,
     )
     return JsonResponse({"ok": True})

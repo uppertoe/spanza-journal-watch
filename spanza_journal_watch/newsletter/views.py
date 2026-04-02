@@ -1,7 +1,9 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from .forms import SubscriberForm
 from .models import Subscriber
@@ -51,6 +53,35 @@ def confirm_unsubscribe(request, unsubscribe_token):
         messages.error(request, "Invalid unsubscribe link.")
 
     return redirect("home")
+
+
+@login_required
+@require_POST
+def toggle_subscription(request):
+    """Toggle the current user's newsletter subscription."""
+    try:
+        subscriber = Subscriber.objects.get(email__iexact=request.user.email)
+        if not subscriber.user:
+            subscriber.user = request.user
+        subscriber.subscribed = not subscriber.subscribed
+        subscriber.save(update_fields=["subscribed", "user", "modified"])
+        request.session["subscribed"] = subscriber.subscribed
+    except Subscriber.DoesNotExist:
+        subscriber = Subscriber.objects.create(
+            email=request.user.email,
+            user=request.user,
+            subscribed=True,
+        )
+        request.session["subscribed"] = True
+        send_confirmation_email.delay(subscriber.pk)
+
+    return render(
+        request,
+        "fragments/user_profile_newsletter_toggle.html",
+        {
+            "user_is_subscribed": subscriber.subscribed,
+        },
+    )
 
 
 def subscribe(request):

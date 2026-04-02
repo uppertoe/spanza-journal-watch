@@ -1,0 +1,104 @@
+<article class="card shadow-sm border-0 journal-reading-list__card" id="reading-list-card-{{ item.article.pk }}">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+      {% if item.article.source_journal_name %}
+        <span class="badge text-bg-primary-subtle text-primary-emphasis">{{ item.article.source_journal_name }}</span>
+      {% endif %}
+      {% if item.article.publication_date %}
+        <span class="text-muted small">{{ item.article.publication_date|date:"j M Y" }}</span>
+      {% elif item.article.publication_month %}
+        <span class="text-muted small">{{ item.article.publication_month|date:"F Y" }}</span>
+      {% endif %}
+      {% if item.state and item.state.read_at %}
+        <span class="badge text-bg-secondary">Archived</span>
+      {% endif %}
+      <span class="badge text-bg-warning-subtle text-warning-emphasis ms-auto jw-star-count-badge {% if not item.star_count %}d-none{% endif %}" data-article-id="{{ item.article.pk }}">
+        <svg class="bi me-1" width="0.8em" height="0.8em" aria-hidden="true"><use href="#icon-star-fill"></use></svg><span class="jw-star-count-value">{{ item.star_count|default:"0" }}</span>
+      </span>
+    </div>
+
+    <h4 class="h5 mb-2">{{ item.article.title|default:"Untitled article" }}</h4>
+
+    <p class="text-muted small mb-2">
+      {% if item.article.doi %}DOI {{ item.article.doi }}{% endif %}
+      {% if item.article.pmid %}{% if item.article.doi %} · {% endif %}PMID {{ item.article.pmid }}{% endif %}
+    </p>
+
+    {# Truncated expandable abstract #}
+    {% if item.article.abstract %}
+      <div class="jw-abstract-clamp mb-3" tabindex="0">
+        <p class="jw-abstract-clamp__text journal-article-card__abstract mb-0">{{ item.article.abstract }}</p>
+        <button type="button" class="jw-abstract-clamp__toggle btn btn-sm btn-link text-decoration-none p-0">
+          <span class="jw-abstract-clamp__more">More</span>
+          <span class="jw-abstract-clamp__less">Less</span>
+        </button>
+      </div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {# Archive / Unarchive button (authenticated only) #}
+      {% if request.user.is_authenticated and item.state %}
+        <form method="post"
+          action="{% url 'submissions:journal_article_toggle_archive' item.article.pk %}"
+          hx-post="{% url 'submissions:journal_article_toggle_archive' item.article.pk %}"
+          hx-target="#reading-list-card-{{ item.article.pk }}"
+          hx-swap="outerHTML swap:0.2s"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="tab" value="{{ tab }}">
+          {% if item.state.read_at %}
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+              <svg class="bi me-1" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-inbox"></use></svg>Unarchive
+            </button>
+          {% else %}
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+              <svg class="bi me-1" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-archive"></use></svg>Archive
+            </button>
+          {% endif %}
+        </form>
+      {% endif %}
+
+      {# Unstar button #}
+      <form method="post"
+        action="{% url 'submissions:journal_article_toggle_star' item.article.pk %}"
+        hx-post="{% url 'submissions:journal_article_toggle_star' item.article.pk %}"
+        hx-target="#reading-list-card-{{ item.article.pk }}"
+        hx-swap="outerHTML swap:0.3s"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'submissions:journal_list' %}">
+        <input type="hidden" name="source" value="reading_list">
+        <button type="submit" class="btn btn-sm btn-outline-warning">Unstar</button>
+      </form>
+
+      {# Recommend for review #}
+      {% if can_recommend and request.user.is_authenticated %}
+        <form method="post"
+          action="{% url 'submissions:journal_article_toggle_recommend' item.article.pk %}"
+          hx-post="{% url 'submissions:journal_article_toggle_recommend' item.article.pk %}"
+          hx-target="#reading-list-card-{{ item.article.pk }}"
+          hx-swap="outerHTML"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'submissions:journal_list' %}">
+          <button type="submit" class="btn btn-sm {% if item.state and item.state.recommended_at %}btn-success{% else %}btn-outline-success{% endif %} jw-action-btn--recommend">
+            <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
+            <span>{% if item.state and item.state.recommended_at %}Recommended{% else %}Recommend for review{% endif %}</span>
+          </button>
+        </form>
+      {% endif %}
+
+      {# Full text link #}
+      {% if item.article.article_url %}
+        <a class="btn btn-sm btn-outline-primary jw-action-btn--fulltext" href="{{ item.article.article_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ item.article.pk }}">
+          <span class="jw-action-btn__sizer" aria-hidden="true"><svg class="bi me-1" width="0.85em" height="0.85em"><use href="#icon-check"></use></svg>Full text</span>
+          <span class="jw-action-btn__label">Full text</span>
+        </a>
+      {% elif item.article.doi %}
+        <a class="btn btn-sm btn-outline-primary" href="https://doi.org/{{ item.article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>
+      {% elif item.article.pubmed_url %}
+        <a class="btn btn-sm btn-outline-primary" href="{{ item.article.pubmed_url }}" target="_blank" rel="noopener noreferrer">PubMed</a>
+      {% endif %}
+    </div>
+  </div>
+</article>

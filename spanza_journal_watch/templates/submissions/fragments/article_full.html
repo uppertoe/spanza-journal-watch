@@ -1,5 +1,3 @@
-{% load cache %}
-{% cache 1800 "issue_detail_articles" content_cache_version request.get_full_path %}
 <div id="articles" class="scrollspy-focus-target" data-bs-spy="scroll" data-bs-target="#list-reviews" tabindex="0">
     {% for review in articles %}
     <article class="article-post deferred-article" id="list-item-{{ review.slug }}" data-analytics-review-id="{{ review.pk }}" data-analytics-source="issue_detail">
@@ -10,10 +8,13 @@
     <div class="mb-3">
         {% include 'fragments/share_actions.html' with share_title=review.share_title share_description=review.share_description share_email_summary=review.share_email_summary canonical_url=review.canonical_url share_text=review.share_text email_share_url=review.email_share_url bluesky_share_url=review.bluesky_share_url x_share_url=review.x_share_url facebook_share_url=review.facebook_share_url show_social_links=True %}
     </div>
-    <div class="d-flex mt-auto justify-content-between align-items-center">
+    <div class="d-flex mt-auto justify-content-between align-items-center flex-wrap gap-2">
         <div class="btn-group">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-custom-class="journalwatch-popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</button>
-            <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" data-analytics-full-text>View full text article</a>
+            <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" data-analytics-full-text data-cpd-article-id="{{ review.article.pk }}">View full text article</a>
+        </div>
+        <div id="review-star-actions-{{ review.pk }}">
+            {% include "submissions/fragments/review_star_button.html" with pubmed_article=review.article pubmed_user_state=review.pubmed_user_state pubmed_session_starred=review.pubmed_session_starred star_target_id=review.star_target_id star_count=review.star_count %}
         </div>
     </div>
     <p class="text-break">{{ review.get_markdown_body|safe }}</p>
@@ -28,4 +29,3 @@
     hx-swap="none"></div>
 {% endfor %}
 </div>
-{% endcache %}

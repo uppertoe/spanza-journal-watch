@@ -1,36 +1,44 @@
 {% load mjml %}
 {% mjml %}
 <mjml>
-  <mj-body background-color="#f6f7fb">
-    <mj-section padding-bottom="0">
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
+      <mj-text line-height="1.6" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f2f4f7">
+
+    <mj-section padding="28px 0 0">
       <mj-column>
-        <mj-text font-size="12px" color="#888888" align="center" letter-spacing="0.08em" font-weight="600">
-          JOURNAL WATCH
+        <mj-text align="center" font-size="11px" color="#8a96a2" letter-spacing="0.14em" font-weight="700" text-transform="uppercase">
+          SPANZA Journal Watch
         </mj-text>
       </mj-column>
     </mj-section>
 
-    <mj-section background-color="#ffffff" border-radius="8px" padding="32px 24px">
+    <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
       <mj-column>
-        <mj-text font-size="22px" font-weight="700" color="#152b3b" padding-bottom="8px">
+        <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
           Password reset request
         </mj-text>
-        <mj-text font-size="15px" color="#444444" line-height="1.6" padding-bottom="8px">
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="8px">
           We received a password reset request for <strong>{{ email }}</strong>, but no account with that address exists on Journal Watch.
         </mj-text>
-        <mj-text font-size="15px" color="#444444" line-height="1.6">
+        <mj-text font-size="15px" color="#444444" line-height="1.65">
           Access to Journal Watch is by invitation only. If you believe you should have an account, please contact the editorial team. If you did not request a password reset, you can safely ignore this email.
         </mj-text>
       </mj-column>
     </mj-section>
 
-    <mj-section padding-top="16px">
+    <mj-section padding="20px 20px 28px">
       <mj-column>
-        <mj-text font-size="12px" color="#aaaaaa" align="center">
+        <mj-text align="center" font-size="12px" color="#8a96a2">
           SPANZA Journal Watch &mdash; paediatric anaesthesia literature review
         </mj-text>
       </mj-column>
     </mj-section>
+
   </mj-body>
 </mjml>
 {% endmjml %}
