@@ -37,17 +37,6 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         subscriber_id = self.request.session.get("subscriber_id")
         PageView.record_view(homepage, subscriber_id, request=self.request)
 
-        try:
-            from spanza_journal_watch.analytics.models import AnalyticsEvent
-
-            AnalyticsEvent.record_event(
-                event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-                request=self.request,
-                metadata={"page": "home"},
-            )
-        except Exception:
-            pass
-
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)
             .select_related(

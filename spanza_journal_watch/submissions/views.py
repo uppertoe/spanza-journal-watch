@@ -346,14 +346,6 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object(queryset=Issue.objects.exclude(active=False))
-        try:
-            AnalyticsEvent.record_event(
-                event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-                request=request,
-                metadata={"page": "issue"},
-            )
-        except Exception:
-            pass
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -576,14 +568,6 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
         obj = super().get_object(queryset)
         subscriber_id = self.request.session.get("subscriber_id")
         PageView.record_view(obj, subscriber_id, request=self.request)
-        try:
-            AnalyticsEvent.record_event(
-                event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-                request=self.request,
-                metadata={"page": "tag"},
-            )
-        except Exception:
-            pass
         return obj
 
     def get_context_data(self, **kwargs):

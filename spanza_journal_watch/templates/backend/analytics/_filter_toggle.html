@@ -1,0 +1,10 @@
+<div class="btn-group w-100" role="group">
+  <a class="btn btn-sm {% if filter_mode == 'human' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+     href="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=human"
+     hx-get="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=human"
+     hx-target="#analytics-content" hx-push-url="true">Human</a>
+  <a class="btn btn-sm {% if filter_mode == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+     href="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=all"
+     hx-get="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=all"
+     hx-target="#analytics-content" hx-push-url="true">All traffic</a>
+</div>
