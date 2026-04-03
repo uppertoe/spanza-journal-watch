@@ -1,4 +1,4 @@
-{% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}<!DOCTYPE html>
+{% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}{% load webpack_fonts %}<!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
   <head><script>
@@ -66,6 +66,7 @@
         body { padding-bottom: 5.5rem; overflow-x: hidden; }
       }
     </style>
+    {% webpack_font_preloads %}
     <!-- This file stores project-specific CSS -->
     {% render_bundle 'public' 'css' %}
     {% endblock %}
