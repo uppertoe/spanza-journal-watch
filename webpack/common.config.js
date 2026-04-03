@@ -51,17 +51,17 @@ module.exports = {
         loader: 'babel-loader',
       },
       {
+        test: /\.(woff2?|ttf|eot)$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: 'fonts/[name]-[contenthash:16][ext]',
+        },
+      },
+      {
         test: /\.s?css$/i,
         use: [
           MiniCssExtractPlugin.loader,
-          {
-            loader: 'css-loader',
-            options: {
-              url: {
-                filter: (url) => !url.startsWith('/static/'),
-              },
-            },
-          },
+          'css-loader',
           {
             loader: 'postcss-loader',
             options: {
