@@ -73,22 +73,8 @@
         <button type="submit" class="btn btn-sm btn-outline-warning">Unstar</button>
       </form>
 
-      {# Recommend for review #}
-      {% if can_recommend and request.user.is_authenticated %}
-        <form method="post"
-          action="{% url 'submissions:journal_article_toggle_recommend' item.article.pk %}"
-          hx-post="{% url 'submissions:journal_article_toggle_recommend' item.article.pk %}"
-          hx-target="#reading-list-card-{{ item.article.pk }}"
-          hx-swap="outerHTML"
-        >
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{% url 'submissions:journal_list' %}">
-          <button type="submit" class="btn btn-sm {% if item.state and item.state.recommended_at %}btn-success{% else %}btn-outline-success{% endif %} jw-action-btn--recommend">
-            <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
-            <span>{% if item.state and item.state.recommended_at %}Recommended{% else %}Recommend for review{% endif %}</span>
-          </button>
-        </form>
-      {% endif %}
+      {# Review indicator / Recommend — reuse actions fragment for correct HTMX swap target #}
+      {% include "submissions/fragments/journal_article_actions.html" with article=item.article user_state=item.state review=item.review star_count=item.star_count next_url=request.get_full_path hide_star=True %}
 
       {# Full text link #}
       {% if item.article.article_url %}
@@ -102,5 +88,20 @@
         <a class="btn btn-sm btn-outline-primary" href="{{ item.article.pubmed_url }}" target="_blank" rel="noopener noreferrer">PubMed</a>
       {% endif %}
     </div>
+
+    {% if item.review %}
+      <p class="small mb-0 mt-2">
+        <a href="{{ item.review.get_absolute_url }}"
+           class="text-decoration-none jw-review-link js-review-modal-trigger"
+           data-bs-toggle="modal"
+           data-bs-target="#journal-review-modal"
+           data-review-modal-url="{{ item.review.get_absolute_url }}"
+           data-review-modal-slug="{{ item.review.slug }}"
+           data-review-modal-shell="journal-review-modal"
+           hx-get="{{ item.review.get_absolute_url }}"
+           hx-indicator="#journal-review-modal-indicator"
+           hx-target="#journal-review-modal-container">Read the review{% if item.review.author %} by {{ item.review.author }}{% endif %} &rarr;</a>
+      </p>
+    {% endif %}
   </div>
 </article>

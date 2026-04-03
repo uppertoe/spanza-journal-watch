@@ -56,7 +56,7 @@
               {% endif %}
 
               <div class="d-flex flex-wrap gap-3 align-items-center">
-                {% include "submissions/fragments/journal_article_actions.html" with article=row.article user_state=row.user_state session_starred=row.session_starred recommendation_count=row.recommendation_count next_url=request.get_full_path %}
+                {% include "submissions/fragments/journal_article_actions.html" with article=row.article user_state=row.user_state session_starred=row.session_starred recommendation_count=row.recommendation_count review=row.review next_url=request.get_full_path %}
                 {% if row.article.article_url %}
                   <a class="btn btn-sm btn-outline-primary jw-action-btn--fulltext" href="{{ row.article.article_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ row.article.pk }}">
                     <span class="jw-action-btn__sizer" aria-hidden="true"><svg class="bi me-1" width="0.85em" height="0.85em"><use href="#icon-check"></use></svg>Full text</span>
@@ -68,6 +68,21 @@
                   <a class="btn btn-sm btn-outline-primary" href="{{ row.article.pubmed_url }}" target="_blank" rel="noopener noreferrer">PubMed</a>
                 {% endif %}
               </div>
+
+              {% if row.review %}
+                <p class="small mb-0 mt-2">
+                  <a href="{{ row.review.get_absolute_url }}"
+                     class="text-decoration-none jw-review-link js-review-modal-trigger"
+                     data-bs-toggle="modal"
+                     data-bs-target="#journal-review-modal"
+                     data-review-modal-url="{{ row.review.get_absolute_url }}"
+                     data-review-modal-slug="{{ row.review.slug }}"
+                     data-review-modal-shell="journal-review-modal"
+                     hx-get="{{ row.review.get_absolute_url }}"
+                     hx-indicator="#journal-review-modal-indicator"
+                     hx-target="#journal-review-modal-container">Read the review{% if row.review.author %} by {{ row.review.author }}{% endif %} &rarr;</a>
+                </p>
+              {% endif %}
             </div>
           </article>
         {% endfor %}

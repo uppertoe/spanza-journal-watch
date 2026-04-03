@@ -172,11 +172,16 @@ p br {
 }
 
 .sticky-mobile-toolbar__wing {
-  flex: 0 0 4.5rem;
-  max-width: 4.5rem;
+  flex: 0 0 2.5rem;
+  max-width: 2.5rem;
   display: flex;
   align-items: center;
   overflow: hidden;
+
+  @media (min-width: 576px) {
+    flex: 0 0 4.5rem;
+    max-width: 4.5rem;
+  }
 }
 
 .sticky-mobile-toolbar__wing--start {
@@ -3050,6 +3055,20 @@ body.jw-modal-open {
     visibility: hidden;
     height: 0;
     overflow: hidden;
+  }
+}
+
+/* ── Review link with glow ────────────────────────────── */
+
+.jw-review-link {
+  color: var(--bs-primary);
+  font-weight: 600;
+  filter: drop-shadow(0 0 4px rgba(var(--bs-primary-rgb), 0.45));
+  transition: filter 0.2s ease;
+
+  &:hover,
+  &:focus {
+    filter: drop-shadow(0 0 6px rgba(var(--bs-primary-rgb), 0.7));
   }
 }
 

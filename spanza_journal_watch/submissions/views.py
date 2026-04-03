@@ -1033,7 +1033,7 @@ def _journal_browser_context(request):
     pubmed_ids = [link.article_id for link in article_links]
     review_map = {}
     if pubmed_ids:
-        reviewed = Review.objects.filter(active=True, article_id__in=pubmed_ids).only("slug", "article_id")
+        reviewed = Review.objects.filter(active=True, article_id__in=pubmed_ids).select_related("author")
         for rev in reviewed:
             review_map.setdefault(rev.article_id, rev)
 
@@ -1077,11 +1077,13 @@ def _journal_article_actions_context(request, article):
     else:
         session_starred = article.pk in request.session.get("starred_article_ids", [])
     star_count = PubmedArticleUserState.objects.filter(article=article, starred_at__isnull=False).count()
+    review = Review.objects.filter(active=True, article=article).select_related("author").first()
     return {
         "article": article,
         "user_state": user_state,
         "session_starred": session_starred,
         "star_count": star_count,
+        "review": review,
         "can_recommend": can_recommend_pubmed_articles(request.user),
         "next_url": request.POST.get("next") or request.GET.get("next") or request.get_full_path(),
     }
@@ -1367,9 +1369,7 @@ def journal_reading_list(request):
 
     review_map = {}
     if reading_list_pubmed_ids:
-        reviewed = Review.objects.filter(active=True, article_id__in=reading_list_pubmed_ids).only(
-            "slug", "article_id"
-        )
+        reviewed = Review.objects.filter(active=True, article_id__in=reading_list_pubmed_ids).select_related("author")
         for rev in reviewed:
             review_map.setdefault(rev.article_id, rev)
     for item in items:

@@ -209,3 +209,23 @@
   </div>
 {% endblock login_prompt_toast %}
 {% endif %}
+
+{% load static %}
+{% block modal %}
+<div class="modal fade" id="journal-review-modal" tabindex="-1" aria-labelledby="journal-review-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="journal-review-modal-label">Journal Watch - Review</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-center">
+                    <img src="{% static "images/spinners/3-dots-move.svg" %}" id="journal-review-modal-indicator" class="htmx-indicator">
+                </div>
+                <div class="container p-2 px-md-5" id="journal-review-modal-container" data-review-modal-container data-shared-review-modal-container></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock modal %}
