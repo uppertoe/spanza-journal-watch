@@ -18,6 +18,12 @@ urlpatterns = [
         views.journal_article_toggle_recommend,
         name="journal_article_toggle_recommend",
     ),
+    path(
+        "journals/articles/<int:article_id>/mark-read",
+        views.journal_article_mark_fulltext,
+        name="journal_article_mark_fulltext",
+    ),
+    path("journals/fulltext-ids/", views.journal_fulltext_ids, name="journal_fulltext_ids"),
     path("journals/search/", views.journal_search, name="journal_search"),
     path("journals/reading-list/", views.journal_reading_list, name="journal_reading_list"),
     path(

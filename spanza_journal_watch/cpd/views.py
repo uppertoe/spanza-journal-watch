@@ -1,54 +1,16 @@
-import json
 import logging
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from spanza_journal_watch.backend.models import PubmedArticle, PubmedArticleUserState
+from spanza_journal_watch.backend.models import PubmedArticleUserState
 from spanza_journal_watch.cpd.models import CPDReport
 from spanza_journal_watch.submissions.models import Issue
 
 logger = logging.getLogger(__name__)
-
-
-@csrf_exempt
-@require_POST
-def record_full_text_click(request):
-    """Record a full-text click for CPD tracking (opt-in, per-user).
-
-    This is separate from the anonymous AnalyticsEvent pipeline (/reader/action).
-    It writes to PubmedArticleUserState.full_text_clicked_at, tied to the
-    authenticated user, and is only active when cpd_tracking_enabled is True.
-    Called via navigator.sendBeacon from the client.
-    """
-    if not request.user.is_authenticated or not request.user.cpd_tracking_enabled:
-        return JsonResponse({"ok": False}, status=403)
-
-    try:
-        body = json.loads(request.body)
-        article_id = int(body["article_id"])
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        return JsonResponse({"ok": False, "error": "invalid payload"}, status=400)
-
-    try:
-        article = PubmedArticle.objects.get(pk=article_id)
-    except PubmedArticle.DoesNotExist:
-        return JsonResponse({"ok": False, "error": "article not found"}, status=404)
-
-    state, _created = PubmedArticleUserState.objects.get_or_create(
-        user=request.user,
-        article=article,
-    )
-    if not state.full_text_clicked_at:
-        state.full_text_clicked_at = timezone.now()
-        state.save(update_fields=["full_text_clicked_at"])
-
-    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -150,20 +112,6 @@ def download_report(request, report_id):
     response = HttpResponse(report.file.read(), content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="cpd_report_{report.date_from}_{report.date_to}.pdf"'
     return response
-
-
-@login_required
-def read_article_ids(request):
-    """Return list of article IDs the user has clicked full text on (for CPD checkmarks)."""
-    if not request.user.cpd_tracking_enabled:
-        return JsonResponse({"ids": []})
-    ids = list(
-        PubmedArticleUserState.objects.filter(
-            user=request.user,
-            full_text_clicked_at__isnull=False,
-        ).values_list("article_id", flat=True)
-    )
-    return JsonResponse({"ids": ids})
 
 
 @login_required

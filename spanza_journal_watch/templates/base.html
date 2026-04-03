@@ -304,42 +304,46 @@
     <div class="sticky-mobile-toolbar d-md-none" aria-label="Quick navigation">
       {% block mobile_toolbar_banner %}{% endblock mobile_toolbar_banner %}
       <div class="sticky-mobile-toolbar__inner">
-        <div class="dropup">
-          <button class="btn btn-bd-primary d-flex align-items-center gap-2" id="bd-theme-mobile" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle theme">
-            <svg class="bi" width="1em" height="1em"><use href="#circle-half"></use></svg>
-            <span class="small fw-semibold">Theme</span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-mobile">
-            <li>
-              <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
-                Light
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-              </button>
-            </li>
-            <li>
-              <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
-                Dark
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-              </button>
-            </li>
-            <li>
-              <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
-                Auto
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-              </button>
-            </li>
-          </ul>
+        <div class="sticky-mobile-toolbar__wing sticky-mobile-toolbar__wing--start">
+          <div class="dropup">
+            <button class="btn btn-bd-primary d-flex align-items-center gap-2" id="bd-theme-mobile" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle theme">
+              <svg class="bi" width="1em" height="1em"><use href="#circle-half"></use></svg>
+              <span class="small fw-semibold">Theme</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-mobile">
+              <li>
+                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                  <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                  Light
+                  <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                  <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                  Dark
+                  <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                  <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                  Auto
+                  <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
         <div class="sticky-mobile-toolbar__actions" id="mobile-action-dock-slot">
           {% block mobile_action_dock %}{% endblock mobile_action_dock %}
         </div>
-        <button class="btn btn-bd-primary d-flex align-items-center gap-2 js-back-to-top" type="button" aria-label="Back to top" style="display:none !important">
-          <svg class="bi" width="1em" height="1em"><use href="#chevron-up"></use></svg>
-          <span class="small fw-semibold">Top</span>
-        </button>
+        <div class="sticky-mobile-toolbar__wing sticky-mobile-toolbar__wing--end">
+          <button class="btn btn-bd-primary d-flex align-items-center gap-2 js-back-to-top" type="button" aria-label="Back to top" style="visibility:hidden">
+            <svg class="bi" width="1em" height="1em"><use href="#chevron-up"></use></svg>
+            <span class="small fw-semibold">Top</span>
+          </button>
+        </div>
       </div>
     </div>
 

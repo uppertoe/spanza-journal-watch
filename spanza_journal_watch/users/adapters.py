@@ -25,11 +25,12 @@ class AccountAdapter(DefaultAccountAdapter):
         return False
 
     def login(self, request, user):
-        """Migrate session stars and link any orphaned Subscriber on login."""
+        """Migrate session stars/full-text clicks and link any orphaned Subscriber on login."""
         from spanza_journal_watch.newsletter.models import Subscriber
-        from spanza_journal_watch.users.utils import migrate_session_stars_to_user
+        from spanza_journal_watch.users.utils import migrate_session_fulltext_to_user, migrate_session_stars_to_user
 
         migrate_session_stars_to_user(request.session, user)
+        migrate_session_fulltext_to_user(request.session, user)
         Subscriber.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
         return super().login(request, user)
 

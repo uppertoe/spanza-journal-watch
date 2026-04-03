@@ -1565,12 +1565,7 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   function updateVisibility() {
     var show = visible && !modalOpen;
     if (fab) fab.classList.toggle('back-to-top-fab--visible', show);
-    if (mobileBtn)
-      mobileBtn.style.setProperty(
-        'display',
-        show ? 'flex' : 'none',
-        'important',
-      );
+    if (mobileBtn) mobileBtn.style.visibility = show ? 'visible' : 'hidden';
   }
 
   window.addEventListener(
@@ -1646,14 +1641,14 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   });
 })();
 
-/* ── CPD full-text click beacon + read checkmarks ────────── */
+/* ── Full-text click checkmarks (all users) ──────────────── */
 (function () {
-  var cpdReadIds = new Set();
+  var fulltextReadIds = new Set();
 
-  function addCheckSvg(container) {
-    if (container.querySelector('.jw-cpd-check')) return;
+  function addFulltextCheck(container) {
+    if (container.querySelector('.jw-fulltext-check')) return;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'bi me-1 jw-cpd-check');
+    svg.setAttribute('class', 'bi me-1 jw-fulltext-check');
     svg.setAttribute('width', '0.85em');
     svg.setAttribute('height', '0.85em');
     svg.setAttribute('aria-hidden', 'true');
@@ -1664,59 +1659,62 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   }
 
   function markReadButtons(root) {
-    if (!document.body.hasAttribute('data-cpd-tracking-enabled')) return;
+    if (!fulltextReadIds.size) return;
     (root || document)
-      .querySelectorAll('[data-cpd-article-id]')
+      .querySelectorAll('.jw-action-btn--fulltext[data-cpd-article-id]')
       .forEach(function (link) {
         var id = Number(link.dataset.cpdArticleId);
-        if (!id || !cpdReadIds.has(id)) return;
+        if (!id || !fulltextReadIds.has(id)) return;
         var label = link.querySelector('.jw-action-btn__label');
-        addCheckSvg(label || link);
+        if (label) addFulltextCheck(label);
       });
   }
 
-  // Fetch read IDs on page load
-  if (document.body.hasAttribute('data-cpd-tracking-enabled')) {
-    window
-      .fetch('/cpd/read-ids/', { credentials: 'same-origin' })
-      .then(function (r) {
-        return r.json();
-      })
-      .then(function (data) {
-        (data.ids || []).forEach(function (id) {
-          cpdReadIds.add(id);
-        });
-        markReadButtons();
-      })
-      .catch(function () {});
-  }
+  // Fetch read IDs on page load (works for both authenticated and anonymous)
+  window
+    .fetch('/journals/fulltext-ids/', { credentials: 'same-origin' })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      (data.ids || []).forEach(function (id) {
+        fulltextReadIds.add(id);
+      });
+      markReadButtons();
+    })
+    .catch(function () {});
 
   // Re-mark after HTMX swaps
   document.body.addEventListener('htmx:afterSettle', function (e) {
     markReadButtons(e.target);
   });
 
-  // Beacon + immediate checkmark on click
+  // Record click + show checkmark immediately
   document.addEventListener('click', function (e) {
-    var link = e.target.closest('[data-cpd-article-id]');
+    var link = e.target.closest(
+      '.jw-action-btn--fulltext[data-cpd-article-id]',
+    );
     if (!link) return;
-    if (!document.body.hasAttribute('data-cpd-tracking-enabled')) return;
 
     var articleId = Number(link.dataset.cpdArticleId);
-    if (!articleId) return;
+    if (!articleId || fulltextReadIds.has(articleId)) return;
 
-    var blob = new Blob([JSON.stringify({ article_id: articleId })], {
-      type: 'application/json',
-    });
-    navigator.sendBeacon('/cpd/record-read/', blob);
+    fulltextReadIds.add(articleId);
 
-    // Mark this article as read and update all matching buttons on the page
-    cpdReadIds.add(articleId);
+    // Beacon to persist in session/profile
+    navigator.sendBeacon(
+      '/journals/articles/' + articleId + '/mark-read',
+      new Blob([], { type: 'application/json' }),
+    );
+
+    // Update all matching buttons on the page
     document
-      .querySelectorAll('[data-cpd-article-id="' + articleId + '"]')
+      .querySelectorAll(
+        '.jw-action-btn--fulltext[data-cpd-article-id="' + articleId + '"]',
+      )
       .forEach(function (el) {
         var label = el.querySelector('.jw-action-btn__label');
-        addCheckSvg(label || el);
+        if (label) addFulltextCheck(label);
       });
   });
 })();

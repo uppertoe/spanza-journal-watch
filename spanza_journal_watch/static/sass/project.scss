@@ -171,12 +171,29 @@ p br {
   gap: 0.75rem;
 }
 
+.sticky-mobile-toolbar__wing {
+  flex: 0 0 4.5rem;
+  max-width: 4.5rem;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.sticky-mobile-toolbar__wing--start {
+  justify-content: flex-start;
+}
+
+.sticky-mobile-toolbar__wing--end {
+  justify-content: flex-end;
+}
+
 .sticky-mobile-toolbar__actions {
   flex: 1;
   min-width: 0;
   min-height: 2.5rem;
   display: flex;
   align-items: stretch;
+  justify-content: center;
 }
 
 .sticky-mobile-toolbar__actions:empty {

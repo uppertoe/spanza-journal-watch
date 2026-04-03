@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.base import RedirectView
@@ -1172,6 +1173,42 @@ def journal_article_toggle_star(request, article_id):
 
         return response
     return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+
+
+@csrf_exempt
+@require_POST
+def journal_article_mark_fulltext(request, article_id):
+    """Record that a user clicked full text. Works for both authenticated and anonymous users."""
+    try:
+        article = PubmedArticle.objects.get(pk=article_id)
+    except PubmedArticle.DoesNotExist:
+        return JsonResponse({"ok": False}, status=404)
+
+    if request.user.is_authenticated:
+        state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
+        if not state.full_text_clicked_at:
+            state.full_text_clicked_at = timezone.now()
+            state.save(update_fields=["full_text_clicked_at"])
+    else:
+        clicked = request.session.get("fulltext_clicked_ids", [])
+        if article.pk not in clicked:
+            clicked.append(article.pk)
+            request.session["fulltext_clicked_ids"] = clicked
+
+    return JsonResponse({"ok": True})
+
+
+def journal_fulltext_ids(request):
+    """Return article IDs the current user/session has clicked full text on."""
+    if request.user.is_authenticated:
+        ids = list(
+            PubmedArticleUserState.objects.filter(user=request.user, full_text_clicked_at__isnull=False).values_list(
+                "article_id", flat=True
+            )
+        )
+    else:
+        ids = request.session.get("fulltext_clicked_ids", [])
+    return JsonResponse({"ids": ids})
 
 
 @login_required
