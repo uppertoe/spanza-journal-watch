@@ -45,9 +45,25 @@
            hx-target="#analytics-content" hx-push-url="true">Journals</a>
         {% endwith %}
       </nav>
+      <div class="border-top pt-3 mb-3">
+        <p class="small text-muted mb-2">Traffic filter</p>
+        <div class="btn-group w-100" role="group">
+          {% with qs_no_filter=request.GET.urlencode %}
+          <a class="btn btn-sm {% if filter_mode == 'human' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+             href="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=human"
+             hx-get="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=human"
+             hx-target="#analytics-content" hx-push-url="true">Human</a>
+          <a class="btn btn-sm {% if filter_mode == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+             href="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=all"
+             hx-get="?{% for key, val in request.GET.items %}{% if key != 'filter' %}{{ key }}={{ val }}&{% endif %}{% endfor %}filter=all"
+             hx-target="#analytics-content" hx-push-url="true">All traffic</a>
+          {% endwith %}
+        </div>
+      </div>
       <div class="border-top pt-3">
         <p class="small text-muted mb-2">Date range</p>
         <form method="get" action="">
+          <input type="hidden" name="filter" value="{{ filter_mode }}">
           <div class="mb-2">
             <label class="form-label x-small text-muted mb-1">From</label>
             <input class="form-control form-control-sm" type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">

@@ -44,7 +44,7 @@
       <div class="card-header">Where users come from</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Source</th><th>Events</th><th>Opens</th><th>Engaged rate</th></tr></thead>
+          <thead><tr><th>Source</th><th>Events</th><th>Opens</th><th>Engaged rate</th><th title="Events sent by a real browser via JavaScript">JS verified</th></tr></thead>
           <tbody>
             {% for item in referrer_breakdown %}
             <tr>
@@ -52,9 +52,10 @@
               <td>{{ item.events }}</td>
               <td>{{ item.opens }}</td>
               <td>{{ item.engaged_rate }}</td>
+              <td>{{ item.js_verified }} <span class="text-muted small">({{ item.js_rate }})</span></td>
             </tr>
             {% empty %}
-            <tr><td colspan="4" class="text-muted small">No referrer data yet — will accumulate as visitors arrive.</td></tr>
+            <tr><td colspan="5" class="text-muted small">No referrer data yet — will accumulate as visitors arrive.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -209,6 +210,50 @@
   });
 })();
 </script>
+
+{% if recent_sessions %}
+<div class="card mb-4">
+  <div class="card-header">Recent sessions</div>
+  <div class="card-body small text-muted mb-0 pb-0">Chronological event timelines for the 15 most recent sessions.</div>
+  <div class="accordion accordion-flush" id="session-explorer">
+    {% for session in recent_sessions %}
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed py-2 small" type="button"
+                data-bs-toggle="collapse" data-bs-target="#session-{{ forloop.counter }}">
+          <span class="d-flex gap-3 align-items-center flex-wrap w-100">
+            <code>{{ session.visitor_id }}</code>
+            <span class="text-muted">{{ session.first_event|date:"j M H:i" }}</span>
+            <span class="badge text-bg-secondary">{{ session.event_count }} event{{ session.event_count|pluralize }}</span>
+            <span class="text-muted">{{ session.duration }}</span>
+            <span class="badge text-bg-light text-dark">{{ session.referrer }}</span>
+          </span>
+        </button>
+      </h2>
+      <div id="session-{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#session-explorer">
+        <div class="accordion-body p-0">
+          {% if session.landing_page != "—" %}
+          <div class="px-3 py-1 bg-body-tertiary small text-muted">Landing: <code>{{ session.landing_page }}</code></div>
+          {% endif %}
+          <table class="table table-sm small mb-0">
+            <thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead>
+            <tbody>
+              {% for event in session.events %}
+              <tr>
+                <td class="text-muted text-nowrap">{{ event.timestamp|date:"H:i:s" }}</td>
+                <td>{{ event.type }}</td>
+                <td class="text-muted text-break">{{ event.detail }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <div class="alert alert-info small mb-0">
   <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means the visitor's ID appeared before the selected date range.

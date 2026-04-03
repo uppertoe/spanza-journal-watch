@@ -7,6 +7,18 @@
 
 <div class="row g-3 mb-2">
   <div class="col-6 col-md-4 col-xl">
+    <div class="card h-100 border-secondary-subtle"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Unique visitors</h6>
+      <p class="display-6 mb-0">{{ unique_visitors }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Sessions</h6>
+      <p class="display-6 mb-0">{{ unique_sessions }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Review opens</h6>
       <p class="display-6 mb-0">{{ total_opens }}</p>
@@ -101,17 +113,41 @@
 {% endif %}
 
 <div class="card">
+  <div class="card-header">Data quality</div>
   <div class="card-body">
-    <div class="row g-2 text-center">
-      <div class="col-6">
-        <div class="small text-muted">Known subscriber activity</div>
+    <div class="row g-3 text-center mb-3">
+      <div class="col-6 col-md-3">
+        <div class="small text-muted">Total events</div>
+        <div class="fw-semibold">{{ total_all_events }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="small text-muted">Filtered as bot</div>
+        <div class="fw-semibold">{{ automated_count }} <span class="text-muted small fw-normal">({% widthratio automated_count total_all_events 100 %}%)</span></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="small text-muted">JS-verified</div>
+        <div class="fw-semibold">{{ js_verified_count }} <span class="text-muted small fw-normal">({% widthratio js_verified_count total_all_events 100 %}%)</span></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="small text-muted">Known subscribers</div>
         <div class="fw-semibold">{{ subscriber_events }} <span class="text-muted small fw-normal">({{ subscriber_share }})</span></div>
       </div>
-      <div class="col-6">
-        <div class="small text-muted">Total human-filtered events</div>
-        <div class="fw-semibold">{{ human_event_count }}</div>
-      </div>
     </div>
+    <table class="table table-sm small mb-0">
+      <thead><tr><th>Confidence level</th><th>Events</th></tr></thead>
+      <tbody>
+        {% for row in confidence_breakdown %}
+        <tr>
+          <td>{{ row.human_confidence|default:"unknown" }}</td>
+          <td>{{ row.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="text-muted mb-0 mt-2" style="font-size:0.7rem">
+      Data quality metrics always show all events regardless of the traffic filter.
+      "JS-verified" means the event was sent by a real browser via JavaScript.
+    </p>
   </div>
 </div>
 

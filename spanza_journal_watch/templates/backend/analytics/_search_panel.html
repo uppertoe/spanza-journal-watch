@@ -25,6 +25,13 @@
   </div>
 </div>
 
+{% if browse_searches %}
+<div class="alert alert-light small mb-4">
+  <strong>Journal browser:</strong> {{ browse_searches }} filter action{{ browse_searches|pluralize }}
+  ({{ browse_ctr }} resulted in article clicks). These are excluded from search analytics below.
+</div>
+{% endif %}
+
 <div class="card mb-4">
   <div class="card-header">Search volume — last 26 weeks</div>
   <div class="card-body">
