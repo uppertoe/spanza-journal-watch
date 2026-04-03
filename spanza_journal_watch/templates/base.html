@@ -66,6 +66,8 @@
         body { padding-bottom: 5.5rem; overflow-x: hidden; }
       }
     </style>
+    <link rel="preload" href="{% static 'fonts/Baloo2-700-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{% static 'fonts/FugazOne-400-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
     <!-- This file stores project-specific CSS -->
     {% render_bundle 'public' 'css' %}
     {% endblock %}
@@ -195,7 +197,7 @@
 
     <div class="container">
       <header class="jw-masthead border-bottom lh-1 py-3">
-        <div class="d-flex align-items-center justify-content-between gap-3">
+        <div class="jw-masthead__row">
           <a href="https://www.spanza.org.au/" target="_blank" rel="noopener noreferrer" class="jw-masthead__logo flex-shrink-0">
             <img
               src="{% static "images/logo/spanza-logo-blue.png" %}"
@@ -206,10 +208,10 @@
               decoding="async"
             >
           </a>
-          <div class="text-center flex-grow-1">
+          <div class="jw-masthead__title text-center flex-grow-1">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text">Journal Watch</span></a>
           </div>
-          <div class="flex-shrink-0">
+          <div class="jw-masthead__profile flex-shrink-0">
             <button class="jw-profile-btn" type="button"
                     data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
                     aria-controls="user-profile-drawer" aria-label="User menu">
@@ -224,6 +226,8 @@
       </header>
 
       <div class="nav-scroller py-1 mb-3 border-bottom">
+        <span class="nav-scroller__arrow nav-scroller__arrow--left d-md-none" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg></span>
+        <span class="nav-scroller__arrow nav-scroller__arrow--right d-md-none" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg></span>
         <nav class="nav nav-underline justify-content-between">
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'home' %} active{% endif %}" href="{% url "home" %}">Home</a>
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_detail' %} active{% endif %}" href="{% url "submissions:issue_latest" %}">This issue</a>

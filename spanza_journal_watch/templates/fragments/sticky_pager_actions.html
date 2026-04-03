@@ -1,19 +1,18 @@
 <div class="sticky-dock-panel">
   <div class="sticky-pager-actions" role="group" aria-label="{{ aria_label|default:'Page navigation' }}">
     {% if is_modal_navigation %}
-      <button type="button" class="btn btn-outline-secondary" data-review-modal-nav="prev" data-current-modal-id="{{ modal_id }}">Previous</button>
+      <button type="button" class="btn btn-outline-secondary" data-review-modal-nav="prev" data-current-modal-id="{{ modal_id }}"><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-left"></use></svg><span class="d-none d-sm-inline">Previous</span></button>
       <span class="badge text-bg-secondary" data-review-modal-position>Review</span>
-      <button type="button" class="btn btn-outline-secondary" data-review-modal-nav="next" data-current-modal-id="{{ modal_id }}">Next</button>
-      <button type="button" class="btn btn-secondary" data-review-modal-close data-current-modal-id="{{ modal_id }}">Close</button>
+      <button type="button" class="btn btn-outline-secondary" data-review-modal-nav="next" data-current-modal-id="{{ modal_id }}"><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-right-sm"></use></svg><span class="d-none d-sm-inline">Next</span></button>
     {% elif is_issue_review_navigation %}
-      <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="prev">Previous</button>
+      <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="prev"><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-left"></use></svg><span class="d-none d-sm-inline">Previous</span></button>
       <span class="badge text-bg-secondary" data-issue-review-position>Review</span>
-      <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="next">Next</button>
+      <button type="button" class="btn btn-outline-secondary" data-issue-review-nav="next"><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-right-sm"></use></svg><span class="d-none d-sm-inline">Next</span></button>
     {% else %}
       {% if page_obj.has_previous %}
-        <a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block" hx-push-url="true">Previous</a>
+        <a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.previous_page_number }}" hx-target="#article-block" hx-push-url="true"><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-left"></use></svg><span class="d-none d-sm-inline">Previous</span></a>
       {% else %}
-        <button class="btn btn-outline-secondary" type="button" disabled>Previous</button>
+        <button class="btn btn-outline-secondary" type="button" disabled><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-left"></use></svg><span class="d-none d-sm-inline">Previous</span></button>
       {% endif %}
 
       {% if show_back_to_top %}
@@ -23,9 +22,9 @@
       {% endif %}
 
       {% if page_obj.has_next %}
-        <a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block" hx-push-url="true">Next</a>
+        <a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}#articles" hx-get="{{ request.path }}?page={{ page_obj.next_page_number }}" hx-target="#article-block" hx-push-url="true"><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-right-sm"></use></svg><span class="d-none d-sm-inline">Next</span></a>
       {% else %}
-        <button class="btn btn-outline-secondary" type="button" disabled>Next</button>
+        <button class="btn btn-outline-secondary" type="button" disabled><svg class="bi d-inline d-sm-none" width="1em" height="1em"><use href="#icon-chevron-right-sm"></use></svg><span class="d-none d-sm-inline">Next</span></button>
       {% endif %}
     {% endif %}
   </div>
