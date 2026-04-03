@@ -61,8 +61,9 @@
         bottom: 0;
         z-index: 1500;
       }
+      html { overflow-x: hidden; }
       @media (max-width: 767.98px) {
-        body { padding-bottom: 5.5rem; }
+        body { padding-bottom: 5.5rem; overflow-x: hidden; }
       }
     </style>
     <link rel="preload" href="{% static 'fonts/FugazOne-400-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
@@ -301,6 +302,7 @@
     {% block modal %}{% endblock modal %}
 
     <div class="sticky-mobile-toolbar d-md-none" aria-label="Quick navigation">
+      {% block mobile_toolbar_banner %}{% endblock mobile_toolbar_banner %}
       <div class="sticky-mobile-toolbar__inner">
         <div class="dropup">
           <button class="btn btn-bd-primary d-flex align-items-center gap-2" id="bd-theme-mobile" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle theme">
@@ -382,6 +384,8 @@
         </div>
       </div>
     </div>
+
+    {% block login_prompt_toast %}{% endblock login_prompt_toast %}
 
     <footer class="py-5 text-center text-body-secondary bg-body-tertiary">
       <a

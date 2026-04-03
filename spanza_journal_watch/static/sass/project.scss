@@ -153,9 +153,9 @@ p br {
 .sticky-mobile-toolbar__inner {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   width: 100%;
-  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  padding: 0.6rem 0.75rem calc(0.6rem + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(21, 43, 59, 0.08);
   background: rgba(248, 249, 250, 0.58);
   box-shadow: 0 -0.75rem 2rem rgba(21, 43, 59, 0.08);
@@ -1264,16 +1264,39 @@ p br {
     white-space: nowrap;
   }
 
+  /* Edge fades — toggled by JS via data attributes */
+  .nav-scroller::before,
   .nav-scroller::after {
     content: '';
     position: absolute;
     top: 0;
-    right: 0;
     bottom: 0;
-    width: 2.5rem;
-    background: linear-gradient(to right, transparent, var(--bs-body-bg, #fff));
+    width: 2rem;
     pointer-events: none;
     z-index: 1;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .nav-scroller::before {
+    left: 0;
+    background: linear-gradient(to left, transparent, var(--bs-body-bg, #fff));
+  }
+
+  .nav-scroller::after {
+    right: 0;
+    background: linear-gradient(to right, transparent, var(--bs-body-bg, #fff));
+  }
+
+  .nav-scroller[data-fade-left]::before {
+    opacity: 1;
+  }
+  .nav-scroller[data-fade-right]::after {
+    opacity: 1;
+  }
+
+  [data-bs-theme='dark'] .nav-scroller::before {
+    background: linear-gradient(to left, transparent, var(--jw-paper, #151c24));
   }
 
   [data-bs-theme='dark'] .nav-scroller::after {
@@ -3021,6 +3044,7 @@ body.jw-modal-open {
   align-items: center;
   justify-content: center;
   flex: 1;
+  min-width: 0;
 }
 
 /* On mobile the dock panel is transparent — journal nav buttons must be opaque */
@@ -3030,6 +3054,52 @@ body.jw-modal-open {
 
 .jw-journal-nav__btn {
   --bs-btn-bg: var(--bs-body-bg, #fff);
+  white-space: nowrap;
+}
+
+.jw-journal-nav__icon {
+  margin-right: 0.25rem;
+}
+
+/* Small mobile: icon-only journal nav buttons in bottom toolbar */
+@media (max-width: 479px) {
+  .sticky-mobile-toolbar .jw-journal-nav__label {
+    display: none;
+  }
+
+  .sticky-mobile-toolbar .jw-journal-nav__icon {
+    margin-right: 0;
+  }
+
+  .sticky-mobile-toolbar .jw-journal-nav__btn {
+    padding-inline: 0.6rem;
+  }
+}
+
+/* Very small screens: tighten further */
+@media (max-width: 374px) {
+  .sticky-mobile-toolbar__inner {
+    gap: 0.35rem;
+    padding-inline: 0.5rem;
+  }
+
+  .sticky-mobile-toolbar .btn-bd-primary .small {
+    font-size: 0.72rem;
+  }
+}
+
+/* ── Login prompt toast (desktop, fixed position) ──────── */
+.jw-login-toast-wrapper {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1950;
+  pointer-events: none;
+}
+
+.jw-login-toast-wrapper .toast {
+  pointer-events: auto;
 }
 
 /* ── Toast message stack ───────────────────────────────── */
@@ -3130,9 +3200,20 @@ body.jw-modal-open {
 
 /* ── Mobile login prompt ───────────────────────────────── */
 .journal-mobile-login-prompt {
-  padding: 0.35rem 0.75rem;
-  background: color-mix(in srgb, var(--bs-primary) 8%, var(--bs-body-bg));
-  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(
+    in srgb,
+    var(--bs-primary) 10%,
+    rgba(248, 249, 250, 0.96)
+  );
+  border-bottom: 1px solid rgba(21, 43, 59, 0.08);
+  text-align: center;
+  backdrop-filter: blur(14px);
+}
+
+[data-bs-theme='dark'] .journal-mobile-login-prompt {
+  background: color-mix(in srgb, var(--bs-primary) 14%, rgba(9, 32, 63, 0.96));
+  border-bottom-color: rgba(233, 236, 239, 0.1);
 }
 
 @media (max-width: 991.98px) {

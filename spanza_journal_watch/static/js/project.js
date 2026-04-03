@@ -1520,6 +1520,32 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   });
 })();
 
+/* ── Nav-scroller edge fades ──────────────────────────────── */
+(function () {
+  const scroller = document.querySelector('.nav-scroller');
+  if (!scroller) return;
+  const nav = scroller.querySelector('.nav');
+  if (!nav) return;
+
+  function updateFades() {
+    const sl = nav.scrollLeft;
+    const maxScroll = nav.scrollWidth - nav.clientWidth;
+    if (maxScroll <= 0) {
+      scroller.removeAttribute('data-fade-left');
+      scroller.removeAttribute('data-fade-right');
+      return;
+    }
+    if (sl > 2) scroller.setAttribute('data-fade-left', '');
+    else scroller.removeAttribute('data-fade-left');
+    if (sl < maxScroll - 2) scroller.setAttribute('data-fade-right', '');
+    else scroller.removeAttribute('data-fade-right');
+  }
+
+  nav.addEventListener('scroll', updateFades, { passive: true });
+  window.addEventListener('resize', updateFades, { passive: true });
+  updateFades();
+})();
+
 /* ── Site-wide back to top ────────────────────────────────── */
 (function () {
   const allBtns = document.querySelectorAll('.js-back-to-top');

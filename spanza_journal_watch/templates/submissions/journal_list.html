@@ -168,26 +168,33 @@
   <div class="sticky-dock-panel">
     {% include "submissions/fragments/journal_browser_nav.html" %}
   </div>
-  {# Login prompt for anonymous users #}
+{% endblock mobile_action_dock %}
+
+{% block mobile_toolbar_banner %}
   {% if not request.user.is_authenticated %}
-    <div id="mobile-login-prompt" class="journal-mobile-login-prompt d-none w-100">
-      <div class="d-flex align-items-center gap-2 small">
+    <div id="mobile-login-prompt" class="journal-mobile-login-prompt d-none">
+      <div class="d-flex align-items-center justify-content-center gap-2 small">
         <svg class="bi text-warning flex-shrink-0" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
         <span><strong data-star-count-mobile>0</strong> starred.</span>
         <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}" class="fw-semibold text-decoration-none">Sign up</a>
         <span class="text-muted">or</span>
         <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}" class="fw-semibold text-decoration-none">log in</a>
+        <span class="text-muted">to save</span>
       </div>
     </div>
   {% endif %}
-{% endblock mobile_action_dock %}
+{% endblock mobile_toolbar_banner %}
 
 {% block desktop_action_dock %}
   <div class="sticky-dock-panel">
     {% include "submissions/fragments/journal_browser_nav.html" %}
   </div>
-  {# Login prompt toast for anonymous users — desktop only #}
-  {% if not request.user.is_authenticated %}
+{% endblock desktop_action_dock %}
+
+{# Login prompt toast — positioned independently so it never displaces the nav #}
+{% if not request.user.is_authenticated %}
+{% block login_prompt_toast %}
+  <div class="jw-login-toast-wrapper d-none d-md-block">
     <div id="login-prompt-toast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
         <div class="toast-body">
@@ -199,5 +206,6 @@
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
     </div>
-  {% endif %}
-{% endblock desktop_action_dock %}
+  </div>
+{% endblock login_prompt_toast %}
+{% endif %}

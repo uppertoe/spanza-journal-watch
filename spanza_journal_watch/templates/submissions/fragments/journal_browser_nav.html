@@ -2,16 +2,16 @@
   <button type="button" class="btn btn-primary btn-sm jw-journal-nav__btn" data-journal-nav="shelf" data-nav-active="btn-primary" data-nav-inactive="btn-outline-primary"
     hx-get="{% url 'submissions:journal_list' %}{% if selected_journal_id %}?journal={{ selected_journal_id }}&month={{ selected_month|date:'Y-m' }}{% endif %}"
     hx-target="#journal-browser-results" hx-swap="innerHTML">
-    <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-book-stack"></use></svg>Shelf
+    <svg class="bi jw-journal-nav__icon" width="1em" height="1em" aria-hidden="true"><use href="#icon-book-stack"></use></svg><span class="jw-journal-nav__label">Shelf</span>
   </button>
   <button type="button" class="btn btn-outline-warning btn-sm jw-journal-nav__btn position-relative" data-journal-nav="reading_list" data-nav-active="btn-warning" data-nav-inactive="btn-outline-warning"
     hx-get="{% url 'submissions:journal_reading_list' %}"
     hx-target="#journal-browser-results" hx-swap="innerHTML">
-    <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>Reading list<span class="jw-dot-indicator jw-reading-list-dot d-none"></span>
+    <svg class="bi jw-journal-nav__icon" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg><span class="jw-journal-nav__label">Reading list</span><span class="jw-dot-indicator jw-reading-list-dot d-none"></span>
   </button>
   <button type="button" class="btn btn-outline-secondary btn-sm jw-journal-nav__btn" data-journal-nav="archive" data-nav-active="btn-secondary" data-nav-inactive="btn-outline-secondary"
     hx-get="{% url 'submissions:journal_reading_list' %}?tab=archived"
     hx-target="#journal-browser-results" hx-swap="innerHTML">
-    <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-archive"></use></svg>Archive
+    <svg class="bi jw-journal-nav__icon" width="1em" height="1em" aria-hidden="true"><use href="#icon-archive"></use></svg><span class="jw-journal-nav__label">Archive</span>
   </button>
 </div>
