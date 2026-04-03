@@ -11,6 +11,16 @@ urlpatterns = [
     path("articles/watched-journals", views.watched_journals, name="watched_journals"),
     path("articles/watched-journals/search", views.watched_journal_search, name="watched_journal_search"),
     path(
+        "articles/watched-journals/<int:watched_journal_id>/edit",
+        views.watched_journal_edit,
+        name="watched_journal_edit",
+    ),
+    path(
+        "articles/watched-journals/<int:watched_journal_id>/delete",
+        views.watched_journal_delete,
+        name="watched_journal_delete",
+    ),
+    path(
         "articles/watched-journals/<int:watched_journal_id>/toggle-active",
         views.watched_journal_toggle_active,
         name="watched_journal_toggle_active",

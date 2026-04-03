@@ -1,0 +1,42 @@
+{% extends "backend/backend_base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Edit: {{ watched_journal }}</h1>
+  <a class="btn btn-outline-secondary" href="{% url "backend:watched_journals" %}">Back to Watched Journals</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12">{{ watched_journal_form.name|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.display_name|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.medline_ta|as_crispy_field }}</div>
+      <div class="col-12 col-md-4">{{ watched_journal_form.nlm_id|as_crispy_field }}</div>
+      <div class="col-12 col-md-4">{{ watched_journal_form.iso_abbreviation|as_crispy_field }}</div>
+      <div class="col-12 col-md-4">{{ watched_journal_form.source|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.issn_print|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.issn_electronic|as_crispy_field }}</div>
+      <div class="col-6">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-6">{{ watched_journal_form.visible_on_frontend|as_crispy_field }}</div>
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save changes</button>
+        <a href="{% url "backend:watched_journals" %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-danger">
+  <div class="card-header text-danger">Danger zone</div>
+  <div class="card-body">
+    <p class="mb-2">Permanently delete this watched journal and all its cached article links.</p>
+    <form method="post" action="{% url "backend:watched_journal_delete" watched_journal.pk %}" onsubmit="return confirm('Delete {{ watched_journal }}? This cannot be undone.');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger btn-sm">Delete journal</button>
+    </form>
+  </div>
+</div>
+{% endblock content %}

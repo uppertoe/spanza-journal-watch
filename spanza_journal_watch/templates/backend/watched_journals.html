@@ -6,7 +6,7 @@
   <h1 class="mb-0">Watched Journals</h1>
   <a class="btn btn-outline-secondary" href="{% url "backend:article_intake" %}">Back to Article Intake</a>
 </div>
-<p class="text-muted mb-3">Add journals to watch in PubMed. Retrieval uses ISSN where provided, otherwise the journal name in a PubMed journal query.</p>
+<p class="text-muted mb-3">Add journals to watch in PubMed. Articles are fetched using the MedlineTA identifier where available, falling back to ISSN or journal name.</p>
 
 <div class="card mb-3">
   <div class="card-header">Find journal from NIH catalog</div>
@@ -30,12 +30,18 @@
 <div class="card mb-3">
   <div class="card-header">Add watched journal</div>
   <div class="card-body">
-    <form method="post" class="row g-3">
+    <form method="post" class="row g-3" id="watched-journal-form">
       {% csrf_token %}
       <div class="col-12">{{ watched_journal_form.name|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.display_name|as_crispy_field }}</div>
+      <div class="col-12 col-md-6">{{ watched_journal_form.medline_ta|as_crispy_field }}</div>
+      <div class="col-12 col-md-4">{{ watched_journal_form.nlm_id|as_crispy_field }}</div>
+      <div class="col-12 col-md-4">{{ watched_journal_form.iso_abbreviation|as_crispy_field }}</div>
+      <div class="col-12 col-md-4">{{ watched_journal_form.source|as_crispy_field }}</div>
       <div class="col-12 col-md-6">{{ watched_journal_form.issn_print|as_crispy_field }}</div>
       <div class="col-12 col-md-6">{{ watched_journal_form.issn_electronic|as_crispy_field }}</div>
-      <div class="col-12">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-6">{{ watched_journal_form.active|as_crispy_field }}</div>
+      <div class="col-6">{{ watched_journal_form.visible_on_frontend|as_crispy_field }}</div>
       <div class="col-12"><button type="submit" class="btn btn-primary">Add watched journal</button></div>
     </form>
   </div>
@@ -50,7 +56,9 @@
           <thead>
             <tr>
               <th>Name</th>
+              <th>MedlineTA</th>
               <th>ISSN</th>
+              <th>Source</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -58,23 +66,34 @@
           <tbody>
             {% for watched in watched_journals %}
               <tr>
-                <td>{{ watched.name }}</td>
                 <td>
-                  {% if watched.issn_print %}<div>Print: {{ watched.issn_print }}</div>{% endif %}
-                  {% if watched.issn_electronic %}<div>Electronic: {{ watched.issn_electronic }}</div>{% endif %}
+                  <strong>{{ watched.effective_name }}</strong>
+                  {% if watched.display_name and watched.display_name != watched.name %}
+                    <div class="text-muted small">NLM: {{ watched.name }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ watched.medline_ta|default:"-" }}</td>
+                <td>
+                  {% if watched.issn_print %}<div class="small">P: {{ watched.issn_print }}</div>{% endif %}
+                  {% if watched.issn_electronic %}<div class="small">E: {{ watched.issn_electronic }}</div>{% endif %}
                   {% if not watched.issn_print and not watched.issn_electronic %}-{% endif %}
                 </td>
+                <td><span class="badge text-bg-light">{{ watched.get_source_display }}</span></td>
                 <td>
                   {% if watched.active %}
                     <span class="badge text-bg-success">Active</span>
                   {% else %}
                     <span class="badge text-bg-secondary">Inactive</span>
                   {% endif %}
+                  {% if watched.visible_on_frontend %}
+                    <span class="badge text-bg-info">Visible</span>
+                  {% endif %}
                 </td>
-                <td>
-                  <form method="post" action="{% url "backend:watched_journal_toggle_active" watched.pk %}">
+                <td class="text-end text-nowrap">
+                  <a href="{% url "backend:watched_journal_edit" watched.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                  <form method="post" action="{% url "backend:watched_journal_toggle_active" watched.pk %}" class="d-inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">Toggle active</button>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">{{ watched.active|yesno:"Deactivate,Activate" }}</button>
                   </form>
                 </td>
               </tr>
@@ -101,8 +120,11 @@
       const nameInput = document.getElementById("id_name");
       const printIssnInput = document.getElementById("id_issn_print");
       const electronicIssnInput = document.getElementById("id_issn_electronic");
+      const medlineTaInput = document.getElementById("id_medline_ta");
+      const nlmIdInput = document.getElementById("id_nlm_id");
+      const isoAbbrInput = document.getElementById("id_iso_abbreviation");
 
-      if (!queryInput || !searchButton || !resultsContainer || !nameInput || !printIssnInput || !electronicIssnInput) {
+      if (!queryInput || !searchButton || !resultsContainer || !nameInput) {
         return;
       }
 
@@ -113,8 +135,11 @@
 
       function applyJournal(result) {
         nameInput.value = result.name || "";
-        printIssnInput.value = result.issn_print || "";
-        electronicIssnInput.value = result.issn_electronic || "";
+        if (printIssnInput) printIssnInput.value = result.issn_print || "";
+        if (electronicIssnInput) electronicIssnInput.value = result.issn_electronic || "";
+        if (medlineTaInput) medlineTaInput.value = result.medline_ta || "";
+        if (nlmIdInput) nlmIdInput.value = result.nlm_id || "";
+        if (isoAbbrInput) isoAbbrInput.value = result.iso_abbreviation || "";
         setStatus("Journal details copied into the form.", false);
       }
 
@@ -127,27 +152,17 @@
         }
 
         setStatus(`Found ${results.length} journal${results.length > 1 ? "s" : ""}.`, false);
-        const q = (queryInput.value || "").trim().toLowerCase();
-        results.sort((a, b) => {
-          const aName = (a.name || "").toLowerCase();
-          const bName = (b.name || "").toLowerCase();
-          if (aName === q && bName !== q) return -1;
-          if (bName === q && aName !== q) return 1;
-          const aStarts = aName.startsWith(q);
-          const bStarts = bName.startsWith(q);
-          if (aStarts && !bStarts) return -1;
-          if (bStarts && !aStarts) return 1;
-          return aName.localeCompare(bName);
-        });
         results.forEach((result) => {
           const button = document.createElement("button");
           button.type = "button";
           button.className = "list-group-item list-group-item-action";
           const name = result.name || "Unknown";
-          const medline = result.medline_ta ? ` (${result.medline_ta})` : "";
-          const printIssn = result.issn_print ? `Print ISSN: ${result.issn_print}` : "Print ISSN: -";
-          const eIssn = result.issn_electronic ? `Electronic ISSN: ${result.issn_electronic}` : "Electronic ISSN: -";
-          button.textContent = `${name}${medline} · ${printIssn} · ${eIssn}`;
+          const medline = result.medline_ta ? ` [${result.medline_ta}]` : "";
+          const nlm = result.nlm_id ? ` NLM: ${result.nlm_id}` : "";
+          const printIssn = result.issn_print ? `P: ${result.issn_print}` : "";
+          const eIssn = result.issn_electronic ? `E: ${result.issn_electronic}` : "";
+          const issnParts = [printIssn, eIssn].filter(Boolean).join(" · ");
+          button.innerHTML = `<strong>${name}</strong>${medline}<br><small class="text-muted">${issnParts}${nlm ? " · " + nlm : ""}</small>`;
           button.addEventListener("click", function () {
             applyJournal(result);
           });

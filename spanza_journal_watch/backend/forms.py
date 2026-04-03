@@ -664,7 +664,18 @@ class ArticleIntakeAssignIssueForm(forms.Form):
 class WatchedJournalForm(forms.ModelForm):
     class Meta:
         model = WatchedJournal
-        fields = ["name", "issn_print", "issn_electronic", "active", "visible_on_frontend"]
+        fields = [
+            "name",
+            "display_name",
+            "medline_ta",
+            "nlm_id",
+            "iso_abbreviation",
+            "issn_print",
+            "issn_electronic",
+            "source",
+            "active",
+            "visible_on_frontend",
+        ]
 
     def clean_name(self):
         return (self.cleaned_data.get("name") or "").strip()

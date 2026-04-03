@@ -655,7 +655,6 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
 
     pubmed_credential = _get_pubmed_integration_credential()
     planka_credential = _get_planka_integration_credential()
-    watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
     planka_client_id = os.getenv("OIDC_CLIENT_ID", "planka-local")
     planka_client_secret = os.getenv("OIDC_CLIENT_SECRET", "")
     planka_oidc_app = OAuthApplication.objects.filter(client_id=planka_client_id).first()
@@ -699,8 +698,6 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
         "planka_connection_error": planka_connection_error,
         "chief_editor_planka_user": chief_editor_planka_user,
         "chief_editor_invites": chief_editor_invites,
-        "watched_journal_form": WatchedJournalForm(),
-        "watched_journals": watched_items,
         "inbox_settings_form": inbox_settings_form,
         "inbox_settings_preview": inbox_settings_form.get_preview_value(),
         "frontend_banner_form": frontend_banner_form,
@@ -2447,8 +2444,6 @@ def watched_journals(request):
         if form.is_valid():
             watched = form.save()
             messages.success(request, f"Watched journal added: {watched.name}")
-            if request.POST.get("next") == "settings":
-                return redirect(reverse("backend:backend_settings"))
             return redirect(reverse("backend:watched_journals"))
         messages.error(request, "Could not save watched journal. Please check the form.")
 
@@ -2478,10 +2473,40 @@ def watched_journal_search(request):
     return JsonResponse({"results": journals})
 
 
-def _watched_journals_table_response(request):
-    """Return just the watched journals table partial for HTMX updates."""
-    watched_items = WatchedJournal.objects.select_related("journal").order_by("name", "pk")
-    return render(request, "backend/_watched_journals_table.html", {"watched_journals": watched_items})
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def watched_journal_edit(request, watched_journal_id):
+    watched = get_object_or_404(WatchedJournal, pk=watched_journal_id)
+    form = WatchedJournalForm(instance=watched)
+
+    if request.method == "POST":
+        form = WatchedJournalForm(request.POST, instance=watched)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Updated: {watched}")
+            return redirect(reverse("backend:watched_journals"))
+        messages.error(request, "Could not save changes. Please check the form.")
+
+    return render(
+        request,
+        "backend/watched_journal_edit.html",
+        {
+            "watched_journal_form": form,
+            "watched_journal": watched,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def watched_journal_delete(request, watched_journal_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+    watched = get_object_or_404(WatchedJournal, pk=watched_journal_id)
+    name = str(watched)
+    watched.delete()
+    messages.success(request, f"Deleted: {name}")
+    return redirect(reverse("backend:watched_journals"))
 
 
 @login_required
@@ -2494,10 +2519,6 @@ def watched_journal_toggle_active(request, watched_journal_id):
     watched.active = not watched.active
     watched.save(update_fields=["active", "modified"])
     messages.success(request, f"{watched.name}: {'active' if watched.active else 'inactive'}")
-    if request.POST.get("next") == "htmx":
-        return _watched_journals_table_response(request)
-    if request.POST.get("next") == "settings":
-        return redirect(reverse("backend:backend_settings"))
     return redirect(reverse("backend:watched_journals"))
 
 
@@ -2511,10 +2532,6 @@ def watched_journal_toggle_frontend(request, watched_journal_id):
     watched.visible_on_frontend = not watched.visible_on_frontend
     watched.save(update_fields=["visible_on_frontend", "modified"])
     messages.success(request, f"{watched.name}: {'visible' if watched.visible_on_frontend else 'hidden'} on frontend")
-    if request.POST.get("next") == "htmx":
-        return _watched_journals_table_response(request)
-    if request.POST.get("next") == "settings":
-        return redirect(reverse("backend:backend_settings"))
     return redirect(reverse("backend:watched_journals"))
 
 

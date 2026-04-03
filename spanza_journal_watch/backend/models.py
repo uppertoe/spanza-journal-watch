@@ -672,8 +672,21 @@ class WatchedJournal(TimeStampedModel):
         null=True,
         related_name="watched_sources",
     )
+    display_name = models.CharField(
+        max_length=255, blank=True, help_text="Custom display name; falls back to name if blank"
+    )
     issn_print = models.CharField(max_length=32, blank=True)
     issn_electronic = models.CharField(max_length=32, blank=True)
+    medline_ta = models.CharField(
+        "MedlineTA",
+        max_length=255,
+        blank=True,
+        help_text="MEDLINE title abbreviation — most reliable PubMed search identifier",
+    )
+    nlm_id = models.CharField("NLM ID", max_length=64, blank=True, help_text="NLM catalog unique identifier")
+    iso_abbreviation = models.CharField(
+        max_length=255, blank=True, help_text="ISO journal abbreviation for article matching"
+    )
     source = models.CharField(max_length=16, choices=Source.choices, default=Source.PUBMED)
     active = models.BooleanField(default=True)
     visible_on_frontend = models.BooleanField(default=True)
@@ -681,9 +694,15 @@ class WatchedJournal(TimeStampedModel):
     class Meta:
         ordering = ("name",)
 
+    @property
+    def effective_name(self):
+        return self.display_name or self.name
+
     def save(self, *args, **kwargs):
         if self.name:
             self.name = self.name.strip()
+        if self.display_name:
+            self.display_name = self.display_name.strip()
 
         super().save(*args, **kwargs)
 
@@ -692,15 +711,16 @@ class WatchedJournal(TimeStampedModel):
 
         from spanza_journal_watch.submissions.models import Journal
 
-        journal = Journal.objects.filter(name__iexact=self.name).order_by("pk").first()
+        lookup_name = self.display_name or self.name
+        journal = Journal.objects.filter(name__iexact=lookup_name).order_by("pk").first()
         if journal is None:
-            journal = Journal.objects.create(name=self.name, active=True)
+            journal = Journal.objects.create(name=lookup_name, active=True)
 
         WatchedJournal.objects.filter(pk=self.pk, journal__isnull=True).update(journal=journal)
         self.journal_id = journal.pk
 
     def __str__(self):
-        return self.name
+        return self.display_name or self.name
 
 
 class WatchedJournalArticle(TimeStampedModel):

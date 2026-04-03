@@ -194,7 +194,7 @@
               {% if perms.submissions.manage_issue_builder %}
               <li class="nav-item">
                 <a
-                  class="nav-link{% if current in 'watched_journals watched_journal_search watched_journal_toggle_active article_intake pubmed_save_api_key article_intake_results article_intake_toggle_selection article_intake_bulk_selection article_intake_assign_issue article_intake_refresh_batch article_intake_push_to_planka issue_builder save_issue_draft update_issue_draft new_issue_review_form add_issue_review edit_issue_review_form update_issue_review remove_issue_review issue_add_contributor issue_send_contributor_invites issue_resend_contributor_invite issue_revoke_contributor issue_sync_contributor_planka publish_issue_bundle issue_planka_import planka_setup_issue_project planka_refresh_publish_cards planka_import_publish_card planka_update_project_background planka_update_project_name issue_reviewers issue_reviews_edit issue_publish issue_set_homepage' %} active{% endif %}"
+                  class="nav-link{% if current in 'article_intake pubmed_save_api_key article_intake_results article_intake_toggle_selection article_intake_bulk_selection article_intake_assign_issue article_intake_refresh_batch article_intake_push_to_planka issue_builder save_issue_draft update_issue_draft new_issue_review_form add_issue_review edit_issue_review_form update_issue_review remove_issue_review issue_add_contributor issue_send_contributor_invites issue_resend_contributor_invite issue_revoke_contributor issue_sync_contributor_planka publish_issue_bundle issue_planka_import planka_setup_issue_project planka_refresh_publish_cards planka_import_publish_card planka_update_project_background planka_update_project_name issue_reviewers issue_reviews_edit issue_publish issue_set_homepage' %} active{% endif %}"
                   href="{% url "backend:issue_builder" %}"
                 >
                   Issues
@@ -203,7 +203,22 @@
               {% endif %}
               {% if perms.submissions.chief_editor %}
               <li class="nav-item">
-                <a class="nav-link{% if current == 'backend_settings' %} active{% endif %}" href="{% url "backend:backend_settings" %}">Settings</a>
+                <a class="nav-link{% if current in 'newsletter_release_list create_newsletter final_newsletter send_test_newsletter send_final_newsletter newsletter_stats_detail' %} active{% endif %}" href="{% url "backend:newsletter_release_list" %}">Newsletter</a>
+              </li>
+              <li class="nav-item dropdown">
+                <a
+                  class="nav-link dropdown-toggle{% if current in 'backend_settings watched_journals watched_journal_edit fetch_monitoring affiliations_list affiliation_edit authors_list author_edit' %} active{% endif %}"
+                  href="#"
+                  role="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  Settings
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url "backend:backend_settings" %}">Settings</a></li>
+                  <li><a class="dropdown-item" href="{% url "backend:watched_journals" %}">Watched Journals</a></li>
+                </ul>
               </li>
               <li class="nav-item">
                 <a class="nav-link{% if current == 'inbox' or current == 'inbox_thread' %} active{% endif %}" href="{% url "backend:inbox" %}">
@@ -232,7 +247,7 @@
 
               {% if perms.backend.view_newsletter_stats %}
               <li class="nav-item">
-                <a class="nav-link{% if current == 'site_analytics' or current == 'newsletter_stats_detail' or current == 'analytics_overview' or current == 'analytics_content' or current == 'analytics_traffic' or current == 'analytics_email' or current == 'analytics_search' or current == 'analytics_journals' %} active{% endif %}" href="{% url "backend:site_analytics" %}">Analytics</a>
+                <a class="nav-link{% if current in 'site_analytics analytics_overview analytics_content analytics_traffic analytics_email analytics_search analytics_journals' %} active{% endif %}" href="{% url "backend:site_analytics" %}">Analytics</a>
               </li>
               {% endif %}
 

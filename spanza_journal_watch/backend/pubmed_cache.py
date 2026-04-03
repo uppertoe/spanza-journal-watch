@@ -37,6 +37,10 @@ def build_pubmed_client(api_key=""):
 
 
 def build_pubmed_term(watched_journal):
+    # Prefer MedlineTA with [ta] tag — most reliable PubMed journal identifier
+    if watched_journal.medline_ta:
+        return f'"{watched_journal.medline_ta.strip()}"[ta]'
+
     issn_terms = []
     if watched_journal.issn_print:
         issn_terms.append(f'"{watched_journal.issn_print.strip()}"[ISSN]')
@@ -45,6 +49,30 @@ def build_pubmed_term(watched_journal):
     if issn_terms:
         return "(" + " OR ".join(issn_terms) + ")"
     return f'"{watched_journal.name.strip()}"[Journal]'
+
+
+def build_accepted_journal_names(watched_journal):
+    """Build a set of accepted journal name variants for post-fetch validation."""
+    names = set()
+    for field in ("name", "display_name", "medline_ta", "iso_abbreviation"):
+        value = (getattr(watched_journal, field, "") or "").strip()
+        if value:
+            names.add(value.lower())
+    return names
+
+
+def article_matches_journal(payload, accepted_names):
+    """Check whether a fetched article's journal matches the expected watched journal."""
+    if not accepted_names:
+        return True  # No names to validate against — accept everything
+
+    source_journal = (payload.get("source_journal_name") or "").strip().lower()
+    iso_abbrev = ((payload.get("metadata_json") or {}).get("iso_abbreviation") or "").strip().lower()
+
+    for name in (source_journal, iso_abbrev):
+        if name and name in accepted_names:
+            return True
+    return False
 
 
 def shift_month(date_value, delta_months):
@@ -174,10 +202,12 @@ def upsert_pubmed_article(payload):
 def refresh_watched_journal_cache(watched_journal, from_month, to_month, *, client=None, seen_pmids=None):
     client = client or build_pubmed_client()
     seen_pmids = seen_pmids if seen_pmids is not None else set()
+    accepted_names = build_accepted_journal_names(watched_journal)
     history = client.search_pmids_history(build_pubmed_term(watched_journal), from_month, to_month)
     now = timezone.now()
     created_links = 0
     touched_links = 0
+    rejected = 0
 
     for payload in client.fetch_articles_history(history["webenv"], history["query_key"], history["count"]):
         pmid = (payload.get("pmid") or "").strip()
@@ -185,6 +215,10 @@ def refresh_watched_journal_cache(watched_journal, from_month, to_month, *, clie
             continue
         seen_pmids.add(pmid)
 
+        if not article_matches_journal(payload, accepted_names):
+            rejected += 1
+            continue
+
         article = upsert_pubmed_article(payload)
         if article is None:
             continue
@@ -211,20 +245,28 @@ def refresh_watched_journal_cache(watched_journal, from_month, to_month, *, clie
             update_fields.append("publication_month")
         link.save(update_fields=update_fields)
 
-    return {"created_links": created_links, "touched_links": touched_links}
+    if rejected:
+        logger.info(
+            "Watched journal %s: rejected %d article(s) that didn't match accepted names",
+            watched_journal,
+            rejected,
+        )
+    return {"created_links": created_links, "touched_links": touched_links, "rejected": rejected}
 
 
 def refresh_crossref_journal_cache(watched_journal, from_month, to_month, *, seen_dois=None):
     """Refresh cached articles for a CrossRef-sourced journal."""
     seen_dois = seen_dois if seen_dois is not None else set()
+    accepted_names = build_accepted_journal_names(watched_journal)
     issn = watched_journal.issn_electronic or watched_journal.issn_print
     if not issn:
         logger.warning("CrossRef journal %s has no ISSN — skipping", watched_journal.name)
-        return {"created_links": 0, "touched_links": 0}
+        return {"created_links": 0, "touched_links": 0, "rejected": 0}
 
     now = timezone.now()
     created_links = 0
     touched_links = 0
+    rejected = 0
 
     for payload in fetch_crossref_journal_articles(issn, from_month, to_month):
         doi = (payload.get("doi") or "").strip().lower()
@@ -232,6 +274,10 @@ def refresh_crossref_journal_cache(watched_journal, from_month, to_month, *, see
             continue
         seen_dois.add(doi)
 
+        if not article_matches_journal(payload, accepted_names):
+            rejected += 1
+            continue
+
         article = upsert_pubmed_article(payload)
         if article is None:
             continue
@@ -258,7 +304,13 @@ def refresh_crossref_journal_cache(watched_journal, from_month, to_month, *, see
             update_fields.append("publication_month")
         link.save(update_fields=update_fields)
 
-    return {"created_links": created_links, "touched_links": touched_links}
+    if rejected:
+        logger.info(
+            "CrossRef journal %s: rejected %d article(s) that didn't match accepted names",
+            watched_journal,
+            rejected,
+        )
+    return {"created_links": created_links, "touched_links": touched_links, "rejected": rejected}
 
 
 def refresh_pubmed_journal_cache(*, watched_journals=None, from_month=None, to_month=None, client=None):

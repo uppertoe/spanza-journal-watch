@@ -118,17 +118,32 @@ class PubmedClient:
         if not term:
             return []
 
-        data = self._request_json(
-            "esearch.fcgi",
-            {
-                "db": "nlmcatalog",
-                "retmode": "json",
-                "retmax": retmax,
-                "term": f"{term}[Journal]",
-            },
-        )
-        ids = data.get("esearchresult", {}).get("idlist", []) or []
-        if not ids:
+        # Search [ta] (MedlineTA) first for exact matches, then [Journal] for broader results.
+        # [ta] results are prioritised so flagship journals aren't truncated by the retmax limit.
+        ta_ids = []
+        journal_ids = []
+        for tag, target in (("[ta]", ta_ids), ("[Journal]", journal_ids)):
+            data = self._request_json(
+                "esearch.fcgi",
+                {
+                    "db": "nlmcatalog",
+                    "retmode": "json",
+                    "retmax": retmax,
+                    "term": f'"{term}"{tag}',
+                },
+            )
+            ids = data.get("esearchresult", {}).get("idlist", []) or []
+            target.extend(ids)
+
+        # Deduplicate: [ta] hits first (exact MedlineTA matches), then [Journal] hits
+        seen = set()
+        unique_ids = []
+        for nlm_cat_id in ta_ids + journal_ids:
+            if nlm_cat_id not in seen:
+                seen.add(nlm_cat_id)
+                unique_ids.append(nlm_cat_id)
+
+        if not unique_ids:
             return []
 
         root = self._request_xml(
@@ -136,16 +151,28 @@ class PubmedClient:
             {
                 "db": "nlmcatalog",
                 "retmode": "xml",
-                "id": ",".join(ids),
+                "id": ",".join(unique_ids[:retmax]),
             },
         )
 
         journals = []
+        query_lower = term.lower()
         for record in root.findall(".//NLMCatalogRecord"):
             parsed = self._parse_nlm_catalog_record(record)
             if parsed:
                 journals.append(parsed)
 
+        # Sort: exact matches first, then prefix matches, then alphabetical
+        def sort_key(j):
+            name_lower = (j.get("name") or "").rstrip(".").lower()
+            ta_lower = (j.get("medline_ta") or "").lower()
+            if name_lower == query_lower or ta_lower == query_lower:
+                return (0, name_lower)
+            if name_lower.startswith(query_lower) or ta_lower.startswith(query_lower):
+                return (1, name_lower)
+            return (2, name_lower)
+
+        journals.sort(key=sort_key)
         return journals
 
     @staticmethod
@@ -391,10 +418,13 @@ class PubmedClient:
                     issn_electronic = candidate
                     break
 
+        iso_abbreviation = (record.findtext(".//ISOAbbreviation") or "").strip()
+
         return {
             "nlm_id": nlm_id,
             "name": title or medline_ta,
             "medline_ta": medline_ta,
+            "iso_abbreviation": iso_abbreviation,
             "issn_print": issn_print,
             "issn_electronic": issn_electronic,
         }
