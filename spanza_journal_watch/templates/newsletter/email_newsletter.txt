@@ -21,7 +21,7 @@ Reviewed by {{ review.author }}
 Original article in "{{ review.article.journal }}" at:
 {{ review.article.url }}
 
-{{ review.get_longer_truncated_body|insert_linebreaks:76 }}
+{{ review.get_longer_truncated_plain_body|insert_linebreaks:76 }}
 
 Read more at:
 {{ domain }}{{ review.get_absolute_url }}

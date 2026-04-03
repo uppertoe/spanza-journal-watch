@@ -1,0 +1,62 @@
+{% load mjml account %}
+{% mjml %}
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
+      <mj-text line-height="1.6" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f2f4f7">
+
+    <mj-section padding="28px 0 0">
+      <mj-column>
+        <mj-text align="center" font-size="11px" color="#8a96a2" letter-spacing="0.14em" font-weight="700" text-transform="uppercase">
+          SPANZA Journal Watch
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
+      <mj-column>
+        <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
+          Verify your email
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="24px">
+          {% user_display user as user_display %}You're receiving this email because {{ user_display }} registered an account on SPANZA Journal Watch. Please confirm your email address to activate your account.
+        </mj-text>
+        {% if code %}
+        <mj-text font-size="15px" color="#444444" padding-bottom="8px">
+          Your verification code is:
+        </mj-text>
+        <mj-text font-size="28px" font-weight="700" color="#1e4468" letter-spacing="0.1em" padding-bottom="24px">
+          {{ code }}
+        </mj-text>
+        <mj-text font-size="13px" color="#8a96a2">
+          Enter this code in your open browser window.
+        </mj-text>
+        {% else %}
+        <mj-button href="{{ activate_url }}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
+          Confirm email address
+        </mj-button>
+        <mj-text font-size="13px" color="#8a96a2" padding-top="24px">
+          If the button doesn't work, paste this link into your browser:
+        </mj-text>
+        <mj-text font-size="12px" color="#2f5a80" padding-top="4px">
+          {{ activate_url }}
+        </mj-text>
+        {% endif %}
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding="20px 20px 28px">
+      <mj-column>
+        <mj-text align="center" font-size="12px" color="#8a96a2">
+          SPANZA Journal Watch — paediatric anaesthesia literature review
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+  </mj-body>
+</mjml>
+{% endmjml %}

@@ -41,7 +41,12 @@ class UserSignupForm(SignupForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["name"] = forms.CharField(label=_("Full name"), required=False, max_length=255)
+        self.fields["name"] = forms.CharField(
+            label=_("Full name"),
+            required=False,
+            max_length=255,
+            widget=forms.TextInput(attrs={"autocomplete": "name"}),
+        )
         self.fields["subscribe_to_newsletter"] = forms.BooleanField(
             label=_("Subscribe to the Journal Watch newsletter"),
             required=False,
