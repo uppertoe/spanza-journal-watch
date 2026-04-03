@@ -10,6 +10,7 @@ from markdownx import urls as markdownx
 
 from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import views as backend_views
+from spanza_journal_watch.layout.feeds import LatestReviewsFeed
 from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
 from spanza_journal_watch.layout.views import HomepageView
 from spanza_journal_watch.users.views import invite_aware_login_view, invite_aware_signup_view
@@ -32,6 +33,7 @@ urlpatterns = [
     path("", HomepageView.as_view(), name="home"),
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),
     path("robots.txt", TemplateView.as_view(template_name="robots.txt", content_type="text/plain")),
+    path("feed/", LatestReviewsFeed(), name="review_feed"),
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
     # User management

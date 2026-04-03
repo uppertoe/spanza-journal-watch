@@ -22,8 +22,19 @@
     {% block canonical_link %}{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}{% endblock canonical_link %}
     {% block robots_meta %}{% if meta_robots %}<meta name="robots" content="{{ meta_robots }}">{% endif %}{% endblock robots_meta %}
     {% block structured_data %}{% if structured_data %}<script type="application/ld+json">{{ structured_data|safe }}</script>{% endif %}{% endblock structured_data %}
-    {% block head_meta %}{% endblock head_meta %}
+    {% block head_meta %}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ page_title|default:"Journal Watch" }}">
+    <meta property="og:description" content="{{ page_meta_description|default:"Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature." }}">
+    {% if canonical_url %}<meta property="og:url" content="{{ canonical_url }}">{% endif %}
+    <meta property="og:site_name" content="Journal Watch">
+    <meta property="og:image" content="{{ default_og_image }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ page_title|default:"Journal Watch" }}">
+    <meta name="twitter:description" content="{{ page_meta_description|default:"Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature." }}">
+    {% endblock head_meta %}
 
+    <link rel="alternate" type="application/rss+xml" title="SPANZA Journal Watch" href="{% url 'review_feed' %}">
     <link rel="icon" href="{% static 'images/logo/newsstand-icon.svg' %}" type="image/svg+xml">
     <meta name="theme-color" content="#152b3b">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/favicon_package/apple-touch-icon.png' %}">
