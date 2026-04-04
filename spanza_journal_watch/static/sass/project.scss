@@ -2856,14 +2856,14 @@ body.jw-modal-open {
   font-size: 1rem;
   text-decoration: none;
   color: var(--bs-primary);
-  background: color-mix(in srgb, var(--bs-primary) 8%, transparent);
+  background: rgba(var(--bs-primary-rgb), 0.08);
   transition:
     background 0.15s,
     color 0.15s;
 }
 
 .journal-month-nav__arrow:hover {
-  background: color-mix(in srgb, var(--bs-primary) 16%, transparent);
+  background: rgba(var(--bs-primary-rgb), 0.16);
   color: var(--bs-primary);
 }
 

@@ -237,8 +237,8 @@
       </header>
 
       <div class="nav-scroller py-1 mb-3 border-bottom">
-        <span class="nav-scroller__arrow nav-scroller__arrow--left d-md-none" aria-hidden="true">&#9664;</span>
-        <span class="nav-scroller__arrow nav-scroller__arrow--right d-md-none" aria-hidden="true">&#9654;</span>
+        <span class="nav-scroller__arrow nav-scroller__arrow--left d-md-none" aria-hidden="true">&#9664;&#xFE0E;</span>
+        <span class="nav-scroller__arrow nav-scroller__arrow--right d-md-none" aria-hidden="true">&#9654;&#xFE0E;</span>
         <nav class="nav nav-underline justify-content-between">
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'home' %} active{% endif %}" href="{% url "home" %}">Home</a>
           <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_list,submissions:issue_detail,submissions:review_detail' %} active{% endif %}" href="{% url "submissions:issue_list" %}">Issues</a>
