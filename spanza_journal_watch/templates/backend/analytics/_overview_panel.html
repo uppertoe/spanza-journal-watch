@@ -86,29 +86,26 @@
 
 {% if newsletter_lift %}
 <div class="card mb-4">
-  <div class="card-header">Newsletter impact (7-day window)</div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Newsletter impact</span>
+    <a href="{% url 'backend:analytics_email' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary">Full stats</a>
+  </div>
   <div class="card-body">
-    <div class="row g-3">
+    <div class="d-flex flex-wrap gap-3">
       {% for item in newsletter_lift %}
-      <div class="col-sm-6 col-lg-3">
-        <div class="card bg-body-tertiary h-100">
-          <div class="card-body">
-            <div class="small text-muted mb-1">{{ item.newsletter.send_date|date:"j M Y" }}</div>
-            <div class="fw-semibold small mb-2">{{ item.newsletter }}</div>
-            <div class="d-flex gap-3 small mb-1">
-              <span class="text-muted">Before: {{ item.before }}</span>
-              <span>After: {{ item.after }}</span>
-            </div>
-            {% if item.lift_pct is not None %}
-            <span class="badge {% if item.lift_pct >= 0 %}text-bg-success{% else %}text-bg-secondary{% endif %}">
-              {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
-            </span>
-            {% endif %}
-          </div>
-        </div>
+      <div class="d-flex align-items-center gap-2 small">
+        <span class="text-muted">{{ item.newsletter.send_date|date:"j M" }}:</span>
+        {% if item.lift_pct is not None %}
+        <span class="badge {% if item.lift_pct >= 0 %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+          {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
+        </span>
+        {% else %}
+        <span class="badge text-bg-light text-dark">—</span>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
+    <p class="text-muted mb-0 mt-2" style="font-size:0.7rem">Engaged views change in the 7 days after each newsletter send.</p>
   </div>
 </div>
 {% endif %}

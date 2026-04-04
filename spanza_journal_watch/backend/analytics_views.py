@@ -1,8 +1,12 @@
 """
 Analytics views for the editorial backend.
 
-Six focused pages, each answering a specific question about how
-readers interact with the site.
+Five tabs, each answering a specific question:
+  Overview – How is the site performing?
+  Editorial Intelligence – What should we cover next?
+  Audience – Who reads and how do they find us?
+  Newsletter Impact – Is the newsletter driving engagement?
+  Feature Adoption – Are our features being used?
 """
 
 import datetime
@@ -12,7 +16,8 @@ from collections import Counter, defaultdict
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Avg, Count, Max, Min, Q
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
@@ -359,6 +364,16 @@ def analytics_overview(request):
 @login_required
 @permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
 def analytics_content(request):
+    """Legacy URL — redirects to editorial."""
+    qs = request.GET.urlencode()
+    url = reverse("backend:analytics_editorial")
+    return redirect(f"{url}?{qs}" if qs else url)
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_editorial(request):
+    """Editorial Intelligence — merges content engagement + search data."""
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
 
     human_events = _base_event_qs(request, start_ts, end_ts)
@@ -510,9 +525,72 @@ def analytics_content(request):
         reverse=True,
     )[:10]
 
+    # ── Search data (merged from analytics_search) ──────────────────
+    search_events = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
+    search_click_events = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK)
+
+    search_query_counter = Counter()
+    zero_result_counter = Counter()
+    for metadata in search_events.values_list("metadata", flat=True):
+        query = (metadata or {}).get("query") or ""
+        label = query.strip() or "[browse]"
+        search_query_counter[label] += 1
+        if not (metadata or {}).get("result_count"):
+            zero_result_counter[label] += 1
+
+    click_counter = Counter()
+    for metadata in search_click_events.values_list("metadata", flat=True):
+        query = (metadata or {}).get("query") or ""
+        label = query.strip() or "[browse]"
+        click_counter[label] += 1
+
+    browse_searches = search_query_counter.pop("[browse]", 0)
+    browse_clicks = click_counter.pop("[browse]", 0)
+    zero_result_counter.pop("[browse]", 0)
+
+    real_search_total = sum(search_query_counter.values())
+    real_click_total = sum(click_counter.values())
+
+    search_insights = [
+        {
+            "label": label,
+            "searches": count,
+            "result_clicks": click_counter.get(label, 0),
+            "click_through_rate": _safe_percentage(click_counter.get(label, 0), count),
+            "zero_results": zero_result_counter.get(label, 0),
+        }
+        for label, count in search_query_counter.most_common(20)
+    ]
+
+    zero_result_queries = sorted(
+        [item for item in search_insights if item["zero_results"] > 0],
+        key=lambda x: -x["zero_results"],
+    )
+
+    weekly_searches = _weekly_buckets(search_events)
+
+    # ── Cross-reference: topics with unmet demand ───────────────────
+    # Match zero-result search terms against tag names (case-insensitive)
+    tag_names_lower = {k.lower(): k for k in tag_totals}
+    unmet_demand = []
+    for zq in zero_result_queries[:10]:
+        q_lower = zq["label"].lower()
+        matched_tag = tag_names_lower.get(q_lower)
+        if matched_tag:
+            tag_data = tag_totals[matched_tag]
+            unmet_demand.append(
+                {
+                    "query": zq["label"],
+                    "searches": zq["searches"],
+                    "zero_results": zq["zero_results"],
+                    "tag_score": tag_data["score"],
+                }
+            )
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
+        # Content engagement
         "total_opens": total_opens,
         "total_engaged": total_engaged,
         "total_full_text": total_full_text,
@@ -530,6 +608,16 @@ def analytics_content(request):
         ],
         "share_breakdown": share_breakdown,
         "share_attributed_visits": share_attributed_visits,
+        # Search data
+        "total_searches": real_search_total,
+        "search_click_count": real_click_total,
+        "search_ctr": _safe_percentage(real_click_total, real_search_total),
+        "browse_searches": browse_searches,
+        "browse_ctr": _safe_percentage(browse_clicks, browse_searches),
+        "search_insights": search_insights,
+        "zero_result_queries": zero_result_queries[:10],
+        "weekly_searches": weekly_searches,
+        "unmet_demand": unmet_demand,
         "active_tab": "content",
     }
     context.update(_confidence_summary(human_events))
@@ -727,10 +815,24 @@ def analytics_traffic(request):
             }
         )
 
+    # Synthesise referrer insight sentence
+    total_engaged_views = sum(r["engaged"] for r in referrer_rows)
+    referrer_insight = ""
+    if total_engaged_views:
+        parts = []
+        for row in sorted(referrer_rows, key=lambda r: -r["engaged"])[:3]:
+            label = referrer_labels.get(row["referrer_category"], row["referrer_category"] or "Unknown")
+            pct = round(row["engaged"] / total_engaged_views * 100)
+            if pct >= 5:
+                parts.append(f"{pct}% from {label}")
+        if parts:
+            referrer_insight = "Engaged views: " + ", ".join(parts) + "."
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
         "referrer_breakdown": referrer_breakdown,
+        "referrer_insight": referrer_insight,
         "other_domains": other_domains,
         "new_visitors": new_count,
         "returning_visitors": returning_count,
@@ -856,6 +958,40 @@ def analytics_email(request):
             else:
                 segment_counts["dormant"] += 1
 
+    # Newsletter lift — engaged views before/after each send
+    newsletter_lift = []
+    for nl in newsletters:
+        if not nl.send_date:
+            continue
+        send_dt = nl.send_date
+        before_start = send_dt - datetime.timedelta(days=7)
+        after_end = send_dt + datetime.timedelta(days=7)
+        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
+        if filter_mode != "all":
+            lift_qs = lift_qs.filter(automated=False)
+        before_count = lift_qs.filter(timestamp__gte=before_start, timestamp__lt=send_dt).count()
+        after_count = lift_qs.filter(timestamp__gte=send_dt, timestamp__lte=after_end).count()
+        lift_pct = None
+        if before_count:
+            lift_pct = round((after_count - before_count) / before_count * 100)
+        newsletter_lift.append(
+            {
+                "newsletter": nl,
+                "before": before_count,
+                "after": after_count,
+                "lift_pct": lift_pct,
+            }
+        )
+
+    # Trend chart data — serialise for Chart.js
+    trend_labels = json.dumps([row["newsletter"].send_date.strftime("%-d %b %Y") for row in newsletter_rows if row])
+    trend_open_rates = json.dumps(
+        [row["human_open_rate"].rstrip("%") if row["human_open_rate"] != "0%" else "0" for row in newsletter_rows]
+    )
+    trend_ctrs = json.dumps(
+        [row["human_ctr"].rstrip("%") if row["human_ctr"] != "0%" else "0" for row in newsletter_rows]
+    )
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -864,6 +1000,10 @@ def analytics_email(request):
         "total_sent": total_sent,
         "segment_counts": segment_counts,
         "segment_newsletter_count": len(recent_nl_ids),
+        "newsletter_lift": newsletter_lift,
+        "trend_labels": trend_labels,
+        "trend_open_rates": trend_open_rates,
+        "trend_ctrs": trend_ctrs,
         "active_tab": "email",
     }
     return _render_analytics(request, "backend/analytics/email.html", context, "backend/analytics/_email_panel.html")
@@ -872,70 +1012,10 @@ def analytics_email(request):
 @login_required
 @permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
 def analytics_search(request):
-    start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
-
-    human_events = _base_event_qs(request, start_ts, end_ts)
-
-    search_events = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
-    search_click_events = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK)
-
-    search_query_counter = Counter()
-    zero_result_counter = Counter()
-    for metadata in search_events.values_list("metadata", flat=True):
-        query = (metadata or {}).get("query") or ""
-        label = query.strip() or "[browse]"
-        search_query_counter[label] += 1
-        if not (metadata or {}).get("result_count"):
-            zero_result_counter[label] += 1
-
-    click_counter = Counter()
-    for metadata in search_click_events.values_list("metadata", flat=True):
-        query = (metadata or {}).get("query") or ""
-        label = query.strip() or "[browse]"
-        click_counter[label] += 1
-
-    # Separate [browse] (journal browser filter actions) from real searches
-    browse_searches = search_query_counter.pop("[browse]", 0)
-    browse_clicks = click_counter.pop("[browse]", 0)
-    zero_result_counter.pop("[browse]", 0)
-
-    real_search_total = sum(search_query_counter.values())
-    real_click_total = sum(click_counter.values())
-
-    search_insights = [
-        {
-            "label": label,
-            "searches": count,
-            "result_clicks": click_counter.get(label, 0),
-            "click_through_rate": _safe_percentage(click_counter.get(label, 0), count),
-            "zero_results": zero_result_counter.get(label, 0),
-        }
-        for label, count in search_query_counter.most_common(20)
-    ]
-
-    zero_result_queries = sorted(
-        [item for item in search_insights if item["zero_results"] > 0],
-        key=lambda x: -x["zero_results"],
-    )
-
-    weekly_searches = _weekly_buckets(search_events)
-
-    context = {
-        "start_date": start_date,
-        "end_date": end_date,
-        "total_searches": real_search_total,
-        "search_click_count": real_click_total,
-        "search_ctr": _safe_percentage(real_click_total, real_search_total),
-        "browse_searches": browse_searches,
-        "browse_clicks": browse_clicks,
-        "browse_ctr": _safe_percentage(browse_clicks, browse_searches),
-        "search_insights": search_insights,
-        "zero_result_queries": zero_result_queries[:10],
-        "weekly_searches": weekly_searches,
-        "active_tab": "search",
-    }
-    context.update(_confidence_summary(human_events))
-    return _render_analytics(request, "backend/analytics/search.html", context, "backend/analytics/_search_panel.html")
+    """Legacy URL — redirects to editorial."""
+    qs = request.GET.urlencode()
+    url = reverse("backend:analytics_editorial")
+    return redirect(f"{url}?{qs}" if qs else url)
 
 
 @login_required
@@ -1046,6 +1126,84 @@ def analytics_journals(request):
         round(total_items_starred_alltime / total_reading_list_users, 1) if total_reading_list_users else 0
     )
 
+    # ── Feature scorecard with period comparisons ──────────────────
+    period_days = (end_date - start_date).days
+    prev_end = start_date - datetime.timedelta(days=1)
+    prev_start = prev_end - datetime.timedelta(days=period_days)
+    prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
+    prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+
+    filter_mode = _get_filter_mode(request)
+    prev_events = AnalyticsEvent.objects.filter(timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts)
+    if filter_mode != "all":
+        prev_events = prev_events.filter(automated=False)
+
+    prev_visits = prev_events.filter(event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT).count()
+    prev_stars = states_in_range.filter(starred_at__gte=prev_start_ts, starred_at__lte=prev_end_ts).count()
+    prev_searches = (
+        prev_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
+        .exclude(metadata__query="")
+        .exclude(metadata__query__isnull=True)
+        .count()
+    )
+
+    share_event_types = [
+        AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
+        AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE,
+        AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY,
+        AnalyticsEvent.EventType.REVIEW_SHARE_X,
+        AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
+    ]
+    total_shares = human_events.filter(event_type__in=share_event_types).count()
+    prev_shares = prev_events.filter(event_type__in=share_event_types).count()
+
+    total_searches = (
+        human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
+        .exclude(metadata__query="")
+        .exclude(metadata__query__isnull=True)
+        .count()
+    )
+    search_clicks = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK).count()
+    search_ctr = _safe_percentage(search_clicks, total_searches) if total_searches else "–"
+
+    prev_cpd = CPDReport.objects.filter(created__gte=prev_start_ts, created__lte=prev_end_ts).count()
+
+    feature_scorecard = [
+        {
+            "name": "Journal Browser",
+            "metric": total_visits,
+            "delta": _pct_change(total_visits, prev_visits),
+            "secondary": f"{returning_rate} returning",
+        },
+        {
+            "name": "Reading Lists",
+            "metric": total_stars,
+            "delta": _pct_change(total_stars, prev_stars),
+            "secondary": f"{total_reading_list_users} users",
+        },
+        {
+            "name": "Search",
+            "metric": total_searches,
+            "delta": _pct_change(total_searches, prev_searches),
+            "secondary": f"{search_ctr} CTR",
+        },
+        {
+            "name": "Sharing",
+            "metric": total_shares,
+            "delta": _pct_change(total_shares, prev_shares),
+            "secondary": "",
+        },
+        {
+            "name": "CPD Reports",
+            "metric": cpd_generated,
+            "delta": _pct_change(cpd_generated, prev_cpd),
+            "secondary": f"{cpd_users} user{'s' if cpd_users != 1 else ''}",
+        },
+    ]
+
+    comparison_label = f"vs {prev_start.strftime('%-d %b')} – {prev_end.strftime('%-d %b')}"
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -1068,6 +1226,8 @@ def analytics_journals(request):
         "trend_stars": trend_stars,
         "total_reading_list_users": total_reading_list_users,
         "avg_items_per_user": avg_items_per_user,
+        "feature_scorecard": feature_scorecard,
+        "comparison_label": comparison_label,
         "active_tab": "journals",
     }
     context.update(_confidence_summary(human_events))

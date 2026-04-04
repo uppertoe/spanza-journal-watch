@@ -4,6 +4,10 @@
 </div>
 {% include "backend/analytics/_confidence_badge.html" %}
 
+{% if referrer_insight %}
+<div class="alert alert-light small mb-4">{{ referrer_insight }}</div>
+{% endif %}
+
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body">

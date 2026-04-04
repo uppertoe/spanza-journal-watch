@@ -32,6 +32,81 @@
   </div>
 </div>
 
+{# ── Content gaps & search demand ──────────────────────────────── #}
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-5">
+    {% if zero_result_queries %}
+    <div class="card h-100">
+      <div class="card-header">Content gaps — zero-result queries</div>
+      <div class="list-group list-group-flush">
+        {% for item in zero_result_queries %}
+        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+          <span class="small">{{ item.label }}</span>
+          <span class="badge text-bg-warning text-dark">{{ item.zero_results }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">Search demand</div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-4 text-center">
+            <div class="small text-muted">Searches</div>
+            <div class="fw-semibold">{{ total_searches }}</div>
+          </div>
+          <div class="col-4 text-center">
+            <div class="small text-muted">Result clicks</div>
+            <div class="fw-semibold">{{ search_click_count }}</div>
+          </div>
+          <div class="col-4 text-center">
+            <div class="small text-muted">CTR</div>
+            <div class="fw-semibold">{{ search_ctr }}</div>
+          </div>
+        </div>
+        {% if browse_searches %}
+        <p class="text-muted small mb-0">Plus {{ browse_searches }} journal browser filter action{{ browse_searches|pluralize }} ({{ browse_ctr }} click-through).</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Search volume chart ──────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">Search volume — last 26 weeks</div>
+  <div class="card-body">
+    <canvas id="search-trend-chart" height="80"></canvas>
+  </div>
+</div>
+
+{# ── Top queries ──────────────────────────────────────────────── #}
+{% if search_insights %}
+<div class="card mb-4">
+  <div class="card-header">Top queries</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Query</th><th>Searches</th><th>Clicks</th><th>CTR</th><th>Zero results</th></tr></thead>
+      <tbody>
+        {% for item in search_insights %}
+        <tr>
+          <td class="small">{{ item.label }}</td>
+          <td>{{ item.searches }}</td>
+          <td>{{ item.result_clicks }}</td>
+          <td>{{ item.click_through_rate }}</td>
+          <td>{% if item.zero_results %}<span class="badge text-bg-warning text-dark">{{ item.zero_results }}</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Top reviews by engagement ─────────────────────────────────── #}
 <div class="row g-4 mb-4">
   <div class="col-12">
     <div class="card h-100">
@@ -84,6 +159,7 @@
   </div>
 </div>
 
+{# ── Topic / journal / tag breakdown + share methods ──────────── #}
 <div class="row g-4 mb-4">
   <div class="col-12 col-lg-5">
     <div class="card mb-3">
@@ -182,5 +258,45 @@
     </div>
   </div>
 </div>
+
+{# ── Search trend chart script ─────────────────────────────────── #}
+<script>
+(function () {
+  const labels = [{% for b in weekly_searches %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  const data = [{% for b in weekly_searches %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  function waitForChart(cb, retries) {
+    if (typeof retries === "undefined") retries = 100;
+    if (window.Chart) { cb(); }
+    else if (retries > 0) { setTimeout(function () { waitForChart(cb, retries - 1); }, 50); }
+    else { console.warn("Chart.js did not load within 5 seconds"); }
+  }
+  waitForChart(function () {
+    const ctx = document.getElementById("search-trend-chart");
+    if (!ctx) return;
+    new window.Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Searches",
+          data: data,
+          backgroundColor: "rgba(var(--bs-warning-rgb), 0.3)",
+          borderColor: "rgba(var(--bs-warning-rgb), 0.8)",
+          borderWidth: 1,
+          borderRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+        },
+      },
+    });
+  });
+})();
+</script>
 
 {% include "backend/analytics/_filter_toggle_oob.html" %}

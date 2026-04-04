@@ -11,9 +11,8 @@
       <h6 class="text-uppercase text-muted fw-semibold mb-3 px-2" style="font-size:0.7rem;letter-spacing:.06em">Analytics</h6>
       <nav class="nav flex-column gap-1 mb-4">
         {% url 'backend:analytics_overview' as url_overview %}
-        {% url 'backend:analytics_content' as url_content %}
+        {% url 'backend:analytics_editorial' as url_editorial %}
         {% url 'backend:analytics_traffic' as url_traffic %}
-        {% url 'backend:analytics_search' as url_search %}
         {% url 'backend:analytics_journals' as url_journals %}
         {% with qs=request.GET.urlencode %}
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'overview' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
@@ -21,8 +20,8 @@
            hx-get="{{ url_overview }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Overview</a>
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'content' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
-           href="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-get="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
+           href="{{ url_editorial }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_editorial }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Editorial</a>
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'traffic' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
@@ -35,10 +34,6 @@
            hx-get="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Newsletter</a>
         {% endif %}
-        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'search' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
-           href="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-get="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-target="#analytics-content" hx-push-url="true">Search</a>
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'journals' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"

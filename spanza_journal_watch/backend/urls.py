@@ -231,11 +231,13 @@ urlpatterns = [
     path("newsletter/stats/<int:pk>", views.newsletter_stats_detail, name="newsletter_stats_detail"),
     path("analytics", views.analytics_redirect, name="site_analytics"),
     path("analytics/overview/", analytics_views.analytics_overview, name="analytics_overview"),
-    path("analytics/content/", analytics_views.analytics_content, name="analytics_content"),
+    path("analytics/editorial/", analytics_views.analytics_editorial, name="analytics_editorial"),
     path("analytics/traffic/", analytics_views.analytics_traffic, name="analytics_traffic"),
     path("analytics/email/", analytics_views.analytics_email, name="analytics_email"),
-    path("analytics/search/", analytics_views.analytics_search, name="analytics_search"),
     path("analytics/journals/", analytics_views.analytics_journals, name="analytics_journals"),
+    # Legacy redirects
+    path("analytics/content/", analytics_views.analytics_content, name="analytics_content"),
+    path("analytics/search/", analytics_views.analytics_search, name="analytics_search"),
     path("settings/run/planka-oidc", views.planka_run_setup_oidc, name="planka_run_setup_oidc"),
     path("settings/run/planka-api-key", views.planka_run_setup_api_key, name="planka_run_setup_api_key"),
     path(

@@ -36,6 +36,48 @@
 <p class="text-muted small mb-4">Segments based on the last {{ segment_newsletter_count }} newsletter{{ segment_newsletter_count|pluralize }}. "Highly engaged" subscribers are your core audience.</p>
 {% endif %}
 
+{# ── Newsletter trend chart ────────────────────────────────────── #}
+{% if newsletter_rows %}
+<div class="card mb-4">
+  <div class="card-header">Open rate &amp; CTR trend</div>
+  <div class="card-body">
+    <canvas id="newsletter-trend-chart" height="80"></canvas>
+  </div>
+</div>
+{% endif %}
+
+{# ── Newsletter lift ───────────────────────────────────────────── #}
+{% if newsletter_lift %}
+<div class="card mb-4">
+  <div class="card-header">Engagement lift (7-day window)</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for item in newsletter_lift %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="card bg-body-tertiary h-100">
+          <div class="card-body">
+            <div class="small text-muted mb-1">{{ item.newsletter.send_date|date:"j M Y" }}</div>
+            <div class="fw-semibold small mb-2">{{ item.newsletter }}</div>
+            <div class="d-flex gap-3 small mb-1">
+              <span class="text-muted">Before: {{ item.before }}</span>
+              <span>After: {{ item.after }}</span>
+            </div>
+            {% if item.lift_pct is not None %}
+            <span class="badge {% if item.lift_pct >= 0 %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+              {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="text-muted mt-2 mb-0" style="font-size:0.7rem">Compares engaged review views in the 7 days before vs after each newsletter send.</p>
+  </div>
+</div>
+{% endif %}
+
+{# ── Newsletter performance table ──────────────────────────────── #}
 <div class="card mb-4">
   <div class="card-header">Newsletter performance</div>
   <div class="table-responsive">
@@ -100,5 +142,70 @@
 <div class="alert alert-info small mb-0">
   <strong>Note on open rates:</strong> Apple Mail Privacy Protection pre-fetches tracking pixels through proxy servers, which can inflate open counts. The bot filter catches many automated opens, but Apple's proxy uses standard user agents. Treat open rates as directional rather than exact. Click-through rates are more reliable.
 </div>
+
+{# ── Trend chart script ───────────────────────────────────────── #}
+{% if newsletter_rows %}
+<script>
+(function () {
+  const labels = {{ trend_labels|safe }};
+  const openRates = {{ trend_open_rates|safe }}.map(Number);
+  const ctrs = {{ trend_ctrs|safe }}.map(Number);
+
+  function waitForChart(cb, retries) {
+    if (typeof retries === "undefined") retries = 100;
+    if (window.Chart) { cb(); }
+    else if (retries > 0) { setTimeout(function () { waitForChart(cb, retries - 1); }, 50); }
+    else { console.warn("Chart.js did not load within 5 seconds"); }
+  }
+
+  waitForChart(function () {
+    const ctx = document.getElementById("newsletter-trend-chart");
+    if (!ctx) return;
+    new window.Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels.reverse(),
+        datasets: [
+          {
+            label: "Open rate %",
+            data: openRates.reverse(),
+            borderColor: "rgba(13, 110, 253, 0.8)",
+            backgroundColor: "rgba(13, 110, 253, 0.1)",
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+          },
+          {
+            label: "CTR %",
+            data: ctrs.reverse(),
+            borderColor: "rgba(25, 135, 84, 0.8)",
+            backgroundColor: "rgba(25, 135, 84, 0.1)",
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12 } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) { return ctx.dataset.label + ": " + ctx.parsed.y + "%"; }
+            }
+          },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { callback: function(v) { return v + "%"; } } },
+        },
+      },
+    });
+  });
+})();
+</script>
+{% endif %}
 
 {% include "backend/analytics/_filter_toggle_oob.html" %}

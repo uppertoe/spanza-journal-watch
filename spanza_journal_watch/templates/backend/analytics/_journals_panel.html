@@ -5,14 +5,27 @@
 </div>
 {% include "backend/analytics/_confidence_badge.html" %}
 
-{# ── Headline metrics ──────────────────────────────────────────── #}
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
+{# ── Feature scorecard ─────────────────────────────────────────── #}
+{% if feature_scorecard %}
+<div class="row g-3 mb-2">
+  {% for card in feature_scorecard %}
+  <div class="col-6 col-md">
     <div class="card h-100"><div class="card-body">
-      <h6 class="text-muted mb-1 small">Browser visits</h6>
-      <p class="display-6 mb-0">{{ total_visits|intcomma }}</p>
+      <h6 class="text-muted mb-1 small">{{ card.name }}</h6>
+      <p class="display-6 mb-0">{{ card.metric|intcomma }}</p>
+      {% if card.delta is not None %}
+      <p class="small mb-0 {% if card.delta >= 0 %}text-success{% else %}text-danger{% endif %}">{% if card.delta > 0 %}+{% endif %}{{ card.delta }}%</p>
+      {% endif %}
+      {% if card.secondary %}<p class="small text-muted mb-0">{{ card.secondary }}</p>{% endif %}
     </div></div>
   </div>
+  {% endfor %}
+</div>
+<p class="text-muted mb-4" style="font-size:0.7rem">{{ comparison_label }}</p>
+{% endif %}
+
+{# ── Headline metrics ──────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Unique visitors</h6>
@@ -30,6 +43,13 @@
     <div class="card h-100 border-success-subtle"><div class="card-body">
       <h6 class="text-muted mb-1 small">Full text clicks</h6>
       <p class="display-6 mb-0">{{ total_full_text|intcomma }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="text-muted mb-1 small">Reading list users</h6>
+      <p class="display-6 mb-0">{{ total_reading_list_users }}</p>
+      <p class="small text-muted mb-0">Avg {{ avg_items_per_user }} items each</p>
     </div></div>
   </div>
 </div>
@@ -116,30 +136,23 @@
 
 {# ── CPD & reading list summary ────────────────────────────────── #}
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-4">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Articles archived</h6>
       <p class="display-6 mb-0">{{ total_archives|intcomma }}</p>
     </div></div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-4">
     <div class="card h-100 border-primary-subtle"><div class="card-body">
       <h6 class="text-muted mb-1 small">Recommended for review</h6>
       <p class="display-6 mb-0">{{ total_recommends|intcomma }}</p>
     </div></div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-4">
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">CPD reports generated</h6>
       <p class="display-6 mb-0">{{ cpd_generated }}</p>
       <p class="small text-muted mb-0">{{ cpd_users }} user{{ cpd_users|pluralize }}</p>
-    </div></div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="card h-100"><div class="card-body">
-      <h6 class="text-muted mb-1 small">Reading list users (all time)</h6>
-      <p class="display-6 mb-0">{{ total_reading_list_users }}</p>
-      <p class="small text-muted mb-0">Avg {{ avg_items_per_user }} items each</p>
     </div></div>
   </div>
 </div>
