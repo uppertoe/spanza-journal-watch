@@ -1,7 +1,8 @@
 import json
 
 from django.conf import settings
-from django.http import FileResponse, HttpRequest, HttpResponse
+from django.http import FileResponse, HttpRequest, HttpResponse, JsonResponse
+from django.templatetags.static import static
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 from django.views.generic import DetailView, ListView
@@ -101,3 +102,47 @@ def favicon_file(request: HttpRequest) -> HttpResponse:
     name = request.path.lstrip("/")
     file = (settings.APPS_DIR / "static" / "images" / "favicon_package" / name).open("rb")
     return FileResponse(file)
+
+
+@require_GET
+def service_worker_view(request: HttpRequest) -> HttpResponse:
+    """Serve the service worker from root scope with no-cache headers."""
+    sw_path = settings.APPS_DIR / "static" / "js" / "sw.js"
+    return FileResponse(
+        sw_path.open("rb"),
+        content_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache",
+            "Service-Worker-Allowed": "/",
+        },
+    )
+
+
+@require_GET
+@cache_control(max_age=60 * 60 * 24, public=True)
+def manifest_view(request: HttpRequest) -> JsonResponse:
+    """PWA web app manifest with all required fields for installability."""
+    manifest = {
+        "id": "/",
+        "name": "SPANZA Journal Watch",
+        "short_name": "Journal Watch",
+        "description": "Curated reviews of the paediatric anaesthesia literature by SPANZA members.",
+        "start_url": "/?source=pwa",
+        "scope": "/",
+        "display": "standalone",
+        "theme_color": "#152b3b",
+        "background_color": "#152b3b",
+        "icons": [
+            {
+                "src": static("images/favicon_package/android-chrome-192x192.png"),
+                "sizes": "192x192",
+                "type": "image/png",
+            },
+            {
+                "src": static("images/favicon_package/android-chrome-512x512.png"),
+                "sizes": "512x512",
+                "type": "image/png",
+            },
+        ],
+    }
+    return JsonResponse(manifest, content_type="application/manifest+json")

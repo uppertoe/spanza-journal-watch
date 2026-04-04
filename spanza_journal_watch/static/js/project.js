@@ -1822,3 +1822,10 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   // Initial state
   detectCurrentView();
 })();
+
+// ── Service Worker Registration ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  });
+}
