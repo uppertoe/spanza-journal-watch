@@ -9,3 +9,4 @@ Runbooks and operational guides for the Journal Watch production stack.
    production-deploy
    deploy-runbook
    aws-setup
+   management-commands

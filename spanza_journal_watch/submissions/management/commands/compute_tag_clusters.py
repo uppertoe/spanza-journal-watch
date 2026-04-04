@@ -16,7 +16,7 @@ from spanza_journal_watch.submissions.models import Tag
 
 CACHE_KEY = "tag_clusters"
 CACHE_TIMEOUT = 60 * 60 * 24 * 7  # 1 week
-SIMILARITY_THRESHOLD = 0.5
+SIMILARITY_THRESHOLD = 0.6
 
 
 class Command(BaseCommand):
