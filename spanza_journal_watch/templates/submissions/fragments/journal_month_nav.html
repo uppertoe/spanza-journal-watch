@@ -1,4 +1,4 @@
-<nav id="journal-month-nav" class="journal-month-nav mb-4" aria-label="Month navigation"{% if hx_swap_oob %} hx-swap-oob="outerHTML:#journal-month-nav"{% endif %}>
+<nav id="journal-month-nav" class="journal-month-nav" aria-label="Month navigation"{% if hx_swap_oob %} hx-swap-oob="outerHTML:#journal-month-nav"{% endif %}>
   {% if has_prev_month %}
     <a
       href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}"

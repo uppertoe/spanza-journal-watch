@@ -6,15 +6,19 @@
 
 {% if sections %}
   {# ── TABLE OF CONTENTS ──────────────────────────────────────────── #}
-  <nav class="journal-toc mb-4" aria-label="Table of contents">
-    <span class="journal-toc__heading">In this issue</span>
-    {% for section_name, section_slug, articles in sections %}
-      <a href="#section-{{ section_slug }}" class="journal-toc__link">
-        {{ section_name }} <span class="journal-toc__count">{{ articles|length }}</span>
-      </a>
-    {% endfor %}
-    <span class="journal-toc__total text-muted">{{ rows|length }} article{{ rows|length|pluralize }} total</span>
-  </nav>
+  <div class="journal-toc-wrapper mb-4">
+    <span class="journal-toc__arrow journal-toc__arrow--left d-md-none" aria-hidden="true">&#9664;</span>
+    <span class="journal-toc__arrow journal-toc__arrow--right d-md-none" aria-hidden="true">&#9654;</span>
+    <nav class="journal-toc" aria-label="Table of contents">
+      <span class="journal-toc__heading">In this issue</span>
+      {% for section_name, section_slug, articles in sections %}
+        <a href="#section-{{ section_slug }}" class="journal-toc__link">
+          {{ section_name }} <span class="journal-toc__count">{{ articles|length }}</span>
+        </a>
+      {% endfor %}
+      <span class="journal-toc__total text-muted">{{ rows|length }} article{{ rows|length|pluralize }} total</span>
+    </nav>
+  </div>
 
   {# ── SECTIONS ───────────────────────────────────────────────────── #}
   {% for section_name, section_slug, articles in sections %}

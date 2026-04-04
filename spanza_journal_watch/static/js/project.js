@@ -1503,6 +1503,40 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   updateFades();
 })();
 
+/* ── Journal TOC scroll fades ────────────────────────────── */
+(function () {
+  function initTocFades() {
+    var wrapper = document.querySelector('.journal-toc-wrapper');
+    var toc = document.querySelector('.journal-toc');
+    if (!wrapper || !toc) return;
+
+    function update() {
+      var sl = toc.scrollLeft;
+      var max = toc.scrollWidth - toc.clientWidth;
+      if (max <= 0) {
+        wrapper.removeAttribute('data-fade-left');
+        wrapper.removeAttribute('data-fade-right');
+        return;
+      }
+      if (sl > 2) wrapper.setAttribute('data-fade-left', '');
+      else wrapper.removeAttribute('data-fade-left');
+      if (sl < max - 2) wrapper.setAttribute('data-fade-right', '');
+      else wrapper.removeAttribute('data-fade-right');
+    }
+
+    toc.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update, { passive: true });
+    update();
+  }
+
+  initTocFades();
+  document.addEventListener('htmx:afterSettle', function (e) {
+    if (e.detail.target && e.detail.target.id === 'journal-browser-results') {
+      initTocFades();
+    }
+  });
+})();
+
 /* ── Site-wide back to top ────────────────────────────────── */
 (function () {
   const allBtns = document.querySelectorAll('.js-back-to-top');
