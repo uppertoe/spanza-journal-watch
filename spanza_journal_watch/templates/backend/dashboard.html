@@ -7,222 +7,152 @@
     <a class="btn btn-primary" href="{% url 'backend:issue_builder' %}">New issue</a>
   {% endif %}
 </div>
-<p class="text-muted">Overview of current site status.</p>
 
-<div class="row g-3 mb-4">
+{# ── Connection Health Strip ──────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex flex-wrap gap-3 align-items-center small">
 
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Homepage</span>
-        {% if current_homepage %}
-          <span class="badge text-bg-success">Live</span>
+      {# Planka #}
+      <a href="{% url 'backend:backend_settings' %}" class="text-decoration-none d-inline-flex align-items-center gap-1">
+        <span class="d-inline-block rounded-circle {% if planka_ok %}bg-success{% elif planka_connection_error %}bg-danger{% else %}bg-warning{% endif %}" style="width:0.5rem;height:0.5rem"></span>
+        <span class="{% if planka_ok %}text-body-secondary{% else %}text-danger-emphasis{% endif %}">
+          Planka{% if planka_ok %}: OK{% elif planka_connection_error %}: Error{% else %}: Setup needed{% endif %}
+        </span>
+      </a>
+
+      <span class="text-muted opacity-25">|</span>
+
+      {# PubMed fetch #}
+      <a href="{% url 'backend:fetch_monitoring' %}" class="text-decoration-none d-inline-flex align-items-center gap-1">
+        {% if fetch_hours_ago is not None %}
+          <span class="d-inline-block rounded-circle {% if fetch_hours_ago < 24 %}bg-success{% elif fetch_hours_ago < 48 %}bg-warning{% else %}bg-danger{% endif %}" style="width:0.5rem;height:0.5rem"></span>
+          <span class="text-body-secondary">Fetch: {{ fetch_hours_ago }}h ago</span>
         {% else %}
-          <span class="badge text-bg-secondary">Not set</span>
+          <span class="d-inline-block rounded-circle bg-secondary" style="width:0.5rem;height:0.5rem"></span>
+          <span class="text-body-secondary">Fetch: No data</span>
         {% endif %}
-      </div>
-      <div class="card-body">
-        {% if current_homepage %}
-          <p class="fw-semibold mb-1">{{ current_homepage.issue.name }}</p>
-          {% if current_homepage.issue.date %}
-            <p class="text-muted small mb-2">{{ current_homepage.issue.date|date:"F Y" }}</p>
-          {% endif %}
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:issue_publish' %}?issue={{ current_homepage.issue.pk }}">View in Publish tab</a>
+      </a>
+
+      <span class="text-muted opacity-25">|</span>
+
+      {# Newsletter #}
+      <a href="{% url 'backend:newsletter_release_list' %}" class="text-decoration-none d-inline-flex align-items-center gap-1">
+        {% if latest_newsletter and latest_newsletter.is_sent %}
+          <span class="d-inline-block rounded-circle bg-success" style="width:0.5rem;height:0.5rem"></span>
+          <span class="text-body-secondary">Newsletter: Sent{% if latest_newsletter.send_date %} {{ latest_newsletter.send_date|date:"j M" }}{% endif %}</span>
+        {% elif latest_newsletter %}
+          <span class="d-inline-block rounded-circle bg-warning" style="width:0.5rem;height:0.5rem"></span>
+          <span class="text-body-secondary">Newsletter: Draft</span>
         {% else %}
-          <p class="text-muted mb-2">No homepage is set. Use the Publish tab to set one.</p>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:issue_publish' %}">Go to Publish</a>
+          <span class="d-inline-block rounded-circle bg-secondary" style="width:0.5rem;height:0.5rem"></span>
+          <span class="text-body-secondary">Newsletter: None</span>
         {% endif %}
-      </div>
+      </a>
+
+      <span class="text-muted opacity-25">|</span>
+
+      {# Subscribers #}
+      <a href="{% url 'backend:subscriber_list' %}" class="text-decoration-none d-inline-flex align-items-center gap-1">
+        <span class="d-inline-block rounded-circle bg-success" style="width:0.5rem;height:0.5rem"></span>
+        <span class="text-body-secondary">Subscribers: {{ subscriber_count }}</span>
+      </a>
+
     </div>
   </div>
-
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Current issue</span>
-        {% if current_issue %}
-          {% if current_issue.active %}
-            <span class="badge text-bg-success">Published</span>
-          {% else %}
-            <span class="badge text-bg-secondary">Draft</span>
-          {% endif %}
-        {% endif %}
-      </div>
-      <div class="card-body">
-        {% if current_issue %}
-          <p class="fw-semibold mb-1">{{ current_issue.name }}</p>
-          {% if current_issue.date %}
-            <p class="text-muted small mb-1">{{ current_issue.date|date:"F Y" }}</p>
-          {% endif %}
-          <p class="text-muted small mb-2">{{ current_issue_review_count }} review{{ current_issue_review_count|pluralize }}</p>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:issue_builder' %}?issue={{ current_issue.pk }}">Open issue</a>
-        {% else %}
-          <p class="text-muted mb-2">No issues yet.</p>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:issue_builder' %}">Create issue</a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Newsletter</span>
-        {% if latest_newsletter %}
-          {% if latest_newsletter.is_sent %}
-            <span class="badge text-bg-success">Sent</span>
-          {% elif latest_newsletter.is_test_sent %}
-            <span class="badge text-bg-primary">Tested</span>
-          {% else %}
-            <span class="badge text-bg-secondary">Draft</span>
-          {% endif %}
-        {% else %}
-          <span class="badge text-bg-secondary">None</span>
-        {% endif %}
-      </div>
-      <div class="card-body">
-        {% if latest_newsletter %}
-          <p class="fw-semibold mb-1">{{ latest_newsletter.issue.name }}</p>
-          <p class="text-muted small mb-1">{{ latest_newsletter.subject }}</p>
-          {% if latest_newsletter.is_sent %}
-            {% if latest_newsletter.send_date %}
-              <p class="text-muted small mb-1">Sent {{ latest_newsletter.send_date|date:"j N Y" }}</p>
-            {% endif %}
-            {% if latest_newsletter.emails_sent %}
-              <p class="text-muted small mb-2">{{ latest_newsletter.emails_sent }} email{{ latest_newsletter.emails_sent|pluralize }} sent</p>
-            {% endif %}
-          {% else %}
-            <p class="text-muted small mb-2">Not yet sent.</p>
-          {% endif %}
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:newsletter_release_list' %}?issue={{ latest_newsletter.issue.pk }}">View newsletter</a>
-        {% else %}
-          <p class="text-muted mb-2">No newsletters yet.</p>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:newsletter_release_list' %}">Newsletter</a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Subscriber list</span>
-        {% if last_csv_upload %}
-          <span class="badge text-bg-success">Uploaded</span>
-        {% else %}
-          <span class="badge text-bg-secondary">None</span>
-        {% endif %}
-      </div>
-      <div class="card-body">
-        {% if last_csv_upload %}
-          <p class="fw-semibold mb-1">{{ last_csv_upload.name }}</p>
-          <p class="text-muted small mb-1">Uploaded {{ last_csv_upload.created|date:"j N Y, H:i" }}</p>
-          {% if last_csv_upload.row_count %}
-            <p class="text-muted small mb-2">
-              {{ last_csv_upload.row_count }} row{{ last_csv_upload.row_count|pluralize }}
-              {% if last_csv_upload.email_added_count %}&middot; {{ last_csv_upload.email_added_count }} added{% endif %}
-            </p>
-          {% endif %}
-        {% else %}
-          <p class="text-muted mb-2">No subscriber list uploaded yet.</p>
-        {% endif %}
-        <div class="d-flex gap-2">
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:upload_subscribers' %}">Upload CSV</a>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backend:subscriber_list' %}">View list</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
 </div>
 
-{% if perms.submissions.chief_editor %}
+{# ── At-a-Glance Metrics ─────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md">
+    <div class="card h-100"><div class="card-body py-3">
+      <h6 class="text-muted mb-1 small">Visitors (7 days)</h6>
+      <p class="fs-3 fw-semibold mb-0">{{ visitors_7d }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md">
+    <div class="card h-100 border-primary-subtle"><div class="card-body py-3">
+      <h6 class="text-muted mb-1 small">Engaged views (7 days)</h6>
+      <p class="fs-3 fw-semibold mb-0">{{ engaged_7d }}</p>
+      {% if engaged_delta is not None %}<p class="small mb-0 {% if engaged_delta >= 0 %}text-success{% else %}text-danger{% endif %}">{% if engaged_delta > 0 %}+{% endif %}{{ engaged_delta }}% vs prior week</p>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-6 col-md">
+    <div class="card h-100"><div class="card-body py-3">
+      <h6 class="text-muted mb-1 small">Full text CTR (7 days)</h6>
+      <p class="fs-3 fw-semibold mb-0">{{ full_text_ctr }}</p>
+    </div></div>
+  </div>
+  <div class="col-6 col-md">
+    <div class="card h-100"><div class="card-body py-3">
+      <h6 class="text-muted mb-1 small">Searches (7 days)</h6>
+      <p class="fs-3 fw-semibold mb-0">{{ searches_7d }}</p>
+    </div></div>
+  </div>
+</div>
+
+{# ── Current Issue ────────────────────────────────────────────────── #}
+{% if current_issue %}
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span>Planka</span>
-    {% if planka_oidc_ok and planka_api_key_ok and not planka_connection_error %}
-      <span class="badge text-bg-success">Connected</span>
-    {% elif planka_api_key_ok and planka_connection_error %}
-      <span class="badge text-bg-danger">Error</span>
+    <span>Current issue</span>
+    {% if current_issue.active %}
+      <span class="badge text-bg-success">Published</span>
     {% else %}
-      <span class="badge text-bg-warning">Action required</span>
+      <span class="badge text-bg-secondary">Draft</span>
     {% endif %}
   </div>
-  <div class="card-body py-2">
-    <div class="d-flex flex-column gap-1">
-
-      {# OIDC #}
-      <div class="d-flex align-items-center gap-2 py-1">
-        {% if planka_oidc_ok %}
-          <svg class="text-success flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-        {% else %}
-          <svg class="text-warning flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <p class="fw-semibold mb-1">{{ current_issue.name }}</p>
+        {% if current_issue.date %}
+          <p class="text-muted small mb-1">{{ current_issue.date|date:"F Y" }}</p>
         {% endif %}
-        <span class="small {% if not planka_oidc_ok %}text-warning-emphasis{% else %}text-muted{% endif %}">
-          OIDC login provider
-          {% if not planka_oidc_ok %}
-            — not registered.
-            <a href="{% url 'backend:backend_settings' %}#planka-setup" class="small">Run setup in Settings →</a>
-          {% endif %}
-        </span>
+        <p class="text-muted small mb-0">{{ current_issue_review_count }} review{{ current_issue_review_count|pluralize }}</p>
       </div>
-
-      {# API key #}
-      <div class="d-flex align-items-center gap-2 py-1">
-        {% if planka_api_key_ok and not planka_connection_error %}
-          <svg class="text-success flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-        {% elif planka_api_key_ok and planka_connection_error %}
-          <svg class="text-danger flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
-        {% else %}
-          <svg class="text-warning flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 4.995z"/></svg>
-        {% endif %}
-        <span class="small {% if planka_connection_error %}text-danger-emphasis{% elif not planka_api_key_ok %}text-warning-emphasis{% else %}text-muted{% endif %}">
-          API key
-          {% if planka_connection_error %}
-            — connection error: {{ planka_connection_error }}
-            <a href="{% url 'backend:backend_settings' %}#planka-setup" class="small">Regenerate in Settings →</a>
-          {% elif not planka_api_key_ok %}
-            — not configured.
-            <a href="{% url 'backend:backend_settings' %}#planka-setup" class="small">Run setup in Settings →</a>
-          {% endif %}
-        </span>
-      </div>
-
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'backend:issue_builder' %}?issue={{ current_issue.pk }}">Open issue</a>
     </div>
+
+    {% if workflow_steps %}
+    <div class="d-flex flex-wrap gap-2">
+      {% for label, done in workflow_steps %}
+      <span class="badge {% if done %}text-bg-success{% else %}bg-body-secondary text-body-secondary{% endif %} fw-normal">
+        {% if done %}&#10003;{% endif %} {{ label }}
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="text-muted mb-2">No issues yet.</p>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'backend:issue_builder' %}">Create issue</a>
   </div>
 </div>
 {% endif %}
 
-<div class="row g-3">
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-header">Editorial</div>
-      <div class="list-group list-group-flush">
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:article_intake' %}">Article Intake</a>
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:issue_builder' %}">Issue Builder</a>
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:issue_planka_import' %}">Planka Sync</a>
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:newsletter_release_list' %}">Newsletter</a>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-header">Subscribers</div>
-      <div class="list-group list-group-flush">
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:upload_subscribers' %}">Upload Subscribers</a>
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:subscriber_list' %}">Users &amp; Subscribers</a>
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:site_analytics' %}">Analytics</a>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-header">Settings</div>
-      <div class="list-group list-group-flush">
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:backend_settings' %}">Settings</a>
-        <a class="list-group-item list-group-item-action" href="{% url 'backend:watched_journals' %}">Watched Journals</a>
-      </div>
-    </div>
+{# ── Action Items ─────────────────────────────────────────────────── #}
+{% if action_items or inbox_unread_count %}
+<div class="card mb-4">
+  <div class="card-header">Next steps</div>
+  <div class="list-group list-group-flush">
+    {% for item in action_items %}
+    <a href="{{ item.url }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+      <span class="d-inline-block rounded-circle bg-warning" style="width:0.4rem;height:0.4rem;flex-shrink:0"></span>
+      {{ item.text }}
+    </a>
+    {% endfor %}
+    {% if inbox_unread_count %}
+    <a href="{% url 'backend:inbox' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+      <span class="d-inline-block rounded-circle bg-primary" style="width:0.4rem;height:0.4rem;flex-shrink:0"></span>
+      {{ inbox_unread_count }} unread inbox message{{ inbox_unread_count|pluralize }}
+    </a>
+    {% endif %}
   </div>
 </div>
+{% endif %}
+
 {% endblock content %}

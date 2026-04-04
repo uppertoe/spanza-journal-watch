@@ -452,13 +452,20 @@ def dashboard(request):
             },
         )
 
+    def _pct_change(current, previous):
+        if not previous:
+            return None
+        return round((current - previous) / previous * 100)
+
+    now = timezone.now()
+    seven_days_ago = now - datetime.timedelta(days=7)
+    fourteen_days_ago = now - datetime.timedelta(days=14)
+
     current_homepage = Homepage.get_current_homepage()
     current_issue = Issue.objects.order_by("-modified").first()
     current_issue_review_count = current_issue.reviews.count() if current_issue else 0
-    latest_newsletter = Newsletter.objects.select_related("issue").order_by("-pk").first()
-    last_csv_upload = SubscriberCSV.objects.filter(confirmed=True).order_by("-pk").first()
 
-    # Planka status — lightweight check, no live API call
+    # ── Health strip ──────────────────────────────────────────────
     planka_credential = _get_planka_integration_credential()
     planka_api_key_ok = bool(planka_credential and planka_credential.get_api_key())
     planka_connection_error = (planka_credential.last_error or "") if planka_credential else ""
@@ -469,6 +476,70 @@ def dashboard(request):
     except Exception:
         planka_oidc_ok = False
 
+    planka_ok = planka_oidc_ok and planka_api_key_ok and not planka_connection_error
+
+    last_fetch = FetchLog.objects.filter(status=FetchLog.STATUS_SUCCESS).order_by("-started_at").first()
+    fetch_hours_ago = None
+    if last_fetch and last_fetch.started_at:
+        fetch_hours_ago = round((now - last_fetch.started_at).total_seconds() / 3600, 1)
+
+    latest_newsletter = Newsletter.objects.select_related("issue").order_by("-pk").first()
+    subscriber_count = Subscriber.objects.filter(subscribed=True).count()
+
+    # ── At-a-glance metrics (7-day window) ────────────────────────
+    review_ct = ContentType.objects.get_for_model(Review)
+    recent_human = AnalyticsEvent.objects.filter(timestamp__gte=seven_days_ago, automated=False)
+    prev_human = AnalyticsEvent.objects.filter(
+        timestamp__gte=fourteen_days_ago, timestamp__lt=seven_days_ago, automated=False
+    )
+
+    visitors_7d = recent_human.exclude(visitor_id=None).values("visitor_id").distinct().count()
+    engaged_7d = recent_human.filter(
+        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, content_type=review_ct
+    ).count()
+    engaged_prev = prev_human.filter(
+        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, content_type=review_ct
+    ).count()
+    engaged_delta = _pct_change(engaged_7d, engaged_prev)
+
+    opens_7d = recent_human.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN, content_type=review_ct).count()
+    full_text_7d = recent_human.filter(
+        event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK, content_type=review_ct
+    ).count()
+    full_text_ctr = _safe_percentage(full_text_7d, opens_7d) if opens_7d else "—"
+
+    searches_7d = recent_human.filter(event_type=AnalyticsEvent.EventType.SEARCH).count()
+
+    # ── Issue workflow progress ───────────────────────────────────
+    workflow_steps = []
+    if current_issue:
+        has_articles = PubmedBatchArticle.objects.filter(batch__issue=current_issue, selected=True).exists()
+        has_reviewers = IssueContributor.objects.filter(issue=current_issue).exists()
+        has_reviews = current_issue.reviews.filter(active=True).exists()
+        is_published = current_issue.active
+        issue_newsletter = Newsletter.objects.filter(issue=current_issue).first()
+        newsletter_sent = issue_newsletter.is_sent if issue_newsletter else False
+
+        workflow_steps = [
+            ("Articles", has_articles),
+            ("Reviewers", has_reviewers),
+            ("Reviews", has_reviews),
+            ("Published", is_published),
+            ("Newsletter", newsletter_sent),
+        ]
+
+    # ── Action items ──────────────────────────────────────────────
+    action_items = []
+    if current_issue and current_issue.active:
+        issue_nl = Newsletter.objects.filter(issue=current_issue).first()
+        if not issue_nl or not issue_nl.is_sent:
+            action_items.append(
+                {
+                    "text": f"Newsletter not yet sent for {current_issue.name}",
+                    "url": reverse("backend:newsletter_release_list") + f"?issue={current_issue.pk}",
+                }
+            )
+
     return render(
         request,
         "backend/dashboard.html",
@@ -476,11 +547,21 @@ def dashboard(request):
             "current_homepage": current_homepage,
             "current_issue": current_issue,
             "current_issue_review_count": current_issue_review_count,
-            "latest_newsletter": latest_newsletter,
-            "last_csv_upload": last_csv_upload,
-            "planka_api_key_ok": planka_api_key_ok,
+            # Health strip
+            "planka_ok": planka_ok,
             "planka_connection_error": planka_connection_error,
-            "planka_oidc_ok": planka_oidc_ok,
+            "fetch_hours_ago": fetch_hours_ago,
+            "latest_newsletter": latest_newsletter,
+            "subscriber_count": subscriber_count,
+            # Metrics
+            "visitors_7d": visitors_7d,
+            "engaged_7d": engaged_7d,
+            "engaged_delta": engaged_delta,
+            "full_text_ctr": full_text_ctr,
+            "searches_7d": searches_7d,
+            # Workflow
+            "workflow_steps": workflow_steps,
+            "action_items": action_items,
         },
     )
 
