@@ -41,6 +41,28 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "dotbot",
     "screaming frog",
     "petalbot",
+    "seranking",
+    # AI crawlers
+    "claudebot",
+    "gptbot",
+    "chatgpt-user",
+    "anthropic-ai",
+    "cohere-ai",
+    "bytespider",
+    "ccbot",
+    # Search engine crawlers
+    "googlebot",
+    "bingbot",
+    "yandexbot",
+    "amazonbot",
+    "baiduspider",
+    "duckduckbot",
+    # Uptime / monitoring bots
+    "sentryuptimebot",
+    "uptimerobot",
+    "pingdom",
+    "statuscake",
+    "site24x7",
     # Social preview bots (these fetch pages to generate link previews, not human reads)
     "facebookexternalhit",
     "twitterbot",
