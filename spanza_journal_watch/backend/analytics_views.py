@@ -61,6 +61,20 @@ def _base_event_qs(request, start_ts, end_ts):
     return qs
 
 
+def _confidence_summary(events_qs):
+    """Return confidence metrics for a queryset of AnalyticsEvent."""
+    total = events_qs.count()
+    if not total:
+        return {"conf_total": 0, "conf_js_rate": "—", "conf_subscriber_rate": "—"}
+    js = events_qs.filter(js_verified=True).count()
+    subs = events_qs.filter(human_confidence="known_subscriber_human").count()
+    return {
+        "conf_total": total,
+        "conf_js_rate": _safe_percentage(js, total),
+        "conf_subscriber_rate": _safe_percentage(subs, total),
+    }
+
+
 def _render_analytics(request, template, context, panel_template=None):
     context.setdefault("filter_mode", _get_filter_mode(request))
     if request.headers.get("HX-Request") and panel_template:
@@ -336,6 +350,7 @@ def analytics_overview(request):
         "comparison_label": f"vs {prev_start.strftime('%-d %b')} – {prev_end.strftime('%-d %b')}",
         "active_tab": "overview",
     }
+    context.update(_confidence_summary(human_events))
     return _render_analytics(
         request, "backend/analytics/overview.html", context, "backend/analytics/_overview_panel.html"
     )
@@ -517,6 +532,7 @@ def analytics_content(request):
         "share_attributed_visits": share_attributed_visits,
         "active_tab": "content",
     }
+    context.update(_confidence_summary(human_events))
     return _render_analytics(
         request, "backend/analytics/content.html", context, "backend/analytics/_content_panel.html"
     )
@@ -730,6 +746,7 @@ def analytics_traffic(request):
         "recent_sessions": recent_sessions,
         "active_tab": "traffic",
     }
+    context.update(_confidence_summary(human_events))
     return _render_analytics(
         request, "backend/analytics/traffic.html", context, "backend/analytics/_traffic_panel.html"
     )
@@ -917,6 +934,7 @@ def analytics_search(request):
         "weekly_searches": weekly_searches,
         "active_tab": "search",
     }
+    context.update(_confidence_summary(human_events))
     return _render_analytics(request, "backend/analytics/search.html", context, "backend/analytics/_search_panel.html")
 
 
@@ -1052,6 +1070,7 @@ def analytics_journals(request):
         "avg_items_per_user": avg_items_per_user,
         "active_tab": "journals",
     }
+    context.update(_confidence_summary(human_events))
     return _render_analytics(
         request, "backend/analytics/journals.html", context, "backend/analytics/_journals_panel.html"
     )

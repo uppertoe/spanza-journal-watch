@@ -23,17 +23,17 @@
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'content' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_content }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-target="#analytics-content" hx-push-url="true">Content</a>
+           hx-target="#analytics-content" hx-push-url="true">Editorial</a>
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'traffic' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-target="#analytics-content" hx-push-url="true">Traffic</a>
+           hx-target="#analytics-content" hx-push-url="true">Audience</a>
         {% if perms.backend.view_newsletter_stats %}
         {% url 'backend:analytics_email' as url_email %}
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'email' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_email }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-target="#analytics-content" hx-push-url="true">Email</a>
+           hx-target="#analytics-content" hx-push-url="true">Newsletter</a>
         {% endif %}
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'search' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_search }}{% if qs %}?{{ qs }}{% endif %}"
@@ -42,7 +42,7 @@
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'journals' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_journals }}{% if qs %}?{{ qs }}{% endif %}"
-           hx-target="#analytics-content" hx-push-url="true">Journals</a>
+           hx-target="#analytics-content" hx-push-url="true">Features</a>
         {% endwith %}
       </nav>
       <div class="border-top pt-3 mb-3">

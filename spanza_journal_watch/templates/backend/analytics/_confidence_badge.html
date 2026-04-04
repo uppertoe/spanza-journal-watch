@@ -1,0 +1,14 @@
+{% if conf_total %}
+<div class="d-inline-flex align-items-center gap-2 small text-muted mb-3" style="font-size:0.75rem">
+  <span class="d-inline-flex align-items-center gap-1">
+    <svg class="text-success" width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+    Human-filtered
+  </span>
+  <span>&middot;</span>
+  <span>{{ conf_js_rate }} JS-verified</span>
+  <span>&middot;</span>
+  <span>{{ conf_subscriber_rate }} known subscribers</span>
+  <span>&middot;</span>
+  <span>{{ conf_total }} events</span>
+</div>
+{% endif %}
