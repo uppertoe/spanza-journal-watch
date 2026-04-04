@@ -513,7 +513,7 @@ def dashboard(request):
     # ── Issue workflow progress ───────────────────────────────────
     workflow_steps = []
     if current_issue:
-        has_articles = PubmedBatchArticle.objects.filter(batch__issue=current_issue, selected=True).exists()
+        has_articles = PubmedBatchArticle.objects.filter(batch__issue=current_issue, is_selected=True).exists()
         has_reviewers = IssueContributor.objects.filter(issue=current_issue).exists()
         has_reviews = current_issue.reviews.filter(active=True).exists()
         is_published = current_issue.active
