@@ -376,6 +376,34 @@
 </div>
 
 <div class="card mb-4">
+  <div class="card-header">Tags &amp; MeSH mappings</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Manage the curated tag list and the mappings from PubMed MeSH terms to tags.
+      Articles are auto-tagged from MeSH terms when fetched. Use the unmapped report to spot gaps.
+    </p>
+    <div class="d-flex gap-2">
+      <a href="{% url "backend:tag_management" %}" class="btn btn-outline-primary">Manage tags</a>
+      <a href="{% url "backend:mesh_mapping_management" %}" class="btn btn-outline-secondary">MeSH mappings</a>
+      <a href="{% url "backend:unmapped_mesh_report" %}" class="btn btn-outline-secondary">Unmapped report</a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Curated collections</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Create themed collections of hand-picked reviews for the Explore page.
+      Collections appear as featured cards and link to a dedicated page of selected reviews.
+    </p>
+    <div class="d-flex gap-2">
+      <a href="{% url "backend:collection_management" %}" class="btn btn-outline-primary">Manage collections</a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
   <div class="card-header">Authors &amp; affiliations</div>
   <div class="card-body">
     <p class="text-muted small mb-3">Manage reviewer author profiles and the health service organisations they are affiliated with.</p>

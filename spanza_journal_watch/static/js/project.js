@@ -78,8 +78,6 @@ document.addEventListener('keydown', (event) => {
 
 let closingModalFromPopStateId = null;
 let pendingModalTargetId = null;
-let mobileDockDefaultMarkup = null;
-let desktopDockDefaultMarkup = null;
 let activeDockModalId = null;
 const sharedReviewModalIndices = new Map();
 
@@ -513,6 +511,8 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
     }
     syncReviewModalShareControls(modal);
     observeAnalyticsReviewElements(container);
+    const modalBody = container.closest('.modal-body');
+    if (modalBody) modalBody.scrollTop = 0;
     const nextReviewElement = container.querySelector(
       '[data-analytics-review-id]',
     );
@@ -520,84 +520,6 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
       openReviewSession(nextReviewElement, { immediate: true });
     }
   });
-};
-
-const rememberDefaultDockMarkup = () => {
-  const mobileSlot = mobileDockSlot();
-  const desktopSlot = desktopDockSlot();
-
-  if (mobileSlot && mobileDockDefaultMarkup === null) {
-    mobileDockDefaultMarkup = mobileSlot.innerHTML;
-    mobileSlot.dataset.defaultDockMarkup = mobileDockDefaultMarkup;
-  }
-
-  if (desktopSlot && desktopDockDefaultMarkup === null) {
-    desktopDockDefaultMarkup = desktopSlot.innerHTML;
-    desktopSlot.dataset.defaultDockMarkup = desktopDockDefaultMarkup;
-  }
-};
-
-const snapshotCurrentDockMarkup = () => {
-  const mobileSlot = mobileDockSlot();
-  const desktopSlot = desktopDockSlot();
-
-  mobileDockDefaultMarkup = mobileSlot ? mobileSlot.innerHTML : null;
-  desktopDockDefaultMarkup = desktopSlot ? desktopSlot.innerHTML : null;
-
-  if (mobileSlot && mobileDockDefaultMarkup !== null) {
-    mobileSlot.dataset.defaultDockMarkup = mobileDockDefaultMarkup;
-  }
-
-  if (desktopSlot && desktopDockDefaultMarkup !== null) {
-    desktopSlot.dataset.defaultDockMarkup = desktopDockDefaultMarkup;
-  }
-};
-
-const restoreDefaultDockMarkup = () => {
-  const mobileSlot = mobileDockSlot();
-  const desktopSlot = desktopDockSlot();
-  const mobileDefaultMarkup =
-    mobileSlot?.dataset.defaultDockMarkup ?? mobileDockDefaultMarkup ?? '';
-  const desktopDefaultMarkup =
-    desktopSlot?.dataset.defaultDockMarkup ?? desktopDockDefaultMarkup ?? '';
-
-  if (mobileSlot) {
-    mobileSlot.innerHTML = mobileDefaultMarkup;
-  }
-
-  if (desktopSlot) {
-    desktopSlot.innerHTML = desktopDefaultMarkup;
-  }
-
-  updateMobileToolbarState();
-  activeDockModalId = null;
-};
-
-const syncModalDockMarkup = (modal) => {
-  if (!modal?.id) return;
-
-  const template = document.querySelector(
-    `[data-review-modal-dock-template="${modal.id}"]`,
-  );
-  const markup = template?.innerHTML?.trim();
-  if (!markup) {
-    restoreDefaultDockMarkup();
-    return;
-  }
-
-  const mobileSlot = mobileDockSlot();
-  const desktopSlot = desktopDockSlot();
-
-  if (mobileSlot) {
-    mobileSlot.innerHTML = markup;
-  }
-
-  if (desktopSlot) {
-    desktopSlot.innerHTML = markup;
-  }
-
-  activeDockModalId = modal.id;
-  updateMobileToolbarState();
 };
 
 const updateMobileToolbarState = () => {
@@ -610,6 +532,55 @@ const updateMobileToolbarState = () => {
     'sticky-mobile-toolbar__inner--theme-only',
     !hasVisibleActions,
   );
+};
+
+// ── Dock slot swap: show modal nav without destroying existing DOM nodes ──
+// Stash original children in a DocumentFragment so they keep HTMX bindings.
+const _savedDockChildren = { mobile: null, desktop: null };
+
+const swapDockToModalNav = (modal) => {
+  if (!modal?.id) return;
+  const template = document.querySelector(
+    `[data-review-modal-dock-template="${modal.id}"]`,
+  );
+  const markup = template?.innerHTML?.trim();
+  if (!markup) return;
+
+  [
+    ['mobile', mobileDockSlot()],
+    ['desktop', desktopDockSlot()],
+  ].forEach(([key, slot]) => {
+    if (!slot) return;
+    // Save existing children into a fragment (preserves DOM nodes + HTMX state)
+    if (!_savedDockChildren[key]) {
+      const frag = document.createDocumentFragment();
+      while (slot.firstChild) frag.appendChild(slot.firstChild);
+      _savedDockChildren[key] = frag;
+    }
+    slot.innerHTML = markup;
+  });
+
+  activeDockModalId = modal.id;
+  updateMobileToolbarState();
+};
+
+const restoreDockFromModalNav = () => {
+  [
+    ['mobile', mobileDockSlot()],
+    ['desktop', desktopDockSlot()],
+  ].forEach(([key, slot]) => {
+    if (!slot) return;
+    // Remove modal nav content
+    slot.innerHTML = '';
+    // Re-attach the original children (HTMX bindings intact)
+    if (_savedDockChildren[key]) {
+      slot.appendChild(_savedDockChildren[key]);
+      _savedDockChildren[key] = null;
+    }
+  });
+
+  updateMobileToolbarState();
+  activeDockModalId = null;
 };
 
 const getReviewModalIds = () =>
@@ -692,7 +663,7 @@ const cleanupModalArtifacts = () => {
   if (anyOpenModal) return;
 
   if (activeDockModalId) {
-    restoreDefaultDockMarkup();
+    restoreDockFromModalNav();
   }
 
   document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
@@ -723,7 +694,7 @@ document.addEventListener('show.bs.modal', (event) => {
     syncReviewModalShareControls(modal);
   }
 
-  syncModalDockMarkup(modal);
+  swapDockToModalNav(modal);
   updateReviewModalNavigator(modal);
 
   if (!window.history.state || window.history.state.modalId !== modal.id) {
@@ -732,14 +703,6 @@ document.addEventListener('show.bs.modal', (event) => {
       '',
       window.location.href,
     );
-  }
-});
-
-document.addEventListener('hide.bs.modal', (event) => {
-  const modal = event.target;
-  if (pendingModalTargetId) return;
-  if (modal?.id && activeDockModalId === modal.id) {
-    restoreDefaultDockMarkup();
   }
 });
 
@@ -777,7 +740,6 @@ document.addEventListener('hidden.bs.modal', (event) => {
   if (closingModalFromPopStateId && closingModalFromPopStateId === modal.id) {
     closingModalFromPopStateId = null;
     sharedReviewModalIndices.delete(modal.id);
-    restoreDefaultDockMarkup();
     cleanupModalArtifacts();
     return;
   }
@@ -815,14 +777,9 @@ document.addEventListener('hidden.bs.modal', (event) => {
     syncReviewModalShareControls(modal);
   }
 
-  if (activeDockModalId === modal.id) {
-    restoreDefaultDockMarkup();
-  }
-
   cleanupModalArtifacts();
 });
 
-rememberDefaultDockMarkup();
 updateMobileToolbarState();
 syncNativeShareButtons();
 observeAnalyticsReviewElements();
@@ -1093,7 +1050,7 @@ document.addEventListener('click', async (event) => {
 
     sharedReviewModalIndices.set(currentModalId, targetIndex);
     await loadSharedReviewModalContent(modal, targetTrigger);
-    syncModalDockMarkup(modal);
+    swapDockToModalNav(modal);
     updateReviewModalNavigator(modal);
     return;
   }
@@ -1155,10 +1112,6 @@ refreshIssueReviewNavigatorCache();
 setupIssueReviewObserver();
 
 document.body.addEventListener('htmx:afterSettle', () => {
-  if (!document.querySelector('.modal.show') && !activeDockModalId) {
-    snapshotCurrentDockMarkup();
-  }
-
   updateMobileToolbarState();
   refreshIssueReviewNavigatorCache();
   setupIssueReviewObserver();
@@ -1169,6 +1122,10 @@ document.body.addEventListener('htmx:afterSettle', () => {
 document.body.addEventListener('htmx:afterSwap', (event) => {
   const modal = event.target.closest('.modal');
   if (!modal || !event.target.matches('[data-review-modal-container]')) return;
+
+  // Scroll modal body to top when new review content loads
+  const modalBody = modal.querySelector('.modal-body');
+  if (modalBody) modalBody.scrollTop = 0;
 
   syncReviewModalShareControls(modal);
   observeAnalyticsReviewElements(event.target);
@@ -1809,10 +1766,16 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     }
   }
 
-  // Update on nav button click
+  // Update on nav button click + close any open modal
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-journal-nav]');
-    if (btn) setActiveNav(btn.dataset.journalNav);
+    if (!btn) return;
+    setActiveNav(btn.dataset.journalNav);
+
+    var openModal = document.querySelector('.modal.show');
+    if (openModal) {
+      Modal.getInstance(openModal)?.hide();
+    }
   });
 
   // Also detect after any HTMX swap into the results area

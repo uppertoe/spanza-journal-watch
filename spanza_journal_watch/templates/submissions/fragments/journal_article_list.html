@@ -48,9 +48,9 @@
                 <div class="jw-abstract-clamp mb-3" tabindex="0">
                   <p class="jw-abstract-clamp__preview journal-article-card__abstract mb-0">{{ row.article.abstract|strip_abstract_labels }}</p>
                   <div class="jw-abstract-clamp__full journal-article-card__abstract mb-0">{{ row.article.abstract|format_abstract }}</div>
-                  <button type="button" class="jw-abstract-clamp__toggle btn btn-sm btn-link text-decoration-none p-0">
-                    <span class="jw-abstract-clamp__more">More</span>
-                    <span class="jw-abstract-clamp__less">Less</span>
+                  <button type="button" class="jw-abstract-clamp__toggle">
+                    <span class="jw-abstract-clamp__more">Show more &darr;</span>
+                    <span class="jw-abstract-clamp__less">Show less &uarr;</span>
                   </button>
                 </div>
               {% endif %}
@@ -82,6 +82,22 @@
                      hx-indicator="#journal-review-modal-indicator"
                      hx-target="#journal-review-modal-container">Read the review{% if row.review.author %} by {{ row.review.author }}{% endif %} &rarr;</a>
                 </p>
+              {% endif %}
+              {% if row.related_reviews %}
+              <div class="related-reviews--inline mt-2">
+                <span class="related-reviews--inline__label">Related:</span>
+                {% for rel in row.related_reviews %}
+                  <a href="{{ rel.get_absolute_url }}" class="related-reviews--inline__link js-review-modal-trigger"
+                     data-bs-toggle="modal"
+                     data-bs-target="#journal-review-modal"
+                     data-review-modal-url="{{ rel.get_absolute_url }}"
+                     data-review-modal-slug="{{ rel.slug }}"
+                     data-review-modal-shell="journal-review-modal"
+                     hx-get="{{ rel.get_absolute_url }}"
+                     hx-indicator="#journal-review-modal-indicator"
+                     hx-target="#journal-review-modal-container">{{ rel.article.title|truncatewords:8 }}</a>{% if not forloop.last %}<span class="related-reviews--inline__sep">&middot;</span>{% endif %}
+                {% endfor %}
+              </div>
               {% endif %}
             </div>
           </article>

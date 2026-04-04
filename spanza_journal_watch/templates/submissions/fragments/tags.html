@@ -2,24 +2,16 @@
 {% cache 1800 "tag_list_results" content_cache_version request.get_full_path %}
 <div id="articles">
     <div class="d-flex justify-content-between align-items-center py-1">
-        <p class="text-body-secondary mb-0">{{ result_count }} tag{{ result_count|pluralize }}</p>
+        <p class="text-body-secondary mb-0">{{ result_count }} topic{{ result_count|pluralize }}</p>
     </div>
 
     {% if tags %}
-    <div class="row g-3 py-2">
+    <div class="tag-directory py-2">
         {% for tag in tags %}
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title mb-1">
-                        <a href="{{ tag.get_absolute_url }}" class="text-decoration-none">{{ tag }}</a>
-                    </h5>
-                    <p class="small text-body-secondary mb-0">
-                        {{ tag.review_count }} review{{ tag.review_count|pluralize }}
-                    </p>
-                </div>
-            </div>
-        </div>
+        <a href="{{ tag.get_absolute_url }}" class="tag-directory__item">
+            <span class="tag-directory__name">{{ tag }}</span>
+            <span class="tag-directory__count">{{ tag.review_count }}</span>
+        </a>
         {% endfor %}
     </div>
     {% else %}

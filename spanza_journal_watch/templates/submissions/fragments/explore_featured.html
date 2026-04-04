@@ -1,0 +1,44 @@
+{% load cache %}
+{% cache 1800 "explore_featured" content_cache_version %}
+
+{# ── Curated collections ─────────────────────────────────────── #}
+{% if collections %}
+<div class="mb-4">
+  <h2 class="h5 mb-3">Collections</h2>
+  <div class="row g-3">
+    {% for collection in collections %}
+    <div class="col-12 col-md-6">
+      <a href="{{ collection.get_absolute_url }}" class="text-decoration-none">
+        <div class="card h-100 border-primary bg-primary bg-opacity-10">
+          <div class="card-body">
+            <h5 class="card-title mb-1 text-primary">{{ collection.title }}</h5>
+            {% if collection.description %}
+            <p class="small text-body-secondary mb-2">{{ collection.description|truncatewords:20 }}</p>
+            {% endif %}
+            <div class="small text-body-secondary">
+              {{ collection.tags.count }} topic{{ collection.tags.count|pluralize }}
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Popular topics ──────────────────────────────────────────── #}
+{% if featured_tags %}
+<div class="mb-2">
+  <h2 class="h5 mb-3">Popular topics</h2>
+  <div class="row g-3">
+    {% for tag in featured_tags %}
+    <div class="col-6 col-md-4 col-lg-3">
+      {% include "submissions/fragments/topic_card.html" %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endcache %}

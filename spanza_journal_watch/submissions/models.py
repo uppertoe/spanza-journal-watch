@@ -112,6 +112,8 @@ class Tag(models.Model):
     text = models.CharField(max_length=255, unique=True, blank=False, null=False)
     slug = models.SlugField(max_length=255, blank=True, unique=True)
     active = models.BooleanField(default=True)
+    curated = models.BooleanField(default=False)
+    display_order = models.PositiveIntegerField(default=0)
     articles = models.ManyToManyField("backend.PubmedArticle", related_name="tags")
 
     @classmethod
@@ -139,6 +141,42 @@ class Tag(models.Model):
         if not self.articles.all().count():
             logger.debug("Deleting unused tag %s", self)
             self.delete()
+
+
+class MeshTagMapping(models.Model):
+    mesh_term = models.CharField(max_length=255, unique=True, db_index=True)
+    tag = models.ForeignKey(Tag, on_delete=models.CASCADE, related_name="mesh_mappings")
+
+    class Meta:
+        ordering = ("mesh_term",)
+
+    def __str__(self):
+        return f"{self.mesh_term} → {self.tag.text}"
+
+
+class CuratedCollection(models.Model):
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    description = models.TextField(blank=True)
+    tags = models.ManyToManyField(Tag, related_name="collections", blank=True)
+    reviews = models.ManyToManyField("Review", related_name="collections", blank=True)
+    active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("display_order", "-created")
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = get_unique_slug(self, slugify(self.title))
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse("submissions:collection_detail", kwargs={"slug": self.slug})
 
 
 class Journal(TimeStampedModel):

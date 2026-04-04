@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 
 from ..layout.models import FeatureArticle, Homepage
 from ..newsletter.models import Newsletter
-from ..submissions.models import Author, HealthService, Issue, Journal, Review
+from ..submissions.models import Author, HealthService, Issue, Journal, Review, Tag
 from .models import (
     BackendPreference,
     InboundEmail,
@@ -303,9 +303,31 @@ class HomepageForm(forms.ModelForm):
 
 
 class ArticleForm(forms.ModelForm):
+    curated_tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.filter(curated=True).order_by("display_order"),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Tags",
+    )
+
     class Meta:
         model = PubmedArticle
         fields = ["title", "journal", "citation", "article_url", "tags_string"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["curated_tags"].initial = self.instance.tags.filter(curated=True)
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        if commit and instance.pk:
+            curated = self.cleaned_data.get("curated_tags", [])
+            # Replace curated tags; keep non-curated tags intact
+            current_non_curated = set(instance.tags.filter(curated=False).values_list("pk", flat=True))
+            new_curated = {t.pk for t in curated}
+            instance.tags.set(current_non_curated | new_curated)
+        return instance
 
 
 class ReviewForm(forms.ModelForm):
@@ -423,7 +445,13 @@ class IssueBuilderReviewForm(forms.Form):
     article_year = forms.IntegerField(required=False, min_value=1900)
     article_citation = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     article_url = forms.URLField(required=False)
-    article_tags_string = forms.CharField(required=False)
+    article_tags_string = forms.CharField(required=False, label="Additional tags (legacy)")
+    article_curated_tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.filter(curated=True).order_by("display_order"),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Tags",
+    )
 
     author_mode = forms.ChoiceField(choices=AUTHOR_MODE_CHOICES, initial=AUTHOR_MODE_EXISTING, required=False)
     author = forms.ModelChoiceField(
@@ -448,6 +476,8 @@ class IssueBuilderReviewForm(forms.Form):
             self.fields["author"].initial = review.author
             self.fields["body"].initial = review.body
             self.fields["is_featured"].initial = review.is_featured
+            if review.article:
+                self.fields["article_curated_tags"].initial = review.article.tags.filter(curated=True)
 
     @property
     def max_featured_reviews(self):
@@ -506,6 +536,13 @@ class IssueBuilderReviewForm(forms.Form):
                 article_url=self.cleaned_data.get("article_url") or "",
                 tags_string=self.cleaned_data.get("article_tags_string") or "",
             )
+
+        # Apply curated tags
+        curated_tags = self.cleaned_data.get("article_curated_tags")
+        if curated_tags is not None:
+            current_non_curated = set(article.tags.filter(curated=False).values_list("pk", flat=True))
+            new_curated = {t.pk for t in curated_tags}
+            article.tags.set(current_non_curated | new_curated)
 
         author_mode = self.cleaned_data["author_mode"]
         if author_mode == self.AUTHOR_MODE_NEW:

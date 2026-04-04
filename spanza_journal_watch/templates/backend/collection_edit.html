@@ -1,0 +1,139 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">{{ collection.title }}</h1>
+  <div class="d-flex gap-2">
+    {% if collection.active %}
+    <a href="{{ collection.get_absolute_url }}" class="btn btn-sm btn-outline-success" target="_blank">View on site</a>
+    {% endif %}
+    <a href="{% url 'backend:collection_management' %}" class="btn btn-sm btn-outline-secondary">All collections</a>
+  </div>
+</div>
+
+{# ── Collection settings ─────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Settings</span>
+    {% if collection.active %}
+      <span class="badge text-bg-success">Active</span>
+    {% else %}
+      <span class="badge text-bg-secondary">Draft</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="id-title">Title</label>
+        <input type="text" id="id-title" name="title" class="form-control" value="{{ collection.title }}" required>
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="id-description">Description</label>
+        <input type="text" id="id-description" name="description" class="form-control" value="{{ collection.description }}">
+      </div>
+      <div class="col-12 col-md-2 d-flex flex-column justify-content-end gap-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="id-active" name="active" {% if collection.active %}checked{% endif %}>
+          <label class="form-check-label" for="id-active">Active</label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Selected reviews ────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">
+    Selected reviews <span class="badge text-bg-secondary ms-1">{{ collection_reviews|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if collection_reviews %}
+    <div class="list-group list-group-flush">
+      {% for review in collection_reviews %}
+      <div class="list-group-item d-flex align-items-start gap-3 py-2">
+        <div class="flex-grow-1">
+          <div class="fw-semibold small">{{ review.article.title|truncatewords:15 }}</div>
+          <div class="text-muted" style="font-size: 0.75rem;">
+            {{ review.article.journal }}
+            {% if review.author %}&middot; {{ review.author }}{% endif %}
+            {% if review.publish_date %}&middot; {{ review.publish_date|date:"M Y" }}{% endif %}
+          </div>
+        </div>
+        <form method="post" action="{% url 'backend:collection_remove_review' collection.pk review.pk %}" class="flex-shrink-0">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted">
+      <p class="mb-0">No reviews selected yet. Search and add reviews below.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Add reviews ─────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">Add reviews</div>
+  <div class="card-body">
+    <form method="get" class="mb-3">
+      <div class="input-group">
+        <input type="search" name="q" class="form-control" placeholder="Search by title, author, or journal..." value="{{ query }}" autocomplete="off">
+        <button type="submit" class="btn btn-outline-primary">Search</button>
+        {% if query %}<a href="{% url 'backend:collection_edit' collection.pk %}" class="btn btn-outline-secondary">Clear</a>{% endif %}
+      </div>
+    </form>
+
+    {% if all_reviews %}
+    <div class="list-group">
+      {% for review in all_reviews %}
+      <div class="list-group-item d-flex align-items-start gap-3 py-2">
+        <div class="flex-grow-1">
+          <div class="fw-semibold small">{{ review.article.title|truncatewords:15 }}</div>
+          <div class="text-muted" style="font-size: 0.75rem;">
+            {{ review.article.journal }}
+            {% if review.author %}&middot; {{ review.author }}{% endif %}
+            {% if review.publish_date %}&middot; {{ review.publish_date|date:"M Y" }}{% endif %}
+          </div>
+        </div>
+        <form method="post" action="{% url 'backend:collection_add_review' collection.pk %}" class="flex-shrink-0">
+          {% csrf_token %}
+          <input type="hidden" name="review_id" value="{{ review.pk }}">
+          <button type="submit" class="btn btn-sm btn-outline-success" title="Add to collection">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% if not query %}
+    <p class="text-muted small mt-2 mb-0">Showing 50 most recent reviews. Use search to find specific reviews.</p>
+    {% endif %}
+    {% elif query %}
+    <div class="text-muted text-center py-3">No reviews match "{{ query }}".</div>
+    {% else %}
+    <div class="text-muted text-center py-3">Search for reviews to add to this collection.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Danger zone ─────────────────────────────────────────────── #}
+<div class="card border-danger">
+  <div class="card-header text-bg-danger">Danger zone</div>
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <div>
+      <p class="mb-0 small">Permanently delete this collection and all its review selections.</p>
+    </div>
+    <form method="post" action="{% url 'backend:collection_delete' collection.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete collection \'{{ collection.title }}\'? This cannot be undone.')">Delete collection</button>
+    </form>
+  </div>
+</div>
+{% endblock content %}

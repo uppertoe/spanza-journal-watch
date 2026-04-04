@@ -23,10 +23,27 @@ class AuthorAdmin(admin.ModelAdmin):
 
 @admin.register(models.Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ("text", "active")
-    list_filter = ("active",)
+    list_display = ("text", "curated", "display_order", "active")
+    list_filter = ("active", "curated")
     search_fields = ("text",)
     readonly_fields = ("slug",)
+
+
+@admin.register(models.MeshTagMapping)
+class MeshTagMappingAdmin(admin.ModelAdmin):
+    list_display = ("mesh_term", "tag")
+    list_filter = ("tag",)
+    search_fields = ("mesh_term", "tag__text")
+    autocomplete_fields = ["tag"]
+
+
+@admin.register(models.CuratedCollection)
+class CuratedCollectionAdmin(admin.ModelAdmin):
+    list_display = ("title", "active", "display_order", "created")
+    list_filter = ("active",)
+    search_fields = ("title",)
+    filter_horizontal = ("tags", "reviews")
+    prepopulated_fields = {"slug": ("title",)}
 
 
 @admin.register(models.Journal)

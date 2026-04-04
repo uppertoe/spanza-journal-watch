@@ -1,0 +1,84 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="mb-0">Curated collections</h1>
+  <a href="{% url 'backend:backend_settings' %}" class="btn btn-sm btn-outline-secondary">Back to settings</a>
+</div>
+
+<p class="text-muted mb-4">
+  Collections are hand-picked groups of reviews that appear on the Explore page.
+  Use them for seasonal highlights, thematic reading lists, or editor's picks.
+</p>
+
+{# ── Create new collection ───────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">New collection</div>
+  <div class="card-body">
+    <form method="post" action="{% url 'backend:collection_create' %}" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="id-title">Title</label>
+        <input type="text" id="id-title" name="title" class="form-control" placeholder="e.g. Summer reading: Neonatal care" required>
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="id-description">Description <span class="text-muted">(optional)</span></label>
+        <input type="text" id="id-description" name="description" class="form-control" placeholder="A short description for the Explore page">
+      </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Existing collections ────────────────────────────────────── #}
+{% if collections %}
+<div class="card">
+  <div class="card-header">Existing collections</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Reviews</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for collection in collections %}
+          <tr>
+            <td>
+              <a href="{% url 'backend:collection_edit' collection.pk %}" class="text-decoration-none fw-semibold">{{ collection.title }}</a>
+              {% if collection.description %}<br><span class="small text-muted">{{ collection.description|truncatewords:10 }}</span>{% endif %}
+            </td>
+            <td class="small">{{ collection.reviews.count }}</td>
+            <td>
+              {% if collection.active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Draft</span>
+              {% endif %}
+            </td>
+            <td class="small text-nowrap">{{ collection.created|date:"j M Y" }}</td>
+            <td class="text-end">
+              <a href="{% url 'backend:collection_edit' collection.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <p class="mb-0">No collections yet. Create one above to get started.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock content %}

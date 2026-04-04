@@ -32,7 +32,8 @@ from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
 
-from .models import Author, HealthService, Issue, Review, Tag
+from .models import Author, CuratedCollection, HealthService, Issue, Review, Tag
+from .templatetags.tag_scores import compute_tag_scores
 
 # ---------------------------------------------------------------------------
 # Journal browser: section grouping for table-of-contents
@@ -307,8 +308,11 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         header = PageHeader.get_active_for(PageHeader.PageType.REVIEW_DETAIL)
         context["page_header"] = header.collate_fields(**override) if header else override
 
-        # Star button context — review.article IS the PubmedArticle after merge
+        # Related reviews
         pubmed_article = self.object.article
+        context["related_reviews"] = pubmed_article.get_related_reviews(limit=4)
+
+        # Star button context — review.article IS the PubmedArticle after merge
         context["pubmed_article"] = pubmed_article
         context["star_count"] = PubmedArticleUserState.objects.filter(
             article=pubmed_article, starred_at__isnull=False
@@ -388,6 +392,10 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
             request=self.request,
         )
 
+        # Attach related reviews to each review on this page
+        for review in context["articles"]:
+            review.related_reviews = review.article.get_related_reviews()
+
         return context
 
     def get_queryset(self):
@@ -458,14 +466,14 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     htmx_templates = ["submissions/fragments/tag_results.html"]
 
     # Frontend options
-    paginate_by = 30
+    paginate_by = None
     issue_cols = 4
 
     def get_queryset(self):
         query = (self.request.GET.get("q") or "").strip()
         sort = (self.request.GET.get("sort") or "popular").strip()
 
-        queryset = Tag.objects.exclude(active=False).annotate(
+        queryset = Tag.objects.filter(active=True, curated=True).annotate(
             review_count=Count("articles__reviews", filter=Q(articles__reviews__active=True), distinct=True)
         )
 
@@ -479,6 +487,13 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         if sort == "name":
             return queryset.order_by("text")
 
+        if sort == "trending":
+            # Sort by engagement score client-side after annotation
+            tag_scores = compute_tag_scores()
+            tags = list(queryset.order_by("-review_count", "text"))
+            tags.sort(key=lambda t: tag_scores.get(t.id, {}).get("score", 0), reverse=True)
+            return tags
+
         return queryset.order_by("-review_count", "text")
 
     def get_context_data(self, **kwargs):
@@ -486,19 +501,19 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         context["issue_cols"] = self.issue_cols
         context["query"] = (self.request.GET.get("q") or "").strip()
         context["sort"] = (self.request.GET.get("sort") or "popular").strip()
-        context["result_count"] = context["paginator"].count
+        context["result_count"] = context["paginator"].count if context["paginator"] else len(context["tags"])
 
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
         context["filter_querystring"] = query_params.urlencode()
-        context["page_title"] = "Tags | SPANZA Journal Watch"
+        context["page_title"] = "Explore topics | SPANZA Journal Watch"
         context["page_meta_description"] = "Browse topics and themes used across SPANZA Journal Watch reviews."
         context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:tag_list"))
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
-                "name": "Tags",
+                "name": "Explore topics",
                 "url": context["canonical_url"],
                 "description": context["page_meta_description"],
             }
@@ -506,33 +521,87 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         if context["query"] or context["sort"] != "popular" or self.request.GET.get("page"):
             context["meta_robots"] = "noindex,follow"
 
-        page_obj = context["page_obj"]
-        total_pages = page_obj.paginator.num_pages
-        current_page = page_obj.number
-        window = 2
+        page_obj = context.get("page_obj")
+        if page_obj:
+            total_pages = page_obj.paginator.num_pages
+            current_page = page_obj.number
+            window = 2
 
-        page_links = [1]
-        start = max(2, current_page - window)
-        end = min(total_pages - 1, current_page + window)
+            page_links = [1]
+            start = max(2, current_page - window)
+            end = min(total_pages - 1, current_page + window)
 
-        if start > 2:
-            page_links.append(None)
+            if start > 2:
+                page_links.append(None)
 
-        page_links.extend(range(start, end + 1))
+            page_links.extend(range(start, end + 1))
 
-        if end < total_pages - 1:
-            page_links.append(None)
+            if end < total_pages - 1:
+                page_links.append(None)
 
-        if total_pages > 1:
-            page_links.append(total_pages)
+            if total_pages > 1:
+                page_links.append(total_pages)
 
-        context["page_links"] = page_links
-        context["total_pages"] = total_pages
+            context["page_links"] = page_links
+            context["total_pages"] = total_pages
 
         # Override header
         header = PageHeader.get_active_for(PageHeader.PageType.TAG)
         override = {}
         context["page_header"] = header.collate_fields(**override) if header else override
+
+        # --- Explore: featured topics (first page, no search) ---
+        is_first_page = not self.request.GET.get("page") or self.request.GET.get("page") == "1"
+        show_explore = is_first_page and not context["query"]
+        context["show_explore"] = show_explore
+
+        if show_explore:
+            tag_scores = compute_tag_scores()
+            # Build featured tags: top 12 curated tags by engagement score
+            scored_tags = (
+                Tag.objects.filter(active=True, curated=True, id__in=tag_scores.keys())
+                .annotate(
+                    review_count=Count("articles__reviews", filter=Q(articles__reviews__active=True), distinct=True)
+                )
+                .filter(review_count__gt=0)
+            )
+            featured = []
+            for tag in scored_tags:
+                tag.engagement_score = tag_scores[tag.id]["score"]
+                featured.append(tag)
+            featured.sort(key=lambda t: t.engagement_score, reverse=True)
+            featured = featured[:12]
+
+            # Assign heat tier for visual indicator
+            for i, tag in enumerate(featured):
+                if i < 4:
+                    tag.heat_tier = "hot"
+                elif i < 8:
+                    tag.heat_tier = "warm"
+                else:
+                    tag.heat_tier = "mild"
+
+            # Attach top 2 review titles per featured tag
+            for tag in featured:
+                top_reviews = list(
+                    Review.objects.filter(active=True, article__tags=tag)
+                    .select_related("article__journal")
+                    .order_by("-publish_date")[:2]
+                )
+                tag.top_reviews = top_reviews
+
+            # Group featured tags by cluster if available
+            clusters = cache.get("tag_clusters", [])
+            if clusters:
+                tag_to_cluster = {}
+                for i, cluster_ids in enumerate(clusters):
+                    for tid in cluster_ids:
+                        tag_to_cluster[tid] = i
+                for tag in featured:
+                    tag.cluster_index = tag_to_cluster.get(tag.id)
+
+            context["featured_tags"] = featured
+            context["collections"] = CuratedCollection.objects.filter(active=True).prefetch_related("tags")
 
         return context
 
@@ -600,6 +669,57 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
                 tag_reviews.append(latest_review)
         attach_review_display_fields(tag_reviews)
         context["tag_reviews"] = tag_reviews
+
+        return context
+
+
+class CuratedCollectionDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
+    model = CuratedCollection
+    context_object_name = "collection"
+    template_name = "submissions/collection_detail.html"
+    queryset = CuratedCollection.objects.filter(active=True).prefetch_related("tags")
+    breadcrumb_use_pk = False
+    article_cols = 1
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        collection = self.object
+
+        # Prefer manually curated reviews; fall back to tag-based reviews
+        if collection.reviews.exists():
+            reviews = list(
+                collection.reviews.filter(active=True)
+                .select_related("author", "article__journal")
+                .prefetch_related("article__tags", "issues")
+                .order_by("-publish_date")
+            )
+        else:
+            tag_ids = list(collection.tags.values_list("id", flat=True))
+            reviews = (
+                list(
+                    Review.objects.filter(active=True, article__tags__id__in=tag_ids)
+                    .select_related("author", "article__journal")
+                    .prefetch_related("article__tags", "issues")
+                    .distinct()
+                    .order_by("-publish_date")
+                )
+                if tag_ids
+                else []
+            )
+        attach_review_display_fields(reviews)
+        context["tag_reviews"] = reviews
+        context["article_cols"] = self.article_cols
+        context["page_title"] = f"{collection.title} | SPANZA Journal Watch"
+        context["page_meta_description"] = (
+            collection.description or f"A curated collection of reviews: {collection.title}."
+        )
+        context["canonical_url"] = build_request_absolute_url(self.request, collection.get_absolute_url())
+
+        header = PageHeader.get_active_for(PageHeader.PageType.TAG)
+        override = {"title": collection.title}
+        if collection.description:
+            override["body"] = collection.description
+        context["page_header"] = header.collate_fields(**override) if header else override
 
         return context
 
@@ -681,7 +801,7 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         context["tag_options"] = cache.get_or_set(
             tag_options_key,
             lambda: list(
-                Tag.objects.exclude(active=False)
+                Tag.objects.filter(active=True, curated=True)
                 .annotate(
                     review_count=Count(
                         "articles__reviews",
@@ -780,8 +900,13 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
 
 
 def ajax_get_tags(request):
-    tags_queryset = Tag.get_all_tags()
-    tags_list = [str(tag) for tag in tags_queryset]
+    tags_queryset = (
+        Tag.objects.filter(active=True, curated=True)
+        .annotate(article_count=Count("articles"))
+        .order_by("-article_count")
+        .values_list("text", flat=True)
+    )
+    tags_list = [f"#{t}" for t in tags_queryset]
     data = {"tags": tags_list}
     return JsonResponse(data)
 
@@ -1052,6 +1177,7 @@ def _journal_browser_context(request):
         rows.append(link)
 
     sections = _group_articles_by_section(rows)
+    _attach_related_reviews(rows)
 
     return {
         "rows": rows,
@@ -1067,6 +1193,38 @@ def _journal_browser_context(request):
         "can_recommend": can_recommend_pubmed_articles(request.user),
         "session_starred_ids": session_starred_ids,
     }
+
+
+def _attach_related_reviews(rows):
+    """Batch-attach related reviews to all journal browser articles based on shared curated tags."""
+    if not rows:
+        return
+
+    article_ids = [r.article_id for r in rows]
+
+    # Fetch curated tag IDs per article in one query
+    tag_links = Tag.objects.filter(curated=True, active=True, articles__id__in=article_ids).values_list(
+        "articles__id", "id"
+    )
+    article_tag_map = {}
+    for article_id, tag_id in tag_links:
+        article_tag_map.setdefault(article_id, set()).add(tag_id)
+
+    for row in rows:
+        tag_ids = article_tag_map.get(row.article_id, set())
+        if not tag_ids:
+            row.related_reviews = []
+            continue
+        related = (
+            Review.objects.filter(active=True, article__tags__id__in=tag_ids)
+            .exclude(article_id=row.article_id)
+            .select_related("article__journal", "author")
+            .annotate(shared_tag_count=Count("article__tags", filter=Q(article__tags__id__in=tag_ids)))
+            .filter(shared_tag_count__gte=1)
+            .order_by("-shared_tag_count", "-publish_date")
+            .distinct()[:2]
+        )
+        row.related_reviews = list(related)
 
 
 def _journal_article_actions_context(request, article):

@@ -296,3 +296,4 @@ backups
 
 .vscode
 .ruff_cache
+.claude

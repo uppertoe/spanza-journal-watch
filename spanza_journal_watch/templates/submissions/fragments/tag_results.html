@@ -1,5 +1,5 @@
 {% include "submissions/fragments/tags.html" %}
 
-{% if page_obj.paginator.num_pages > 1 %}
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
 {% include "submissions/fragments/tag_pagination.html" %}
 {% endif %}

@@ -311,6 +311,130 @@ def refresh_pubmed_journal_cache_task(self, from_month=None, to_month=None):
 
 
 @celery_app.task(bind=True)
+def refresh_mesh_terms_task(self):
+    """Re-fetch PubMed metadata for articles missing MeSH terms, then auto-tag."""
+    from .models import FetchLog, PubmedArticle
+    from .pubmed_cache import build_pubmed_client, fill_missing_article_metadata
+
+    fetch_log = FetchLog.objects.create(
+        task_type=FetchLog.TASK_CACHE_REFRESH,
+        celery_task_id=self.request.id or "",
+        details={"type": "mesh_refresh"},
+    )
+
+    try:
+        client = build_pubmed_client()
+        candidates = []
+        for article in PubmedArticle.objects.filter(pmid__isnull=False).iterator():
+            if not (article.metadata_json or {}).get("mesh_terms"):
+                candidates.append(article)
+
+        pmid_to_article = {a.pmid: a for a in candidates}
+        pmid_list = list(pmid_to_article.keys())
+        batch_size = 200
+        updated = 0
+        still_empty = 0
+        errors = 0
+
+        for i in range(0, len(pmid_list), batch_size):
+            batch = pmid_list[i : i + batch_size]
+            try:
+                payloads = client.fetch_articles(batch)
+            except Exception:
+                logger.exception("MeSH refresh: failed batch at offset %d", i)
+                errors += len(batch)
+                continue
+
+            fetched = {}
+            for payload in payloads:
+                pmid = (payload.get("pmid") or "").strip()
+                if pmid:
+                    fetched[pmid] = payload
+
+            for pmid in batch:
+                article = pmid_to_article[pmid]
+                payload = fetched.get(pmid)
+                if not payload:
+                    still_empty += 1
+                    continue
+                incoming_mesh = (payload.get("metadata_json") or {}).get("mesh_terms", [])
+                if incoming_mesh:
+                    fill_missing_article_metadata(article, payload)
+                    updated += 1
+                else:
+                    still_empty += 1
+
+        stats = {
+            "type": "mesh_refresh",
+            "candidates": len(candidates),
+            "updated": updated,
+            "still_empty": still_empty,
+            "errors": errors,
+        }
+        fetch_log.finish(FetchLog.STATUS_SUCCESS, details=stats)
+        logger.info("MeSH refresh complete: %s", stats)
+        return stats
+    except Exception as exc:
+        logger.error("MeSH refresh failed: %s", exc)
+        fetch_log.finish(FetchLog.STATUS_ERROR, error_message=str(exc))
+        raise
+
+
+@celery_app.task
+def compute_tag_clusters_task():
+    """Recompute tag co-occurrence clusters and cache the result."""
+    from collections import defaultdict
+    from itertools import combinations
+
+    from django.core.cache import cache
+
+    from spanza_journal_watch.submissions.management.commands.compute_tag_clusters import (
+        CACHE_KEY,
+        CACHE_TIMEOUT,
+        SIMILARITY_THRESHOLD,
+    )
+    from spanza_journal_watch.submissions.models import Tag
+
+    tag_articles = {}
+    for tag in Tag.objects.filter(active=True, curated=True):
+        article_ids = set(tag.articles.values_list("id", flat=True))
+        if article_ids:
+            tag_articles[tag.id] = article_ids
+
+    adjacency = defaultdict(set)
+    for (a_id, a_articles), (b_id, b_articles) in combinations(tag_articles.items(), 2):
+        overlap = len(a_articles & b_articles)
+        if overlap == 0:
+            continue
+        min_size = min(len(a_articles), len(b_articles))
+        if overlap / min_size >= SIMILARITY_THRESHOLD:
+            adjacency[a_id].add(b_id)
+            adjacency[b_id].add(a_id)
+
+    visited = set()
+    clusters = []
+    for tag_id in tag_articles:
+        if tag_id in visited:
+            continue
+        component = set()
+        queue = [tag_id]
+        while queue:
+            current = queue.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            component.add(current)
+            queue.extend(adjacency.get(current, set()) - visited)
+        if len(component) > 1:
+            clusters.append(sorted(component))
+
+    clusters.sort(key=len, reverse=True)
+    cache.set(CACHE_KEY, clusters, CACHE_TIMEOUT)
+    logger.info("Tag clusters recomputed: %d clusters from %d tags", len(clusters), len(tag_articles))
+    return {"clusters": len(clusters), "tags": len(tag_articles)}
+
+
+@celery_app.task(bind=True)
 def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
     from django.conf import settings
     from django.utils import timezone

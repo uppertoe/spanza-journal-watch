@@ -85,15 +85,31 @@ class SidebarMixin:
         )
         context["sidebar_tags"] = cache.get_or_set(
             tags_cache_key,
-            lambda: list(
-                Tag.objects.exclude(active=False)
-                .annotate(article_count=Count("articles"))
-                .order_by("-article_count")[: self.number_of_tags]
-            ),
+            lambda: self._sidebar_tags_by_engagement(self.number_of_tags),
             timeout=60 * 30,
         )
         Issue.attach_display_images(context["sidebar_issues"])
         return context
+
+    @staticmethod
+    def _sidebar_tags_by_engagement(n):
+        from spanza_journal_watch.submissions.templatetags.tag_scores import compute_tag_scores
+
+        tag_scores = compute_tag_scores()
+        if tag_scores:
+            scored_ids = sorted(tag_scores, key=lambda tid: tag_scores[tid]["score"], reverse=True)[:n]
+            tags = list(Tag.objects.filter(id__in=scored_ids, active=True))
+            # Preserve score order
+            id_order = {tid: i for i, tid in enumerate(scored_ids)}
+            tags.sort(key=lambda t: id_order.get(t.id, 999))
+            if tags:
+                return tags
+        # Fallback: by article count
+        return list(
+            Tag.objects.filter(active=True, curated=True)
+            .annotate(article_count=Count("articles"))
+            .order_by("-article_count")[:n]
+        )
 
 
 class GetLatestInstanceMixin:

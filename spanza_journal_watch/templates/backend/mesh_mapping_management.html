@@ -1,0 +1,61 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="mb-0">MeSH Mappings</h1>
+  <div class="d-flex gap-2">
+    <a href="{% url 'backend:tag_management' %}" class="btn btn-outline-secondary">Back to tags</a>
+    <a href="{% url 'backend:unmapped_mesh_report' %}" class="btn btn-outline-secondary">Unmapped report</a>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Add mapping</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Map a PubMed MeSH term to a curated tag. When an article has this MeSH term, it will be automatically tagged.
+    </p>
+    <form method="post" action="{% url 'backend:mesh_mapping_add' %}" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="mesh-term">MeSH term (exact)</label>
+        <input type="text" id="mesh-term" name="mesh_term" class="form-control" placeholder="e.g. Nerve Block" required>
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label" for="tag-id">Maps to tag</label>
+        <select id="tag-id" name="tag_id" class="form-select" required>
+          <option value="">Select tag...</option>
+          {% for tag in curated_tags %}
+          <option value="{{ tag.pk }}">#{{ tag.text }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Current mappings ({{ total_mappings }})</div>
+  <div class="card-body p-0">
+    {% for tag, mappings in grouped_mappings.items %}
+    <div class="border-bottom px-3 py-2">
+      <div class="fw-semibold mb-1">#{{ tag.text }} <span class="text-muted fw-normal small">({{ mappings|length }} mappings)</span></div>
+      <div class="d-flex flex-wrap gap-1">
+        {% for mapping in mappings %}
+        <span class="badge text-bg-light text-dark border d-inline-flex align-items-center gap-1">
+          {{ mapping.mesh_term }}
+          <form method="post" action="{% url 'backend:mesh_mapping_delete' mapping.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn-close btn-close-sm" style="font-size: 0.5rem;" aria-label="Remove" title="Remove mapping"></button>
+          </form>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock content %}

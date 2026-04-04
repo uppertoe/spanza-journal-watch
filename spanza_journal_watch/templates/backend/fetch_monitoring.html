@@ -88,6 +88,43 @@
   {% endif %}
 </div>
 
+{# ── MeSH refresh status ──────────────────────────────────────── #}
+{% if mesh_refresh_stats %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>MeSH term refresh</span>
+    <span class="badge text-bg-success">Weekly (Sun 04:00 UTC)</span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Re-fetches PubMed metadata for articles missing MeSH terms. New MeSH terms trigger auto-tagging.
+    </p>
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <div class="small"><strong>Last run:</strong>
+          {% if mesh_refresh_stats.last_run %}{{ mesh_refresh_stats.last_run|date:"j M Y H:i" }}{% else %}Never{% endif %}
+        </div>
+      </div>
+      {% if mesh_refresh_stats.last_log %}
+      <div class="col-auto">
+        <div class="small"><strong>Result:</strong>
+          {% with log=mesh_refresh_stats.last_log %}
+            {% if log.details.updated %}{{ log.details.updated }} updated{% endif %}{% if log.details.still_empty %}, {{ log.details.still_empty }} still pending{% endif %}{% if log.details.errors %}, {{ log.details.errors }} errors{% endif %}
+          {% endwith %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <form method="post" action="{% url 'backend:trigger_mesh_refresh' %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-primary" onclick="return confirm('Queue a MeSH refresh now? This fetches from PubMed and may take a few minutes.')">
+        Run MeSH refresh now
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {# ── Fetch log table ──────────────────────────────────────────── #}
 <div class="card">
   <div class="card-header">Fetch history</div>

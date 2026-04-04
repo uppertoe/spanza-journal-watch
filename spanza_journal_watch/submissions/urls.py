@@ -34,8 +34,12 @@ urlpatterns = [
     path("issues", views.IssueListView.as_view(), name="issue_list"),
     path("issues/latest", views.LatestIssueView.as_view(), name="issue_latest"),
     path("issues/<slug:slug>", views.IssueDetailView.as_view(), name="issue_detail"),
-    path("tags", views.TagListView.as_view(), name="tag_list"),
-    path("tags/<slug:slug>", views.TagDetailView.as_view(), name="tag_detail"),
+    path("explore", views.TagListView.as_view(), name="tag_list"),
+    path("explore/collections/<slug:slug>", views.CuratedCollectionDetailView.as_view(), name="collection_detail"),
+    path("explore/<slug:slug>", views.TagDetailView.as_view(), name="tag_detail"),
+    # Redirect old /tags URLs
+    path("tags", RedirectView.as_view(url="/explore", permanent=True)),
+    path("tags/<slug:slug>", RedirectView.as_view(pattern_name="submissions:tag_detail", permanent=True)),
     path("search", views.SearchView.as_view(), name="search"),
     path("ajax/tags", views.ajax_get_tags, name="ajax_get_tags"),  # Hardcoded in base.html
     path("about", views.HealthServiceListView.as_view(), name="about"),

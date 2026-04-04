@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block main-feature %}
+{% if page_header %}
+{% with page_header as content %}
+    {% include "fragments/main_feature.html" with header_kicker="Collection" %}
+    {% endwith %}
+    {% else %}
+    {% include "fragments/main_feature.html" with title=collection.title body=collection.description header_theme="tags" header_pattern="crest" header_kicker="Collection" %}
+{% endif %}
+{% endblock main-feature %}
+
+{% block article-title %}
+{% endblock article-title %}
+
+{% block article-block %}
+<div class="mb-3">
+  <a href="{% url 'submissions:tag_list' %}" class="text-decoration-none small">&larr; Back to Explore</a>
+</div>
+
+{% if collection.tags.all %}
+<div class="mb-3">
+  {% for tag in collection.tags.all %}
+  <a href="{{ tag.get_absolute_url }}" class="badge text-bg-secondary text-decoration-none me-1">{{ tag }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div id="article-block">
+    {% include "submissions/fragments/tag_articles.html" with shared_review_modal="collection-review-modal" %}
+</div>
+{% endblock article-block %}
+
+{% block mobile_action_dock %}
+{% endblock mobile_action_dock %}
+
+{% block desktop_action_dock %}
+{% endblock desktop_action_dock %}
+
+{% block modal %}
+<div class="modal fade" id="collection-review-modal" tabindex="-1" aria-labelledby="collection-review-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="collection-review-modal-label">Journal Watch - Review</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-center">
+                    <img src="{% static "images/spinners/3-dots-move.svg" %}" id="collection-review-modal-indicator" class="htmx-indicator">
+                </div>
+                <div class="container p-2 px-md-5" id="collection-review-modal-container" data-review-modal-container data-shared-review-modal-container></div>
+            </div>
+        </div>
+    </div>
+</div>
+<template data-review-modal-dock-template="collection-review-modal">
+    {% include "fragments/sticky_pager_actions.html" with is_modal_navigation=True modal_id="collection-review-modal" aria_label="Review modal navigation" %}
+</template>
+{% endblock modal %}

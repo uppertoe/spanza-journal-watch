@@ -916,6 +916,7 @@ class PubmedArticle(TimeStampedModel):
         if self.tags_string:
             current_tags = self.create_tag_objects()
             self.prune_tag_objects(current_tags)
+        self.auto_tag_from_mesh()
 
     def __str__(self):
         return self.title or f"PMID {self.pmid}"
@@ -958,6 +959,10 @@ class PubmedArticle(TimeStampedModel):
     def get_related_review(self):
         return self.reviews.exclude(active=False).order_by("-created").first()
 
+    @property
+    def tags_curated(self):
+        return self.tags.filter(curated=True)
+
     # ── Tag management (ported from submissions.Article) ──
 
     def tags_list(self):
@@ -986,11 +991,41 @@ class PubmedArticle(TimeStampedModel):
         return current_tags
 
     def prune_tag_objects(self, current_tags):
-        tags = self.tags.all()
+        # Only prune non-curated tags that came from tags_string
+        tags = self.tags.filter(curated=False)
         for tag in tags:
             if tag not in current_tags:
                 tag.articles.remove(self)
                 tag.delete_if_orphaned()
+
+    def auto_tag_from_mesh(self):
+        from spanza_journal_watch.submissions.models import MeshTagMapping
+
+        mesh_terms = (self.metadata_json or {}).get("mesh_terms", [])
+        if not mesh_terms:
+            return
+        mappings = MeshTagMapping.objects.filter(mesh_term__in=mesh_terms).select_related("tag")
+        tag_pks = {m.tag_id for m in mappings}
+        if tag_pks:
+            self.tags.add(*tag_pks)
+
+    def get_related_reviews(self, limit=4, min_shared=1):
+        from django.db.models import Count, Q
+
+        from spanza_journal_watch.submissions.models import Review
+
+        tag_ids = list(self.tags.filter(curated=True).values_list("id", flat=True))
+        if not tag_ids:
+            return Review.objects.none()
+        return (
+            Review.objects.filter(active=True, article__tags__id__in=tag_ids)
+            .exclude(article=self)
+            .annotate(shared_tag_count=Count("article__tags", filter=Q(article__tags__id__in=tag_ids)))
+            .filter(shared_tag_count__gte=min_shared)
+            .order_by("-shared_tag_count", "-created")
+            .select_related("article__journal", "author")
+            .distinct()[:limit]
+        )
 
 
 class PubmedBatchArticle(TimeStampedModel):

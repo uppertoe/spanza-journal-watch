@@ -1,0 +1,25 @@
+<div class="card h-100 topic-card topic-card--{{ tag.heat_tier }}">
+  <div class="topic-card__heat-bar"></div>
+  <div class="card-body d-flex flex-column">
+    <div class="mb-2">
+      <span class="badge rounded-pill topic-card__badge topic-card__badge--{{ tag.heat_tier }}">
+        {% if tag.heat_tier == "hot" %}Trending{% elif tag.heat_tier == "warm" %}Popular{% else %}Active{% endif %}
+      </span>
+    </div>
+    <h6 class="card-title topic-card__title mb-1">
+      <a href="{{ tag.get_absolute_url }}" class="text-decoration-none stretched-link">{{ tag }}</a>
+    </h6>
+    <p class="topic-card__count mb-0">
+      {{ tag.review_count }} review{{ tag.review_count|pluralize }}
+    </p>
+    {% if tag.top_reviews %}
+    <div class="topic-card__previews mt-auto pt-2">
+      {% for review in tag.top_reviews %}
+      <p class="topic-card__preview-title mb-0{% if not forloop.last %} mb-1{% endif %}">
+        {{ review.article.title|truncatewords:8 }}
+      </p>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
