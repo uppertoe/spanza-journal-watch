@@ -462,6 +462,10 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     # Breadcrumb
     breadcrumb_use_pk = False
 
+    @cached_property
+    def crumbs(self):
+        return [("Explore", "")]
+
     # HTMX
     htmx_templates = ["submissions/fragments/tag_results.html"]
 
@@ -606,7 +610,7 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         return context
 
 
-class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
+class TagDetailView(SidebarMixin, BaseBreadcrumbMixin, DetailView):
     model = Tag
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
@@ -628,7 +632,9 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
     )
 
     # Breadcrumb
-    breadcrumb_use_pk = False
+    @cached_property
+    def crumbs(self):
+        return [("Explore", reverse("submissions:tag_list")), (self.object, "")]
 
     # Frontend options
     article_cols = 1
@@ -673,13 +679,16 @@ class TagDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
         return context
 
 
-class CuratedCollectionDetailView(SidebarMixin, DetailBreadcrumbMixin, DetailView):
+class CuratedCollectionDetailView(SidebarMixin, BaseBreadcrumbMixin, DetailView):
     model = CuratedCollection
     context_object_name = "collection"
     template_name = "submissions/collection_detail.html"
     queryset = CuratedCollection.objects.filter(active=True).prefetch_related("tags")
-    breadcrumb_use_pk = False
     article_cols = 1
+
+    @cached_property
+    def crumbs(self):
+        return [("Explore", reverse("submissions:tag_list")), (self.object, "")]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
