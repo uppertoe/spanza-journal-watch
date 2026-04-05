@@ -1446,12 +1446,9 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   }
 
   // Clear dots when reading list is viewed (any reading list button)
-  var scrollPending = false;
-
   function clearDotsOnReadingListClick() {
     sessionStorage.removeItem(DOT_KEY);
     hideDots();
-    scrollPending = true;
   }
 
   var rlBtn = document.getElementById('reading-list-btn');
@@ -1463,17 +1460,6 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-journal-nav="reading_list"]');
     if (btn) clearDotsOnReadingListClick();
-  });
-
-  // After HTMX swap, scroll to the reading list area
-  document.body.addEventListener('htmx:afterSettle', function (event) {
-    if (scrollPending && event.target.id === 'journal-browser-results') {
-      scrollPending = false;
-      var target = document.getElementById('journal-browser-results');
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }
   });
 })();
 
@@ -1799,6 +1785,25 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
       setActiveNav('shelf');
     }
   }
+
+  // Track which nav view is currently active
+  var currentView = null;
+
+  var origSetActiveNav = setActiveNav;
+  setActiveNav = function (viewName) {
+    currentView = viewName;
+    origSetActiveNav(viewName);
+  };
+
+  // Cancel HTMX request when the button is already active and no modal is open
+  document.body.addEventListener('htmx:confirm', function (e) {
+    var btn = e.target.closest('[data-journal-nav]');
+    if (!btn) return;
+    var openModal = document.querySelector('.modal.show');
+    if (btn.dataset.journalNav === currentView && !openModal) {
+      e.preventDefault();
+    }
+  });
 
   // Update on nav button click + close any open modal
   document.addEventListener('click', function (e) {
