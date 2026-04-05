@@ -1604,7 +1604,7 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
   function hideUnnecessaryToggles(root) {
     var clamps = (root || document).querySelectorAll('.jw-abstract-clamp');
     clamps.forEach(function (el) {
-      var text = el.querySelector('.jw-abstract-clamp__text');
+      var text = el.querySelector('.jw-abstract-clamp__preview');
       var btn = el.querySelector('.jw-abstract-clamp__toggle');
       if (text && btn) {
         btn.style.display =

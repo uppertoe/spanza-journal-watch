@@ -144,5 +144,21 @@ def manifest_view(request: HttpRequest) -> JsonResponse:
                 "type": "image/png",
             },
         ],
+        "screenshots": [
+            {
+                "src": static("images/pwa/screenshot-wide.png"),
+                "sizes": "1156x654",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": "Journal Watch desktop view",
+            },
+            {
+                "src": static("images/pwa/screenshot-narrow.png"),
+                "sizes": "760x1330",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": "Journal Watch mobile view",
+            },
+        ],
     }
     return JsonResponse(manifest, content_type="application/manifest+json")
