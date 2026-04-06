@@ -134,9 +134,13 @@ class PlankaClient:
         payload = self._request("PATCH", f"/projects/{project_id}", json={"name": name})
         return payload.get("item", {})
 
-    def update_project_hidden(self, project_id, is_hidden):
-        """Set project visibility. Hidden projects are only visible to the creator."""
-        payload = self._request("PATCH", f"/projects/{project_id}", json={"isHidden": is_hidden})
+    def make_project_shared(self, project_id):
+        """Remove owner restriction so admins and added members can access the project."""
+        payload = self._request(
+            "PATCH",
+            f"/projects/{project_id}",
+            json={"ownerProjectManagerId": None},
+        )
         return payload.get("item", {})
 
     def update_project_background(self, project_id, *, background_type="image", background_image_id=None):
@@ -332,7 +336,7 @@ class PlankaClient:
         import secrets
 
         raw_prefix = email.split("@")[0].lower()
-        username = re.sub(r"[^a-z0-9_-]", "_", raw_prefix).strip("_-") or "user"
+        username = re.sub(r"[^a-z0-9_.]", "_", raw_prefix).strip("_.") or "user"
         username = username[:48]
 
         payload = self._request(

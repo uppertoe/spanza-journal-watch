@@ -3920,9 +3920,9 @@ def _issue_builder_base_context(
             try:
                 client = _build_planka_client()
                 project = client.get_project(binding.project_id)
-                context["planka_project_hidden"] = project.get("isHidden", False)
+                context["planka_project_private"] = bool(project.get("ownerProjectManagerId"))
             except PlankaAPIError:
-                context["planka_project_hidden"] = None
+                context["planka_project_private"] = None
 
         context["review_form"] = review_form or IssueBuilderReviewForm(issue=issue)
         context["review_form_action"] = form_action or reverse(
@@ -5736,7 +5736,7 @@ def planka_make_project_shared(request, issue_id):
 
     try:
         client = _build_planka_client()
-        client.update_project_hidden(binding.project_id, False)
+        client.make_project_shared(binding.project_id)
     except PlankaAPIError as error:
         safe_error = _safe_planka_error(error)
         if request.headers.get("HX-Request") == "true":
