@@ -3801,7 +3801,8 @@ def _send_issue_invite_email(request, invite, raw_token):
         "docs_url": request.build_absolute_uri(reverse("backend:docs")),
     }
 
-    subject = f"Invitation to contribute to {issue.name}"
+    role_label = contributor.get_role_display().lower()
+    subject = f"Invitation to be a {role_label} for {issue.name}"
     text_body = render_to_string("backend/email/issue_contributor_invite.txt", context)
     html_body = render_to_string("backend/email/issue_contributor_invite.html", context)
 
@@ -3830,7 +3831,8 @@ def _send_issue_welcome_email(request, contributor):
         "planka_url": planka_url,
         "docs_url": request.build_absolute_uri(reverse("backend:docs")),
     }
-    subject = f"Thank you for agreeing to review for {issue.name}"
+    role_label = contributor.get_role_display().lower()
+    subject = f"Welcome as a {role_label} for {issue.name}"
     text_body = render_to_string("backend/email/issue_contributor_welcome.txt", context)
     html_body = render_to_string("backend/email/issue_contributor_welcome.html", context)
     message = EmailMultiAlternatives(

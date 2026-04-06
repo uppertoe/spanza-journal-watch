@@ -20,11 +20,11 @@
     <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
       <mj-column>
         <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
-          You've been invited to contribute
+          You've been invited to be a {{ contributor.get_role_display|lower }}
         </mj-text>
         <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="24px">
           {% if contributor.name %}Hello {{ contributor.name }},<br><br>{% endif %}
-          You have been invited to contribute to <strong>{{ issue.name }}</strong> on Journal Watch. Click the button below to accept your invitation and get started.
+          You have been invited to be a <strong>{{ contributor.get_role_display|lower }}</strong> for <strong>{{ issue.name }}</strong> on Journal Watch. Click the button below to accept your invitation and get started.
         </mj-text>
         <mj-button href="{{ accept_url }}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
           Accept invitation
@@ -34,7 +34,11 @@
         </mj-text>
         {% if docs_url %}
         <mj-text font-size="14px" color="#444444" padding-top="16px" line-height="1.6">
+          {% if contributor.role == "coordinator" %}
+          New to Journal Watch? Read the <a href="{{ docs_url }}user-guide/coordinator.html" style="color:#2f5a80;">coordinator guide</a> to learn how the editorial workflow works.
+          {% else %}
           New to Journal Watch? Read the <a href="{{ docs_url }}user-guide/reviewer.html" style="color:#2f5a80;">reviewer guide</a> to learn how the review workflow works.
+          {% endif %}
         </mj-text>
         {% endif %}
         <mj-text font-size="12px" color="#8a96a2" padding-top="20px">
