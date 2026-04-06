@@ -3551,7 +3551,14 @@ def _sync_contributor_to_planka(contributor):
 
         desired_name = (contributor.name or "").strip() or contributor.email
         if not planka_user:
-            planka_user = client.create_user(contributor.email, desired_name)
+            try:
+                planka_user = client.create_user(contributor.email, desired_name)
+            except PlankaAPIError as exc:
+                if "403" in str(exc):
+                    # OIDC_ENFORCED=true blocks the REST API — create via direct DB write
+                    planka_user = client.create_user_via_db(contributor.email, desired_name)
+                else:
+                    raise
         elif (planka_user.get("name") or "").strip() != desired_name:
             try:
                 client.update_user(str(planka_user["id"]), desired_name)

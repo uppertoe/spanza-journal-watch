@@ -352,6 +352,77 @@ class PlankaClient:
         )
         return payload.get("item", {})
 
+    def create_user_via_db(self, email, name, role="boardUser"):
+        """Create a Planka user directly in the database.
+
+        Required when OIDC_ENFORCED=true blocks POST /api/users.
+        The user will be linked to their OIDC identity on first SSO login
+        via Planka's get-or-create-one-with-oidc helper (matches by email).
+        """
+        import re
+        from datetime import datetime, timezone
+
+        import psycopg2
+
+        db_url = (getattr(settings, "PLANKA_DB_URL", "") or "").strip()
+        if not db_url:
+            raise PlankaAPIError("PLANKA_DB_URL is not configured.")
+
+        raw_prefix = email.split("@")[0].lower()
+        username = re.sub(r"[^a-z0-9_.]", "_", raw_prefix).strip("_.") or "user"
+        username = username[:48]
+
+        try:
+            conn = psycopg2.connect(db_url)
+        except Exception as error:
+            raise PlankaAPIError(f"Could not connect to Planka database: {error}") from error
+
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    # Ensure username is unique — append suffix if needed
+                    cur.execute("SELECT id FROM user_account WHERE username = %s", (username,))
+                    if cur.fetchone():
+                        base = username[:44]
+                        for i in range(1, 1000):
+                            candidate = f"{base}_{i}"
+                            cur.execute("SELECT id FROM user_account WHERE username = %s", (candidate,))
+                            if not cur.fetchone():
+                                username = candidate
+                                break
+
+                    now = datetime.now(timezone.utc)
+                    cur.execute(
+                        """
+                        INSERT INTO user_account (
+                            id, email, name, username, role,
+                            is_sso_user, is_deactivated,
+                            subscribe_to_own_cards, subscribe_to_card_when_commenting,
+                            turn_off_recent_card_highlighting, enable_favorites_by_default,
+                            default_editor_mode, default_home_view, default_projects_order,
+                            created_at, updated_at
+                        ) VALUES (
+                            next_id(), %s, %s, %s, %s,
+                            true, false,
+                            false, true,
+                            false, true,
+                            'wysiwyg', 'groupedProjects', 'byDefault',
+                            %s, %s
+                        )
+                        RETURNING id
+                        """,
+                        (email, name, username, role, now, now),
+                    )
+                    user_id = cur.fetchone()[0]
+        except psycopg2.IntegrityError as error:
+            raise PlankaAPIError(f"User with email {email} may already exist: {error}") from error
+        except Exception as error:
+            raise PlankaAPIError(f"Failed to create Planka user via DB: {error}") from error
+        finally:
+            conn.close()
+
+        return {"id": user_id, "email": email, "name": name, "username": username, "role": role}
+
     def update_user(self, user_id, name):
         payload = self._request("PATCH", f"/users/{user_id}", json={"name": name})
         return payload.get("item", {})
