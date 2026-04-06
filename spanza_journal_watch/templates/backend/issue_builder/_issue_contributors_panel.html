@@ -7,7 +7,7 @@
   </div>
   <div class="card-body">
     <p class="text-muted small mb-3">
-      Add reviewers below, then select them and send invites as a separate step. Invite links are valid for {{ issue_invite_ttl_days }} days.
+      Add reviewers one at a time, then send invites. Invite links are valid for {{ issue_invite_ttl_days }} days.
     </p>
 
     {% if not planka_binding %}
@@ -22,14 +22,14 @@
       {% endif %}
     {% else %}
 
-    {# Datalist for affiliation autocomplete — shared across all rows #}
+    {# Datalist for affiliation autocomplete #}
     <datalist id="affiliation-options">
       {% for hs_name in all_health_services %}
         <option value="{{ hs_name }}">
       {% endfor %}
     </datalist>
 
-    {# Step 1: Add contributors #}
+    {# Step 1: Add a single reviewer #}
     <form
       id="contributor-bulk-form"
       hx-post="{% url "backend:issue_add_contributor" selected_issue.pk %}"
@@ -52,7 +52,6 @@
       </div>
 
       <div id="contributor-rows">
-        <!-- Row template (index 0) -->
         <div class="contributor-row row g-2 align-items-start mb-2" data-index="0">
           <div class="col-12 col-md-3">
             <input type="text" name="name_0" class="form-control contributor-name" placeholder="Dr Jane Smith" required>
@@ -62,9 +61,7 @@
           </div>
           <div class="col-12 col-md-4">
             <div class="contributor-affiliation-container">
-              {# Tags for existing (locked) and newly added (removable) affiliations #}
               <div class="contributor-affiliation-tags d-flex flex-wrap gap-1 mb-1"></div>
-              {# Text input for adding a new affiliation #}
               <input
                 type="text"
                 list="affiliation-options"
@@ -76,21 +73,16 @@
             </div>
           </div>
           <div class="col-auto">
-            <button type="button" class="btn btn-outline-secondary btn-sm remove-row-btn" disabled>&times;</button>
+            <button type="submit" class="btn btn-primary btn-sm">Add</button>
           </div>
         </div>
-      </div>
-
-      <div class="d-flex gap-2 mt-2 mb-4">
-        <button type="button" id="add-contributor-row" class="btn btn-outline-secondary btn-sm">+ Add another</button>
-        <button type="submit" class="btn btn-primary btn-sm">Add Reviewers</button>
       </div>
     </form>
     {% endif %}
 
     <hr class="my-3">
 
-    {# Step 2: Contributor table with bulk invite sending #}
+    {# Step 2: Reviewer table with invite actions #}
     <form
       id="send-invites-form"
       hx-post="{% url "backend:issue_send_contributor_invites" selected_issue.pk %}"
@@ -121,7 +113,7 @@
             {% for contributor in issue_reviewers %}
               <tr>
                 <td>
-                  {% if contributor.status != "active" and contributor.status != "revoked" %}
+                  {% if contributor.status != "revoked" %}
                     <input
                       type="checkbox"
                       name="contributor_ids"
@@ -181,18 +173,6 @@
                     Sync Planka
                   </button>
                   {% endif %}
-                  {% if contributor.status != "revoked" %}
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    hx-post="{% url "backend:issue_resend_contributor_invite" selected_issue.pk contributor.pk %}"
-                    hx-target="#issue-contributors-panel"
-                    hx-swap="outerHTML"
-                    hx-confirm="Resend invite to {{ contributor.email }}?"
-                  >
-                    Resend
-                  </button>
-                  {% endif %}
                   <button
                     type="button"
                     class="btn btn-outline-danger btn-sm"
@@ -214,13 +194,20 @@
         </table>
       </div>
 
-      <div class="d-flex justify-content-end mt-2">
+      <div class="d-flex justify-content-end gap-2 mt-2">
         <button
           type="submit"
+          name="send_all_pending"
+          value="1"
           class="btn btn-primary btn-sm"
-          id="send-invites-btn"
+          id="send-initial-invites-btn"
+        >Send initial invites</button>
+        <button
+          type="submit"
+          class="btn btn-outline-primary btn-sm"
+          id="resend-selected-btn"
           disabled
-        >Send invites to selected</button>
+        >Resend to selected</button>
       </div>
     </form>
 
@@ -240,12 +227,11 @@
   }
 
   function addAffiliationTag(row, name, locked) {
-    if (currentAffiliationNames(row).includes(name)) return; // no duplicates
+    if (currentAffiliationNames(row).includes(name)) return;
 
     const tagsEl = getTagsEl(row);
     const idx = row.dataset.index;
 
-    // Hidden input submitted with the form.
     const hidden = document.createElement('input');
     hidden.type = 'hidden';
     hidden.className = 'contributor-affiliation-hidden';
@@ -253,7 +239,6 @@
     hidden.value = name;
     row.querySelector('.contributor-affiliation-container').appendChild(hidden);
 
-    // Visible badge.
     const badge = document.createElement('span');
     badge.className = `badge d-inline-flex align-items-center gap-1 py-1 px-2 ${locked ? 'text-bg-secondary' : 'text-bg-primary'}`;
     badge.dataset.affiliationName = name;
@@ -303,7 +288,6 @@
           }
 
           if (data.has_affiliations) {
-            // Show existing affiliations as locked tags; user can still add more.
             clearAffiliations(row);
             data.affiliations.forEach(a => addAffiliationTag(row, a.name, true));
             affiliationInput.placeholder = 'Add another affiliation…';
@@ -318,7 +302,6 @@
         .catch(() => {});
     });
 
-    // Add a new affiliation tag when the user picks/types one.
     affiliationInput && affiliationInput.addEventListener('change', function () {
       const val = affiliationInput.value.trim();
       if (val) {
@@ -328,71 +311,20 @@
     });
   }
 
-  // ── Row management ────────────────────────────────────────────────────────
+  // ── Init add-reviewer row ────────────────────────────────────────────────
 
-  function reindexRows() {
-    rowsContainer.querySelectorAll('.contributor-row').forEach(function (row, i) {
-      row.dataset.index = i;
-      row.querySelector('.contributor-name').name = `name_${i}`;
-      row.querySelector('.contributor-email').name = `email_${i}`;
-      row.querySelectorAll('.contributor-affiliation-hidden').forEach(h => {
-        h.name = `affiliation_${i}`;
-      });
-    });
-  }
+  const row = document.querySelector('#contributor-rows .contributor-row');
+  if (row) attachEmailLookup(row);
 
-  const rowsContainer = document.getElementById('contributor-rows');
-  const addBtn = document.getElementById('add-contributor-row');
+  // ── Resend-to-selected checkboxes ────────────────────────────────────────
 
-  if (rowsContainer && addBtn) {
-    function updateRemoveButtons() {
-      const rows = rowsContainer.querySelectorAll('.contributor-row');
-      rows.forEach(row => {
-        row.querySelector('.remove-row-btn').disabled = rows.length === 1;
-      });
-    }
-
-    attachEmailLookup(rowsContainer.querySelector('.contributor-row'));
-
-    addBtn.addEventListener('click', function () {
-      const rows = rowsContainer.querySelectorAll('.contributor-row');
-      const idx = rows.length;
-      const tpl = rows[0].cloneNode(true);
-      tpl.dataset.index = idx;
-      tpl.querySelector('.contributor-name').name = `name_${idx}`;
-      tpl.querySelector('.contributor-name').value = '';
-      tpl.querySelector('.contributor-email').name = `email_${idx}`;
-      tpl.querySelector('.contributor-email').value = '';
-      // Clear affiliations on cloned row.
-      tpl.querySelectorAll('.contributor-affiliation-hidden').forEach(h => h.remove());
-      getTagsEl(tpl).innerHTML = '';
-      const clonedInput = tpl.querySelector('.contributor-affiliation-input');
-      if (clonedInput) { clonedInput.value = ''; clonedInput.placeholder = 'Type to add affiliation…'; }
-      const clonedHint = tpl.querySelector('.affiliation-hint');
-      if (clonedHint) { clonedHint.textContent = ''; clonedHint.classList.add('d-none'); }
-      tpl.querySelector('.remove-row-btn').disabled = false;
-      rowsContainer.appendChild(tpl);
-      attachEmailLookup(tpl);
-      updateRemoveButtons();
-    });
-
-    rowsContainer.addEventListener('click', function (e) {
-      if (!e.target.classList.contains('remove-row-btn')) return;
-      if (rowsContainer.querySelectorAll('.contributor-row').length === 1) return;
-      e.target.closest('.contributor-row').remove();
-      reindexRows();
-      updateRemoveButtons();
-    });
-  }
-
-  // Step 2: send-invites table checkboxes
   const selectAllCb = document.getElementById('contributor-select-all-table');
-  const sendBtn = document.getElementById('send-invites-btn');
+  const resendBtn = document.getElementById('resend-selected-btn');
 
-  function updateSendBtn() {
-    if (!sendBtn) return;
+  function updateResendBtn() {
+    if (!resendBtn) return;
     const anyChecked = document.querySelectorAll('.contributor-table-cb:checked').length > 0;
-    sendBtn.disabled = !anyChecked;
+    resendBtn.disabled = !anyChecked;
   }
 
   if (selectAllCb) {
@@ -400,17 +332,17 @@
       document.querySelectorAll('.contributor-table-cb').forEach(cb => {
         cb.checked = selectAllCb.checked;
       });
-      updateSendBtn();
+      updateResendBtn();
     });
   }
 
   document.querySelectorAll('.contributor-table-cb').forEach(cb => {
     cb.addEventListener('change', function () {
-      updateSendBtn();
+      updateResendBtn();
       if (!this.checked && selectAllCb) selectAllCb.checked = false;
     });
   });
 
-  updateSendBtn();
+  updateResendBtn();
 })();
 </script>

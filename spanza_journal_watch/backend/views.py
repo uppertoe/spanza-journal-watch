@@ -5057,16 +5057,26 @@ def issue_send_contributor_invites(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     _check_coordinator_issue_access(request, issue)
     contributor_ids = request.POST.getlist("contributor_ids")
+    send_all_pending = request.POST.get("send_all_pending") == "1"
     panel_role = _panel_role_from_request(request)
 
-    if not contributor_ids:
+    if send_all_pending:
+        contributors = IssueContributor.objects.filter(
+            issue=issue,
+            role=panel_role,
+            status=IssueContributor.Status.PENDING,
+        )
+        if not contributors.exists():
+            messages.info(request, "No pending reviewers to invite.")
+            return _render_issue_contributors_panel(request, issue, role=panel_role)
+    elif contributor_ids:
+        contributors = IssueContributor.objects.filter(
+            issue=issue,
+            pk__in=contributor_ids,
+        ).exclude(status=IssueContributor.Status.REVOKED)
+    else:
         messages.error(request, "No contributors selected.")
         return _render_issue_contributors_panel(request, issue, role=panel_role)
-
-    contributors = IssueContributor.objects.filter(
-        issue=issue,
-        pk__in=contributor_ids,
-    ).exclude(status=IssueContributor.Status.REVOKED)
 
     now = timezone.now()
     for contributor in contributors:
