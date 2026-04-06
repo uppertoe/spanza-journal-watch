@@ -788,6 +788,28 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
 
     chief_editor_invites = ChiefEditorInvite.objects.order_by("-created")[:10]
 
+    # Webhook config checks
+    planka_callback_url = (getattr(settings, "PLANKA_CALLBACK_BASE_URL", "") or "").strip()
+    planka_webhook_secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip()
+    planka_webhook_status = None  # None = not checked, dict with details
+    if planka_connected and planka_callback_url:
+        expected_url = _build_planka_webhook_url()
+        try:
+            webhooks = client.list_webhooks()
+            matching = [w for w in webhooks if w.get("url") == expected_url]
+            if matching:
+                wh = matching[0]
+                planka_webhook_status = {
+                    "registered": True,
+                    "id": wh.get("id"),
+                    "url": wh.get("url"),
+                    "events": wh.get("events") or [],
+                }
+            else:
+                planka_webhook_status = {"registered": False, "expected_url": expected_url}
+        except PlankaAPIError as exc:
+            planka_webhook_status = {"registered": False, "error": _safe_planka_error(exc)}
+
     return {
         "now": timezone.now(),
         "pubmed_credential": pubmed_credential,
@@ -798,6 +820,9 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
         "planka_connected": planka_connected,
         "planka_connection_user": planka_connection_user,
         "planka_connection_error": planka_connection_error,
+        "planka_callback_url": planka_callback_url,
+        "planka_webhook_secret_set": bool(planka_webhook_secret),
+        "planka_webhook_status": planka_webhook_status,
         "chief_editor_planka_user": chief_editor_planka_user,
         "chief_editor_invites": chief_editor_invites,
         "inbox_settings_form": inbox_settings_form,

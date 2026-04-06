@@ -203,6 +203,33 @@
     {% endif %}
   </div>
   <div class="card-body">
+    {% if not planka_callback_url or not planka_webhook_secret_set %}
+      <div class="alert alert-warning py-2 small mb-3">
+        <strong>Webhook not configured.</strong> Card revision tracking requires:
+        <ul class="mb-0 mt-1">
+          {% if not planka_callback_url %}<li><code>PLANKA_CALLBACK_BASE_URL</code> is not set (e.g. <code>http://jw_django:5000</code>)</li>{% endif %}
+          {% if not planka_webhook_secret_set %}<li><code>PLANKA_WEBHOOK_SECRET</code> is not set</li>{% endif %}
+        </ul>
+      </div>
+    {% elif planka_webhook_status %}
+      {% if planka_webhook_status.registered %}
+        <div class="alert alert-success py-2 small mb-3">
+          <strong>Webhook registered.</strong>
+          URL: <code>{{ planka_webhook_status.url }}</code>
+          · Events: {{ planka_webhook_status.events|join:", " }}
+        </div>
+      {% elif planka_webhook_status.error %}
+        <div class="alert alert-danger py-2 small mb-3">
+          <strong>Webhook check failed:</strong> {{ planka_webhook_status.error }}
+        </div>
+      {% else %}
+        <div class="alert alert-warning py-2 small mb-3">
+          <strong>No webhook registered.</strong>
+          Expected URL: <code>{{ planka_webhook_status.expected_url }}</code>.
+          Re-link a Planka board from the issue builder to register it automatically.
+        </div>
+      {% endif %}
+    {% endif %}
     {% if planka_connected %}
       <div class="d-flex align-items-center gap-2 text-success mb-1">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
