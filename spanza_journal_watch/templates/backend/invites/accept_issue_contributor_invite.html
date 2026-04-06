@@ -53,7 +53,7 @@
                     <div class="d-flex flex-wrap justify-content-center gap-2">
                         <form method="post" action="{% url 'account_logout' %}">
                             {% csrf_token %}
-                            <input type="hidden" name="next" value="{% url 'account_login' %}?next={{ request.path }}">
+                            <input type="hidden" name="next" value="{{ request.path }}">
                             <button type="submit" class="btn btn-primary">Sign out and switch account</button>
                         </form>
                     </div>

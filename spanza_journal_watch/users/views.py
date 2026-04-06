@@ -64,9 +64,9 @@ def update_profile_name(request):
     return render(request, "fragments/user_profile_name.html")
 
 
-def _invite_email_from_session(request):
-    """Return invited email stored in session when arriving from an invite link."""
-    return request.session.get("pending_invite_email", "")
+def _invite_email_from_request(request):
+    """Return invited email from session or query string (survives logout redirect)."""
+    return request.session.get("pending_invite_email", "") or request.GET.get("invite_email", "")
 
 
 class InviteAwareLoginView(AllauthLoginView):
@@ -74,12 +74,12 @@ class InviteAwareLoginView(AllauthLoginView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["invite_email"] = _invite_email_from_session(self.request)
+        ctx["invite_email"] = _invite_email_from_request(self.request)
         return ctx
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        invite_email = _invite_email_from_session(self.request)
+        invite_email = _invite_email_from_request(self.request)
         if invite_email and self.request.method == "GET":
             kwargs.setdefault("initial", {})["login"] = invite_email
         return kwargs
@@ -93,12 +93,12 @@ class InviteAwareSignupView(AllauthSignupView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["invite_email"] = _invite_email_from_session(self.request)
+        ctx["invite_email"] = _invite_email_from_request(self.request)
         return ctx
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        invite_email = _invite_email_from_session(self.request)
+        invite_email = _invite_email_from_request(self.request)
         if invite_email and self.request.method == "GET":
             kwargs.setdefault("initial", {})["email"] = invite_email
         return kwargs

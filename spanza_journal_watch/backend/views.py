@@ -4395,6 +4395,7 @@ def chief_editor_invite_accept(request, token):
 
     if expected_email != user_email:
         context["status"] = "email_mismatch"
+        context["invited_email"] = invite.email
         context["status_message"] = (
             f"You're signed in as {request.user.email}, but this invite was sent to "
             f"{invite.email}. Please sign out and sign in with the correct account."
@@ -5267,6 +5268,7 @@ def issue_invite_accept(request, token):
 
     if expected_email != user_email:
         context["status"] = "email_mismatch"
+        context["invited_email"] = contributor.email
         context["status_message"] = (
             f"You're signed in as {request.user.email}, but this invite was sent to "
             f"{contributor.email}. Please sign out and sign in with the correct account."
