@@ -38,7 +38,11 @@
                     <h1 class="h3 mb-3">Sign in with the invited email</h1>
                     <p class="text-body-secondary mb-4">{{ status_message }}</p>
                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                        <a class="btn btn-primary" href="{% url 'account_login' %}?next={{ request.path }}">Sign in with another account</a>
+                        <form method="post" action="{% url 'account_logout' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'account_login' %}?next={{ request.path }}">
+                            <button type="submit" class="btn btn-primary">Sign out and switch account</button>
+                        </form>
                     </div>
 
                 {% elif status == "expired" %}
