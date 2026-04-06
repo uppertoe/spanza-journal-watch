@@ -5,7 +5,7 @@
   </div>
   <div class="card-body">
     <p class="text-muted small mb-3">
-      Add regional coordinators who will manage this issue. They will receive an invite link valid for {{ issue_invite_ttl_days }} days, and on acceptance will get access to the editorial backend and Planka board.
+      Add regional coordinators one at a time, then send invites. Invite links are valid for {{ issue_invite_ttl_days }} days.
     </p>
 
     {% if not planka_binding %}
@@ -15,7 +15,7 @@
       </div>
     {% else %}
 
-    {# Step 1: Add coordinators #}
+    {# Step 1: Add a single coordinator #}
     <form
       id="coordinator-bulk-form"
       hx-post="{% url "backend:issue_add_contributor" selected_issue.pk %}"
@@ -26,8 +26,12 @@
       <input type="hidden" name="role" value="coordinator">
       <input type="hidden" name="panel_role" value="coordinator">
 
+      <div class="row g-1 mb-1 d-none d-md-flex">
+        <div class="col-md-4"><label class="form-label mb-0 small text-muted">Name</label></div>
+        <div class="col-md-4"><label class="form-label mb-0 small text-muted">Email</label></div>
+      </div>
+
       <div id="coordinator-rows">
-        <!-- Row template (index 0) -->
         <div class="coordinator-row row g-2 align-items-center mb-2" data-index="0">
           <div class="col-12 col-md-4">
             <input type="text" name="name_0" class="form-control" placeholder="Dr Jane Smith" required>
@@ -36,27 +40,16 @@
             <input type="email" name="email_0" class="form-control" placeholder="coordinator@example.com" required>
           </div>
           <div class="col-auto">
-            <button type="button" class="btn btn-outline-secondary btn-sm remove-coordinator-row-btn" disabled>&times;</button>
+            <button type="submit" class="btn btn-primary btn-sm">Add</button>
           </div>
         </div>
-      </div>
-
-      <div class="d-flex gap-2 mt-2 mb-4">
-        <button type="button" id="add-coordinator-row" class="btn btn-outline-secondary btn-sm">+ Add another</button>
-        <button type="submit" class="btn btn-primary btn-sm">Add coordinators to issue</button>
       </div>
     </form>
     {% endif %}
 
-    {% if planka_binding and not issue_coordinators %}
-      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
-        <span>No coordinators have been added yet. Add coordinators above and send them an invite.</span>
-      </div>
-    {% endif %}
-
     <hr class="my-3">
 
-    {# Step 2: Coordinator table with bulk invite sending #}
+    {# Step 2: Coordinator table with invite actions #}
     <form
       id="send-coordinator-invites-form"
       hx-post="{% url "backend:issue_send_contributor_invites" selected_issue.pk %}"
@@ -85,7 +78,7 @@
             {% for contributor in issue_coordinators %}
               <tr>
                 <td>
-                  {% if contributor.status != "active" and contributor.status != "revoked" %}
+                  {% if contributor.status != "revoked" %}
                     <input
                       type="checkbox"
                       name="contributor_ids"
@@ -137,18 +130,6 @@
                     Sync Planka
                   </button>
                   {% endif %}
-                  {% if contributor.status != "revoked" %}
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    hx-post="{% url "backend:issue_resend_contributor_invite" selected_issue.pk contributor.pk %}"
-                    hx-target="#issue-coordinators-panel"
-                    hx-swap="outerHTML"
-                    hx-confirm="Resend invite to {{ contributor.email }}?"
-                  >
-                    Resend
-                  </button>
-                  {% endif %}
                   <button
                     type="button"
                     class="btn btn-outline-danger btn-sm"
@@ -172,16 +153,18 @@
 
       <div class="d-flex justify-content-end gap-2 mt-2">
         <button
-          type="button"
-          class="btn btn-outline-primary btn-sm"
-          id="invite-all-coordinators-btn"
-        >Invite all</button>
+          type="submit"
+          name="send_all_pending"
+          value="1"
+          class="btn btn-primary btn-sm"
+          id="send-initial-coordinator-invites-btn"
+        >Send initial invites</button>
         <button
           type="submit"
-          class="btn btn-primary btn-sm"
-          id="send-coordinator-invites-btn"
+          class="btn btn-outline-primary btn-sm"
+          id="resend-coordinator-selected-btn"
           disabled
-        >Invite selected</button>
+        >Resend to selected</button>
       </div>
     </form>
 
@@ -190,52 +173,13 @@
 
 <script>
 (function () {
-  const rowsContainer = document.getElementById('coordinator-rows');
-  const addBtn = document.getElementById('add-coordinator-row');
-
-  if (rowsContainer && addBtn) {
-    function updateRemoveBtns() {
-      const rows = rowsContainer.querySelectorAll('.coordinator-row');
-      rows.forEach(row => {
-        row.querySelector('.remove-coordinator-row-btn').disabled = rows.length === 1;
-      });
-    }
-
-    addBtn.addEventListener('click', function () {
-      const rows = rowsContainer.querySelectorAll('.coordinator-row');
-      const idx = rows.length;
-      const tpl = rows[0].cloneNode(true);
-      tpl.dataset.index = idx;
-      tpl.querySelector('input[type="text"]').name = `name_${idx}`;
-      tpl.querySelector('input[type="text"]').value = '';
-      tpl.querySelector('input[type="email"]').name = `email_${idx}`;
-      tpl.querySelector('input[type="email"]').value = '';
-      tpl.querySelector('.remove-coordinator-row-btn').disabled = false;
-      rowsContainer.appendChild(tpl);
-      updateRemoveBtns();
-    });
-
-    rowsContainer.addEventListener('click', function (e) {
-      if (!e.target.classList.contains('remove-coordinator-row-btn')) return;
-      const rows = rowsContainer.querySelectorAll('.coordinator-row');
-      if (rows.length === 1) return;
-      e.target.closest('.coordinator-row').remove();
-      rowsContainer.querySelectorAll('.coordinator-row').forEach(function (row, i) {
-        row.dataset.index = i;
-        row.querySelector('input[type="text"]').name = `name_${i}`;
-        row.querySelector('input[type="email"]').name = `email_${i}`;
-      });
-      updateRemoveBtns();
-    });
-  }
-
   const selectAllCb = document.getElementById('coordinator-select-all-table');
-  const sendBtn = document.getElementById('send-coordinator-invites-btn');
+  const resendBtn = document.getElementById('resend-coordinator-selected-btn');
 
-  function updateSendBtn() {
-    if (!sendBtn) return;
+  function updateResendBtn() {
+    if (!resendBtn) return;
     const anyChecked = document.querySelectorAll('.coordinator-table-cb:checked').length > 0;
-    sendBtn.disabled = !anyChecked;
+    resendBtn.disabled = !anyChecked;
   }
 
   if (selectAllCb) {
@@ -243,28 +187,17 @@
       document.querySelectorAll('.coordinator-table-cb').forEach(cb => {
         cb.checked = selectAllCb.checked;
       });
-      updateSendBtn();
+      updateResendBtn();
     });
   }
 
   document.querySelectorAll('.coordinator-table-cb').forEach(cb => {
     cb.addEventListener('change', function () {
-      updateSendBtn();
+      updateResendBtn();
       if (!this.checked && selectAllCb) selectAllCb.checked = false;
     });
   });
 
-  updateSendBtn();
-
-  const inviteAllBtn = document.getElementById('invite-all-coordinators-btn');
-  if (inviteAllBtn) {
-    inviteAllBtn.addEventListener('click', function () {
-      const checkboxes = document.querySelectorAll('.coordinator-table-cb');
-      checkboxes.forEach(cb => { cb.checked = true; });
-      updateSendBtn();
-      const form = document.getElementById('send-coordinator-invites-form');
-      if (form) htmx.trigger(form, 'submit');
-    });
-  }
+  updateResendBtn();
 })();
 </script>

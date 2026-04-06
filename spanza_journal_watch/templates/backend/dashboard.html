@@ -4,7 +4,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Dashboard</h1>
   {% if perms.submissions.chief_editor %}
-    <a class="btn btn-primary" href="{% url 'backend:issue_builder' %}">New issue</a>
+    <a class="btn btn-primary" href="{% url 'backend:issue_builder' %}?issue=new">New issue</a>
   {% endif %}
 </div>
 

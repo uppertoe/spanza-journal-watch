@@ -288,7 +288,7 @@
       </div>
       {% if not is_coordinator_only %}
       <div class="p-3 border-bottom">
-        <a class="btn btn-sm btn-primary w-100" href="{% url 'backend:issue_builder' %}">+ New issue</a>
+        <a class="btn btn-sm btn-primary w-100" href="{% url 'backend:issue_builder' %}?issue=new">+ New issue</a>
       </div>
       {% endif %}
       <div class="issues-list">

@@ -3435,9 +3435,12 @@ def _check_coordinator_issue_access(request, issue):
 def _resolve_and_persist_issue(request, *, fallback_latest=True):
     """Resolve the selected issue, persisting the choice to the session.
 
-    Priority: ?issue= param in GET/POST > session > most-recently-modified issue.
+    Priority: ?issue=new (clear) > ?issue=<id> > session > most-recently-modified issue.
     """
     issue_id = (request.GET.get("issue") or request.POST.get("issue") or "").strip()
+    if issue_id.lower() == "new":
+        request.session.pop("selected_issue_id", None)
+        return None
     if issue_id.isdigit():
         issue = Issue.objects.filter(pk=issue_id).first()
         if issue:

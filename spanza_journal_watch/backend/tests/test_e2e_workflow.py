@@ -188,6 +188,19 @@ class TestStage1IssueAndReview:
         )
         assert Issue.objects.get(name="March 2024").active is False
 
+    def test_new_issue_clears_session_and_shows_blank_form(self):
+        """Clicking '+ New issue' when an issue is already selected must show a blank create form."""
+        client, _ = _make_editor()
+        existing = Issue.objects.create(name="March 2024", active=False, body="Body.")
+        # Select the existing issue so it's stored in the session.
+        client.get(reverse("backend:issue_builder") + f"?issue={existing.pk}")
+        # Navigate to "new issue".
+        response = client.get(reverse("backend:issue_builder") + "?issue=new")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Create issue draft" in content
+        assert "Edit issue draft" not in content
+
     def test_add_review_creates_article_author_and_links_to_issue(self):
         issue = Issue.objects.create(name="March 2024", active=False, body="Body.")
         client, _ = _make_editor()
