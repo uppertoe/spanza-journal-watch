@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.search import TrigramSimilarity
 from django.core.exceptions import MultipleObjectsReturned, PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
@@ -106,6 +107,9 @@ from .pubmed_cache import (
 )
 from .pubmed_cache import (
     shift_month as _shift_month,
+)
+from .pubmed_cache import (
+    upsert_pubmed_article as _upsert_pubmed_article,
 )
 from .tasks import (
     process_subscriber_csv,
@@ -379,9 +383,12 @@ def process_csv(request, save_token):
 
 
 @login_required
+@permission_required("submissions.invited_contributor", raise_exception=True)
 def backend_go(request):
     """
-    Role-aware destination chooser. Shown after login for staff/editorial users.
+    Role-aware destination chooser for editorial users.
+    Requires invited_contributor permission (granted to all invited reviewers,
+    coordinators, and chief editors).
     - Reviewers (no backend perms) → redirect straight to Planka.
     - Chief editors / regional coordinators → show Backend + Planka choice.
     """
@@ -4369,15 +4376,14 @@ def chief_editor_invite_accept(request, token):
     user_email = (request.user.email or "").strip().lower()
 
     if expected_email != user_email:
-        from django.contrib.auth import logout as auth_logout
-
-        auth_logout(request)
-        messages.info(
-            request,
-            f"You've been signed out. Please sign in or create an account"
-            f" with {invite.email} to accept this invite.",
+        context["status"] = "email_mismatch"
+        context["status_message"] = (
+            f"You're signed in as {request.user.email}, but this invite was sent to "
+            f"{invite.email}. Please sign out and sign in with the correct account."
         )
-        return redirect(request.get_full_path())
+        request.session["_pending_invite_token"] = token
+        request.session["pending_invite_email"] = invite.email
+        return render(request, template, context)
 
     if invite.consumed_at and invite.accepted_by == request.user:
         context["status"] = "accepted"
@@ -4403,6 +4409,7 @@ def chief_editor_invite_accept(request, token):
             ("submissions", "manage_issue_builder"),
             ("submissions", "regional_coordinator"),
             ("submissions", "can_recommend"),
+            ("submissions", "invited_contributor"),
             ("backend", "manage_subscriber_csv"),
             ("backend", "send_newsletters"),
             ("backend", "view_newsletter_stats"),
@@ -4724,6 +4731,117 @@ def add_issue_review(request, issue_id):
             "form_action": reverse("backend:add_issue_review", kwargs={"issue_id": issue.pk}),
             "is_edit": False,
         },
+    )
+
+
+def _get_suggested_tag_pks(article, threshold=0.15, max_suggestions=6):
+    """Return curated Tag PKs suggested by trigram similarity to article text."""
+    search_text = f"{article.title or ''} {article.abstract or ''}".strip()
+    if not search_text:
+        return set()
+    # Truncate to keep similarity computation reasonable
+    search_text = search_text[:2000]
+    suggested = (
+        Tag.objects.filter(curated=True, active=True)
+        .annotate(similarity=TrigramSimilarity("text", search_text))
+        .filter(similarity__gte=threshold)
+        .order_by("-similarity")
+        .values_list("pk", flat=True)[:max_suggestions]
+    )
+    return set(suggested)
+
+
+def _build_tag_grid_context(article):
+    """Build annotated curated tag list for an article (MeSH-matched + similarity-suggested)."""
+    curated_tags = list(Tag.objects.filter(curated=True, active=True).order_by("display_order"))
+    mesh_tag_pks = set(article.tags.filter(curated=True).values_list("pk", flat=True))
+    suggested_pks = _get_suggested_tag_pks(article) - mesh_tag_pks
+    for tag in curated_tags:
+        tag.mesh_matched = tag.pk in mesh_tag_pks
+        tag.similarity_suggested = tag.pk in suggested_pks
+    return curated_tags
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def review_pubmed_search(request, issue_id):
+    """HTMX GET: search PubMed and return results for the review form."""
+    get_object_or_404(Issue, pk=issue_id)
+    query = (request.GET.get("q") or "").strip()
+    articles = []
+    error = None
+    if query:
+        try:
+            articles = _build_pubmed_client().find_articles(query, retmax=8)
+        except PubmedAPIError as exc:
+            error = str(exc)
+    # Mark articles that already exist locally
+    if articles:
+        existing_pmids = set(
+            PubmedArticle.objects.filter(pmid__in=[a.get("pmid") for a in articles if a.get("pmid")]).values_list(
+                "pmid", flat=True
+            )
+        )
+        for a in articles:
+            a["already_exists"] = a.get("pmid") in existing_pmids
+    return render(
+        request,
+        "backend/issue_builder/_review_pubmed_search_results.html",
+        {"articles": articles, "query": query, "error": error, "issue_id": issue_id},
+    )
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def review_pubmed_select(request, issue_id):
+    """HTMX POST: import/select a PubMed article and return citation card + tag grid OOB."""
+    get_object_or_404(Issue, pk=issue_id)
+    pmid = (request.POST.get("pmid") or "").strip()
+    if not pmid:
+        return HttpResponseBadRequest("No PMID provided.")
+
+    try:
+        payloads = _build_pubmed_client().fetch_articles([pmid])
+    except PubmedAPIError as exc:
+        return render(
+            request,
+            "backend/issue_builder/_review_pubmed_search_results.html",
+            {"articles": [], "query": "", "error": str(exc), "issue_id": issue_id},
+        )
+
+    if not payloads:
+        return render(
+            request,
+            "backend/issue_builder/_review_pubmed_search_results.html",
+            {"articles": [], "query": "", "error": f"No article found for PMID {pmid}.", "issue_id": issue_id},
+        )
+
+    article = _upsert_pubmed_article(payloads[0])
+    curated_tags = _build_tag_grid_context(article)
+    mesh_context = _build_article_mesh_context(article)
+
+    return render(
+        request,
+        "backend/issue_builder/_review_article_selected.html",
+        {
+            "article": article,
+            "curated_tags": curated_tags,
+            "article_mesh_terms": mesh_context,
+            "issue_id": issue_id,
+        },
+    )
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def review_tag_suggestions(request, article_id):
+    """HTMX GET: return annotated tag grid for an article."""
+    article = get_object_or_404(PubmedArticle, pk=article_id)
+    curated_tags = _build_tag_grid_context(article)
+    return render(
+        request,
+        "backend/issue_builder/_review_tag_grid_container.html",
+        {"curated_tags": curated_tags},
     )
 
 
@@ -5120,15 +5238,14 @@ def issue_invite_accept(request, token):
     user_email = (request.user.email or "").strip().lower()
 
     if expected_email != user_email:
-        from django.contrib.auth import logout as auth_logout
-
-        auth_logout(request)
-        messages.info(
-            request,
-            f"You've been signed out. Please sign in or create an account"
-            f" with {contributor.email} to accept this invite.",
+        context["status"] = "email_mismatch"
+        context["status_message"] = (
+            f"You're signed in as {request.user.email}, but this invite was sent to "
+            f"{contributor.email}. Please sign out and sign in with the correct account."
         )
-        return redirect(request.get_full_path())
+        request.session["_pending_invite_token"] = token
+        request.session["pending_invite_email"] = contributor.email
+        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
 
     if (
         invite.consumed_at
@@ -5172,9 +5289,10 @@ def issue_invite_accept(request, token):
 
         logger = logging.getLogger(__name__)
 
-        # All accepted contributors can recommend articles
+        # All accepted contributors can recommend articles and access editorial tools
         perms_to_grant = [
             ("submissions", "can_recommend"),
+            ("submissions", "invited_contributor"),
         ]
         # Coordinators also get backend access
         if contributor.role == IssueContributor.Role.COORDINATOR:

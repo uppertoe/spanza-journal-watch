@@ -1,0 +1,38 @@
+{% if error %}
+<div class="alert alert-warning small py-2">{{ error }}</div>
+{% elif query and not articles %}
+<div class="text-muted small py-2">No articles found for &ldquo;{{ query }}&rdquo;. Try different search terms or enter details manually.</div>
+{% endif %}
+
+{% if articles %}
+<div class="list-group list-group-flush">
+  {% for article in articles %}
+  <div class="list-group-item px-0 py-2">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+      <div class="min-w-0">
+        <div class="fw-semibold small text-break">{{ article.title }}</div>
+        <div class="text-muted small">
+          {{ article.source_journal_name }}
+          {% if article.publication_date %} &middot; {{ article.publication_date|date:"M Y" }}{% endif %}
+          {% if article.pmid %} &middot; PMID {{ article.pmid }}{% endif %}
+        </div>
+        {% if article.already_exists %}
+          <span class="badge text-bg-light border small mt-1">Already in database</span>
+        {% endif %}
+      </div>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-primary flex-shrink-0"
+        hx-post="{% url 'backend:review_pubmed_select' issue_id %}"
+        hx-vals='{"pmid": "{{ article.pmid }}"}'
+        hx-target="#article-select-area"
+        hx-swap="innerHTML"
+        hx-disabled-elt="this"
+      >
+        Select
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

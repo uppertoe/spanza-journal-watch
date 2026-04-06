@@ -127,7 +127,7 @@ class PlankaClient:
         return payload.get("item", {})
 
     def create_project(self, name):
-        payload = self._request("POST", "/projects", json={"type": "private", "name": name})
+        payload = self._request("POST", "/projects", json={"type": "shared", "name": name})
         return payload["item"]
 
     def update_project_name(self, project_id, name):

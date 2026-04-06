@@ -14,14 +14,22 @@ class AccountAdapter(DefaultAccountAdapter):
         if token:
             from django.utils import timezone
 
-            from spanza_journal_watch.backend.models import IssueContributorInvite
+            from spanza_journal_watch.backend.models import ChiefEditorInvite, IssueContributorInvite
 
             token_hash = IssueContributorInvite.hash_token(token)
-            return IssueContributorInvite.objects.filter(
+            now = timezone.now()
+            if IssueContributorInvite.objects.filter(
                 token_hash=token_hash,
-                expires_at__gt=timezone.now(),
+                expires_at__gt=now,
                 consumed_at__isnull=True,
-            ).exists()
+            ).exists():
+                return True
+            if ChiefEditorInvite.objects.filter(
+                token_hash=token_hash,
+                expires_at__gt=now,
+                consumed_at__isnull=True,
+            ).exists():
+                return True
         return False
 
     def login(self, request, user):
@@ -32,13 +40,30 @@ class AccountAdapter(DefaultAccountAdapter):
         migrate_session_stars_to_user(request.session, user)
         migrate_session_fulltext_to_user(request.session, user)
         Subscriber.objects.filter(email__iexact=user.email, user__isnull=True).update(user=user)
+
+        # Auto-verify email when logging in via an invite link.
+        # The invite link itself is proof the user controls this email address,
+        # so skip the email verification step that would otherwise block login.
+        if request.session.get("_pending_invite_token"):
+            from allauth.account.models import EmailAddress
+
+            email_obj = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
+            if email_obj and not email_obj.verified:
+                email_obj.verified = True
+                email_obj.primary = True
+                email_obj.save(update_fields=["verified", "primary"])
+            elif not email_obj:
+                EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+
         return super().login(request, user)
 
     def get_login_redirect_url(self, request):
-        """Respect ?next= when present; otherwise staff→backend, others→journals."""
+        """Respect ?next= when present; otherwise always go to journals.
+
+        Editorial users reach the backend via the 'Editor' button in the nav,
+        not via automatic login redirect.
+        """
         next_url = request.POST.get("next") or request.GET.get("next") or ""
         if next_url:
             return next_url
-        if request.user.is_staff:
-            return reverse("backend:backend_go")
         return reverse("submissions:journal_list")

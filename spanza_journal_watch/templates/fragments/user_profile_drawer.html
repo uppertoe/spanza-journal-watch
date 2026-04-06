@@ -30,7 +30,7 @@
           <svg class="bi me-1" width="1em" height="1em"><use href="#icon-file-text"></use></svg>
           CPD Report
         </a>
-        {% if perms.submissions.manage_issue_builder %}
+        {% if perms.submissions.invited_contributor %}
           <a href="{% url 'backend:backend_go' %}" class="btn btn-outline-secondary">
             <svg class="bi me-1" width="1em" height="1em"><use href="#icon-gear"></use></svg>
             Editor

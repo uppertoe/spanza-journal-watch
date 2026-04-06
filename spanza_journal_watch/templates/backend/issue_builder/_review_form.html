@@ -13,30 +13,99 @@
   <div class="row g-3">
         <div class="col-12">{{ review_form.article_mode|as_crispy_field }}</div>
 
+        {# --- Existing article mode --- #}
         <div class="col-12 article-existing-fields">
-          {{ review_form.existing_article|as_crispy_field }}
+          <div style="display:none">{{ review_form.existing_article }}</div>
+          <label class="form-label">Article</label>
+          <input
+            type="text"
+            id="existing-article-picker-search"
+            class="form-control mb-2"
+            placeholder="Search by title…"
+            autocomplete="off"
+          >
+          <div
+            id="existing-article-picker-list"
+            class="list-group mb-1"
+            style="max-height:220px; overflow-y:auto; border:1px solid var(--bs-border-color); border-radius:var(--bs-border-radius);"
+          >
+            {% for art in review_form.fields.existing_article.queryset %}
+              <button
+                type="button"
+                class="list-group-item list-group-item-action existing-article-picker-item d-flex justify-content-between align-items-center py-2"
+                data-article-id="{{ art.pk }}"
+                data-article-title="{{ art.title }}"
+              >
+                <span class="small text-break">{{ art.title }}</span>
+              </button>
+            {% endfor %}
+          </div>
+          <div id="existing-article-picker-selected" class="text-muted small mt-1" style="min-height:1.2em;"></div>
         </div>
 
-        <div class="col-12 article-new-fields">
+        {# --- New article mode: PubMed search (default sub-mode) --- #}
+        <div class="col-12 article-new-fields article-new-search">
+          <label class="form-label fw-semibold">Find article on PubMed</label>
+          <div class="input-group">
+            <input
+              type="text"
+              id="pubmed-search-input"
+              class="form-control"
+              placeholder="Search by title, PMID, or DOI…"
+              autocomplete="off"
+            >
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              id="pubmed-search-btn"
+              hx-get="{% url 'backend:review_pubmed_search' selected_issue.pk %}"
+              hx-vals='js:{"q": document.getElementById("pubmed-search-input").value}'
+              hx-target="#pubmed-search-results"
+              hx-swap="innerHTML"
+              hx-indicator="#pubmed-search-spinner"
+              hx-disabled-elt="this"
+            >
+              Match
+            </button>
+          </div>
+          <div id="pubmed-search-spinner" class="htmx-indicator text-muted small mt-1">Searching…</div>
+          <div id="pubmed-search-results" class="mt-2"></div>
+          <div class="mt-2">
+            <a href="#" class="small text-muted" id="toggle-manual-entry">Can't find it? Enter details manually &rarr;</a>
+          </div>
+        </div>
+
+        {# --- New article mode: article selected display --- #}
+        <div class="col-12 article-new-fields article-selected-display" style="display:none">
+          <label class="form-label fw-semibold">Selected article</label>
+          <div id="article-select-area"></div>
+        </div>
+
+        {# --- New article mode: manual entry (hidden by default) --- #}
+        <div class="col-12 article-new-fields article-manual-fields" style="display:none">
+          <div class="mb-2">
+            <a href="#" class="small text-muted" id="toggle-pubmed-search">&larr; Back to PubMed search</a>
+          </div>
           {{ review_form.article_name|as_crispy_field }}
         </div>
-        <div class="col-md-6 article-new-fields">
+        <div class="col-md-6 article-new-fields article-manual-fields" style="display:none">
           {{ review_form.article_journal|as_crispy_field }}
         </div>
-        <div class="col-md-6 article-new-fields">
+        <div class="col-md-6 article-new-fields article-manual-fields" style="display:none">
           {{ review_form.article_year|as_crispy_field }}
         </div>
-        <div class="col-12 article-new-fields">
+        <div class="col-12 article-new-fields article-manual-fields" style="display:none">
           {{ review_form.article_citation|as_crispy_field }}
         </div>
-        <div class="col-12 article-new-fields">
+        <div class="col-12 article-new-fields article-manual-fields" style="display:none">
           {{ review_form.article_url|as_crispy_field }}
         </div>
-        <div class="col-12 article-new-fields">
+        <div class="col-12 article-new-fields article-manual-fields" style="display:none">
           {{ review_form.article_tags_string|as_crispy_field }}
         </div>
 
-        <div class="col-12">
+        {# --- Tag grid (swappable via OOB) --- #}
+        <div class="col-12" id="tag-grid-container">
           <label class="form-label fw-semibold">Tags</label>
           <div class="row g-1">
             {% for checkbox in review_form.article_curated_tags %}
@@ -191,14 +260,32 @@
     const preview = form.querySelector('#review-body-preview');
     const fileInput = form.querySelector('input[type="file"][name="feature_image"]');
 
+    // Track which sub-mode of "new" is active: 'search', 'manual', or 'selected'
+    let newSubMode = 'search';
+
     function setModeVisibility() {
       const useExisting = modeSelect && modeSelect.value === 'existing';
+
+      // Top-level: existing vs new
       form.querySelectorAll('.article-existing-fields').forEach((el) => {
         el.style.display = useExisting ? '' : 'none';
       });
       form.querySelectorAll('.article-new-fields').forEach((el) => {
         el.style.display = useExisting ? 'none' : '';
       });
+
+      if (!useExisting) {
+        // Sub-modes within "new"
+        form.querySelectorAll('.article-new-search').forEach((el) => {
+          el.style.display = newSubMode === 'search' ? '' : 'none';
+        });
+        form.querySelectorAll('.article-manual-fields').forEach((el) => {
+          el.style.display = newSubMode === 'manual' ? '' : 'none';
+        });
+        form.querySelectorAll('.article-selected-display').forEach((el) => {
+          el.style.display = newSubMode === 'selected' ? '' : 'none';
+        });
+      }
     }
 
     function setAuthorModeVisibility() {
@@ -270,9 +357,100 @@
       });
     });
 
-    if (modeSelect) modeSelect.addEventListener('change', setModeVisibility);
+    if (modeSelect) modeSelect.addEventListener('change', function () {
+      // Reset sub-mode when switching back to "new"
+      if (modeSelect.value === 'new') {
+        newSubMode = 'search';
+        // Remove overrides so the real article_mode select is used
+        const overrideMode = form.querySelector('#id_article_mode_override');
+        if (overrideMode) overrideMode.remove();
+        const overrideArticle = form.querySelector('#id_existing_article_override');
+        if (overrideArticle) overrideArticle.remove();
+      }
+      setModeVisibility();
+    });
     if (authorModeSelect) authorModeSelect.addEventListener('change', setAuthorModeVisibility);
     if (bodyTextarea) bodyTextarea.addEventListener('input', updatePreview);
+
+    // Toggle: manual entry link
+    const toggleManual = form.querySelector('#toggle-manual-entry');
+    if (toggleManual) {
+      toggleManual.addEventListener('click', function (e) {
+        e.preventDefault();
+        newSubMode = 'manual';
+        setModeVisibility();
+      });
+    }
+
+    // Toggle: back to PubMed search link
+    const toggleSearch = form.querySelector('#toggle-pubmed-search');
+    if (toggleSearch) {
+      toggleSearch.addEventListener('click', function (e) {
+        e.preventDefault();
+        newSubMode = 'search';
+        setModeVisibility();
+      });
+    }
+
+    // PubMed search: allow Enter key to trigger Match button
+    const searchInput = form.querySelector('#pubmed-search-input');
+    const searchBtn = form.querySelector('#pubmed-search-btn');
+    if (searchInput && searchBtn) {
+      searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchBtn.click();
+        }
+      });
+    }
+
+    // When an article is selected via PubMed (article-select-area gets content),
+    // switch to selected sub-mode and disable the original article_mode select
+    // so the hidden overrides take precedence.
+    document.addEventListener('htmx:afterSwap', function (e) {
+      if (e.detail.target && e.detail.target.id === 'article-select-area') {
+        const area = form.querySelector('#article-select-area');
+        if (area && area.innerHTML.trim()) {
+          newSubMode = 'selected';
+          // Hide the article_mode dropdown since it's now overridden
+          const modeField = modeSelect ? modeSelect.closest('.col-12') : null;
+          if (modeField) modeField.style.display = 'none';
+          setModeVisibility();
+
+          // Attach change-article handler
+          const changeLink = form.querySelector('#change-article-link');
+          if (changeLink) {
+            changeLink.addEventListener('click', function (ev) {
+              ev.preventDefault();
+              // Remove overrides
+              const overrideMode = form.querySelector('#id_article_mode_override');
+              if (overrideMode) overrideMode.remove();
+              const overrideArticle = form.querySelector('#id_existing_article_override');
+              if (overrideArticle) overrideArticle.remove();
+              // Reset article_mode to "new" and show it again
+              if (modeSelect) {
+                modeSelect.value = 'new';
+                const modeField = modeSelect.closest('.col-12');
+                if (modeField) modeField.style.display = '';
+              }
+              newSubMode = 'search';
+              setModeVisibility();
+              // Clear the selected area
+              area.innerHTML = '';
+              // Reset tag grid to default (clear MeSH/similarity highlights)
+              const tagGrid = form.querySelector('#tag-grid-container');
+              if (tagGrid) {
+                tagGrid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                tagGrid.querySelectorAll('.border-info-subtle, .bg-info-subtle, .border-success-subtle, .bg-success-subtle').forEach(function (el) {
+                  el.classList.remove('border', 'border-info-subtle', 'bg-info-subtle', 'border-success-subtle', 'bg-success-subtle');
+                });
+                tagGrid.querySelectorAll('.badge').forEach(function (b) { b.remove(); });
+              }
+            });
+          }
+        }
+      }
+    });
 
     setModeVisibility();
     setAuthorModeVisibility();
@@ -327,6 +505,63 @@
         if (!item) return;
         const alreadyActive = item.classList.contains('active');
         selectAuthor(alreadyActive ? '' : item.dataset.authorId, item.dataset.authorName);
+      });
+    })();
+
+    // Existing article picker (with tag suggestion fetch on select)
+    (function () {
+      const searchInput = form.querySelector('#existing-article-picker-search');
+      const list = form.querySelector('#existing-article-picker-list');
+      const selectedLabel = form.querySelector('#existing-article-picker-selected');
+      const hiddenSelect = form.querySelector('select[name="existing_article"]');
+      if (!searchInput || !list || !hiddenSelect) return;
+
+      function getItems() {
+        return Array.from(list.querySelectorAll('.existing-article-picker-item'));
+      }
+
+      function filterItems() {
+        const q = (searchInput.value || '').trim().toLowerCase();
+        getItems().forEach(function (item) {
+          const title = (item.dataset.articleTitle || '').toLowerCase();
+          item.classList.toggle('d-none', q && !title.includes(q));
+        });
+      }
+
+      function selectArticle(id, title) {
+        hiddenSelect.value = id || '';
+        if (selectedLabel) {
+          selectedLabel.textContent = id ? 'Selected: ' + title : '';
+        }
+        getItems().forEach(function (item) {
+          item.classList.toggle('active', item.dataset.articleId === String(id));
+        });
+        // Fetch tag suggestions for the selected article
+        if (id) {
+          htmx.ajax('GET', '/backend/issues/builder/article/' + id + '/tag-suggestions/', {
+            target: '#tag-grid-container',
+            swap: 'outerHTML'
+          });
+        }
+      }
+
+      // Pre-select if there is an initial value
+      const initialVal = hiddenSelect.value;
+      if (initialVal) {
+        const initialItem = list.querySelector('[data-article-id="' + initialVal + '"]');
+        if (initialItem) {
+          initialItem.classList.add('active');
+          if (selectedLabel) selectedLabel.textContent = 'Selected: ' + initialItem.dataset.articleTitle;
+        }
+      }
+
+      searchInput.addEventListener('input', filterItems);
+
+      list.addEventListener('click', function (e) {
+        const item = e.target.closest('.existing-article-picker-item');
+        if (!item) return;
+        const alreadyActive = item.classList.contains('active');
+        selectArticle(alreadyActive ? '' : item.dataset.articleId, item.dataset.articleTitle);
       });
     })();
   })();

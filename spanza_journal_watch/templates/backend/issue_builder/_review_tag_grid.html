@@ -1,0 +1,26 @@
+<label class="form-label fw-semibold">Tags</label>
+<div class="row g-1">
+  {% for tag in curated_tags %}
+  <div class="col-6 col-md-4 col-lg-3">
+    <div class="form-check form-check-sm{% if tag.similarity_suggested %} border border-info-subtle rounded bg-info-subtle px-2{% endif %}{% if tag.mesh_matched %} border border-success-subtle rounded bg-success-subtle px-2{% endif %}">
+      <input
+        type="checkbox"
+        name="article_curated_tags"
+        value="{{ tag.pk }}"
+        class="form-check-input"
+        id="tag-{{ tag.pk }}"
+        {% if tag.mesh_matched %}checked{% endif %}
+      >
+      <label class="form-check-label small" for="tag-{{ tag.pk }}">
+        {{ tag.text }}
+        {% if tag.similarity_suggested %}
+          <span class="badge text-bg-info ms-1" title="Suggested based on article content">suggested</span>
+        {% endif %}
+        {% if tag.mesh_matched %}
+          <span class="badge text-bg-success ms-1" title="Matched via MeSH term">MeSH</span>
+        {% endif %}
+      </label>
+    </div>
+  </div>
+  {% endfor %}
+</div>

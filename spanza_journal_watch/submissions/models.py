@@ -353,6 +353,7 @@ class Issue(TimeStampedModel):
             ("chief_editor", "Can edit reviews, publish issues, and access chief editor functions"),
             ("regional_coordinator", "Can edit assigned issues and reviews; cannot publish or manage newsletter"),
             ("can_recommend", "Can recommend articles for review"),
+            ("invited_contributor", "Invited contributor — can access editorial tools and Planka"),
         ]
 
     def get_card_features(self):

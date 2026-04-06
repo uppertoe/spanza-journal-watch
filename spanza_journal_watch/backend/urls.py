@@ -136,6 +136,21 @@ urlpatterns = [
     path("issues/builder/<int:issue_id>/reviews/new", views.new_review_form, name="new_issue_review_form"),
     path("issues/builder/<int:issue_id>/reviews/add", views.add_issue_review, name="add_issue_review"),
     path(
+        "issues/builder/<int:issue_id>/reviews/pubmed-search",
+        views.review_pubmed_search,
+        name="review_pubmed_search",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/reviews/pubmed-select",
+        views.review_pubmed_select,
+        name="review_pubmed_select",
+    ),
+    path(
+        "issues/builder/article/<int:article_id>/tag-suggestions",
+        views.review_tag_suggestions,
+        name="review_tag_suggestions",
+    ),
+    path(
         "issues/builder/<int:issue_id>/reviews/<int:review_id>/edit",
         views.edit_issue_review_form,
         name="edit_issue_review_form",

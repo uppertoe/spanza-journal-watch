@@ -1,0 +1,44 @@
+{# Primary swap: citation card + hidden inputs #}
+<div class="card card-body bg-light py-2">
+  <div class="fw-semibold small text-break">{{ article.title }}</div>
+  <div class="text-muted small">
+    {% if article.source_journal_name %}{{ article.source_journal_name }}{% elif article.journal %}{{ article.journal.name }}{% endif %}
+    {% if article.publication_date %} &middot; {{ article.publication_date|date:"M Y" }}{% endif %}
+    {% if article.pmid %} &middot; PMID {{ article.pmid }}{% endif %}
+    {% if article.doi %} &middot; DOI {{ article.doi }}{% endif %}
+  </div>
+  {% if article.abstract %}
+  <details class="mt-1">
+    <summary class="text-muted small" style="cursor:pointer;">Abstract</summary>
+    <div class="small mt-1">{{ article.abstract }}</div>
+  </details>
+  {% endif %}
+</div>
+<input type="hidden" name="article_mode" value="existing" id="id_article_mode_override">
+<input type="hidden" name="existing_article" value="{{ article.pk }}" id="id_existing_article_override">
+<a href="#" class="small text-muted mt-1 d-inline-block" id="change-article-link">Change article</a>
+
+{% if article_mesh_terms %}
+<details class="mt-2">
+  <summary class="form-label text-muted small" style="cursor: pointer;">
+    PubMed MeSH terms ({{ article_mesh_terms|length }})
+  </summary>
+  <div class="mt-2 d-flex flex-wrap gap-1">
+    {% for item in article_mesh_terms %}
+      {% if item.tag %}
+        <span class="badge text-bg-light text-dark border" title="Mapped to #{{ item.tag }}">{{ item.term }} &rarr; #{{ item.tag }}</span>
+      {% else %}
+        <span class="badge text-bg-warning border" title="No mapping">{{ item.term }}</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="mt-2">
+    <a href="{% url 'backend:mesh_mapping_management' %}" target="_blank" class="small text-muted">Manage MeSH mappings &rarr;</a>
+  </div>
+</details>
+{% endif %}
+
+{# OOB swap: tag grid #}
+<div class="col-12" id="tag-grid-container" hx-swap-oob="outerHTML:#tag-grid-container">
+  {% include "backend/issue_builder/_review_tag_grid.html" %}
+</div>
