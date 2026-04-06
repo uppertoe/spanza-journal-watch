@@ -7,6 +7,23 @@
       </div>
     {% endif %}
 
+    {% if planka_project_type == "private" %}
+      <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3">
+        <span>This Planka project is <strong>private</strong> — only the creator can see it.</span>
+        <form
+          method="post"
+          action="{% url "backend:planka_make_project_shared" selected_issue.pk %}"
+          hx-post="{% url "backend:planka_make_project_shared" selected_issue.pk %}"
+          hx-target="#planka-project-context-card"
+          hx-swap="outerHTML"
+          class="ms-3"
+        >
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-warning">Make shared</button>
+        </form>
+      </div>
+    {% endif %}
+
     <div class="d-flex justify-content-between align-items-start gap-3">
       <h4 class="mb-1">{{ planka_binding.project_name }}</h4>
       <button

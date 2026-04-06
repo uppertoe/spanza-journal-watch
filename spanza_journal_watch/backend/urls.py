@@ -217,6 +217,11 @@ urlpatterns = [
         name="planka_update_project_name",
     ),
     path(
+        "issues/builder/<int:issue_id>/planka/make-shared",
+        views.planka_make_project_shared,
+        name="planka_make_project_shared",
+    ),
+    path(
         "issues/builder/<int:issue_id>/planka/import-card",
         views.planka_import_publish_card,
         name="planka_import_publish_card",

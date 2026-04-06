@@ -134,6 +134,11 @@ class PlankaClient:
         payload = self._request("PATCH", f"/projects/{project_id}", json={"name": name})
         return payload.get("item", {})
 
+    def update_project_type(self, project_id, project_type="shared"):
+        """Set project visibility: 'shared' (visible to added users/admins) or 'private'."""
+        payload = self._request("PATCH", f"/projects/{project_id}", json={"type": project_type})
+        return payload.get("item", {})
+
     def update_project_background(self, project_id, *, background_type="image", background_image_id=None):
         payload = {
             "backgroundType": background_type,

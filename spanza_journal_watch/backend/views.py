@@ -515,7 +515,12 @@ def dashboard(request):
     ).count()
     full_text_ctr = _safe_percentage(full_text_7d, opens_7d) if opens_7d else "—"
 
-    searches_7d = recent_human.filter(event_type=AnalyticsEvent.EventType.SEARCH).count()
+    searches_7d = (
+        recent_human.filter(event_type=AnalyticsEvent.EventType.SEARCH)
+        .exclude(metadata__query="")
+        .exclude(metadata__query__isnull=True)
+        .count()
+    )
 
     # ── Issue workflow progress ───────────────────────────────────
     workflow_steps = []
@@ -3912,6 +3917,12 @@ def _issue_builder_base_context(
             context["planka_background_form"].fields["background_asset"].initial = binding.background_asset_id
         if binding:
             context["planka_project_name_form"].fields["project_name"].initial = binding.project_name
+            try:
+                client = _build_planka_client()
+                project = client.get_project(binding.project_id)
+                context["planka_project_type"] = (project.get("type") or "").lower()
+            except PlankaAPIError:
+                context["planka_project_type"] = ""
 
         context["review_form"] = review_form or IssueBuilderReviewForm(issue=issue)
         context["review_form_action"] = form_action or reverse(
@@ -5710,6 +5721,43 @@ def planka_update_project_name(request, issue_id):
         )
 
     messages.success(request, "Project name updated.")
+    return redirect(redirect_url)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def planka_make_project_shared(request, issue_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    issue = get_object_or_404(Issue, pk=issue_id)
+    binding = get_object_or_404(PlankaIssueBinding, issue=issue)
+    redirect_url = f"{reverse('backend:issue_planka_import')}?issue={issue.pk}"
+
+    try:
+        client = _build_planka_client()
+        client.update_project_type(binding.project_id, "shared")
+    except PlankaAPIError as error:
+        safe_error = _safe_planka_error(error)
+        if request.headers.get("HX-Request") == "true":
+            return _render_planka_project_context_card(
+                request,
+                issue,
+                card_status=f"Could not update project visibility: {safe_error}",
+                card_status_level="danger",
+            )
+        messages.error(request, f"Could not update project visibility: {safe_error}")
+        return redirect(redirect_url)
+
+    if request.headers.get("HX-Request") == "true":
+        return _render_planka_project_context_card(
+            request,
+            issue,
+            card_status="Project is now shared — visible to added users and admins.",
+            card_status_level="success",
+        )
+
+    messages.success(request, "Project is now shared — visible to added users and admins.")
     return redirect(redirect_url)
 
 
