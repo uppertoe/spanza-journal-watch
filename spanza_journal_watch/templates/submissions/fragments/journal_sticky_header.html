@@ -1,0 +1,71 @@
+{% load format_abstract %}
+<div class="journal-sticky-header" id="journal-sticky-header"{% if hx_swap_oob %} hx-swap-oob="outerHTML:#journal-sticky-header"{% endif %}>
+  {# ── Month navigation ── #}
+  <nav class="journal-month-nav" aria-label="Month navigation">
+    {% if has_prev_month %}
+      <a
+        href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}"
+        hx-get="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}"
+        hx-target="#journal-browser-results"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="journal-month-nav__arrow"
+        aria-label="Previous month"
+      >&#9664;&#xFE0E;</a>
+    {% else %}
+      <span class="journal-month-nav__arrow journal-month-nav__arrow--disabled" aria-hidden="true">&#9664;&#xFE0E;</span>
+    {% endif %}
+
+    <div class="journal-month-nav__center">
+      {% if selected_journal %}
+        <span class="journal-month-nav__journal">{{ selected_journal.name }}</span>
+      {% endif %}
+      <span class="journal-month-nav__label">{{ selected_month|date:"F Y" }}</span>
+    </div>
+
+    {% if has_next_month %}
+      <a
+        href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ next_month|date:'Y-m' }}"
+        hx-get="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ next_month|date:'Y-m' }}"
+        hx-target="#journal-browser-results"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="journal-month-nav__arrow"
+        aria-label="Next month"
+      >&#9654;&#xFE0E;</a>
+    {% else %}
+      <span class="journal-month-nav__arrow journal-month-nav__arrow--disabled" aria-hidden="true">&#9654;&#xFE0E;</span>
+    {% endif %}
+  </nav>
+
+  {# ── Filter toggle ── #}
+  <div class="journal-filter-bar">
+    <button
+      type="button"
+      class="journal-filter-bar__btn"
+      id="hide-no-abstract"
+      aria-pressed="true"
+    >
+      <svg class="bi" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-funnel"></use></svg>
+      <span class="journal-filter-bar__label-hide" style="display:none">Hide articles without abstracts</span>
+      <span class="journal-filter-bar__label-show">Show all articles</span>
+    </button>
+  </div>
+
+  {# ── Table of contents ── #}
+  {% if sections %}
+    <div class="journal-toc-wrapper">
+      <span class="journal-toc__arrow journal-toc__arrow--left d-md-none" aria-hidden="true">&#9664;&#xFE0E;</span>
+      <span class="journal-toc__arrow journal-toc__arrow--right d-md-none" aria-hidden="true">&#9654;&#xFE0E;</span>
+      <nav class="journal-toc" aria-label="Table of contents">
+        <span class="journal-toc__heading">In this issue</span>
+        {% for section_name, section_slug, articles in sections %}
+          <a href="#section-{{ section_slug }}" class="journal-toc__link">
+            {{ section_name }} <span class="journal-toc__count">{{ articles|length }}</span>
+          </a>
+        {% endfor %}
+        <span class="journal-toc__total text-muted">{{ rows|length }} article{{ rows|length|pluralize }} total</span>
+      </nav>
+    </div>
+  {% endif %}
+</div>

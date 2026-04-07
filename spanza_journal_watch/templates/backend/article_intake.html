@@ -33,7 +33,7 @@
 
 {% if selected_issue %}
 <div class="card mb-3">
-  <div class="card-header">Step 1 · Build from cached articles</div>
+  <div class="card-header">Step 1 · Load articles from local cache</div>
   <div class="card-body">
     <form method="post" class="row g-3" hx-post="{% url "backend:article_intake" %}" hx-target="#article-intake-page" hx-select="#article-intake-page" hx-swap="outerHTML" hx-push-url="true">
       {% csrf_token %}
@@ -100,7 +100,8 @@
         </div>
       </div>
       <div class="col-12">
-        <button type="submit" class="btn btn-primary">Load cached articles</button>
+        <button type="submit" class="btn btn-primary">Load from cache</button>
+        <p class="text-muted small mt-2 mb-0">Loads previously fetched articles from the local cache. To fetch new articles from PubMed, use "Fetch from PubMed" in step 2.</p>
       </div>
     </form>
   </div>
@@ -108,7 +109,7 @@
 
 {% if batch %}
   <div class="card mb-3">
-    <div class="card-header">Step 2 · Stage and review cached articles</div>
+    <div class="card-header">Step 2 · Stage and review articles</div>
     <div class="card-body">
       <div class="mb-2">
         <strong>Range:</strong> {{ batch.from_month|date:"F Y" }} to {{ batch.to_month|date:"F Y" }}
@@ -120,11 +121,11 @@
         <form method="post" action="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
           {% csrf_token %}
           <input type="hidden" name="async" value="1">
-          <button type="submit" class="btn btn-outline-secondary" title="Reload batch articles from the local cache (no API call)">Rebuild batch from cache</button>
+          <button type="submit" class="btn btn-outline-secondary" title="Reload this batch from already-cached articles (no PubMed API call)">Reload from cache</button>
         </form>
         <form method="post" action="{% url "backend:article_intake_refresh_cache" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_cache" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
           {% csrf_token %}
-          <button type="submit" class="btn btn-outline-primary" title="Fetch new articles from PubMed API for this date range, then rebuild from cache">Fetch from PubMed</button>
+          <button type="submit" class="btn btn-primary" title="Fetch new articles from PubMed API, update the local cache, then reload this batch">Fetch new articles from PubMed</button>
         </form>
       </div>
 

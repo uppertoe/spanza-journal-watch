@@ -1,24 +1,10 @@
 {% load format_abstract %}
-{# OOB swap for month nav — only on HTMX requests to avoid doubling on initial load #}
+{# OOB swap for sticky header — only on HTMX requests to avoid doubling on initial load #}
 {% if is_htmx %}
-  {% include "submissions/fragments/journal_month_nav.html" with hx_swap_oob="true" %}
+  {% include "submissions/fragments/journal_sticky_header.html" with hx_swap_oob="true" %}
 {% endif %}
 
 {% if sections %}
-  {# ── TABLE OF CONTENTS ──────────────────────────────────────────── #}
-  <div class="journal-toc-wrapper mb-4">
-    <span class="journal-toc__arrow journal-toc__arrow--left d-md-none" aria-hidden="true">&#9664;&#xFE0E;</span>
-    <span class="journal-toc__arrow journal-toc__arrow--right d-md-none" aria-hidden="true">&#9654;&#xFE0E;</span>
-    <nav class="journal-toc" aria-label="Table of contents">
-      <span class="journal-toc__heading">In this issue</span>
-      {% for section_name, section_slug, articles in sections %}
-        <a href="#section-{{ section_slug }}" class="journal-toc__link">
-          {{ section_name }} <span class="journal-toc__count">{{ articles|length }}</span>
-        </a>
-      {% endfor %}
-      <span class="journal-toc__total text-muted">{{ rows|length }} article{{ rows|length|pluralize }} total</span>
-    </nav>
-  </div>
 
   {# ── SECTIONS ───────────────────────────────────────────────────── #}
   {% for section_name, section_slug, articles in sections %}
@@ -29,7 +15,7 @@
       </h3>
       <div class="d-grid gap-3">
         {% for row in articles %}
-          <article class="card shadow-sm border-0 journal-article-card">
+          <article class="card shadow-sm border-0 journal-article-card"{% if not row.article.abstract %} data-no-abstract="1"{% endif %}>
             <div class="card-body p-4">
               <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                 <span class="badge text-bg-primary-subtle text-primary-emphasis">{{ row.watched_journal.name }}</span>
@@ -109,6 +95,13 @@
       </div>
     </section>
   {% endfor %}
+
+  <div class="card shadow-sm border-0 d-none" id="all-filtered-message">
+    <div class="card-body text-center py-5">
+      <h2 class="h5 mb-2">All articles in this issue lack abstracts</h2>
+      <p class="text-muted mb-0">Click "Show all articles" above to see them.</p>
+    </div>
+  </div>
 
 {% else %}
   <div class="card shadow-sm border-0">

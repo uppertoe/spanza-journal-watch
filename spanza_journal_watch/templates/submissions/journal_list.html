@@ -71,7 +71,7 @@
                   value="{{ journal.pk }}"
                   id="journal-{{ journal.pk }}"
                   {% if journal.pk == selected_journal_id %}checked{% endif %}
-                  hx-get="{% url 'submissions:journal_list' %}?journal={{ journal.pk }}&month={{ selected_month|date:'Y-m' }}"
+                  hx-get="{% url 'submissions:journal_list' %}?journal={{ journal.pk }}"
                   hx-target="#journal-browser-results"
                   hx-swap="innerHTML"
                   hx-trigger="change"
@@ -105,8 +105,8 @@
         <div class="journal-shelf-dots d-lg-none" id="shelf-dots"></div>
       </section>
 
-      {# ── MONTH NAVIGATION ────────────────────────────────────────── #}
-      {% include "submissions/fragments/journal_month_nav.html" %}
+      {# ── STICKY HEADER (month nav + filter + TOC) ──────────────── #}
+      {% include "submissions/fragments/journal_sticky_header.html" %}
 
       {# ── ARTICLE LIST (HTMX target) ──────────────────────────────── #}
       <div id="journal-browser-results">
@@ -229,3 +229,49 @@
     </div>
 </div>
 {% endblock modal %}
+
+{% block inline_javascript %}
+{{ block.super }}
+<script>
+(function () {
+  // ── Abstract filter toggle ──
+  var STORAGE_KEY = 'jw-hide-no-abstract';
+  var stored = localStorage.getItem(STORAGE_KEY);
+  var active = stored === null ? true : stored === '1';
+
+  function apply() {
+    var btn = document.getElementById('hide-no-abstract');
+    if (btn) {
+      btn.setAttribute('aria-pressed', active);
+      var hideLabel = btn.querySelector('.journal-filter-bar__label-hide');
+      var showLabel = btn.querySelector('.journal-filter-bar__label-show');
+      if (hideLabel) hideLabel.style.display = active ? 'none' : '';
+      if (showLabel) showLabel.style.display = active ? '' : 'none';
+    }
+    var noAbstract = document.querySelectorAll('.journal-article-card[data-no-abstract]');
+    noAbstract.forEach(function (card) {
+      card.style.display = active ? 'none' : '';
+    });
+    var msg = document.getElementById('all-filtered-message');
+    if (msg) {
+      var total = document.querySelectorAll('.journal-article-card').length;
+      var allHidden = active && total > 0 && noAbstract.length === total;
+      msg.classList.toggle('d-none', !allHidden);
+    }
+  }
+
+  apply();
+
+  // Delegate click so it survives OOB swaps replacing the button
+  document.body.addEventListener('click', function (e) {
+    if (e.target.closest('#hide-no-abstract')) {
+      active = !active;
+      localStorage.setItem(STORAGE_KEY, active ? '1' : '0');
+      apply();
+    }
+  });
+
+  document.body.addEventListener('htmx:afterSettle', apply);
+})();
+</script>
+{% endblock inline_javascript %}

@@ -2086,7 +2086,7 @@ def article_intake_refresh_cache(request, batch_id):
         messages.success(
             request,
             f"PubMed cache refresh queued for {batch.from_month:%b %Y} - {batch.to_month:%b %Y}. "
-            "Use 'Rebuild current batch from cache' once complete to load new articles.",
+            "Once complete, click 'Reload from cache' to load new articles into this batch.",
         )
 
     if request.headers.get("HX-Request") == "true":
