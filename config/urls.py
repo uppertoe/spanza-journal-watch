@@ -5,6 +5,7 @@ from django.contrib.sitemaps.views import sitemap
 from django.http import HttpResponse
 from django.urls import include, path
 from django.views import defaults as default_views
+from django.views.decorators.cache import cache_control, cache_page
 from django.views.generic.base import TemplateView
 from markdownx import urls as markdownx
 
@@ -31,9 +32,19 @@ urlpatterns = [
     # Layout
     path("healthz", healthz, name="healthz"),
     path("", HomepageView.as_view(), name="home"),
-    path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),
-    path("robots.txt", TemplateView.as_view(template_name="robots.txt", content_type="text/plain")),
-    path("feed/", LatestReviewsFeed(), name="review_feed"),
+    path(
+        "sitemap.xml",
+        cache_page(86400)(sitemap),
+        {"sitemaps": sitemaps},
+        name="django.contrib.sitemaps.views.sitemap",
+    ),
+    path(
+        "robots.txt",
+        cache_control(max_age=604800, public=True)(
+            TemplateView.as_view(template_name="robots.txt", content_type="text/plain")
+        ),
+    ),
+    path("feed/", cache_page(3600)(LatestReviewsFeed()), name="review_feed"),
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
     # User management

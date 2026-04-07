@@ -1,4 +1,4 @@
-{% if result_reviews %}
+{% if has_filters and result_reviews %}
     <div class="d-flex justify-content-between align-items-center mb-2">
         {% if is_browse_mode %}
             <h3 class="mb-0">Browse reviews</h3>
@@ -47,18 +47,18 @@
             {% endwith %}
 
             {% if not is_browse_mode and review.headline %}
-                <blockquote class="blockquote mb-2">"{{ review.headline|safe }}"</blockquote>
+                <p class="mb-0 text-body-secondary">&hellip; {{ review.headline|safe }} &hellip;</p>
             {% else %}
                 <p class="mb-0 text-body-secondary">{{ review.get_truncated_body }}</p>
             {% endif %}
         </div>
     {% endfor %}
-{% else %}
+{% elif has_filters %}
     {% if no_result_message %}
         <h3 class="mb-2">No matching reviews</h3>
         <p>{{ no_result_message }}. Try broadening filters or removing a tag.</p>
-    {% else %}
-        <h3 class="text-decoration-none">Start browsing the archive</h3>
-        <p>Use the year and tag filters above to explore reviews by topic or period.</p>
     {% endif %}
+{% else %}
+    <h3 class="text-decoration-none">Start browsing the archive</h3>
+    <p>Use the search box, year, and tag filters above to explore reviews by topic or period.</p>
 {% endif %}

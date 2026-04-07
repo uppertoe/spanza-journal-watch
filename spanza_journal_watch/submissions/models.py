@@ -205,9 +205,6 @@ class Review(TimeStampedModel):
     MAX_LINE_CHARS = 50
 
     search_vector = SearchVectorField(null=True, blank=True)
-    title_similarity = 0.1
-    author_similarity = 0.3
-    body_rank = 0.3
 
     article = models.ForeignKey("backend.PubmedArticle", on_delete=models.CASCADE, related_name="reviews")
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
@@ -306,41 +303,88 @@ class Review(TimeStampedModel):
                 variant_widths=(240, 480),
             )
 
-        # Create a SearchVector from the body text
+        # Update the body-only search vector
         Review.objects.filter(pk=self.pk).update(search_vector=SearchVector("body"))
+
+    # ------------------------------------------------------------------
+    # Search
+    # ------------------------------------------------------------------
+    # Thresholds — class-level so they can be tuned in one place
+    TITLE_TRIGRAM_THRESHOLD = 0.15
+    AUTHOR_TRIGRAM_THRESHOLD = 0.3
+    JOURNAL_TRIGRAM_THRESHOLD = 0.35
+    BODY_RANK_THRESHOLD = 0.05
+    HEADLINE_DELIMITER = "JWFRAGDELIM"
 
     @classmethod
     def search(cls, query):
-        PLACEHOLDER = "JWFRAGDELIM"
+        """Search reviews using trigram similarity for names and full-text search for body content.
 
+        Tag matching is done as a separate ID lookup to avoid a join that
+        multiplies rows and makes the trigram/FTS filter much more expensive.
+        """
+        search_query = SearchQuery(query)
+
+        # Collect review IDs that match via tags (separate query avoids row multiplication)
+        tag_match_ids = set(
+            cls.objects.filter(active=True, article__tags__text__icontains=query).values_list("id", flat=True)
+        )
+
+        # Main query: trigram + full-text on the base review table (no tag join)
         results = (
             cls.objects.exclude(active=False)
             .annotate(
                 title_similarity=TrigramSimilarity("article__title", query),
                 author_similarity=TrigramSimilarity("author__name", query),
-                rank=SearchRank("search_vector", SearchQuery(query)),
+                journal_similarity=TrigramSimilarity("article__journal__name", query),
+                body_rank=SearchRank("search_vector", search_query),
             )
             .filter(
-                Q(title_similarity__gt=cls.title_similarity)
-                | Q(rank__gte=cls.body_rank)
-                | Q(search_vector=SearchQuery(query))  # Exact matches
-                | Q(author_similarity__gt=cls.author_similarity)
+                Q(title_similarity__gte=cls.TITLE_TRIGRAM_THRESHOLD)
+                | Q(body_rank__gte=cls.BODY_RANK_THRESHOLD)
+                | Q(search_vector=search_query)
+                | Q(author_similarity__gte=cls.AUTHOR_TRIGRAM_THRESHOLD)
+                | Q(journal_similarity__gte=cls.JOURNAL_TRIGRAM_THRESHOLD)
+                | Q(pk__in=tag_match_ids)
             )
-            .annotate(headline=SearchHeadline("body", query, max_fragments=3, fragment_delimiter=PLACEHOLDER))
-            .order_by("-title_similarity", "-rank", "-author_similarity", "-created")
+            .annotate(
+                headline=SearchHeadline(
+                    "body", search_query, max_fragments=3, fragment_delimiter=cls.HEADLINE_DELIMITER
+                ),
+            )
+            .order_by("-title_similarity", "-body_rank", "-author_similarity", "-created")
             .select_related("article__journal", "author")
+            .prefetch_related("article__tags", "issues")
         )
 
-        # Post-process each result:
+        return results
+
+    @classmethod
+    def post_process_headlines(cls, results):
+        """Convert search headline fragments to clean text with <mark> highlights.
+
+        If the headline contains no highlighted terms (no <b> tags from
+        SearchHeadline), clear it so the template falls back to the
+        truncated body instead of showing a random excerpt.
+        """
         for r in results:
-            html = markdownify(r.headline or "")
+            raw = r.headline or ""
+            if "<b>" not in raw:
+                r.headline = ""
+                continue
+            # Protect search highlights by converting to placeholder
+            text = raw.replace("<b>", "\x00MARK\x00").replace("</b>", "\x00/MARK\x00")
+            # Convert markdown to HTML, then strip all tags (except our placeholders)
+            html = markdownify(text)
             html = cls.heading_tag_re.sub(" ", html)
             text = strip_tags(html)
+            # Clean up whitespace and markdown artefacts
             text = re.sub(r"(?m)(^|\n)\s{0,3}#{1,6}\s*", " ", text)
-            text = text.replace(PLACEHOLDER, " ... ")
+            text = text.replace(cls.HEADLINE_DELIMITER, " &hellip; ")
             text = re.sub(r"\s+", " ", text).strip()
+            # Restore highlights as <mark> tags
+            text = text.replace("\x00MARK\x00", "<mark>").replace("\x00/MARK\x00", "</mark>")
             r.headline = text
-        return results
 
     def __str__(self):
         return self.article.get_truncated_name()

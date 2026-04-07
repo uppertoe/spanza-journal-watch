@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView, TemplateView
@@ -777,14 +778,18 @@ class LatestIssueView(RedirectView):
         return issue.get_absolute_url()
 
 
-class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
+class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, ListView):
     template_name = "submissions/search.html"
+    context_object_name = "result_reviews"
+    paginate_by = 20
 
     # HTMX
-    htmx_templates = ["submissions/fragments/search_results.html"]
+    htmx_templates = [
+        "submissions/fragments/search_results.html",
+        "submissions/fragments/search_pagination.html",
+    ]
 
     # Search settings
-    sim_thres = 0.1
     no_result_message = "No results found"
 
     # Breadcrumb
@@ -792,20 +797,63 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
     def crumbs(self):
         return [("Search", reverse("submissions:search"))]
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def get_queryset(self):
         query = (self.request.GET.get("q") or "").strip()
         selected_year = (self.request.GET.get("year") or "").strip()
         selected_tags = [slug for slug in self.request.GET.getlist("tag") if slug]
 
-        # Accept comma-separated tags as a fallback (useful for manually edited URLs)
         if not selected_tags:
             comma_tags = (self.request.GET.get("tags") or "").strip()
             if comma_tags:
                 selected_tags = [slug.strip() for slug in comma_tags.split(",") if slug.strip()]
 
-        search_results = self.search(query, year=selected_year, tag_slugs=selected_tags)
-        context.update(search_results)
+        self._query = query
+        self._selected_year = selected_year
+        self._selected_tags = selected_tags
+        # Empty state: no query and no filters → return nothing
+        if not any([query, selected_year, selected_tags]):
+            return Review.objects.none()
+
+        if query:
+            reviews = Review.search(query)
+        else:
+            reviews = (
+                Review.objects.exclude(active=False)
+                .select_related("article__journal", "author")
+                .prefetch_related("article__tags", "issues")
+                .order_by("-created")
+            )
+
+        if selected_year and str(selected_year).isdigit():
+            reviews = reviews.filter(publish_date__year=int(selected_year))
+
+        if selected_tags:
+            reviews = reviews.filter(article__tags__slug__in=selected_tags).distinct()
+
+        return reviews
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        query = self._query
+        selected_year = self._selected_year
+        selected_tags = self._selected_tags
+        has_filters = any([query, selected_year, selected_tags])
+
+        # Post-process search headlines and attach display fields
+        page_reviews = list(context["result_reviews"])
+        if query:
+            Review.post_process_headlines(page_reviews)
+        attach_review_display_fields(page_reviews)
+        context["result_reviews"] = page_reviews
+
+        result_count = context["paginator"].count if has_filters else 0
+        context["result_count"] = result_count
+        context["is_browse_mode"] = has_filters and not query
+        context["has_filters"] = has_filters
+
+        if has_filters and result_count == 0:
+            context["no_result_message"] = self.no_result_message
 
         context["query"] = query
         context["selected_year"] = selected_year
@@ -862,17 +910,22 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
         override = {}
         context["page_header"] = header.collate_fields(**override) if header else override
 
-        self.record_search_event(
+        # Build query string for pagination links (preserving filters)
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        context["filter_query_string"] = params.urlencode()
+
+        self._record_search_event(
             query=query,
             selected_year=selected_year,
             selected_tags=selected_tags,
-            result_count=search_results["result_count"],
-            is_browse_mode=search_results["is_browse_mode"],
+            result_count=result_count,
+            is_browse_mode=context["is_browse_mode"],
         )
 
         return context
 
-    def record_search_event(self, *, query, selected_year, selected_tags, result_count, is_browse_mode):
+    def _record_search_event(self, *, query, selected_year, selected_tags, result_count, is_browse_mode):
         if not any([query, selected_year, selected_tags]):
             return
 
@@ -903,44 +956,8 @@ class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, TemplateView):
             },
         )
 
-    def search(self, query, year="", tag_slugs=None):
-        tag_slugs = tag_slugs or []
 
-        if query:
-            reviews = Review.search(query)
-        else:
-            reviews = (
-                Review.objects.exclude(active=False)
-                .select_related("article__journal", "author")
-                .prefetch_related("article__tags", "issues")
-                .order_by("-created")
-            )
-
-        if year and str(year).isdigit():
-            reviews = reviews.filter(publish_date__year=int(year))
-
-        if tag_slugs:
-            reviews = reviews.filter(article__tags__slug__in=tag_slugs).distinct()
-
-        reviews = reviews.prefetch_related("article__tags", "issues")
-        result_count = reviews.count()
-
-        # Keep search pages fast and readable
-        result_reviews = list(reviews[:80])
-        attach_review_display_fields(result_reviews)
-        results = {
-            "result_reviews": result_reviews,
-            "result_count": result_count,
-            "is_browse_mode": not bool(query),
-        }
-
-        if result_count == 0:
-            # Add a message if no results
-            results["no_result_message"] = self.no_result_message
-
-        return results
-
-
+@cache_page(3600)
 def ajax_get_tags(request):
     tags_queryset = (
         Tag.objects.filter(active=True, curated=True)
