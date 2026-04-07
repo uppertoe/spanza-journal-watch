@@ -411,9 +411,8 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
             request=self.request,
         )
 
-        # Attach related reviews to each review on this page
-        for review in context["articles"]:
-            review.related_reviews = review.article.get_related_reviews()
+        # Batch-attach related reviews to each review on this page
+        _attach_related_reviews_to_issue_page(context["articles"])
 
         return context
 
@@ -604,14 +603,29 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
                 else:
                     tag.heat_tier = "mild"
 
-            # Attach top 2 review titles per featured tag
+            # Batch-attach top 2 reviews per featured tag (1 query instead of 12)
+            featured_tag_ids = [t.pk for t in featured]
+            tag_review_links = (
+                Review.objects.filter(active=True, article__tags__id__in=featured_tag_ids)
+                .select_related("article__journal")
+                .order_by("-publish_date")
+                .values_list("article__tags__id", "pk")
+                .distinct()
+            )
+            # Collect review PKs per tag, limited to 2 each
+            tag_review_pks: dict[int, list[int]] = {}
+            for tag_id, review_pk in tag_review_links:
+                pks = tag_review_pks.setdefault(tag_id, [])
+                if len(pks) < 2 and review_pk not in pks:
+                    pks.append(review_pk)
+            all_review_pks = {pk for pks in tag_review_pks.values() for pk in pks}
+            review_map = (
+                {r.pk: r for r in Review.objects.filter(pk__in=all_review_pks).select_related("article__journal")}
+                if all_review_pks
+                else {}
+            )
             for tag in featured:
-                top_reviews = list(
-                    Review.objects.filter(active=True, article__tags=tag)
-                    .select_related("article__journal")
-                    .order_by("-publish_date")[:2]
-                )
-                tag.top_reviews = top_reviews
+                tag.top_reviews = [review_map[pk] for pk in tag_review_pks.get(tag.pk, []) if pk in review_map]
 
             # Group featured tags by cluster if available
             clusters = cache.get("tag_clusters", [])
@@ -1310,6 +1324,54 @@ def _attach_related_reviews(rows):
                 scored.append((shared, review))
         scored.sort(key=lambda x: (-x[0], -(x[1].publish_date or datetime.date.min).toordinal()))
         row.related_reviews = [review for _, review in scored[:2]]
+
+
+def _attach_related_reviews_to_issue_page(reviews):
+    """Batch-attach related reviews to issue detail page reviews (same pattern as journal browser)."""
+    if not reviews:
+        return
+
+    article_ids = [r.article_id for r in reviews]
+
+    tag_links = Tag.objects.filter(curated=True, active=True, articles__id__in=article_ids).values_list(
+        "articles__id", "id"
+    )
+    article_tag_map: dict[int, set[int]] = {}
+    all_tag_ids: set[int] = set()
+    for article_id, tag_id in tag_links:
+        article_tag_map.setdefault(article_id, set()).add(tag_id)
+        all_tag_ids.add(tag_id)
+
+    if not all_tag_ids:
+        for review in reviews:
+            review.related_reviews = []
+        return
+
+    article_id_set = set(article_ids)
+    candidate_reviews = list(
+        Review.objects.filter(active=True, article__tags__id__in=all_tag_ids)
+        .exclude(article_id__in=article_id_set)
+        .select_related("article__journal", "author")
+        .prefetch_related("article__tags")
+        .distinct()
+    )
+
+    review_tag_map: dict[int, set[int]] = {}
+    for candidate in candidate_reviews:
+        review_tag_map[candidate.pk] = {t.pk for t in candidate.article.tags.all()}
+
+    for review in reviews:
+        row_tag_ids = article_tag_map.get(review.article_id, set())
+        if not row_tag_ids:
+            review.related_reviews = []
+            continue
+        scored = []
+        for candidate in candidate_reviews:
+            shared = len(review_tag_map.get(candidate.pk, set()) & row_tag_ids)
+            if shared:
+                scored.append((shared, candidate))
+        scored.sort(key=lambda x: (-x[0], -(x[1].publish_date or datetime.date.min).toordinal()))
+        review.related_reviews = [r for _, r in scored[:4]]
 
 
 def _journal_article_actions_context(request, article):

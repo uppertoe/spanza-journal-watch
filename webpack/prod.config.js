@@ -1,4 +1,5 @@
 const { merge } = require('webpack-merge');
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const commonConfig = require('./common.config');
 
 // This variable should mirror the one from config/settings/production.py
@@ -10,5 +11,8 @@ module.exports = merge(commonConfig, {
   bail: true,
   output: {
     publicPath: `${staticUrl}webpack_bundles/`,
+  },
+  optimization: {
+    minimizer: ['...', new CssMinimizerPlugin()],
   },
 });

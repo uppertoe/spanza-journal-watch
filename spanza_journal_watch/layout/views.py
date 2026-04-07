@@ -120,7 +120,7 @@ def service_worker_view(request: HttpRequest) -> HttpResponse:
 
 
 @require_GET
-@cache_control(max_age=60 * 60 * 24, public=True)
+@cache_control(max_age=86400, public=True)
 def manifest_view(request: HttpRequest) -> JsonResponse:
     """PWA web app manifest with all required fields for installability."""
     manifest = {

@@ -116,6 +116,11 @@ class Tag(models.Model):
     display_order = models.PositiveIntegerField(default=0)
     articles = models.ManyToManyField("backend.PubmedArticle", related_name="tags")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["active", "curated"]),
+        ]
+
     @classmethod
     def get_all_tags(cls):
         tags = (
@@ -220,7 +225,10 @@ class Review(TimeStampedModel):
 
     class Meta:
         # Requires from django.contrib.postgres.operations import BtreeGinExtension in the migration
-        indexes = [GinIndex(fields=("search_vector",))]
+        indexes = [
+            GinIndex(fields=("search_vector",)),
+            models.Index(fields=["active", "-created"]),
+        ]
 
     def get_markdown_body(self, strip=False):
         return markdownify(self.body) if not strip else strip_tags(markdownify(self.body))
@@ -348,6 +356,9 @@ class Issue(TimeStampedModel):
     active = models.BooleanField(default=False)
 
     class Meta:
+        indexes = [
+            models.Index(fields=["active", "-date"]),
+        ]
         permissions = [
             ("manage_issue_builder", "Can create and publish issue bundles in backend issue builder"),
             ("chief_editor", "Can edit reviews, publish issues, and access chief editor functions"),
