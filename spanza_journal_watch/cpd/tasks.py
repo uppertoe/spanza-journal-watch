@@ -36,23 +36,32 @@ def generate_cpd_report_task(self, report_id):
             .select_related("article")
             .order_by("full_text_clicked_at")
         )
-        articles = [s.article for s in states]
+
+        # Group articles by access date (first full-text click)
+        from collections import OrderedDict
+
+        grouped: OrderedDict = OrderedDict()
+        for state in states:
+            access_date = state.full_text_clicked_at.date()
+            grouped.setdefault(access_date, []).append(state.article)
+        articles_by_date = list(grouped.items())
+        article_count = sum(len(arts) for _, arts in articles_by_date)
 
         pdf_bytes = generate_cpd_pdf(
             user_name=report.user.name or report.user.email,
             user_email=report.user.email,
             date_from=report.date_from,
             date_to=report.date_to,
-            articles=articles,
+            articles_by_date=articles_by_date,
         )
 
         filename = f"cpd_report_{report.user.pk}_{report.date_from}_{report.date_to}.pdf"
         report.file.save(filename, ContentFile(pdf_bytes), save=False)
-        report.article_count = len(articles)
+        report.article_count = article_count
         report.status = CPDReport.Status.READY
         report.save(update_fields=["file", "article_count", "status"])
 
-        logger.info("CPD report %s generated: %d articles", report_id, len(articles))
+        logger.info("CPD report %s generated: %d articles", report_id, article_count)
 
     except Exception:
         logger.exception("Error generating CPD report %s", report_id)

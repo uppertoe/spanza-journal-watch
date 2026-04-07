@@ -22,11 +22,22 @@ BRAND_BLUE = (47, 90, 128)  # #2f5a80 — accents
 BRAND_MUTED = (138, 150, 162)  # #8a96a2 — secondary text
 BODY_TEXT = (51, 51, 51)  # #333333
 LIGHT_RULE = (216, 222, 228)  # #d8dee4
+DATE_BG = (237, 242, 248)  # #edf2f8 — date subheading background
 
 
 def _fmt_date(d: date) -> str:
     """Format date as '2 January 2026' (no leading zero)."""
     return f"{d.day} {d.strftime('%B %Y')}"
+
+
+def _fmt_date_heading(d: date) -> str:
+    """Format date as '7th January 2026' for date group headings."""
+    day = d.day
+    if 11 <= day <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix} {d.strftime('%B %Y')}"
 
 
 def _escape_md(text: str) -> str:
@@ -106,8 +117,16 @@ def generate_cpd_pdf(
     user_email: str,
     date_from: date,
     date_to: date,
-    articles: list,
+    articles_by_date: list[tuple[date, list]],
 ) -> bytes:
+    """Generate a CPD activity report PDF.
+
+    ``articles_by_date`` is a list of ``(access_date, [article, ...])`` tuples,
+    ordered chronologically.  Each article appears under the date it was first
+    accessed.
+    """
+    total_count = sum(len(arts) for _, arts in articles_by_date)
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=25)
     pdf.set_margin(20)
@@ -161,7 +180,7 @@ def generate_cpd_pdf(
         0,
         5,
         f"This document records the journal articles that {user_name} has "
-        f"accessed the via SPANZA Journal Watch during the period "
+        f"accessed via SPANZA Journal Watch during the period "
         f"{_fmt_date(date_from)} to {_fmt_date(date_to)}.",
     )
     pdf.ln(2)
@@ -186,7 +205,7 @@ def generate_cpd_pdf(
     pdf.cell(0, 6, "Journal articles accessed:", new_x="RIGHT")
 
     # Article count pill
-    count_text = str(len(articles))
+    count_text = str(total_count)
     pdf.set_font("Helvetica", "B", 9)
     pill_w = pdf.get_string_width(count_text) + 6
     pill_x = 20 + page_w - pill_w
@@ -198,8 +217,8 @@ def generate_cpd_pdf(
 
     pdf.ln(4)
 
-    # ── Reference list ──────────────────────────────────────────────
-    if not articles:
+    # ── Date-grouped reference list ─────────────────────────────────
+    if not articles_by_date or total_count == 0:
         pdf.set_font("Helvetica", "I", 9.5)
         pdf.set_text_color(*BRAND_MUTED)
         pdf.cell(
@@ -210,43 +229,41 @@ def generate_cpd_pdf(
             new_y="NEXT",
         )
     else:
+        ref_num = 0
         num_w = 8
-        for i, article in enumerate(articles, 1):
-            citation_md = format_vancouver_citation(article)
-            y_start = pdf.get_y()
 
-            # Light alternating row background
-            bg = i % 2 == 0
+        for access_date, articles in articles_by_date:
+            # ── Date subheading ──
+            pdf.ln(2)
+            y_dh = pdf.get_y()
+            pdf.set_fill_color(*DATE_BG)
+            pdf.rect(20, y_dh, page_w, 6.5, style="F")
+            # Accent bar on the left edge
+            pdf.set_fill_color(*BRAND_BLUE)
+            pdf.rect(20, y_dh, 1.2, 6.5, style="F")
 
-            # Number
-            pdf.set_font("Helvetica", "", 8)
-            pdf.set_text_color(*BRAND_MUTED)
-            x_left = pdf.get_x()
-            pdf.cell(num_w, 4.5, f"{i}.", new_x="RIGHT")
+            pdf.set_xy(24, y_dh + 0.5)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(*BRAND_NAVY)
+            pdf.cell(0, 5.5, _fmt_date_heading(access_date), new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
 
-            # Full Vancouver citation with bold title
-            pdf.set_font("Helvetica", "", 8.5)
-            pdf.set_text_color(*BODY_TEXT)
-            pdf.multi_cell(page_w - num_w, 4.5, citation_md, markdown=True)
+            # ── Citations for this date ──
+            for article in articles:
+                ref_num += 1
+                citation_md = format_vancouver_citation(article)
 
-            y_end = pdf.get_y()
-            row_h = y_end - y_start
-
-            # Draw background behind the row if alternating
-            if bg:
-                pdf.set_xy(x_left, y_start)
-                pdf.set_fill_color(245, 247, 250)
-                pdf.rect(x_left, y_start, page_w, row_h, style="F")
-                # Re-render the row content over the background
-                pdf.set_xy(x_left, y_start)
+                # Number
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(*BRAND_MUTED)
-                pdf.cell(num_w, 4.5, f"{i}.", new_x="RIGHT")
+                pdf.cell(num_w, 4.5, f"{ref_num}.", new_x="RIGHT")
+
+                # Full Vancouver citation with bold title
                 pdf.set_font("Helvetica", "", 8.5)
                 pdf.set_text_color(*BODY_TEXT)
                 pdf.multi_cell(page_w - num_w, 4.5, citation_md, markdown=True)
 
-            pdf.ln(1.5)
+                pdf.ln(1.5)
 
     # ── Footer rule + text ──────────────────────────────────────────
     pdf.ln(8)
