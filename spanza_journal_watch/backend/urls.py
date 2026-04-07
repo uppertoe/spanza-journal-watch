@@ -270,6 +270,7 @@ urlpatterns = [
     path("affiliations/<int:affiliation_id>/edit", views.affiliation_edit, name="affiliation_edit"),
     path("authors", views.authors_list, name="authors_list"),
     path("authors/<int:author_id>/edit", views.author_edit, name="author_edit"),
+    path("authors/<int:author_id>/merge", views.author_merge, name="author_merge"),
     path(
         "webhooks/planka/card-update",
         views.planka_card_update_webhook,

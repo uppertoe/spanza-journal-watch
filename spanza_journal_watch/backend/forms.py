@@ -195,7 +195,7 @@ class NewsletterEditForm(forms.ModelForm):
         required=False,
         label="Use issue cover image",
         help_text=(
-            "Copy the issue's cover image and convert it to greyscale for the newsletter header. "
+            "Copy the issue's cover image and process it for the newsletter header. "
             "If you also upload a custom image below, the uploaded file takes precedence."
         ),
     )
@@ -214,7 +214,7 @@ class NewsletterCreateForm(forms.ModelForm):
         required=False,
         label="Use issue cover image",
         help_text=(
-            "Copy the issue's cover image and convert it to greyscale for the newsletter header. "
+            "Copy the issue's cover image and process it for the newsletter header. "
             "If you also upload a custom image below, the uploaded file takes precedence."
         ),
     )

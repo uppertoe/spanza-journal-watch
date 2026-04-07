@@ -8,7 +8,7 @@
       <span class="fw-semibold small">Current version (live in Planka)</span>
       <span class="badge text-bg-primary">Current</span>
     </div>
-    <pre id="current-version-body" class="p-2 border rounded bg-light small mb-0" style="white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto;">{% if current_description %}{{ current_description }}{% else %}<span class="text-muted fst-italic">(empty)</span>{% endif %}</pre>
+    <pre id="current-version-body" class="p-2 border rounded bg-body-secondary small mb-0" style="white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto;">{% if current_description %}{{ current_description }}{% else %}<span class="text-muted fst-italic">(empty)</span>{% endif %}</pre>
   </div>
   <hr class="my-3">
 {% endif %}
@@ -83,7 +83,7 @@
           {# Expandable content row — hidden by default #}
           <tr id="rev-diff-{{ rev.pk }}" class="d-none">
             <td colspan="5">
-              <pre class="p-2 border rounded bg-light small mb-0" style="white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;">{% if rev.description %}{{ rev.description }}{% else %}<span class="text-muted fst-italic">(empty)</span>{% endif %}</pre>
+              <pre class="p-2 border rounded bg-body-secondary small mb-0" style="white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;">{% if rev.description %}{{ rev.description }}{% else %}<span class="text-muted fst-italic">(empty)</span>{% endif %}</pre>
             </td>
           </tr>
         {% endfor %}

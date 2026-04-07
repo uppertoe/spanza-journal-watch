@@ -1,7 +1,6 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from django.conf import settings
 from django.http import HttpRequest
-from django.urls import reverse
 
 
 class AccountAdapter(DefaultAccountAdapter):
@@ -32,6 +31,21 @@ class AccountAdapter(DefaultAccountAdapter):
                 return True
         return False
 
+    def save_user(self, request, user, form, commit=True):
+        """Mark email as verified at signup when arriving from an invite link."""
+        user = super().save_user(request, user, form, commit=commit)
+        if request.session.get("_pending_invite_token") and commit:
+            from allauth.account.models import EmailAddress
+
+            email_obj = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
+            if email_obj and not email_obj.verified:
+                email_obj.verified = True
+                email_obj.primary = True
+                email_obj.save(update_fields=["verified", "primary"])
+            elif not email_obj:
+                EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+        return user
+
     def login(self, request, user):
         """Migrate session stars/full-text clicks and link any orphaned Subscriber on login."""
         from spanza_journal_watch.newsletter.models import Subscriber
@@ -58,12 +72,8 @@ class AccountAdapter(DefaultAccountAdapter):
         return super().login(request, user)
 
     def get_login_redirect_url(self, request):
-        """Respect ?next= when present; otherwise always go to journals.
-
-        Editorial users reach the backend via the 'Editor' button in the nav,
-        not via automatic login redirect.
-        """
+        """Respect ?next= when present; otherwise go to home page."""
         next_url = request.POST.get("next") or request.GET.get("next") or ""
         if next_url:
             return next_url
-        return reverse("submissions:journal_list")
+        return "/"

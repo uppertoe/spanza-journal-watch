@@ -59,7 +59,7 @@
 
         {% if issue_for_preview %}
           <div class="mb-3">
-            <p class="text-muted small mb-1">Issue cover image (will be converted to greyscale):</p>
+            <p class="text-muted small mb-1">Issue cover image (will be cropped, desaturated and tinted):</p>
             <img src="{{ issue_for_preview.image.url }}"
                  alt="Issue cover image"
                  class="img-thumbnail"

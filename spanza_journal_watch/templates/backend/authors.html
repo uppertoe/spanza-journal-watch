@@ -81,7 +81,10 @@
                       {% endfor %}
                     </td>
                     <td>
-                      <a href="{% url "backend:author_edit" author.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                      <div class="d-flex gap-1">
+                        <a href="{% url "backend:author_edit" author.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <a href="{% url "backend:author_merge" author.pk %}" class="btn btn-sm btn-outline-warning">Merge</a>
+                      </div>
                     </td>
                   </tr>
                 {% endfor %}

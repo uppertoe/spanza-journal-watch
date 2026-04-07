@@ -1,0 +1,151 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url "backend:authors_list" %}" class="text-muted small text-decoration-none">&larr; Authors</a>
+</div>
+
+<h1 class="mb-2">Merge author</h1>
+<p class="text-muted">Move all reviews, contributor memberships, and affiliations from one author into another, then delete the source.</p>
+
+<div class="row g-4">
+  {# ── Source author ── #}
+  <div class="col-12 col-md-5">
+    <div class="card border-warning">
+      <div class="card-header text-bg-warning">
+        <span class="fw-semibold">Source (will be deleted)</span>
+      </div>
+      <div class="card-body">
+        <h5 class="mb-1">{{ source.title }} {{ source.name }}</h5>
+        <p class="text-muted small mb-2">
+          {% if source.email %}{{ source.email }}{% else %}No email{% endif %}
+        </p>
+        <ul class="list-unstyled small mb-0">
+          <li>{{ source.reviews.count }} review{{ source.reviews.count|pluralize }}</li>
+          <li>{{ source.contributor_memberships.count }} contributor membership{{ source.contributor_memberships.count|pluralize }}</li>
+          <li>
+            {% for hs in source.health_services.all %}
+              <span class="badge text-bg-light text-dark border">{{ hs.name }}</span>
+            {% empty %}
+              No affiliations
+            {% endfor %}
+          </li>
+          {% if source.user %}<li>Linked to user: {{ source.user.email }}</li>{% endif %}
+          {% if source.profile_image %}<li>Has profile image</li>{% endif %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  {# ── Arrow ── #}
+  <div class="col-12 col-md-2 d-flex align-items-center justify-content-center">
+    <span class="fs-2 text-muted">&rarr;</span>
+  </div>
+
+  {# ── Target author ── #}
+  <div class="col-12 col-md-5">
+    {% if target %}
+      <div class="card border-primary">
+        <div class="card-header text-bg-primary">
+          <span class="fw-semibold">Target (will be kept)</span>
+        </div>
+        <div class="card-body">
+          <h5 class="mb-1">{{ target.title }} {{ target.name }}</h5>
+          <p class="text-muted small mb-2">
+            {% if target.email %}{{ target.email }}{% else %}No email{% endif %}
+          </p>
+          <ul class="list-unstyled small mb-0">
+            <li>{{ target.reviews.count }} review{{ target.reviews.count|pluralize }}</li>
+            <li>{{ target.contributor_memberships.count }} contributor membership{{ target.contributor_memberships.count|pluralize }}</li>
+            <li>
+              {% for hs in target.health_services.all %}
+                <span class="badge text-bg-light text-dark border">{{ hs.name }}</span>
+              {% empty %}
+                No affiliations
+              {% endfor %}
+            </li>
+            {% if target.user %}<li>Linked to user: {{ target.user.email }}</li>{% endif %}
+            {% if target.profile_image %}<li>Has profile image</li>{% endif %}
+          </ul>
+        </div>
+      </div>
+    {% else %}
+      <div class="card">
+        <div class="card-header">Target (will be kept)</div>
+        <div class="card-body text-muted">Select a target author below.</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Target selection ── #}
+{% if not target %}
+  <div class="card mt-4">
+    <div class="card-header">Select target author</div>
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Merge "{{ source.title }} {{ source.name }}" into&hellip;</label>
+          <select name="into" class="form-select" required>
+            <option value="">Choose an author</option>
+            {% for author in all_authors %}
+              <option value="{{ author.pk }}">{{ author.title }} {{ author.name }}{% if author.email %} ({{ author.email }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary">Preview merge</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+{# ── Preview and confirm ── #}
+{% if preview %}
+  <div class="card mt-4">
+    <div class="card-header">Merge preview</div>
+    <div class="card-body">
+      <ul class="mb-3">
+        {% if preview.review_count %}
+          <li><strong>{{ preview.review_count }}</strong> review{{ preview.review_count|pluralize }} will be reassigned</li>
+        {% endif %}
+        {% if preview.membership_count %}
+          <li><strong>{{ preview.membership_count }}</strong> contributor membership{{ preview.membership_count|pluralize }} will be reassigned</li>
+        {% endif %}
+        {% if preview.new_service_count %}
+          <li><strong>{{ preview.new_service_count }}</strong> affiliation{{ preview.new_service_count|pluralize }} will be added:
+            {% for hs in preview.new_services %}
+              <span class="badge text-bg-light text-dark border">{{ hs.name }}</span>
+            {% endfor %}
+          </li>
+        {% endif %}
+        {% if preview.email_action == "keep source's" %}
+          <li>Email <strong>{{ source.email }}</strong> will be copied to target</li>
+        {% endif %}
+        {% if preview.user_action == "keep source's" %}
+          <li>User account link will be copied to target</li>
+        {% endif %}
+        {% if preview.image_action == "keep source's" %}
+          <li>Profile image will be copied to target</li>
+        {% endif %}
+        {% if not preview.review_count and not preview.membership_count and not preview.new_service_count and preview.email_action == "none" and preview.user_action == "none" and preview.image_action == "none" %}
+          <li class="text-muted">Nothing to transfer &mdash; source will simply be deleted</li>
+        {% endif %}
+      </ul>
+      <p class="text-danger small mb-3">
+        <strong>{{ source.title }} {{ source.name }}</strong> will be permanently deleted after merging.
+      </p>
+      <form method="post" action="{% url "backend:author_merge" source.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="into" value="{{ target.pk }}">
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure? This cannot be undone.')">Confirm merge</button>
+          <a href="{% url "backend:authors_list" %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock content %}
