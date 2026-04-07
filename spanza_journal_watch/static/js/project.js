@@ -1169,7 +1169,6 @@ document.addEventListener('click', (event) => {
 
 /* ── Journal shelf: visibility toggling + horizontal scroll ────── */
 (function () {
-  var HIDDEN_KEY = 'jw_hidden_journals';
   var grid = document.getElementById('journal-shelf-grid');
   if (!grid) return;
 
@@ -1180,36 +1179,12 @@ document.addEventListener('click', (event) => {
   var arrowRight = document.getElementById('shelf-arrow-right');
   var dotsContainer = document.getElementById('shelf-dots');
 
-  function getHiddenIds() {
-    try {
-      return JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]');
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveHiddenIds(ids) {
-    localStorage.setItem(HIDDEN_KEY, JSON.stringify(ids));
-  }
-
-  function applyVisibility() {
-    var hidden = getHiddenIds();
-    var books = grid.querySelectorAll('.journal-book[data-journal-id]');
-    var hiddenTotal = 0;
-    books.forEach(function (book) {
-      var id = book.getAttribute('data-journal-id');
-      if (hidden.indexOf(id) !== -1) {
-        book.classList.add('journal-book--hidden');
-        hiddenTotal++;
-      } else {
-        book.classList.remove('journal-book--hidden');
-      }
-    });
-
+  function updateHiddenBar() {
+    var total = grid.querySelectorAll('.journal-book--hidden').length;
     if (hiddenBar) {
-      if (hiddenTotal > 0) {
+      if (total > 0) {
         hiddenBar.classList.remove('d-none');
-        hiddenCount.textContent = hiddenTotal;
+        hiddenCount.textContent = total;
       } else {
         hiddenBar.classList.add('d-none');
       }
@@ -1218,26 +1193,27 @@ document.addEventListener('click', (event) => {
     updateArrows();
   }
 
-  // Hide a journal
+  // Hide a journal — instant DOM toggle + persist to session
   grid.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-hide-journal]');
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
     var id = btn.getAttribute('data-hide-journal');
-    var hidden = getHiddenIds();
-    if (hidden.indexOf(id) === -1) {
-      hidden.push(id);
-      saveHiddenIds(hidden);
-    }
-    applyVisibility();
+    var book = btn.closest('.journal-book');
+    if (book) book.classList.add('journal-book--hidden');
+    updateHiddenBar();
+    navigator.sendBeacon('/journals/shelf/hide/' + id + '/');
   });
 
-  // Show all
+  // Show all — instant DOM toggle + persist to session
   if (showAllBtn) {
     showAllBtn.addEventListener('click', function () {
-      localStorage.removeItem(HIDDEN_KEY);
-      applyVisibility();
+      grid.querySelectorAll('.journal-book--hidden').forEach(function (b) {
+        b.classList.remove('journal-book--hidden');
+      });
+      updateHiddenBar();
+      navigator.sendBeacon('/journals/shelf/show-all/');
     });
   }
 
@@ -1341,8 +1317,9 @@ document.addEventListener('click', (event) => {
     });
   }
 
-  // Init
-  applyVisibility();
+  // Init — hidden class is rendered server-side, just sync dots/arrows
+  updateDots();
+  updateArrows();
 
   // Re-check on resize
   window.addEventListener(
@@ -1620,7 +1597,8 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
 
 /* ── Full-text click checkmarks (all users) ──────────────── */
 (function () {
-  var fulltextReadIds = new Set();
+  // Track IDs clicked in this page session (for instant feedback before next server render)
+  var clickedThisSession = new Set();
 
   function addFulltextCheck(container) {
     if (container.querySelector('.jw-fulltext-check')) return;
@@ -1635,38 +1613,7 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     container.prepend(svg);
   }
 
-  function markReadButtons(root) {
-    if (!fulltextReadIds.size) return;
-    (root || document)
-      .querySelectorAll('.jw-action-btn--fulltext[data-cpd-article-id]')
-      .forEach(function (link) {
-        var id = Number(link.dataset.cpdArticleId);
-        if (!id || !fulltextReadIds.has(id)) return;
-        var label = link.querySelector('.jw-action-btn__label');
-        if (label) addFulltextCheck(label);
-      });
-  }
-
-  // Fetch read IDs on page load (works for both authenticated and anonymous)
-  window
-    .fetch('/journals/fulltext-ids/', { credentials: 'same-origin' })
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (data) {
-      (data.ids || []).forEach(function (id) {
-        fulltextReadIds.add(id);
-      });
-      markReadButtons();
-    })
-    .catch(function () {});
-
-  // Re-mark after HTMX swaps
-  document.body.addEventListener('htmx:afterSettle', function (e) {
-    markReadButtons(e.target);
-  });
-
-  // Record click + show checkmark immediately
+  // Record click + show checkmark immediately (before next server render)
   document.addEventListener('click', function (e) {
     var link = e.target.closest(
       '.jw-action-btn--fulltext[data-cpd-article-id]',
@@ -1674,9 +1621,9 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     if (!link) return;
 
     var articleId = Number(link.dataset.cpdArticleId);
-    if (!articleId || fulltextReadIds.has(articleId)) return;
+    if (!articleId || clickedThisSession.has(articleId)) return;
 
-    fulltextReadIds.add(articleId);
+    clickedThisSession.add(articleId);
 
     // Beacon to persist in session/profile
     navigator.sendBeacon(
@@ -1769,21 +1716,12 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     });
   }
 
-  // Detect current view from #journal-browser-results content
+  // Detect current view from server-rendered data attribute
   function detectCurrentView() {
     var results = document.getElementById('journal-browser-results');
     if (!results) return;
-    var readingList = results.querySelector('.journal-reading-list');
-    if (readingList) {
-      var archivedTab = results.querySelector(
-        '.journal-reading-list__tab--active',
-      );
-      var isArchived =
-        archivedTab && archivedTab.textContent.trim().indexOf('Archived') === 0;
-      setActiveNav(isArchived ? 'archive' : 'reading_list');
-    } else {
-      setActiveNav('shelf');
-    }
+    var marker = results.querySelector('[data-current-view]');
+    setActiveNav(marker ? marker.getAttribute('data-current-view') : 'shelf');
   }
 
   // Track which nav view is currently active

@@ -48,10 +48,10 @@
         </div>
 
         {# ── Hidden journals restore bar ──────────────────────── #}
-        <div id="shelf-hidden-bar" class="journal-shelf-hidden-bar d-none">
+        <div id="shelf-hidden-bar" class="journal-shelf-hidden-bar{% if not hidden_journal_count %} d-none{% endif %}">
           <span class="small text-muted">
             <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-eye-slash"></use></svg>
-            <span id="shelf-hidden-count">0</span> journal(s) hidden
+            <span id="shelf-hidden-count">{{ hidden_journal_count }}</span> journal(s) hidden
           </span>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="shelf-show-all-btn">Show all</button>
         </div>
@@ -64,7 +64,7 @@
           <div class="journal-shelf-grid" id="journal-shelf-grid">
             {% for journal in active_journals %}
               {% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as book_pattern silent %}
-              <div class="journal-book journal-book--{{ journal.shelf_tone }} journal-book--pattern-{{ book_pattern }}" data-journal-id="{{ journal.pk }}">
+              <div class="journal-book journal-book--{{ journal.shelf_tone }} journal-book--pattern-{{ book_pattern }}{% if journal.shelf_hidden %} journal-book--hidden{% endif %}" data-journal-id="{{ journal.pk }}">
                 <input
                   class="journal-book__input"
                   type="radio"
@@ -243,76 +243,19 @@
 {{ block.super }}
 <script>
 (function () {
-  var PAED_KEY = 'jw-paediatric-only';
-  var ABS_KEY = 'jw-hide-no-abstract';
-
-  function getState(key) {
-    var v = localStorage.getItem(key);
-    return v === null ? true : v === '1';
-  }
-
-  function syncCheckbox(id, active) {
-    var el = document.getElementById(id);
-    if (el) el.checked = active;
-  }
-
-  function applyFilters() {
-    var paedActive = getState(PAED_KEY);
-    var absActive = getState(ABS_KEY);
-
-    syncCheckbox('filter-paediatric', paedActive);
-    syncCheckbox('hide-no-abstract', absActive);
-
-    // Apply visibility to all cards
-    var cards = document.querySelectorAll('.journal-article-card');
-    var visibleCount = 0;
-    cards.forEach(function (card) {
-      var hiddenByPaed = paedActive && !card.hasAttribute('data-paediatric');
-      var hiddenByAbs = absActive && card.hasAttribute('data-no-abstract');
-      card.style.display = (hiddenByPaed || hiddenByAbs) ? 'none' : '';
-      if (card.style.display !== 'none') visibleCount++;
-    });
-
-    // Hide sections where all articles are filtered out
-    var hiddenSectionIds = new Set();
-    document.querySelectorAll('.journal-section').forEach(function (section) {
-      var sectionCards = section.querySelectorAll('.journal-article-card');
-      var anyVisible = false;
-      for (var i = 0; i < sectionCards.length; i++) {
-        if (sectionCards[i].style.display !== 'none') { anyVisible = true; break; }
-      }
-      section.style.display = anyVisible ? '' : 'none';
-      if (!anyVisible) hiddenSectionIds.add(section.id);
-    });
-
-    // Hide corresponding TOC links for hidden sections
-    document.querySelectorAll('.journal-toc__link').forEach(function (link) {
-      var target = (link.getAttribute('href') || '').replace('#', '');
-      link.style.display = hiddenSectionIds.has(target) ? 'none' : '';
-    });
-
-    // Show "all filtered" message if every card is hidden
-    var msg = document.getElementById('all-filtered-message');
-    if (msg) {
-      msg.classList.toggle('d-none', visibleCount > 0 || cards.length === 0);
-    }
-  }
-
-  applyFilters();
-
-  // Handle switch changes — delegated so they survive OOB swaps
+  // Handle filter switch changes — read checkbox state from server-rendered DOM
   document.body.addEventListener('change', function (e) {
-    if (e.target.id === 'filter-paediatric') {
-      localStorage.setItem(PAED_KEY, e.target.checked ? '1' : '0');
-      applyFilters();
-    }
-    if (e.target.id === 'hide-no-abstract') {
-      localStorage.setItem(ABS_KEY, e.target.checked ? '1' : '0');
-      applyFilters();
-    }
+    if (e.target.id !== 'filter-paediatric' && e.target.id !== 'hide-no-abstract') return;
+    var params = new URLSearchParams(window.location.search);
+    var checked = document.querySelector('input[name="journal-select"]:checked');
+    if (checked) params.set('journal', checked.value);
+    var paedEl = document.getElementById('filter-paediatric');
+    var absEl = document.getElementById('hide-no-abstract');
+    params.set('paediatric', paedEl && paedEl.checked ? '1' : '0');
+    params.set('has_abstract', absEl && absEl.checked ? '1' : '0');
+    var url = '{% url "submissions:journal_list" %}?' + params.toString();
+    htmx.ajax('GET', url, {target: '#journal-browser-results', swap: 'innerHTML', pushUrl: true});
   });
-
-  document.body.addEventListener('htmx:afterSettle', applyFilters);
 })();
 </script>
 {% endblock inline_javascript %}

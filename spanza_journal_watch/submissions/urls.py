@@ -24,6 +24,8 @@ urlpatterns = [
         name="journal_article_mark_fulltext",
     ),
     path("journals/fulltext-ids/", views.journal_fulltext_ids, name="journal_fulltext_ids"),
+    path("journals/shelf/hide/<int:journal_id>/", views.journal_shelf_hide, name="journal_shelf_hide"),
+    path("journals/shelf/show-all/", views.journal_shelf_show_all, name="journal_shelf_show_all"),
     path("journals/search/", views.journal_search, name="journal_search"),
     path("journals/reading-list/", views.journal_reading_list, name="journal_reading_list"),
     path(

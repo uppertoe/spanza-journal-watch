@@ -33,8 +33,9 @@ module.exports = {
       '../spanza_journal_watch/static/webpack_bundles/',
     ),
     publicPath: '/static/webpack_bundles/',
-    filename: 'js/[name]-[fullhash].js',
-    chunkFilename: 'js/[name]-[hash].js',
+    filename: 'js/[name]-[contenthash].js',
+    chunkFilename: 'js/[name]-[contenthash].js',
+    clean: true,
   },
   plugins: [
     new BundleTracker({
@@ -48,6 +49,7 @@ module.exports = {
       // we pass the output from babel loader to react-hot loader
       {
         test: /\.js$/,
+        exclude: /node_modules/,
         loader: 'babel-loader',
       },
       {

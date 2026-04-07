@@ -1102,8 +1102,10 @@ def _journal_browser_context(request):
     """Build context for the single-journal browsable view."""
     active_journals = list(WatchedJournal.objects.filter(active=True, visible_on_frontend=True).order_by("name", "pk"))
     shelf_tones = ["cobalt", "sunset", "sage", "berry", "ochre", "marine", "rose", "slate"]
+    hidden_journal_ids = set(request.session.get("hidden_shelf_journals", []))
     for journal in active_journals:
         journal.shelf_tone = shelf_tones[journal.pk % len(shelf_tones)]
+        journal.shelf_hidden = journal.pk in hidden_journal_ids
 
     # --- Determine selected journal (single, not multi) ---
     raw_journal = request.GET.get("journal")
@@ -1179,8 +1181,10 @@ def _journal_browser_context(request):
         }
 
     session_starred_ids = set()
+    session_fulltext_ids = set()
     if not request.user.is_authenticated:
         session_starred_ids = set(request.session.get("starred_article_ids", []))
+        session_fulltext_ids = set(request.session.get("fulltext_clicked_ids", []))
 
     # Build PubmedArticle.pk → Review lookup for articles that have been reviewed
     pubmed_ids = [link.article_id for link in article_links]
@@ -1190,12 +1194,20 @@ def _journal_browser_context(request):
         for rev in reviewed:
             review_map.setdefault(rev.article_id, rev)
 
+    # --- Parse filter state from query params, falling back to session, then default on ---
+    filter_paediatric = request.GET.get("paediatric", request.session.get("jw_filter_paediatric", "1")) == "1"
+    filter_has_abstract = request.GET.get("has_abstract", request.session.get("jw_filter_has_abstract", "1")) == "1"
+    request.session["jw_filter_paediatric"] = "1" if filter_paediatric else "0"
+    request.session["jw_filter_has_abstract"] = "1" if filter_has_abstract else "0"
+
     rows = []
+    total_unfiltered = 0
     seen_article_ids = set()
     for link in article_links:
         if link.article_id in seen_article_ids:
             continue
         seen_article_ids.add(link.article_id)
+        total_unfiltered += 1
         link.user_state = user_state_map.get(link.article_id)
         link.session_starred = link.article_id in session_starred_ids
         link.publication_types = article_metadata_list(link.article, "publication_types")
@@ -1207,6 +1219,18 @@ def _journal_browser_context(request):
             text_terms=_PAEDIATRIC_TEXT_TERMS,
         )
         link.review = review_map.get(link.article_id)
+        if request.user.is_authenticated:
+            state = user_state_map.get(link.article_id)
+            link.full_text_read = bool(state and state.full_text_clicked_at)
+        else:
+            link.full_text_read = link.article_id in session_fulltext_ids
+
+        # Apply server-side filters
+        if filter_paediatric and not link.is_paediatric:
+            continue
+        if filter_has_abstract and not link.article.abstract:
+            continue
+
         rows.append(link)
 
     sections = _group_articles_by_section(rows)
@@ -1225,39 +1249,67 @@ def _journal_browser_context(request):
         "has_next_month": has_next_month,
         "can_recommend": can_recommend_pubmed_articles(request.user),
         "session_starred_ids": session_starred_ids,
+        "filter_paediatric": filter_paediatric,
+        "filter_has_abstract": filter_has_abstract,
+        "all_filtered_out": total_unfiltered > 0 and len(rows) == 0,
+        "hidden_journal_count": sum(1 for j in active_journals if j.shelf_hidden),
     }
 
 
 def _attach_related_reviews(rows):
-    """Batch-attach related reviews to all journal browser articles based on shared curated tags."""
+    """Batch-attach related reviews to all journal browser articles based on shared curated tags.
+
+    Uses two queries total (tag links + candidate reviews) instead of one per row.
+    """
     if not rows:
         return
 
     article_ids = [r.article_id for r in rows]
 
-    # Fetch curated tag IDs per article in one query
+    # 1) Fetch curated tag IDs per article in one query
     tag_links = Tag.objects.filter(curated=True, active=True, articles__id__in=article_ids).values_list(
         "articles__id", "id"
     )
-    article_tag_map = {}
+    article_tag_map: dict[int, set[int]] = {}
+    all_tag_ids: set[int] = set()
     for article_id, tag_id in tag_links:
         article_tag_map.setdefault(article_id, set()).add(tag_id)
+        all_tag_ids.add(tag_id)
 
+    if not all_tag_ids:
+        for row in rows:
+            row.related_reviews = []
+        return
+
+    # 2) Fetch all candidate related reviews in one query, excluding current page articles
+    article_id_set = set(article_ids)
+    candidate_reviews = list(
+        Review.objects.filter(active=True, article__tags__id__in=all_tag_ids)
+        .exclude(article_id__in=article_id_set)
+        .select_related("article__journal", "author")
+        .prefetch_related("article__tags")
+        .distinct()
+    )
+
+    # Build review → tag_id set lookup from prefetched tags
+    review_tag_map: dict[int, set[int]] = {}
+    for review in candidate_reviews:
+        review_tag_map[review.pk] = {t.pk for t in review.article.tags.all()}
+
+    # 3) Distribute reviews to rows based on shared tag overlap
     for row in rows:
-        tag_ids = article_tag_map.get(row.article_id, set())
-        if not tag_ids:
+        row_tag_ids = article_tag_map.get(row.article_id, set())
+        if not row_tag_ids:
             row.related_reviews = []
             continue
-        related = (
-            Review.objects.filter(active=True, article__tags__id__in=tag_ids)
-            .exclude(article_id=row.article_id)
-            .select_related("article__journal", "author")
-            .annotate(shared_tag_count=Count("article__tags", filter=Q(article__tags__id__in=tag_ids)))
-            .filter(shared_tag_count__gte=1)
-            .order_by("-shared_tag_count", "-publish_date")
-            .distinct()[:2]
-        )
-        row.related_reviews = list(related)
+
+        scored = []
+        for review in candidate_reviews:
+            shared = len(review_tag_map.get(review.pk, set()) & row_tag_ids)
+            if shared:
+                scored.append((shared, review))
+        scored.sort(key=lambda x: (-x[0], -(x[1].publish_date or datetime.date.min).toordinal()))
+        row.related_reviews = [review for _, review in scored[:2]]
 
 
 def _journal_article_actions_context(request, article):
@@ -1402,6 +1454,25 @@ def journal_fulltext_ids(request):
     else:
         ids = request.session.get("fulltext_clicked_ids", [])
     return JsonResponse({"ids": ids})
+
+
+@csrf_exempt
+@require_POST
+def journal_shelf_hide(request, journal_id):
+    """Add a journal to the hidden shelf list (stored in session)."""
+    hidden = request.session.get("hidden_shelf_journals", [])
+    if journal_id not in hidden:
+        hidden.append(journal_id)
+        request.session["hidden_shelf_journals"] = hidden
+    return JsonResponse({"ok": True})
+
+
+@csrf_exempt
+@require_POST
+def journal_shelf_show_all(request):
+    """Clear the hidden shelf list."""
+    request.session.pop("hidden_shelf_journals", None)
+    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -1583,6 +1654,7 @@ def journal_reading_list(request):
         "journal_names": journal_names,
         "is_reading_list": True,
         "can_recommend": can_recommend_pubmed_articles(request.user),
+        "current_view": "archive" if tab == "archived" else "reading_list",
     }
 
     if request.headers.get("HX-Request") == "true":

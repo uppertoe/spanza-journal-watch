@@ -34,7 +34,8 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     feature_text_styles = ["text-primary", "text-secondary", "text-primary-emphasis", "text-success", "text_danger"]
 
     def get_queryset(self):
-        homepage = Homepage.get_current_homepage()
+        self._homepage = Homepage.get_current_homepage()
+        homepage = self._homepage
         subscriber_id = self.request.session.get("subscriber_id")
         PageView.record_view(homepage, subscriber_id, request=self.request)
 
@@ -52,7 +53,7 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        homepage = Homepage.get_current_homepage()
+        homepage = self._homepage
         domain = get_domain_url()
 
         context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]

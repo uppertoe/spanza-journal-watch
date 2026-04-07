@@ -3,7 +3,7 @@
 <div id="journal-sticky-header" class="d-none" hx-swap-oob="outerHTML:#journal-sticky-header"></div>
 {% endif %}
 
-<div class="journal-reading-list">
+<div class="journal-reading-list" data-current-view="{{ current_view }}">
   <a href="{% url 'submissions:journal_list' %}" class="btn btn-sm btn-outline-secondary mb-3 d-inline-flex align-items-center gap-1">&larr; Back to shelf</a>
 
   {# ── CPD tracking reminder ─────────────────────────────── #}

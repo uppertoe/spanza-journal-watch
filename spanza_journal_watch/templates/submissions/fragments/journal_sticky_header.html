@@ -4,8 +4,8 @@
   <nav class="journal-month-nav" aria-label="Month navigation">
     {% if has_prev_month %}
       <a
-        href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}"
-        hx-get="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}"
+        href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}&paediatric={% if filter_paediatric %}1{% else %}0{% endif %}&has_abstract={% if filter_has_abstract %}1{% else %}0{% endif %}"
+        hx-get="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ prev_month|date:'Y-m' }}&paediatric={% if filter_paediatric %}1{% else %}0{% endif %}&has_abstract={% if filter_has_abstract %}1{% else %}0{% endif %}"
         hx-target="#journal-browser-results"
         hx-swap="innerHTML"
         hx-push-url="true"
@@ -25,8 +25,8 @@
 
     {% if has_next_month %}
       <a
-        href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ next_month|date:'Y-m' }}"
-        hx-get="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ next_month|date:'Y-m' }}"
+        href="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ next_month|date:'Y-m' }}&paediatric={% if filter_paediatric %}1{% else %}0{% endif %}&has_abstract={% if filter_has_abstract %}1{% else %}0{% endif %}"
+        hx-get="{% url 'submissions:journal_list' %}?journal={{ selected_journal_id }}&month={{ next_month|date:'Y-m' }}&paediatric={% if filter_paediatric %}1{% else %}0{% endif %}&has_abstract={% if filter_has_abstract %}1{% else %}0{% endif %}"
         hx-target="#journal-browser-results"
         hx-swap="innerHTML"
         hx-push-url="true"
@@ -41,11 +41,23 @@
   {# ── Filter switches ── #}
   <div class="journal-filter-bar">
     <div class="form-check form-switch journal-filter-switch">
-      <input class="form-check-input" type="checkbox" role="switch" id="filter-paediatric" checked>
+      <input
+        class="form-check-input"
+        type="checkbox"
+        role="switch"
+        id="filter-paediatric"
+        {% if filter_paediatric %}checked{% endif %}
+      >
       <label class="form-check-label" for="filter-paediatric">Paediatric</label>
     </div>
     <div class="form-check form-switch journal-filter-switch">
-      <input class="form-check-input" type="checkbox" role="switch" id="hide-no-abstract" checked>
+      <input
+        class="form-check-input"
+        type="checkbox"
+        role="switch"
+        id="hide-no-abstract"
+        {% if filter_has_abstract %}checked{% endif %}
+      >
       <label class="form-check-label" for="hide-no-abstract">Has abstract</label>
     </div>
   </div>

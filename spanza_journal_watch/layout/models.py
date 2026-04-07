@@ -109,7 +109,11 @@ class Homepage(TimeStampedModel):
         return homepage
 
     def get_card_features(self):
-        card_features = Review.objects.filter(issues__homepage=self, is_featured=True, active=True).order_by("created")
+        card_features = (
+            Review.objects.filter(issues__homepage=self, is_featured=True, active=True)
+            .select_related("article", "author")
+            .order_by("created")
+        )
         return card_features
 
     # Special methods
