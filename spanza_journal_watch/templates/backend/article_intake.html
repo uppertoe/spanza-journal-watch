@@ -83,7 +83,7 @@
       <div class="col-12">
         <label class="form-label fw-semibold">Watched journals</label>
         <input type="text" id="journal-filter" class="form-control form-control-sm mb-1" placeholder="Filter journals&hellip;" autocomplete="off">
-        <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto; background: #fff;">
+        <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto; background: var(--bs-body-bg);">
           {% for checkbox in fetch_form.watched_journals %}
             <div class="form-check journal-check-item mb-1">
               {{ checkbox.tag }}
@@ -131,7 +131,7 @@
 
       <div id="article-intake-task-status" {% if show_stage2_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
 
-      <div class="card mb-3 border-0 bg-light">
+      <div class="card mb-3 border-0 bg-body-secondary">
         <div class="card-body py-3">
           <div class="fw-semibold small mb-1">Add a specific article</div>
           <p class="text-muted small mb-2">Search by title, DOI, or PMID to add an article directly to staging.</p>
