@@ -26,7 +26,7 @@ from spanza_journal_watch.backend.models import (
     WatchedJournalArticle,
     can_recommend_pubmed_articles,
 )
-from spanza_journal_watch.backend.pubmed_cache import article_metadata_list, shift_month
+from spanza_journal_watch.backend.pubmed_cache import article_matches_topic, article_metadata_list, shift_month
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
@@ -68,6 +68,25 @@ JOURNAL_SECTIONS = [
     ("Case Reports", "case-reports", {"Case Reports"}),
     ("Letters", "letters", {"Letter"}),
 ]
+
+_PAEDIATRIC_MESH_TERMS = {
+    "Pediatrics",
+    "Infant",
+    "Infant, Newborn",
+    "Child",
+    "Child, Preschool",
+    "Adolescent",
+}
+_PAEDIATRIC_TEXT_TERMS = {
+    "pediatric",
+    "paediatric",
+    "child",
+    "children",
+    "infant",
+    "newborn",
+    "neonat",
+    "adolescent",
+}
 
 IGNORED_PUBLICATION_TYPES = {
     "Journal Article",
@@ -1182,6 +1201,11 @@ def _journal_browser_context(request):
         link.publication_types = article_metadata_list(link.article, "publication_types")
         link.mesh_terms = article_metadata_list(link.article, "mesh_terms")
         link.keywords = article_metadata_list(link.article, "keywords")
+        link.is_paediatric = article_matches_topic(
+            link.article,
+            mesh_terms=_PAEDIATRIC_MESH_TERMS,
+            text_terms=_PAEDIATRIC_TEXT_TERMS,
+        )
         link.review = review_map.get(link.article_id)
         rows.append(link)
 

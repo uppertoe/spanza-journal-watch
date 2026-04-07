@@ -15,7 +15,7 @@
       </h3>
       <div class="d-grid gap-3">
         {% for row in articles %}
-          <article class="card shadow-sm border-0 journal-article-card"{% if not row.article.abstract %} data-no-abstract="1"{% endif %}>
+          <article class="card shadow-sm border-0 journal-article-card"{% if not row.article.abstract %} data-no-abstract="1"{% endif %}{% if row.is_paediatric %} data-paediatric="1"{% endif %}>
             <div class="card-body p-4">
               <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                 <span class="badge text-bg-primary-subtle text-primary-emphasis">{{ row.watched_journal.name }}</span>
@@ -98,8 +98,8 @@
 
   <div class="card shadow-sm border-0 d-none" id="all-filtered-message">
     <div class="card-body text-center py-5">
-      <h2 class="h5 mb-2">All articles in this issue lack abstracts</h2>
-      <p class="text-muted mb-0">Click "Show all articles" above to see them.</p>
+      <h2 class="h5 mb-2">No articles match the current filters</h2>
+      <p class="text-muted mb-0">Try turning off a filter above to see more articles.</p>
     </div>
   </div>
 

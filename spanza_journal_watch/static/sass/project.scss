@@ -2887,11 +2887,12 @@ body.jw-modal-open {
   pointer-events: none;
 }
 
-/* ── Filter toggle ─────────────────────────────────────── */
+/* ── Filter switches ───────────────────────────────────── */
 
 .journal-filter-bar {
   display: flex;
   justify-content: center;
+  gap: 1rem;
   padding: 0 1rem 0.5rem;
 
   @media (min-width: 768px) {
@@ -2899,26 +2900,51 @@ body.jw-modal-open {
   }
 }
 
-.journal-filter-bar__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--bs-secondary-color);
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.15s;
+.journal-filter-switch {
+  margin-bottom: 0;
 
-  &:hover {
-    color: var(--bs-primary);
+  .form-check-input {
+    cursor: pointer;
+    border-color: #c4a2a2;
+    background-color: #d4adad;
+
+    &:focus {
+      box-shadow: 0 0 0 0.2rem rgba(163, 120, 120, 0.25);
+      border-color: #c4a2a2;
+    }
+
+    &:checked {
+      background-color: #6a9e7e;
+      border-color: #5c8d6f;
+
+      &:focus {
+        box-shadow: 0 0 0 0.2rem rgba(106, 158, 126, 0.25);
+        border-color: #5c8d6f;
+      }
+    }
   }
 
-  &[aria-pressed='true'] {
-    color: var(--bs-primary);
+  .form-check-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--bs-secondary-color);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .form-check-input:checked + .form-check-label {
+    color: var(--bs-body-color);
     font-weight: 600;
+  }
+
+  [data-bs-theme='dark'] & .form-check-input {
+    background-color: #7d5555;
+    border-color: #6b4a4a;
+
+    &:checked {
+      background-color: #4d7a5e;
+      border-color: #3f6b4f;
+    }
   }
 }
 

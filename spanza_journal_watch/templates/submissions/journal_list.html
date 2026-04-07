@@ -243,44 +243,76 @@
 {{ block.super }}
 <script>
 (function () {
-  // ── Abstract filter toggle ──
-  var STORAGE_KEY = 'jw-hide-no-abstract';
-  var stored = localStorage.getItem(STORAGE_KEY);
-  var active = stored === null ? true : stored === '1';
+  var PAED_KEY = 'jw-paediatric-only';
+  var ABS_KEY = 'jw-hide-no-abstract';
 
-  function apply() {
-    var btn = document.getElementById('hide-no-abstract');
-    if (btn) {
-      btn.setAttribute('aria-pressed', active);
-      var hideLabel = btn.querySelector('.journal-filter-bar__label-hide');
-      var showLabel = btn.querySelector('.journal-filter-bar__label-show');
-      if (hideLabel) hideLabel.style.display = active ? 'none' : '';
-      if (showLabel) showLabel.style.display = active ? '' : 'none';
-    }
-    var noAbstract = document.querySelectorAll('.journal-article-card[data-no-abstract]');
-    noAbstract.forEach(function (card) {
-      card.style.display = active ? 'none' : '';
+  function getState(key) {
+    var v = localStorage.getItem(key);
+    return v === null ? true : v === '1';
+  }
+
+  function syncCheckbox(id, active) {
+    var el = document.getElementById(id);
+    if (el) el.checked = active;
+  }
+
+  function applyFilters() {
+    var paedActive = getState(PAED_KEY);
+    var absActive = getState(ABS_KEY);
+
+    syncCheckbox('filter-paediatric', paedActive);
+    syncCheckbox('hide-no-abstract', absActive);
+
+    // Apply visibility to all cards
+    var cards = document.querySelectorAll('.journal-article-card');
+    var visibleCount = 0;
+    cards.forEach(function (card) {
+      var hiddenByPaed = paedActive && !card.hasAttribute('data-paediatric');
+      var hiddenByAbs = absActive && card.hasAttribute('data-no-abstract');
+      card.style.display = (hiddenByPaed || hiddenByAbs) ? 'none' : '';
+      if (card.style.display !== 'none') visibleCount++;
     });
+
+    // Hide sections where all articles are filtered out
+    var hiddenSectionIds = new Set();
+    document.querySelectorAll('.journal-section').forEach(function (section) {
+      var sectionCards = section.querySelectorAll('.journal-article-card');
+      var anyVisible = false;
+      for (var i = 0; i < sectionCards.length; i++) {
+        if (sectionCards[i].style.display !== 'none') { anyVisible = true; break; }
+      }
+      section.style.display = anyVisible ? '' : 'none';
+      if (!anyVisible) hiddenSectionIds.add(section.id);
+    });
+
+    // Hide corresponding TOC links for hidden sections
+    document.querySelectorAll('.journal-toc__link').forEach(function (link) {
+      var target = (link.getAttribute('href') || '').replace('#', '');
+      link.style.display = hiddenSectionIds.has(target) ? 'none' : '';
+    });
+
+    // Show "all filtered" message if every card is hidden
     var msg = document.getElementById('all-filtered-message');
     if (msg) {
-      var total = document.querySelectorAll('.journal-article-card').length;
-      var allHidden = active && total > 0 && noAbstract.length === total;
-      msg.classList.toggle('d-none', !allHidden);
+      msg.classList.toggle('d-none', visibleCount > 0 || cards.length === 0);
     }
   }
 
-  apply();
+  applyFilters();
 
-  // Delegate click so it survives OOB swaps replacing the button
-  document.body.addEventListener('click', function (e) {
-    if (e.target.closest('#hide-no-abstract')) {
-      active = !active;
-      localStorage.setItem(STORAGE_KEY, active ? '1' : '0');
-      apply();
+  // Handle switch changes — delegated so they survive OOB swaps
+  document.body.addEventListener('change', function (e) {
+    if (e.target.id === 'filter-paediatric') {
+      localStorage.setItem(PAED_KEY, e.target.checked ? '1' : '0');
+      applyFilters();
+    }
+    if (e.target.id === 'hide-no-abstract') {
+      localStorage.setItem(ABS_KEY, e.target.checked ? '1' : '0');
+      applyFilters();
     }
   });
 
-  document.body.addEventListener('htmx:afterSettle', apply);
+  document.body.addEventListener('htmx:afterSettle', applyFilters);
 })();
 </script>
 {% endblock inline_javascript %}
