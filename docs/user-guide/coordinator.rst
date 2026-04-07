@@ -4,19 +4,20 @@ Regional Coordinator Guide
 ==========================
 
 Regional coordinators are assigned to specific issues by the chief editor.
-Your role is to help manage article intake and contributors for the issues
+Your role is to help manage article intake and invite reviewers for the issues
 assigned to you. You have access to the backend editorial interface for those
 issues only.
 
 Logging in
 ----------
 
-Go to ``/backend/`` and sign in with your account. After logging in you land on
-the **coordinator dashboard**, which shows a card for each issue you have been
-assigned to.
+Go to ``/backend/`` and sign in with your account. You will see a landing page
+where you can choose **Go to backend** or **Go to Planka**.
 
-If you have not yet been assigned to an issue, the dashboard will be empty.
-Contact the chief editor to be assigned.
+If you go to the backend, you land on the **coordinator dashboard**, which
+shows a card for each issue you have been assigned to. If you have not yet
+been assigned to an issue, the dashboard will be empty — contact the chief
+editor to be assigned.
 
 On each issue card you will see:
 
@@ -25,15 +26,17 @@ On each issue card you will see:
 - **Articles** — jump to Article Intake for this issue
 - **Reviewers** — jump to the Contributors list for this issue
 
-You can also choose to go directly to the Planka board from the
-**Go to backend / Go to Planka** landing page (``/backend/go/``).
+At the top of the page, an **issue context bar** shows the currently selected
+issue and two workflow tabs available to you: **Articles** and **Reviewers**.
+The remaining tabs (Pull Reviews, Edit Reviews, Publish, Newsletter) are
+managed by the chief editor.
 
 
 Article intake
 --------------
 
-Click **Articles** on an issue card to open Article Intake for that issue.
-You can also access it via the top navigation if the issue is pre-selected.
+Click **Articles** on an issue card (or the Articles tab in the context bar)
+to open Article Intake for that issue.
 
 Article Intake has three stages:
 
@@ -68,13 +71,15 @@ in the Candidates list and which have been moved or removed.
 Managing contributors
 ---------------------
 
-Click **Reviewers** on an issue card to open the Contributors list for that issue.
+Click **Reviewers** on an issue card (or the Reviewers tab) to open the
+Contributors list for that issue.
 
 Adding a reviewer
 ~~~~~~~~~~~~~~~~~
 
-Enter the reviewer's email address and click **Add reviewer**. They are added
-with status *Pending*.
+Enter the reviewer's **name** and **email address**, then click **Add
+reviewer**. Both fields are required. The reviewer is added with status
+*Pending*.
 
 Sending invitations
 ~~~~~~~~~~~~~~~~~~~
@@ -102,15 +107,16 @@ Working in Planka
 -----------------
 
 Once you are assigned to an issue, you are added to its Planka board. Log in to
-Planka at ``/planka/`` (or the URL your chief editor has given you) using your
-Journal Watch account — no separate Planka login is needed.
+Planka using your Journal Watch account — click **Sign in with Journal Watch**
+on the Planka login page. No separate Planka login is needed.
 
 In Planka you can:
 
-- View all article cards in the board
-- Move cards between lists (e.g. from *Candidates* to *Under Review*)
-- Comment on cards
-- Check reviewer progress
+- View all article cards on the Reviews board
+- Move cards between lists (e.g. from *Candidates* to *Under review*)
+- Comment on cards to give feedback to reviewers
+- Check reviewer progress by seeing which cards are in each list
 
-Your role in Planka is typically as a board editor. You can see and interact
-with all cards, but Planka board settings are managed by the chief editor.
+Your role on the Reviews board is board editor — you can see and interact
+with all cards. The Instructions board contains read-only guidance cards.
+Planka board settings are managed by the chief editor.

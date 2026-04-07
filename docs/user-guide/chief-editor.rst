@@ -69,22 +69,28 @@ and ISSN numbers. Newly added journals are active by default.
 Issue workflow overview
 -----------------------
 
-Each newsletter issue moves through five steps, shown as tabs at the top of
-the Issue Builder pages:
+Each newsletter issue moves through seven steps, shown as tabs in the issue
+context bar at the top of all issue builder pages:
 
-1. **Setup** — create the issue and configure Planka
-2. **Reviewers** — invite contributors
-3. **Reviews** — import and edit the article content
-4. **Publish** — make reviews live and set the homepage
-5. **Planka** — sync cards from the board
+1. **Setup** — create the issue, configure Planka, and assign coordinators
+2. **Articles** — fetch articles from PubMed, stage candidates, and push to Planka
+3. **Reviewers** — invite contributors and monitor their status
+4. **Pull Reviews** — import completed reviews from the Planka board
+5. **Edit Reviews** — edit and polish the review content
+6. **Publish** — make reviews live and set the homepage
+7. **Newsletter** — compose and send the newsletter email
 
-You can navigate between tabs at any time and come back to earlier steps.
+Coordinators see only the Articles and Reviewers tabs. The remaining tabs are
+chief-editor only.
+
+You can navigate between tabs at any time and come back to earlier steps. An
+**Issues** sidebar lets you switch between issues or create a new one.
 
 
-Step 1: Create the issue
-------------------------
+Step 1: Setup
+-------------
 
-Go to **Issue Builder** (``/backend/issues/builder/``).
+Go to **Setup** (``/backend/issues/builder/``).
 
 Fill in:
 
@@ -98,47 +104,35 @@ visible on the public site until you publish it.
 
 Once saved, two additional panels appear on the page:
 
-**Planka setup** — create the Planka kanban board for this issue (see
-:ref:`chief-editor-planka` below).
+**Planka setup** — create the Planka kanban board for this issue. Click
+**Initialise Planka board** (or **Create Planka project**). This automatically:
+
+- Creates a Planka project named after the issue
+- Sets up a **Reviews** board with three lists: *Candidates*, *Under review*,
+  and *Publish ready*
+- Creates a separate **Instructions** board with guidance cards for reviewers,
+  editors, and administrators
+- Registers a webhook so that card changes in Planka sync back to the backend
+
+After the board is created, the page shows a link to the board and allows you to
+set a custom background image. You can recreate the board (e.g. if it was
+accidentally deleted) without losing review data — the backend retains imported
+review content independently of Planka.
 
 **Issue coordinators** — assign regional coordinators to this issue. Enter a
-coordinator's email address. They must already have an account with the
-``regional_coordinator`` permission. Once assigned, they can access Article
-Intake and the Reviewers tab for this issue from their dashboard.
+coordinator's name and email address. Once assigned, they can access the
+Articles and Reviewers tabs for this issue from their dashboard.
 
 .. note::
    You can return to the Setup tab at any time to update the issue name, body,
    image, or coordinator list before publishing.
 
 
-.. _chief-editor-planka:
+Step 2: Articles
+----------------
 
-Step 2: Set up Planka
----------------------
-
-The Planka board is the workspace where reviewers write and edit their reviews.
-Go to the **Planka** tab for the issue.
-
-Click **Create Planka project**. This automatically:
-
-- Creates a Planka project and board named after the issue
-- Sets up the standard lists: *Candidates*, *Under Review*, *Publish Ready*, and
-  an *Instructions* board
-- Registers a webhook so that card changes in Planka sync back to the backend
-
-After the board is created, the page shows a link to the board and allows you to
-set a custom background image.
-
-You can recreate the board (e.g. if it was accidentally deleted) without losing
-review data — the backend retains imported review content independently of
-Planka.
-
-
-Step 3: Article intake from PubMed
------------------------------------
-
-Go to **Article Intake** (``/backend/articles/intake/``), select the issue from
-the dropdown at the top, and work through the three-stage workflow.
+Go to the **Articles** tab (``/backend/articles/intake/``). If an issue is not
+already selected, choose one from the Issues sidebar.
 
 Stage 1 — Fetch
 ~~~~~~~~~~~~~~~
@@ -185,17 +179,16 @@ articles published after the initial search, without losing your existing
 selections.
 
 
-Step 4: Add reviewers
-----------------------
+Step 3: Reviewers
+-----------------
 
-Go to the **Reviewers** tab for the issue (``/backend/issues/reviewers/``).
+Go to the **Reviewers** tab (``/backend/issues/reviewers/``).
 
 Adding reviewers
 ~~~~~~~~~~~~~~~~
 
-Enter a reviewer's email address and click **Add reviewer**. The autocomplete
-draws from existing author profiles, but you can type any email. The reviewer
-is added with status *Pending*.
+Enter a reviewer's **name** and **email address**, then click **Add reviewer**.
+Both fields are required. The reviewer is added with status *Pending*.
 
 Sending invitations
 ~~~~~~~~~~~~~~~~~~~~
@@ -203,7 +196,8 @@ Sending invitations
 Once you have added the reviewers you want, click **Send invites**. Each
 pending reviewer receives an email with a personalised invitation link valid
 for 180 days. The link takes them to a page where they sign in (or create an
-account) with their invited email address, then accept the invitation.
+account) with their invited email address. Once signed in with the correct
+email, their invitation is accepted automatically.
 
 Once a reviewer accepts, their status changes to *Active* and they are
 automatically added as a member of the Planka board.
@@ -224,31 +218,23 @@ reviewer's board membership appears out of sync (e.g. after a Planka database
 restore).
 
 
-Reviewers on the Planka board
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 4: Pull Reviews
+--------------------
 
-After accepting their invite, reviewers are added to the Planka board and can
-work directly in Planka. The chief editor and coordinators can also be added to
-the board as viewers or editors via Planka's own member management.
-
-
-Step 5: Import reviews from Planka
-------------------------------------
-
-When reviewers complete their cards and move them to the *Publish Ready* list on
+When reviewers complete their cards and move them to the *Publish ready* list on
 the Planka board, you import them into the backend.
 
-Go to the **Planka** tab for the issue.
+Go to the **Pull Reviews** tab.
 
 The **Import cards** panel shows all cards in the Planka board. Use the scope
-selector to show only the *Publish Ready* list (recommended) or all cards.
+selector to show only the *Publish ready* list (recommended) or all cards.
 
 Click **Import** next to each card you want to bring in. The backend extracts
-the article data from the card description and creates a Review record linked
-to the issue. Cards that have already been imported are shown as blocked —
-click the review link to edit the existing review instead.
+the review content from the card description (below the marker line) and creates
+a Review record linked to the issue. Cards that have already been imported are
+shown as blocked — click the review link to edit the existing review instead.
 
-Click **Import all publish-ready cards** to import the entire Publish Ready list
+Click **Import all publish-ready cards** to import the entire Publish ready list
 in one action.
 
 .. note::
@@ -258,10 +244,10 @@ in one action.
    earlier version if needed.
 
 
-Step 6: Edit reviews
+Step 5: Edit Reviews
 ---------------------
 
-Go to the **Reviews** tab (``/backend/issues/reviews/``).
+Go to the **Edit Reviews** tab (``/backend/issues/reviews/``).
 
 The reviews table lists all reviews currently attached to this issue. For each
 review you can see whether it is **Featured**, whether it is **Live** (published),
@@ -277,7 +263,6 @@ Click **Edit** on any row to open the review form:
   existing profiles)
 - **Body** — the review text (Markdown)
 - **Featured** — tick to mark this review as a featured article in the issue
-  (maximum five featured reviews per issue)
 - **Featured image** — optional image displayed alongside the featured review
 
 Adding a review manually
@@ -293,7 +278,7 @@ Click **Remove** on any row to detach the review from this issue. The review
 record is not deleted — it can be re-attached later if needed.
 
 
-Step 7: Publish
+Step 6: Publish
 ---------------
 
 Go to the **Publish** tab (``/backend/issues/publish/``).
@@ -316,11 +301,11 @@ homepage does not automatically publish individual reviews — toggle them live
 first.
 
 
-Newsletter release
+Step 7: Newsletter
 ------------------
 
-Once the issue is live, go to **Newsletter** (accessible from the dashboard) to
-compose and send the newsletter email.
+Go to the **Newsletter** tab to compose and send the newsletter email for this
+issue.
 
 The newsletter workflow:
 
