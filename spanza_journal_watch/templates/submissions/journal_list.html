@@ -38,6 +38,7 @@
               hx-get="{% url 'submissions:journal_reading_list' %}"
               hx-target="#journal-browser-results"
               hx-swap="innerHTML"
+              hx-push-url="true"
             >
               <svg class="bi" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
               Reading list
@@ -106,11 +107,19 @@
       </section>
 
       {# ── STICKY HEADER (month nav + filter + TOC) ──────────────── #}
-      {% include "submissions/fragments/journal_sticky_header.html" %}
+      {% if reading_list_fragment %}
+        <div class="journal-sticky-header d-none" id="journal-sticky-header"></div>
+      {% else %}
+        {% include "submissions/fragments/journal_sticky_header.html" %}
+      {% endif %}
 
       {# ── ARTICLE LIST (HTMX target) ──────────────────────────────── #}
       <div id="journal-browser-results">
-        {% include "submissions/fragments/journal_article_list.html" %}
+        {% if reading_list_fragment %}
+          {% include "submissions/fragments/journal_reading_list.html" %}
+        {% else %}
+          {% include "submissions/fragments/journal_article_list.html" %}
+        {% endif %}
       </div>
 
     </div>

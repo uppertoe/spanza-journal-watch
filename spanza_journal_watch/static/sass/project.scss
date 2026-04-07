@@ -2729,6 +2729,17 @@ body.jw-modal-open {
 
 .journal-article-card {
   border-radius: 1.35rem;
+  overflow: hidden;
+  min-width: 0;
+
+  .card-body {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .badge {
+    white-space: normal;
+  }
 }
 
 .journal-article-card__abstract {
@@ -3172,7 +3183,9 @@ body.jw-modal-open {
 
 .journal-reading-list__search-group .form-control,
 .journal-reading-list__search-group .form-select {
-  max-width: 18rem;
+  @media (min-width: 768px) {
+    max-width: 18rem;
+  }
 }
 
 .journal-reading-list__group-header {
@@ -3192,6 +3205,17 @@ body.jw-modal-open {
   border: 1px solid rgba(21, 43, 59, 0.08);
   background: var(--journal-surface);
   box-shadow: var(--journal-shadow);
+  overflow: hidden;
+  min-width: 0;
+
+  .card-body {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .badge {
+    white-space: normal;
+  }
 }
 
 [data-bs-theme='dark'] .journal-reading-list__card {

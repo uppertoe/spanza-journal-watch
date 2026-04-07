@@ -1,6 +1,6 @@
-{# Hide month nav when reading list is displayed via OOB swap #}
-{% if is_reading_list %}
-<nav id="journal-month-nav" class="journal-month-nav mb-4 d-none" hx-swap-oob="outerHTML:#journal-month-nav"></nav>
+{# Hide sticky header when reading list is displayed via HTMX OOB swap #}
+{% if is_reading_list and not reading_list_fragment %}
+<div id="journal-sticky-header" class="d-none" hx-swap-oob="outerHTML:#journal-sticky-header"></div>
 {% endif %}
 
 <div class="journal-reading-list">
@@ -21,10 +21,17 @@
   <div class="journal-reading-list__header mb-4">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
       <div>
-        <p class="text-uppercase small fw-semibold text-warning mb-1">
-          <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
-          Reading list
-        </p>
+        {% if tab == "archived" %}
+          <p class="text-uppercase small fw-semibold text-secondary mb-1">
+            <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-archive"></use></svg>
+            Archive
+          </p>
+        {% else %}
+          <p class="text-uppercase small fw-semibold text-warning mb-1">
+            <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+            Reading list
+          </p>
+        {% endif %}
         <h2 class="h4 mb-0">{{ total_count }} article{{ total_count|pluralize }}</h2>
       </div>
       {% if request.user.is_authenticated %}
@@ -39,28 +46,28 @@
 
     <form class="journal-reading-list__filters" id="reading-list-filters">
       {# Active / Archived tabs #}
-      {% if request.user.is_authenticated %}
-        <div class="journal-reading-list__tabs">
-          <button
-            type="button"
-            class="journal-reading-list__tab {% if tab == 'active' %}journal-reading-list__tab--active{% endif %}"
-            hx-get="{% url 'submissions:journal_reading_list' %}?tab=active"
-            hx-target="#journal-browser-results"
-            hx-swap="innerHTML"
-          >
-            Active <span class="journal-reading-list__tab-count" id="reading-list-active-count">{{ active_count }}</span>
-          </button>
-          <button
-            type="button"
-            class="journal-reading-list__tab {% if tab == 'archived' %}journal-reading-list__tab--active{% endif %}"
-            hx-get="{% url 'submissions:journal_reading_list' %}?tab=archived"
-            hx-target="#journal-browser-results"
-            hx-swap="innerHTML"
-          >
-            Archived <span class="journal-reading-list__tab-count" id="reading-list-archived-count">{{ archived_count }}</span>
-          </button>
-        </div>
-      {% endif %}
+      <div class="journal-reading-list__tabs">
+        <button
+          type="button"
+          class="journal-reading-list__tab {% if tab == 'active' %}journal-reading-list__tab--active{% endif %}"
+          hx-get="{% url 'submissions:journal_reading_list' %}?tab=active"
+          hx-target="#journal-browser-results"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+        >
+          Active <span class="journal-reading-list__tab-count" id="reading-list-active-count">{{ active_count }}</span>
+        </button>
+        <button
+          type="button"
+          class="journal-reading-list__tab {% if tab == 'archived' %}journal-reading-list__tab--active{% endif %}"
+          hx-get="{% url 'submissions:journal_reading_list' %}?tab=archived"
+          hx-target="#journal-browser-results"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+        >
+          Archived <span class="journal-reading-list__tab-count" id="reading-list-archived-count">{{ archived_count }}</span>
+        </button>
+      </div>
 
       <input type="hidden" name="tab" value="{{ tab }}">
 
@@ -115,6 +122,13 @@
         {% if query or journal_filter %}
           <h3 class="h5 mb-2">No matching articles</h3>
           <p class="text-muted mb-0">Try adjusting your search or filter.</p>
+        {% elif tab == "archived" and not request.user.is_authenticated %}
+          <h3 class="h5 mb-2">Archive requires an account</h3>
+          <p class="text-muted mb-0">
+            <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}">Sign up</a> or
+            <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}">log in</a>
+            to archive articles you've read.
+          </p>
         {% elif tab == "archived" %}
           <h3 class="h5 mb-2">No archived articles</h3>
           <p class="text-muted mb-0">Articles you mark as read will appear here.</p>

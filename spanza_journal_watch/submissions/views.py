@@ -1495,7 +1495,7 @@ def journal_reading_list(request):
         journal_names = sorted(n for n in all_names if n)
     else:
         starred_ids = request.session.get("starred_article_ids", [])
-        if starred_ids:
+        if starred_ids and tab != "archived":
             articles_qs = PubmedArticle.objects.filter(pk__in=starred_ids)
             if query:
                 articles_qs = articles_qs.filter(Q(title__icontains=query) | Q(abstract__icontains=query))
@@ -1517,6 +1517,8 @@ def journal_reading_list(request):
                 if article.source_journal_name:
                     journal_names.add(article.source_journal_name)
             journal_names = sorted(journal_names)
+        elif starred_ids:
+            active_count = len(starred_ids)
 
     # Build star count + review lookup for reading list items
     reading_list_pubmed_ids = [item["article"].pk for item in items]
@@ -1558,7 +1560,14 @@ def journal_reading_list(request):
         "is_reading_list": True,
         "can_recommend": can_recommend_pubmed_articles(request.user),
     }
-    return render(request, "submissions/fragments/journal_reading_list.html", context)
+
+    if request.headers.get("HX-Request") == "true":
+        return render(request, "submissions/fragments/journal_reading_list.html", context)
+
+    # Full-page request (direct navigation / refresh) — render inside the journal shell
+    context.update(_journal_browser_context(request))
+    context["reading_list_fragment"] = True
+    return render(request, "submissions/journal_list.html", context)
 
 
 @login_required
