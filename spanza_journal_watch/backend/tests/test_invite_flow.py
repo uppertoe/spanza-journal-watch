@@ -316,3 +316,129 @@ class TestEmailMismatchSignout:
         assert follow_response.status_code == 200
         # Now unauthenticated — should see invite acceptance prompt
         assert "invitation" in follow_response.content.decode().lower()
+
+
+# ---------------------------------------------------------------------------
+# 5. End-to-end invite signup: new user signs up via invite and gets verified
+# ---------------------------------------------------------------------------
+
+
+class TestInviteSignupEndToEnd:
+    """Simulate the full invite → signup → acceptance flow.
+
+    This is the flow that triggered the production AssertionError in
+    allauth's ``setup_user_email`` when ``save_user`` prematurely created
+    an ``EmailAddress`` record.
+    """
+
+    def test_signup_via_invite_creates_verified_user(self, settings):
+        """New user: visit invite link → sign up → email is auto-verified."""
+        settings.ACCOUNT_ALLOW_REGISTRATION = False
+
+        issue = make_issue()
+        contributor = make_contributor(issue, email="newuser@example.com")
+        invite, raw_token = make_invite(contributor)
+
+        client = Client()
+
+        # Step 1: Visit the invite link — sets session token
+        resp = client.get(invite_url(raw_token))
+        assert resp.status_code == 200
+        assert client.session["_pending_invite_token"] == raw_token
+
+        # Step 2: POST to the signup form (as allauth expects)
+        signup_url = reverse("account_signup")
+        resp = client.post(
+            signup_url,
+            {
+                "email": "newuser@example.com",
+                "password1": "Str0ng!Pass42x",
+                "password2": "Str0ng!Pass42x",
+            },
+        )
+        # Successful signup redirects (302); a failure would re-render the form (200)
+        assert resp.status_code == 302, (
+            f"Signup failed (status {resp.status_code}). " "This may reproduce the AssertionError in setup_user_email."
+        )
+
+        # Step 3: Verify user was created
+        user = User.objects.filter(email="newuser@example.com").first()
+        assert user is not None, "User should have been created"
+
+        # Step 4: Email should be auto-verified (invite = proof of ownership)
+        email_addr = EmailAddress.objects.filter(user=user, email="newuser@example.com").first()
+        assert email_addr is not None, "EmailAddress record should exist"
+        assert email_addr.verified is True, "Email should be verified for invite signups"
+        assert email_addr.primary is True
+
+    def test_signup_via_invite_then_accept_completes_flow(self, settings):
+        """Full round-trip: invite link → signup → revisit invite → contributor activated."""
+        settings.ACCOUNT_ALLOW_REGISTRATION = False
+
+        issue = make_issue()
+        contributor = make_contributor(issue, email="fullflow@example.com")
+        invite, raw_token = make_invite(contributor)
+
+        client = Client()
+
+        # Visit invite link (unauthenticated)
+        client.get(invite_url(raw_token))
+
+        # Sign up
+        resp = client.post(
+            reverse("account_signup"),
+            {
+                "email": "fullflow@example.com",
+                "password1": "Str0ng!Pass42x",
+                "password2": "Str0ng!Pass42x",
+            },
+        )
+        assert resp.status_code == 302
+
+        user = User.objects.get(email="fullflow@example.com")
+
+        # The signup redirect includes ?next= pointing back to the invite URL.
+        # Simulate the user following through: log in and accept.
+        client.force_login(user)
+        resp = client.get(invite_url(raw_token))
+
+        # Contributor should now be ACTIVE
+        contributor.refresh_from_db()
+        assert contributor.status == IssueContributor.Status.ACTIVE
+        assert contributor.user_id == user.pk
+
+    def test_signup_without_invite_token_still_blocked(self, settings):
+        """Signup must still be refused when there's no invite token in session."""
+        settings.ACCOUNT_ALLOW_REGISTRATION = False
+
+        client = Client()
+        client.post(
+            reverse("account_signup"),
+            {
+                "email": "sneaky@example.com",
+                "password1": "Str0ng!Pass42x",
+                "password2": "Str0ng!Pass42x",
+            },
+        )
+        assert User.objects.filter(email="sneaky@example.com").count() == 0
+
+    def test_normal_signup_no_invite_does_not_verify_email(self, settings):
+        """When ACCOUNT_ALLOW_REGISTRATION=True and no invite, email stays unverified."""
+        settings.ACCOUNT_ALLOW_REGISTRATION = True
+
+        client = Client()
+        resp = client.post(
+            reverse("account_signup"),
+            {
+                "email": "regular@example.com",
+                "password1": "Str0ng!Pass42x",
+                "password2": "Str0ng!Pass42x",
+            },
+        )
+        assert resp.status_code == 302
+
+        user = User.objects.get(email="regular@example.com")
+        email_addr = EmailAddress.objects.filter(user=user, email="regular@example.com").first()
+        assert email_addr is not None
+        # Without an invite, email should NOT be auto-verified
+        assert email_addr.verified is False

@@ -55,6 +55,10 @@ class UserSignupForm(SignupForm):
 
     def save(self, request):
         user = super().save(request)
+        # Verify email now that allauth's setup_user_email has created the EmailAddress
+        from spanza_journal_watch.users.adapters import AccountAdapter
+
+        AccountAdapter.confirm_email_on_invite(user)
         user.name = (self.cleaned_data.get("name") or user.name or "").strip()
         user.save(update_fields=["name"])
 

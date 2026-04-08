@@ -32,19 +32,29 @@ class AccountAdapter(DefaultAccountAdapter):
         return False
 
     def save_user(self, request, user, form, commit=True):
-        """Mark email as verified at signup when arriving from an invite link."""
+        """Flag user for email auto-verification when arriving from an invite link.
+
+        The actual EmailAddress record is created later by allauth's
+        ``setup_user_email``.  We must not create it here or the assertion in
+        ``setup_user_email`` will fail.  Instead we stash a flag on the user
+        instance and verify the address in ``confirm_email_on_invite`` (called
+        from the signup form's ``save`` after ``setup_user_email`` has run).
+        """
         user = super().save_user(request, user, form, commit=commit)
         if request.session.get("_pending_invite_token") and commit:
-            from allauth.account.models import EmailAddress
-
-            email_obj = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
-            if email_obj and not email_obj.verified:
-                email_obj.verified = True
-                email_obj.primary = True
-                email_obj.save(update_fields=["verified", "primary"])
-            elif not email_obj:
-                EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+            user._invite_verify_email = True
         return user
+
+    @staticmethod
+    def confirm_email_on_invite(user):
+        """Verify the primary EmailAddress created by allauth after signup."""
+        if not getattr(user, "_invite_verify_email", False):
+            return
+        from allauth.account.models import EmailAddress
+
+        EmailAddress.objects.filter(user=user, email__iexact=user.email, verified=False).update(
+            verified=True, primary=True
+        )
 
     def login(self, request, user):
         """Migrate session stars/full-text clicks and link any orphaned Subscriber on login."""
