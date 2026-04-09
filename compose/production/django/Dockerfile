@@ -102,7 +102,6 @@ RUN chmod +x /start-flower
 # Copy application code into the runtime image. Frontend build dependencies
 # stay in the Node build stage; only built assets are copied below.
 COPY --chown=django:django ./config ${APP_HOME}/config
-COPY --chown=django:django ./docs ${APP_HOME}/docs
 COPY --chown=django:django ./manage.py ${APP_HOME}/manage.py
 COPY --chown=django:django ./spanza_journal_watch ${APP_HOME}/spanza_journal_watch
 COPY --from=client-builder --chown=django:django \

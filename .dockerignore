@@ -34,6 +34,7 @@ spanza_journal_watch/fixtures/
 spanza_journal_watch/conftest.py
 spanza_journal_watch/**/tests/
 docs/_build/
+tests/
 deploy/
 local.yml
 docker-compose*.yml
