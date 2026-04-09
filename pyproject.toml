@@ -1,12 +1,14 @@
 # ==== pytest ====
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--ds=config.settings.test --reuse-db"
+addopts = "--ds=config.settings.test --reuse-db -m 'not integration'"
 python_files = [
     "tests.py",
     "test_*.py",
+    "tests_*.py",
 ]
 markers = [
+    "integration: tests that hit real external services (PubMed API, Planka). Run with: pytest -m integration",
 ]
 
 # ==== Coverage ====

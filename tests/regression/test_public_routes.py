@@ -12,7 +12,7 @@ class TestPublicRoutes:
     def test_core_routes_status_and_templates(self, route_client, regression_baseline):
         issue = Issue.objects.order_by("pk").first()
         review = Review.objects.order_by("pk").first()
-        tag = Tag.objects.order_by("pk").first()
+        tag = Tag.objects.filter(active=True).order_by("pk").first()
         author = Author.objects.filter(anonymous=False).order_by("pk").first()
 
         assert issue is not None
@@ -186,9 +186,9 @@ class TestPublicRoutes:
 
         page_markers = {
             "newsletter_subscribe_htmx": ['id="subscribe-container"', 'name="email"', "csrfmiddlewaretoken"],
-            "issue_list": ['<h1 class="display-4 fst-italic">Issues</h1>', 'id="article-block"'],
-            "tag_list": ['<h1 class="display-4 fst-italic">Tags</h1>', 'id="article-block"'],
-            "search": ['<h1 class="display-4 fst-italic">Search</h1>', 'id="search-results"'],
+            "issue_list": ["abstract-header__title", "Issues", 'id="article-block"'],
+            "tag_list": ["abstract-header__title", "Tags", 'id="article-block"'],
+            "search": ["abstract-header__title", "Search", 'id="search-results"'],
         }
         for marker in page_markers[name]:
             assert marker in actual

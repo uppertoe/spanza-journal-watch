@@ -1,8 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
-from django.test import Client
-from django.test import override_settings
+from django.test import Client, override_settings
 from django.urls import reverse
 
 from spanza_journal_watch.newsletter.models import Subscriber
@@ -160,6 +159,158 @@ def test_confirmation_email_uses_reply_to_and_metadata():
     assert message.reply_to == ["queries@example.test"]
     assert message.metadata == {"type": "subscription_confirmation"}
     assert message.tags == ["subscription-confirmation"]
+
+
+@pytest.mark.django_db
+class TestNewsletterSignalEdgeCases:
+    """Edge cases for SES event parsing and recipient extraction."""
+
+    def test_ses_sns_wrapper_message_parsed(self):
+        """When SES sends via SNS, the real payload is inside a 'Message' key as JSON string."""
+        import json
+
+        subscriber = Subscriber.objects.create(email="sns@example.test", subscribed=True)
+        inner_payload = json.dumps(
+            {
+                "notificationType": "Bounce",
+                "bounce": {
+                    "bounceType": "Permanent",
+                    "bounceSubType": "General",
+                    "bouncedRecipients": [{"emailAddress": "sns@example.test"}],
+                },
+            }
+        )
+        event = SimpleNamespace(
+            description="",
+            recipient="",
+            recipients=[],
+            esp_event={"Message": inner_payload},
+            metadata={},
+        )
+
+        handle_bounce(event)
+
+        subscriber.refresh_from_db()
+        assert subscriber.bounced is True
+        assert subscriber.subscribed is False
+
+    def test_bounce_with_no_matching_subscriber_does_not_raise(self):
+        event = SimpleNamespace(
+            description="Permanent:General",
+            recipient="nonexistent@example.test",
+            recipients=[],
+            esp_event={},
+            metadata={},
+        )
+        # Should not raise
+        handle_bounce(event)
+
+    def test_complaint_with_no_matching_subscriber_does_not_raise(self):
+        event = SimpleNamespace(
+            description="Complaint",
+            recipient="ghost@example.test",
+            recipients=[],
+            esp_event={},
+            metadata={},
+        )
+        handle_complaint(event)
+
+    def test_bounce_with_no_recipients_does_not_raise(self):
+        event = SimpleNamespace(
+            description="Permanent:General",
+            recipient="",
+            recipients=[],
+            esp_event={},
+            metadata={},
+        )
+        handle_bounce(event)
+
+    def test_subscription_topic_level_optout(self):
+        """Test _is_subscription_opt_out with topic-level preferences."""
+        subscriber = Subscriber.objects.create(email="topic-optout@example.test", subscribed=True)
+        event = SimpleNamespace(
+            description="Subscription",
+            recipient="",
+            recipients=[],
+            esp_event={
+                "eventType": "Subscription",
+                "mail": {"destination": ["topic-optout@example.test"]},
+                "subscription": {
+                    "newTopicPreferences": {
+                        "newsletter": {
+                            "subscriptionStatus": "OptOut",
+                        }
+                    }
+                },
+            },
+            metadata={},
+            event_type="subscription",
+        )
+
+        handle_subscription(event)
+
+        subscriber.refresh_from_db()
+        assert subscriber.subscribed is False
+
+    def test_subscription_event_without_optout_keeps_subscriber(self):
+        subscriber = Subscriber.objects.create(email="keep@example.test", subscribed=True)
+        event = SimpleNamespace(
+            description="Subscription",
+            recipient="",
+            recipients=[],
+            esp_event={
+                "eventType": "Subscription",
+                "mail": {"destination": ["keep@example.test"]},
+                "subscription": {
+                    "newTopicPreferences": {
+                        "newsletter": {
+                            "subscriptionStatus": "OptIn",
+                        }
+                    }
+                },
+            },
+            metadata={},
+            event_type="subscription",
+        )
+
+        handle_subscription(event)
+
+        subscriber.refresh_from_db()
+        assert subscriber.subscribed is True
+
+    def test_recipients_deduplicated(self):
+        from spanza_journal_watch.newsletter.signals import _extract_recipients
+
+        event = SimpleNamespace(
+            recipient="dupe@example.test",
+            recipients=["dupe@example.test", "other@example.test"],
+            esp_event={},
+        )
+        result = _extract_recipients(event)
+        assert result.count("dupe@example.test") == 1
+        assert "other@example.test" in result
+
+    def test_recipients_normalized_to_lowercase(self):
+        from spanza_journal_watch.newsletter.signals import _extract_recipients
+
+        event = SimpleNamespace(
+            recipient="UPPER@Example.Test",
+            recipients=[],
+            esp_event={},
+        )
+        result = _extract_recipients(event)
+        assert result == ["upper@example.test"]
+
+    def test_esp_event_as_string_parsed(self):
+        """esp_event can be a JSON string rather than a dict."""
+        import json
+
+        from spanza_journal_watch.newsletter.signals import _extract_ses_event_payload
+
+        payload = json.dumps({"bounce": {"bounceType": "Permanent"}})
+        event = SimpleNamespace(esp_event=payload)
+        result = _extract_ses_event_payload(event)
+        assert result["bounce"]["bounceType"] == "Permanent"
 
 
 @pytest.mark.django_db

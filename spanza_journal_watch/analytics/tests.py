@@ -377,3 +377,153 @@ def test_analytics_email_requires_view_newsletter_stats(client):
     client.force_login(user)
     response = client.get(reverse("backend:analytics_email"))
     assert response.status_code == 403
+
+
+# ---- extract_referrer_domain ----
+
+
+def test_extract_referrer_domain_strips_www():
+    from spanza_journal_watch.analytics.utils import extract_referrer_domain
+
+    request = RequestFactory().get("/", HTTP_REFERER="https://www.google.com/search?q=test")
+    assert extract_referrer_domain(request) == "google.com"
+
+
+def test_extract_referrer_domain_empty_referer():
+    from spanza_journal_watch.analytics.utils import extract_referrer_domain
+
+    request = RequestFactory().get("/")
+    assert extract_referrer_domain(request) == ""
+
+
+def test_extract_referrer_domain_no_www():
+    from spanza_journal_watch.analytics.utils import extract_referrer_domain
+
+    request = RequestFactory().get("/", HTTP_REFERER="https://bsky.app/profile/user")
+    assert extract_referrer_domain(request) == "bsky.app"
+
+
+# ---- extract_utm_params ----
+
+
+def test_extract_utm_params_returns_present_params():
+    from spanza_journal_watch.analytics.utils import extract_utm_params
+
+    request = RequestFactory().get("/?utm_source=newsletter&utm_medium=email&utm_campaign=jan2026")
+    params = extract_utm_params(request)
+    assert params == {"utm_source": "newsletter", "utm_medium": "email", "utm_campaign": "jan2026"}
+
+
+def test_extract_utm_params_ignores_empty():
+    from spanza_journal_watch.analytics.utils import extract_utm_params
+
+    request = RequestFactory().get("/?utm_source=&utm_medium=email")
+    params = extract_utm_params(request)
+    assert params == {"utm_medium": "email"}
+    assert "utm_source" not in params
+
+
+def test_extract_utm_params_truncates_long_values():
+    from spanza_journal_watch.analytics.utils import extract_utm_params
+
+    request = RequestFactory().get(f"/?utm_source={'a' * 200}")
+    params = extract_utm_params(request)
+    assert len(params["utm_source"]) == 128
+
+
+# ---- UTM-based referrer categorisation ----
+
+
+def test_utm_newsletter_source_categorised():
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+
+    request = RequestFactory().get("/?utm_source=newsletter")
+    assert _categorize_from_utm(request) == REFERRER_NEWSLETTER
+
+
+def test_utm_email_source_categorised_as_newsletter():
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+
+    request = RequestFactory().get("/?utm_source=email")
+    assert _categorize_from_utm(request) == REFERRER_NEWSLETTER
+
+
+def test_utm_twitter_source_categorised_as_social():
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+
+    request = RequestFactory().get("/?utm_source=twitter")
+    assert _categorize_from_utm(request) == REFERRER_SOCIAL
+
+
+def test_utm_google_source_categorised_as_search():
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+
+    request = RequestFactory().get("/?utm_source=google")
+    assert _categorize_from_utm(request) == REFERRER_SEARCH
+
+
+def test_utm_unknown_source_categorised_as_other():
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+
+    request = RequestFactory().get("/?utm_source=partner_site")
+    assert _categorize_from_utm(request) == REFERRER_OTHER
+
+
+def test_utm_empty_returns_none():
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+
+    request = RequestFactory().get("/")
+    assert _categorize_from_utm(request) is None
+
+
+# ---- Prefetch / sec-fetch header detection ----
+
+
+def test_purpose_prefetch_header_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Mozilla/5.0", HTTP_PURPOSE="prefetch")
+    assert is_probable_automated_event(request) is True
+
+
+def test_x_purpose_preview_header_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Mozilla/5.0", HTTP_X_PURPOSE="preview")
+    assert is_probable_automated_event(request) is True
+
+
+def test_x_moz_prefetch_header_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Mozilla/5.0", HTTP_X_MOZ="prefetch")
+    assert is_probable_automated_event(request) is True
+
+
+def test_sec_fetch_no_cors_cross_site_is_automated(rf):
+    request = rf.get(
+        "/",
+        HTTP_USER_AGENT="Mozilla/5.0",
+        HTTP_SEC_FETCH_MODE="no-cors",
+        HTTP_SEC_FETCH_SITE="cross-site",
+    )
+    assert is_probable_automated_event(request) is True
+
+
+def test_sec_fetch_navigate_same_origin_not_automated(rf):
+    request = rf.get(
+        "/",
+        HTTP_USER_AGENT="Mozilla/5.0",
+        HTTP_SEC_FETCH_MODE="navigate",
+        HTTP_SEC_FETCH_SITE="same-origin",
+    )
+    assert is_probable_automated_event(request) is False
+
+
+# ---- Landing page capture in VisitorIdMiddleware ----
+
+
+def test_landing_page_captured_in_session(client):
+    client.get("/")
+    session = client.session
+    assert session.get("analytics_landing_page") == "/"
+
+
+def test_share_token_captured_from_ref_param(client):
+    client.get("/newsletter/success/?ref=abc123")
+    session = client.session
+    assert session.get("analytics_share_token") == "abc123"

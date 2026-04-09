@@ -262,11 +262,14 @@ class TestBackendWorkflows:
         Subscriber.objects.create(email="active@example.test", subscribed=True, bounced=False, complained=False)
         Subscriber.objects.create(email="bounced@example.test", subscribed=True, bounced=True, complained=False)
 
-        response = route_client.get(reverse("backend:subscriber_list"), data={"bounced": "true"})
+        response = route_client.get(
+            reverse("backend:subscriber_list"),
+            data={"view": "subscribers", "q": "bounced"},
+        )
 
         assert response.status_code == 200
         body = response.content.decode("utf-8", errors="ignore")
-        assert "Mailing List" in body
+        assert "Subscribers" in body
         assert "bounced@example.test" in body
 
     def test_send_final_newsletter_queues_task_when_ready(self, route_client, regression_baseline, monkeypatch):
@@ -606,6 +609,9 @@ class TestIssueBuilderPlankaIntegration:
             def get_board(self, board_id):
                 return None, {"labels": [], "lists": [], "cards": []}
 
+            def get_project(self, project_id):
+                return {"id": project_id}
+
         monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient())
 
         response = route_client.post(
@@ -642,6 +648,9 @@ class TestIssueBuilderPlankaIntegration:
         )
 
         class FakeRenameClient:
+            def get_project(self, project_id):
+                return {"id": project_id}
+
             def update_project_name(self, project_id, name):
                 assert project_id == binding.project_id
                 return {"id": project_id, "name": name}
@@ -684,6 +693,9 @@ class TestIssueBuilderPlankaIntegration:
         author = Author.objects.create(name="Integration Author", title="Dr", email="author@example.test")
 
         class FakePlankaImportClient:
+            def get_project(self, project_id):
+                return {"id": project_id}
+
             def get_card_members(self, card_id):
                 return [{"userId": "user-1"}], {
                     "user-1": {"email": "author@example.test", "name": "Integration Author"}
@@ -762,6 +774,9 @@ class TestIssueBuilderPlankaIntegration:
         )
 
         class FakePlankaImportClientMinimal:
+            def get_project(self, project_id):
+                return {"id": project_id}
+
             def get_card_members(self, card_id):
                 return [], {}
 
@@ -1620,6 +1635,9 @@ class TestArticleIntakeWorkflow:
         )
 
         class FakePlankaClient:
+            def get_project(self, project_id):
+                return {"id": project_id}
+
             def get_board(self, board_id):
                 return None, {"labels": [], "lists": []}
 

@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.management import call_command
 
 from spanza_journal_watch.layout.models import Homepage
-from spanza_journal_watch.submissions.models import Issue
+from spanza_journal_watch.submissions.models import Issue, MeshTagMapping, Tag
 
 
 @pytest.fixture(scope="session")
@@ -20,6 +20,11 @@ def regression_baseline(django_db_setup, django_db_blocker):
 
     with django_db_blocker.unblock():
         if not Issue.objects.exists():
+            # Data migration 0048_populate_curated_tags pre-populates Tags and
+            # MeshTagMappings with auto-incremented PKs that conflict with the
+            # fixture's hard-coded PKs. Clear them before loading.
+            MeshTagMapping.objects.all().delete()
+            Tag.objects.all().delete()
             call_command("loaddata", fixture_name, verbosity=0)
 
         latest_homepage = Homepage.objects.filter(publication_ready=True).order_by("-created").first()

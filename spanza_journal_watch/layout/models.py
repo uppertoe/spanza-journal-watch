@@ -180,7 +180,7 @@ class TagSitemap(Sitemap):
     priority = 0.7
 
     def items(self):
-        return Tag.objects.all().order_by("text")
+        return Tag.objects.filter(active=True).order_by("text")
 
 
 class AuthorSitemap(Sitemap):

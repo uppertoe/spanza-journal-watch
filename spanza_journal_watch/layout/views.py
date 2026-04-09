@@ -36,8 +36,9 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
     def get_queryset(self):
         self._homepage = Homepage.get_current_homepage()
         homepage = self._homepage
-        subscriber_id = self.request.session.get("subscriber_id")
-        PageView.record_view(homepage, subscriber_id, request=self.request)
+        if homepage is not None:
+            subscriber_id = self.request.session.get("subscriber_id")
+            PageView.record_view(homepage, subscriber_id, request=self.request)
 
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)
@@ -56,8 +57,11 @@ class HomepageView(SidebarMixin, HtmxMixin, ListView):
         homepage = self._homepage
         domain = get_domain_url()
 
-        context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]
-        attach_review_display_fields(context["card_features"])
+        if homepage is not None:
+            context["card_features"] = homepage.get_card_features()[: self.number_of_card_features]
+            attach_review_display_fields(context["card_features"])
+        else:
+            context["card_features"] = Review.objects.none()
         attach_review_display_fields(context["reviews"])
         context["article_cols"] = self.article_cols
         context["feature_text_styles"] = self.feature_text_styles

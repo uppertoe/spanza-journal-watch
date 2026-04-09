@@ -194,16 +194,14 @@ class PlankaClient:
         return result.get("item", {})
 
     def create_card(self, list_id, name, description="", position=65536, card_type="story"):
-        payload = self._request(
-            "POST",
-            f"/lists/{list_id}/cards",
-            json={
-                "type": card_type,
-                "position": position,
-                "name": name,
-                "description": description,
-            },
-        )
+        body = {
+            "type": card_type,
+            "position": position,
+            "name": name,
+        }
+        if description:
+            body["description"] = description
+        payload = self._request("POST", f"/lists/{list_id}/cards", json=body)
         return payload.get("item", {})
 
     def create_custom_field_group(self, board_id, name="Journal Watch Review Card", position=65536):

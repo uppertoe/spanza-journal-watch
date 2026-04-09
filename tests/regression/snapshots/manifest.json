@@ -37,13 +37,13 @@
   },
   "tag_list": {
     "path": "/tags",
-    "status_code": 200,
+    "status_code": 301,
     "content_type": "text/html; charset=utf-8",
     "snapshot_file": "tests/regression/snapshots/tag_list.html"
   },
   "tag_detail": {
     "path": "/tags/ultrasound",
-    "status_code": 200,
+    "status_code": 301,
     "content_type": "text/html; charset=utf-8",
     "snapshot_file": "tests/regression/snapshots/tag_detail.html"
   },
@@ -78,7 +78,7 @@
     "snapshot_file": "tests/regression/snapshots/newsletter_success.html"
   },
   "newsletter_unsubscribe": {
-    "path": "/newsletter/unsubscribe/HXJM0_2kRw2WY6_Z0funKA",
+    "path": "/newsletter/unsubscribe/OZjFzy3kQ-KgFiFQFXcwIA",
     "status_code": 200,
     "content_type": "text/html; charset=utf-8",
     "snapshot_file": "tests/regression/snapshots/newsletter_unsubscribe.html"

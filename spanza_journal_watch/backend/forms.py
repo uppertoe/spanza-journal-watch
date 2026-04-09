@@ -714,6 +714,14 @@ class WatchedJournalForm(forms.ModelForm):
             "visible_on_frontend",
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["source"].required = False
+        self.fields["source"].initial = WatchedJournal.Source.PUBMED
+
+    def clean_source(self):
+        return self.cleaned_data.get("source") or WatchedJournal.Source.PUBMED
+
     def clean_name(self):
         return (self.cleaned_data.get("name") or "").strip()
 

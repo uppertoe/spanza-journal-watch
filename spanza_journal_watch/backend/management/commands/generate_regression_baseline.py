@@ -17,7 +17,8 @@ MODEL_LABELS = [
     "submissions.author",
     "submissions.tag",
     "submissions.journal",
-    "submissions.article",
+    "backend.watchedjournal",
+    "backend.pubmedarticle",
     "submissions.review",
     "submissions.issue",
     "layout.featurearticle",
@@ -110,8 +111,13 @@ class Command(BaseCommand):
                 if field in fields and fields.get(field):
                     fields[field] = self._stable_token(model_label, field, pk)
 
-            if model_label == "users.user" and fields.get("username"):
-                fields["username"] = f"user-{pk}"
+            if model_label == "users.user":
+                if fields.get("username"):
+                    fields["username"] = f"user-{pk}"
+                # Strip permission/group M2M — PKs are DB-instance-specific
+                # and regression tests don't need them.
+                fields.pop("user_permissions", None)
+                fields.pop("groups", None)
 
         return rows
 

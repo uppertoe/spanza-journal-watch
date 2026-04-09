@@ -4424,15 +4424,12 @@ def chief_editor_invite_accept(request, token):
     user_email = (request.user.email or "").strip().lower()
 
     if expected_email != user_email:
-        context["status"] = "email_mismatch"
-        context["invited_email"] = invite.email
-        context["status_message"] = (
-            f"You're signed in as {request.user.email}, but this invite was sent to "
-            f"{invite.email}. Please sign out and sign in with the correct account."
-        )
+        from django.contrib.auth import logout
+
+        logout(request)
         request.session["_pending_invite_token"] = token
         request.session["pending_invite_email"] = invite.email
-        return render(request, template, context)
+        return redirect(request.get_full_path())
 
     if invite.consumed_at and invite.accepted_by == request.user:
         context["status"] = "accepted"
@@ -5375,15 +5372,12 @@ def issue_invite_accept(request, token):
     user_email = (request.user.email or "").strip().lower()
 
     if expected_email != user_email:
-        context["status"] = "email_mismatch"
-        context["invited_email"] = contributor.email
-        context["status_message"] = (
-            f"You're signed in as {request.user.email}, but this invite was sent to "
-            f"{contributor.email}. Please sign out and sign in with the correct account."
-        )
+        from django.contrib.auth import logout
+
+        logout(request)
         request.session["_pending_invite_token"] = token
         request.session["pending_invite_email"] = contributor.email
-        return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+        return redirect(request.get_full_path())
 
     if (
         invite.consumed_at
