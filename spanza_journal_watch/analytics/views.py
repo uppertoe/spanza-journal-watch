@@ -200,10 +200,17 @@ def track_event(request):
         metadata=event_metadata,
         js_verified=True,
     )
-    # Prevent the response from setting a session cookie.  This endpoint is
-    # called via sendBeacon during visibilitychange (page transitions).  If the
-    # response includes Set-Cookie it can overwrite the authenticated session
-    # cookie due to a race with the concurrent navigation request — especially
-    # after login, where cycle_key() has already deleted the old session.
+    # Prevent the response from setting or deleting the session cookie.  This
+    # endpoint is called via sendBeacon during visibilitychange / pagehide.  If
+    # the response includes Set-Cookie it can overwrite the authenticated
+    # session cookie due to a race with the concurrent navigation request —
+    # especially after login, where cycle_key() has already deleted the old
+    # session.
+    #
+    # modified = False blocks SessionMiddleware's SET branch, but not the
+    # DELETE branch (Django #11506).  _no_session_cookie tells our
+    # SafeSessionCookieMiddleware to strip the cookie from the response
+    # regardless of which branch fired.
     request.session.modified = False
+    request._no_session_cookie = True
     return JsonResponse({"ok": True})

@@ -546,3 +546,72 @@ def test_share_token_captured_from_ref_param(client):
     client.get("/newsletter/success/?ref=abc123")
     session = client.session
     assert session.get("analytics_share_token") == "abc123"
+
+
+# ---- SafeSessionCookieMiddleware ----
+
+
+def test_manifest_response_has_no_session_cookie(client):
+    """manifest.json is a sub-resource; its response must never carry sessionid."""
+    client.cookies["sessionid"] = "stale-session-cookie"
+    response = client.get("/manifest.json")
+    assert response.status_code == 200
+    assert "sessionid" not in response.cookies
+
+
+def test_sw_js_response_has_no_session_cookie(client):
+    """sw.js is a sub-resource; its response must never carry sessionid."""
+    client.cookies["sessionid"] = "stale-session-cookie"
+    response = client.get("/sw.js")
+    assert response.status_code == 200
+    assert "sessionid" not in response.cookies
+
+
+def test_robots_txt_response_has_no_session_cookie(client):
+    client.cookies["sessionid"] = "stale-session-cookie"
+    response = client.get("/robots.txt")
+    assert response.status_code == 200
+    assert "sessionid" not in response.cookies
+
+
+def test_favicon_response_has_no_session_cookie(client):
+    client.cookies["sessionid"] = "stale-session-cookie"
+    response = client.get("/favicon.ico")
+    assert "sessionid" not in response.cookies
+
+
+def test_track_event_with_stale_session_does_not_delete_cookie(client):
+    """
+    Regression test for Django #11506.  sendBeacon requests may carry a stale
+    session cookie (deleted by cycle_key() during login).  The response must
+    not include Set-Cookie — neither SET nor DELETE — because it would race
+    with the authenticated session cookie from the login response.
+    """
+    client.cookies["sessionid"] = "stale-session-cookie"
+
+    response = client.post(
+        reverse("reader_action"),
+        data={
+            "event_type": AnalyticsEvent.EventType.PAGE_VISIT,
+            "source": "scroll_depth",
+            "scroll_depth": 42,
+            "metadata": {"page": "home"},
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert "sessionid" not in response.cookies
+
+
+def test_manifest_does_not_add_vary_cookie(client):
+    """Sub-resource views should not trigger Vary: Cookie (breaks cacheability)."""
+    response = client.get("/manifest.json")
+    vary = response.get("Vary", "")
+    assert "Cookie" not in vary
+
+
+def test_visitor_id_still_set_on_sub_resource_paths(client):
+    """VisitorIdMiddleware should still set the jwvid cookie on sub-resource paths."""
+    response = client.get("/manifest.json")
+    assert "jwvid" in response.cookies

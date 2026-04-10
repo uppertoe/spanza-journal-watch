@@ -11,7 +11,7 @@
  *   - Network-only for everything else
  */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `jw-static-${CACHE_VERSION}`;
 
 // Matches WhiteNoise's WHITENOISE_IMMUTABLE_FILE_TEST
@@ -58,12 +58,31 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
 });
 
+/**
+ * Clone a response for caching, stripping Set-Cookie headers.
+ *
+ * The Cache API spec says Set-Cookie should be filtered on match, but Firefox
+ * has had bugs where cached Set-Cookie headers are replayed to the browser,
+ * overwriting the live cookie jar (e.g. the authenticated session cookie after
+ * login).  Stripping before storage is defence-in-depth.
+ */
+function stripCookiesAndCache(cache, request, response) {
+  const headers = new Headers(response.headers);
+  headers.delete('Set-Cookie');
+  const cleaned = new Response(response.clone().body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  return cache.put(request, cleaned);
+}
+
 function cacheFirst(request, cacheName) {
   return caches.open(cacheName).then((cache) =>
     cache.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
-        if (response.ok) cache.put(request, response.clone());
+        if (response.ok) stripCookiesAndCache(cache, request, response);
         return response;
       });
     }),
@@ -74,7 +93,7 @@ function staleWhileRevalidate(request, cacheName) {
   return caches.open(cacheName).then((cache) =>
     cache.match(request).then((cached) => {
       const fetchPromise = fetch(request).then((response) => {
-        if (response.ok) cache.put(request, response.clone());
+        if (response.ok) stripCookiesAndCache(cache, request, response);
         return response;
       });
       return cached || fetchPromise;

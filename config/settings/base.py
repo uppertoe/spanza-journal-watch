@@ -164,6 +164,7 @@ AUTH_PASSWORD_VALIDATORS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "spanza_journal_watch.analytics.middleware.SafeSessionCookieMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "spanza_journal_watch.analytics.middleware.VisitorIdMiddleware",
     "django.middleware.locale.LocaleMiddleware",
