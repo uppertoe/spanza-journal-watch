@@ -1,11 +1,13 @@
 import logging
 
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import models
 from django.template.loader import render_to_string
 
+from spanza_journal_watch.analytics.middleware import _session_exists
 from spanza_journal_watch.analytics.utils import (
     categorize_referrer,
     classify_event_confidence,
@@ -149,7 +151,11 @@ class PageView(models.Model):
         referrer_category = ""
         referrer_domain = ""
         if request is not None:
-            if not request.session.session_key:
+            session_cookie_name = getattr(settings, "SESSION_COOKIE_NAME", "sessionid")
+            has_session_cookie = bool(request.COOKIES.get(session_cookie_name))
+            session_key = request.session.session_key or ""
+            has_persisted_session = _session_exists(request.session, session_key)
+            if not has_persisted_session and not has_session_cookie:
                 request.session.create()
             user_agent = request.headers.get("user-agent", "")
             automated = is_probable_automated_event(request)

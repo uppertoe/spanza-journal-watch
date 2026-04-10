@@ -86,6 +86,16 @@ class TestPageViewRecordView:
         pv = PageView.objects.filter(object_id=issue.pk).latest("timestamp")
         assert str(pv.visitor_id) == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
+    def test_with_stale_session_cookie_does_not_create_new_session(self):
+        issue = _make_issue()
+        request = _request_with_session()
+        request.session.session_key = None
+        request.COOKIES["sessionid"] = "stale-session-cookie"
+        PageView.record_view(issue, request=request)
+
+        pv = PageView.objects.filter(object_id=issue.pk).latest("timestamp")
+        assert pv.session_key == ""
+
     def test_with_subscriber_id(self):
         issue = _make_issue()
         sub = Subscriber.objects.create(email="pv-sub@example.com", subscribed=True)

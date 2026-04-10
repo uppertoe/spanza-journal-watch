@@ -195,6 +195,25 @@ def test_visitor_id_cookie_not_reset_on_second_visit(client):
         assert r2.cookies["jwvid"].value == first_value
 
 
+def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_home(client):
+    client.cookies["sessionid"] = "stale-session-cookie"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.cookies["sessionid"].value == ""
+
+
+def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_pageview(client):
+    review = _make_review()
+    client.cookies["sessionid"] = "stale-session-cookie"
+
+    response = client.get(reverse("analytics:page_view", args=["review", review.slug]))
+
+    assert response.status_code == 200
+    assert response.cookies["sessionid"].value == ""
+
+
 # ---- Referrer categorisation ----
 
 
