@@ -5,7 +5,7 @@ Covers:
 1. PageView.record_view — creates PageView with correct fields, handles no request
 2. PageView._get_subscriber — returns subscriber, handles missing/invalid
 3. AnalyticsEvent.record_event — creates event, clamps scroll_depth/duration_ms,
-   increments session_sequence, captures landing_page and share_token
+   computes session_sequence, captures landing_page and share_token
 """
 
 import pytest
@@ -49,7 +49,7 @@ def _request_with_session(path="/", **headers):
     """Return a request with a real-ish session dict."""
     factory = RequestFactory()
     request = factory.get(path, **headers)
-    request.session = _FakeSession({"analytics_event_seq": 0})
+    request.session = _FakeSession()
     request.analytics_visitor_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     return request
 

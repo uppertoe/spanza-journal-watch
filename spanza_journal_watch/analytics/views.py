@@ -200,4 +200,10 @@ def track_event(request):
         metadata=event_metadata,
         js_verified=True,
     )
+    # Prevent the response from setting a session cookie.  This endpoint is
+    # called via sendBeacon during visibilitychange (page transitions).  If the
+    # response includes Set-Cookie it can overwrite the authenticated session
+    # cookie due to a race with the concurrent navigation request — especially
+    # after login, where cycle_key() has already deleted the old session.
+    request.session.modified = False
     return JsonResponse({"ok": True})

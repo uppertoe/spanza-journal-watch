@@ -231,6 +231,7 @@ class AnalyticsEvent(models.Model):
             models.Index(fields=["event_type", "timestamp"]),
             models.Index(fields=["content_type", "object_id", "timestamp"]),
             models.Index(fields=["source", "timestamp"]),
+            models.Index(fields=["session_key"]),
         ]
         ordering = ("-timestamp",)
 
@@ -267,9 +268,8 @@ class AnalyticsEvent(models.Model):
             referrer_category = categorize_referrer(request)
             referrer_domain = extract_referrer_domain(request)
             landing_page = request.session.get("analytics_landing_page", "")
-            seq = request.session.get("analytics_event_seq", 0) + 1
-            request.session["analytics_event_seq"] = seq
-            session_sequence = seq
+            if session_key:
+                session_sequence = cls.objects.filter(session_key=session_key).count() + 1
             share_token = request.session.get("analytics_share_token", "")
         human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 

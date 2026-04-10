@@ -39,8 +39,27 @@ CACHES = {
             "SOCKET_CONNECT_TIMEOUT": env.float("DJANGO_REDIS_SOCKET_CONNECT_TIMEOUT", default=2.0),
             "SOCKET_TIMEOUT": env.float("DJANGO_REDIS_SOCKET_TIMEOUT", default=2.0),
         },
-    }
+    },
+    "sessions": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("REDIS_URL"),
+        "KEY_PREFIX": "session",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # Sessions must never fail silently — raise on errors.
+            "IGNORE_EXCEPTIONS": False,
+            "SOCKET_CONNECT_TIMEOUT": env.float("DJANGO_REDIS_SOCKET_CONNECT_TIMEOUT", default=2.0),
+            "SOCKET_TIMEOUT": env.float("DJANGO_REDIS_SOCKET_TIMEOUT", default=2.0),
+        },
+    },
 }
+
+# SESSIONS
+# ------------------------------------------------------------------------------
+# Redis is faster than the database session backend and avoids querying a
+# table with hundreds of thousands of expired rows.
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "sessions"
 
 # SECURITY
 # ------------------------------------------------------------------------------
