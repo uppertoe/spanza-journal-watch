@@ -1,4 +1,29 @@
-import { Chart, registerables } from 'chart.js';
+import {
+  Chart,
+  BarController,
+  LineController,
+  BarElement,
+  LineElement,
+  PointElement,
+  CategoryScale,
+  LinearScale,
+  Filler,
+  Legend,
+  Tooltip,
+} from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
-Chart.register(...registerables, annotationPlugin);
+
+Chart.register(
+  BarController,
+  LineController,
+  BarElement,
+  LineElement,
+  PointElement,
+  CategoryScale,
+  LinearScale,
+  Filler,
+  Legend,
+  Tooltip,
+  annotationPlugin,
+);
 window.Chart = Chart;

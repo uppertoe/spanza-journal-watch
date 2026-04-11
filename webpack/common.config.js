@@ -10,10 +10,6 @@ module.exports = {
       __dirname,
       '../spanza_journal_watch/static/js/public_styles',
     ),
-    backend: path.resolve(
-      __dirname,
-      '../spanza_journal_watch/static/js/backend_styles',
-    ),
     project: path.resolve(
       __dirname,
       '../spanza_journal_watch/static/js/project',
@@ -68,7 +64,7 @@ module.exports = {
             loader: 'postcss-loader',
             options: {
               postcssOptions: {
-                plugins: ['postcss-preset-env', 'autoprefixer', 'pixrem'],
+                plugins: ['postcss-preset-env'],
               },
             },
           },
