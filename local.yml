@@ -71,24 +71,11 @@ services:
     ports: []
     command: /start-celeryworker
 
-  celerybeat:
-    <<: *django
-    image: spanza_journal_watch_local_celerybeat
-    container_name: spanza_journal_watch_local_celerybeat
-    profiles: ['workers']
-    depends_on:
-      - redis
-      - postgres
-      - mailpit
-      - mjml
-    ports: []
-    command: /start-celerybeat
-
   flower:
     <<: *django
     image: spanza_journal_watch_local_flower
     container_name: spanza_journal_watch_local_flower
-    profiles: ['workers']
+    profiles: ['flower']
     ports:
       - '5555:5555'
     command: /start-flower
