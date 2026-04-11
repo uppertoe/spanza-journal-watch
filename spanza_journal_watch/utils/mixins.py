@@ -9,6 +9,41 @@ from spanza_journal_watch.submissions.models import Hit, Issue, Tag
 from spanza_journal_watch.utils.cache import get_content_cache_version
 
 
+class AnonymousCacheMixin:
+    """Cache rendered responses for anonymous GET requests.
+
+    Uses Redis with a key derived from the URL, HX-Request header, and the
+    content cache version (bumped on publish) so cached pages are automatically
+    invalidated when content changes.
+
+    Views that include HitMixin or record PageView analytics should be aware
+    that analytics will only fire on cache misses.
+    """
+
+    anonymous_cache_timeout = 300  # 5 minutes
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.method != "GET" or request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+
+        is_htmx = request.headers.get("HX-Request") == "true"
+        version = get_content_cache_version()
+        cache_key = f"page:v{version}:{request.get_full_path()}:htmx={is_htmx}"
+
+        response = cache.get(cache_key)
+        if response is not None:
+            return response
+
+        response = super().dispatch(request, *args, **kwargs)
+        if hasattr(response, "render"):
+            response.render()
+
+        if response.status_code == 200:
+            cache.set(cache_key, response, self.anonymous_cache_timeout)
+
+        return response
+
+
 class HtmxMixin:
     """
     If an HTMX request is made, takes a ["templates"] and returns

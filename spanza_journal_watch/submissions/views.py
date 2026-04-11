@@ -32,7 +32,7 @@ from spanza_journal_watch.backend.pubmed_cache import article_matches_topic, art
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
-from spanza_journal_watch.utils.mixins import HitMixin, HtmxMixin, SidebarMixin
+from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HitMixin, HtmxMixin, SidebarMixin
 
 from .models import Author, CuratedCollection, HealthService, Issue, Review, Tag
 from .templatetags.tag_scores import compute_tag_scores
@@ -260,7 +260,7 @@ def attach_review_display_fields(reviews, *, issue=None, include_share_context=F
     return review_list
 
 
-class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
+class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
     model = Review
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
@@ -360,7 +360,9 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         return context
 
 
-class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView):
+class IssueDetailView(
+    AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, DetailBreadcrumbMixin, ListView
+):
     template_name = "submissions/issue_detail.html"
     model = Issue
 
@@ -437,7 +439,7 @@ class IssueDetailView(HitMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, Deta
         )
 
 
-class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
+class IssueListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     model = Issue
     context_object_name = "issues"
     template_name = "submissions/issue_list.html"
@@ -483,7 +485,7 @@ class IssueListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         return context
 
 
-class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
+class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
     model = Tag
     context_object_name = "tags"
     template_name = "submissions/tag_list.html"
@@ -655,7 +657,7 @@ class TagListView(SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
         return context
 
 
-class TagDetailView(SidebarMixin, BaseBreadcrumbMixin, DetailView):
+class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, DetailView):
     model = Tag
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
@@ -724,7 +726,7 @@ class TagDetailView(SidebarMixin, BaseBreadcrumbMixin, DetailView):
         return context
 
 
-class CuratedCollectionDetailView(SidebarMixin, BaseBreadcrumbMixin, DetailView):
+class CuratedCollectionDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, DetailView):
     model = CuratedCollection
     context_object_name = "collection"
     template_name = "submissions/collection_detail.html"
@@ -789,7 +791,7 @@ class LatestIssueView(RedirectView):
         return issue.get_absolute_url()
 
 
-class SearchView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, ListView):
+class SearchView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, ListView):
     template_name = "submissions/search.html"
     context_object_name = "result_reviews"
     paginate_by = 20
@@ -981,7 +983,9 @@ def ajax_get_tags(request):
     return JsonResponse(data)
 
 
-class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, ListView):
+class AuthorDetailView(
+    AnonymousCacheMixin, HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, SingleObjectMixin, ListView
+):
     model = Author
     template_name = "submissions/author_detail.html"
 
@@ -1043,7 +1047,7 @@ class AuthorDetailView(HitMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, S
         )
 
 
-class HealthServiceListView(BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, ListView):
+class HealthServiceListView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMixin, ListView):
     model = HealthService
     template_name = "submissions/healthservice_list.html"
     context_object_name = "health_services"

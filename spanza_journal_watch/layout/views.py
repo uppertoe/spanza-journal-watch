@@ -11,12 +11,12 @@ from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Review
 from spanza_journal_watch.submissions.views import attach_review_display_fields
 from spanza_journal_watch.utils.functions import get_domain_url
-from spanza_journal_watch.utils.mixins import HtmxMixin, SidebarMixin
+from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HtmxMixin, SidebarMixin
 
 from .models import FeatureArticle, Homepage, PageHeader
 
 
-class HomepageView(SidebarMixin, HtmxMixin, ListView):
+class HomepageView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListView):
     template_name = "layout/home.html"
     paginate_by = 5
     context_object_name = "reviews"
