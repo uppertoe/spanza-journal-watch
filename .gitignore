@@ -297,3 +297,11 @@ backups
 .vscode
 .ruff_cache
 .claude
+
+# Temporary probe/debug artifacts
+tmp/
+tmp_*/
+new_har
+tmp_prod_login_check.js
+tmp_har
+tests/regression/browser/

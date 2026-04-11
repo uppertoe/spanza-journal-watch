@@ -42,3 +42,6 @@ docker-compose*.yml
 *.sqlite3
 *.db
 venv
+tmp/
+tmp_*
+new_har

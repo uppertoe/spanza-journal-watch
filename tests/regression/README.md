@@ -40,6 +40,16 @@ Route-to-test mapping:
 
 - `tests/regression/ROUTE_COVERAGE.md`
 
+## Browser auth probe
+
+For login/session regressions that only show up in a real browser, use:
+
+`NODE_PATH=/tmp/codex-playwright/node_modules npm run login:probe`
+
+Details and environment variables:
+
+- `tests/regression/browser/README.md`
+
 ## Notes
 
 - Only project-owned routes are covered in this phase.

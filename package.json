@@ -42,6 +42,7 @@
   },
   "scripts": {
     "dev": "webpack serve --config webpack/dev.config.js",
-    "build": "webpack --config webpack/prod.config.js"
+    "build": "webpack --config webpack/prod.config.js",
+    "login:probe": "node tests/regression/browser/login_session_probe.js"
   }
 }
