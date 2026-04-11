@@ -1,17 +1,17 @@
 # define an alias for the specific python version used in this file.
-FROM python:3.13-slim-bookworm AS python
+FROM python:3.13-alpine3.21 AS python
 
 # Python build stage
 FROM python AS python-build-stage
 
 ARG BUILD_ENVIRONMENT=local
 
-# Install apt packages
-RUN apt-get update && apt-get install --no-install-recommends -y \
+# Install build dependencies
+RUN apk add --no-cache \
   # dependencies for building Python packages
-  build-essential \
+  build-base \
   # psycopg2 dependencies
-  libpq-dev
+  postgresql-dev
 
 # Requirements are installed here to ensure they will be cached.
 COPY ./requirements .
@@ -34,14 +34,11 @@ ENV BUILD_ENV=${BUILD_ENVIRONMENT}
 WORKDIR ${APP_HOME}
 
 # Install required system dependencies
-RUN apt-get update && apt-get install --no-install-recommends -y \
-  # psycopg2 dependencies
-  libpq-dev \
+RUN apk add --no-cache \
+  # PostgreSQL runtime library for psycopg
+  postgresql-libs \
   # Translations dependencies
-  gettext \
-  # cleaning up unused files
-  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
-  && rm -rf /var/lib/apt/lists/*
+  gettext
 
 # All absolute dir copies ignore workdir instruction. All relative dir copies are wrt to the workdir instruction
 # copy python dependency wheels from python-build-stage
@@ -51,26 +48,11 @@ COPY --from=python-build-stage /usr/src/app/wheels  /wheels/
 RUN pip install --no-cache-dir --no-index --find-links=/wheels/ /wheels/* \
   && rm -rf /wheels/
 
-COPY ./compose/production/django/entrypoint /entrypoint
-RUN sed -i 's/\r$//g' /entrypoint
-RUN chmod +x /entrypoint
-
-COPY ./compose/local/django/start /start
-RUN sed -i 's/\r$//g' /start
-RUN chmod +x /start
-
-
-COPY ./compose/local/django/celery/worker/start /start-celeryworker
-RUN sed -i 's/\r$//g' /start-celeryworker
-RUN chmod +x /start-celeryworker
-
-COPY ./compose/local/django/celery/beat/start /start-celerybeat
-RUN sed -i 's/\r$//g' /start-celerybeat
-RUN chmod +x /start-celerybeat
-
-COPY ./compose/local/django/celery/flower/start /start-flower
-RUN sed -i 's/\r$//g' /start-flower
-RUN chmod +x /start-flower
+COPY --chmod=755 ./compose/production/django/entrypoint /entrypoint
+COPY --chmod=755 ./compose/local/django/start /start
+COPY --chmod=755 ./compose/local/django/celery/worker/start /start-celeryworker
+COPY --chmod=755 ./compose/local/django/celery/beat/start /start-celerybeat
+COPY --chmod=755 ./compose/local/django/celery/flower/start /start-flower
 
 
 # copy application code to WORKDIR
