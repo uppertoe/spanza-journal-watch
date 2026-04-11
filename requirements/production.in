@@ -14,3 +14,6 @@ sentry-sdk
 # Django integrations
 django-storages[boto3]
 django-anymail[amazon-ses]
+
+# Brotli precompression for WhiteNoise static files
+Brotli
