@@ -32,6 +32,7 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="{{ page_title|default:"Journal Watch" }}">
     <meta name="twitter:description" content="{{ page_meta_description|default:"Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature." }}">
+    <meta name="twitter:image" content="{{ default_og_image }}">
     {% endblock head_meta %}
 
     <link rel="alternate" type="application/rss+xml" title="SPANZA Journal Watch" href="{% url 'review_feed' %}">
@@ -42,6 +43,8 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon_package/favicon-16x16.png' %}">
     <link rel="manifest" href="{% url 'layout:manifest' %}">
     <meta name="theme-color" content="#152b3b">
+
+    {% if media_origin %}<link rel="preconnect" href="{{ media_origin }}">{% endif %}
 
     {% block css %}
     <!-- Your stuff: Third-party CSS libraries go here -->

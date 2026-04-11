@@ -154,7 +154,7 @@ class PageHeader(PageModel):
 
 
 class ReviewSitemap(Sitemap):
-    changefreq = "monthly"
+    changefreq = "yearly"
     priority = 0.9
 
     def items(self):
@@ -176,11 +176,18 @@ class IssueSitemap(Sitemap):
 
 
 class TagSitemap(Sitemap):
-    changefreq = "monthly"
+    changefreq = "weekly"
     priority = 0.7
 
     def items(self):
-        return Tag.objects.filter(active=True).order_by("text")
+        return (
+            Tag.objects.filter(active=True)
+            .annotate(latest_review=models.Max("articles__reviews__modified"))
+            .order_by("text")
+        )
+
+    def lastmod(self, obj):
+        return obj.latest_review
 
 
 class AuthorSitemap(Sitemap):
@@ -189,3 +196,6 @@ class AuthorSitemap(Sitemap):
 
     def items(self):
         return Author.objects.filter(anonymous=False).order_by("name")
+
+    def lastmod(self, obj):
+        return obj.modified

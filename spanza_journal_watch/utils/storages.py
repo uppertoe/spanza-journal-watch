@@ -1,4 +1,9 @@
+import mimetypes
+
 from storages.backends.s3boto3 import S3Boto3Storage
+
+# Ensure webp is recognised on all platforms (Alpine's mimetypes DB may lack it)
+mimetypes.add_type("image/webp", ".webp")
 
 
 class StaticRootS3Boto3Storage(S3Boto3Storage):

@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -293,6 +294,11 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
         )
 
         context["canonical_url"] = canonical_url
+        og_image = (
+            self.request.build_absolute_uri(self.object.feature_image.url)
+            if self.object.feature_image
+            else self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png"))
+        )
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
@@ -300,6 +306,7 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
                 "headline": share_title,
                 "description": share_description,
                 "url": canonical_url,
+                "image": og_image,
                 "datePublished": review_date.isoformat() if review_date else "",
                 "author": {
                     "@type": "Person",
@@ -308,6 +315,10 @@ class ReviewDetailView(HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, D
                 "publisher": {
                     "@type": "Organization",
                     "name": "Journal Watch",
+                    "logo": {
+                        "@type": "ImageObject",
+                        "url": self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png")),
+                    },
                 },
             }
         )

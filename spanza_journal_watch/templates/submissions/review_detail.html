@@ -13,7 +13,7 @@
 <meta name="twitter:card" content="{% if share_image_url %}summary_large_image{% else %}summary{% endif %}">
 <meta name="twitter:title" content="{{ share_title }}">
 <meta name="twitter:description" content="{{ share_description }}">
-{% if share_image_url %}<meta name="twitter:image" content="{{ share_image_url }}">{% endif %}
+<meta name="twitter:image" content="{% if share_image_url %}{{ share_image_url }}{% else %}{{ default_og_image }}{% endif %}">
 {% endblock head_meta %}
 {% block main-feature %}
     {% include "fragments/main_feature.html" with title=review.article.get_title body="A contributor review of a paper from the paediatric anaesthesia literature." header_theme="review" header_pattern="arc" header_kicker="Editorial review" %}
