@@ -710,11 +710,13 @@ p br {
     min-width: 0;
   }
 
-  .share-chip--email span {
+  .share-chip--email span,
+  .share-chip--native span {
     display: none;
   }
 
-  .share-chip--email {
+  .share-chip--email,
+  .share-chip--native {
     flex: 0 0 auto !important;
     padding-inline: 0.42rem;
   }

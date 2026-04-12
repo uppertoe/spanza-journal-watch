@@ -510,6 +510,7 @@ const loadSharedReviewModalContent = async (modal, trigger) => {
       window.htmx.process(container);
     }
     syncReviewModalShareControls(modal);
+    syncNativeShareButtons(container);
     observeAnalyticsReviewElements(container);
     const modalBody = container.closest('.modal-body');
     if (modalBody) modalBody.scrollTop = 0;
