@@ -2882,6 +2882,9 @@ def enable_newsletter_resend(request, send_token):
 @login_required
 @permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
 def send_final_newsletter(request, send_token):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
     try:
         newsletter = Newsletter.objects.get(send_token=send_token)
         if newsletter.is_ready_to_send():
@@ -3499,6 +3502,10 @@ def _register_planka_webhook(client, binding):
     if not callback_url.startswith("http"):
         logger.warning("PLANKA_CALLBACK_BASE_URL is not set; skipping webhook registration.")
         return
+    secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip()
+    if not secret:
+        logger.warning("PLANKA_WEBHOOK_SECRET is not set; skipping webhook registration.")
+        return
 
     # Check if a webhook for our URL already exists (created for a previous binding).
     try:
@@ -3513,7 +3520,6 @@ def _register_planka_webhook(client, binding):
     except PlankaAPIError as exc:
         logger.error("Could not list Planka webhooks: %s", exc)
 
-    secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip() or None
     try:
         webhook = client.create_webhook(
             callback_url,
@@ -6416,14 +6422,17 @@ def planka_card_update_webhook(request):
     """
     Receives cardUpdate / cardCreate / cardDelete events from Planka.
     Planka payload: { event, data: { item, included }, prevData: { item }, user }
-    Auth: if PLANKA_WEBHOOK_SECRET is set, verifies Authorization: Bearer <secret>.
+    Auth: requires Authorization: Bearer <secret>.
     """
     secret = (getattr(settings, "PLANKA_WEBHOOK_SECRET", "") or "").strip()
-    if secret:
-        auth_header = request.headers.get("Authorization", "")
-        token = auth_header.removeprefix("Bearer ").strip()
-        if not hmac.compare_digest(token, secret):
-            return JsonResponse({"detail": "Forbidden"}, status=403)
+    if not secret:
+        logger.error("PLANKA_WEBHOOK_SECRET is not set; rejecting Planka webhook request.")
+        return JsonResponse({"detail": "Webhook misconfigured"}, status=503)
+
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.removeprefix("Bearer ").strip()
+    if not hmac.compare_digest(token, secret):
+        return JsonResponse({"detail": "Forbidden"}, status=403)
 
     try:
         payload = json.loads(request.body)
@@ -6677,6 +6686,10 @@ _DOCS_ROOT = Path(settings.BASE_DIR) / "docs" / "_build" / "html"
 @login_required
 def serve_docs(request, path=""):
     """Serve the built Sphinx documentation, protected by login."""
+    if not (
+        request.user.has_perm("submissions.chief_editor") or request.user.has_perm("submissions.regional_coordinator")
+    ):
+        raise PermissionDenied
     if not path:
         path = "index.html"
     return static_serve(request, path, document_root=str(_DOCS_ROOT))

@@ -38,6 +38,21 @@ class Subscriber(models.Model):
         SubscriberCSV, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Uploaded via CSV"
     )
 
+    @staticmethod
+    def normalize_email(email):
+        return (email or "").strip().lower()
+
+    @classmethod
+    def by_email(cls, email):
+        normalized = cls.normalize_email(email)
+        if not normalized:
+            return cls.objects.none()
+        return cls.objects.filter(email__iexact=normalized).order_by("pk")
+
+    @classmethod
+    def first_by_email(cls, email):
+        return cls.by_email(email).first()
+
     def get_email_context(self):
         domain = get_domain_url()
         image_domain = domain if settings.DEBUG else ""
@@ -125,6 +140,7 @@ class Subscriber(models.Model):
         return subscribers
 
     def save(self, *args, **kwargs):
+        self.email = self.normalize_email(self.email)
         if not self.unsubscribe_token:
             self.unsubscribe_token = self.generate_unsubscribe_token()
         super().save(*args, **kwargs)

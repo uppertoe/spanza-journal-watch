@@ -28,5 +28,6 @@ django-webpack-loader
 django-view-breadcrumbs
 django-request-logging
 django-markdownx
+bleach
 openpyxl
 fpdf2

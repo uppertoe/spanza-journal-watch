@@ -33,10 +33,8 @@ def _get_newsletter(token):
 
 
 def _get_subscriber(email):
-    try:
-        subscriber = Subscriber.objects.get(email=email)
-    except Subscriber.DoesNotExist:
-        subscriber = None
+    subscriber = Subscriber.first_by_email(email)
+    if not subscriber:
         logger.warning("No matching subscriber for email: %s", email)
     return subscriber
 
@@ -150,11 +148,11 @@ def track_email_click(request):
     email = request.GET.get("email") or None
     next = request.GET.get("next") or "/"
 
-    try:
-        subscriber = Subscriber.objects.get(email=email)
+    subscriber = Subscriber.first_by_email(email)
+    if subscriber:
         request.session["subscriber_id"] = subscriber.pk
         set_newsletter_referrer_in_session(request)
-    except Subscriber.DoesNotExist:
+    else:
         subscriber = None
         logger.warning("No subscriber by this email: %s", email)
 

@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest
 from django.test import RequestFactory
 
+from spanza_journal_watch.users.adapters import AccountAdapter
 from spanza_journal_watch.users.forms import UserAdminChangeForm
 from spanza_journal_watch.users.models import User
 from spanza_journal_watch.users.views import UserRedirectView, UserUpdateView, user_detail_view
@@ -87,3 +88,17 @@ class TestUserDetailView:
         request.user = AnonymousUser()
         with pytest.raises(PermissionDenied):
             user_detail_view(request, pk=user.pk)
+
+
+class TestAccountAdapter:
+    def test_allows_safe_relative_next(self, rf: RequestFactory, settings):
+        settings.ALLOWED_HOSTS = ["testserver"]
+        request = rf.get("/accounts/login/", {"next": "/editorial/"})
+
+        assert AccountAdapter().get_login_redirect_url(request) == "/editorial/"
+
+    def test_rejects_external_next(self, rf: RequestFactory, settings):
+        settings.ALLOWED_HOSTS = ["testserver"]
+        request = rf.get("/accounts/login/", {"next": "https://evil.example/phish"})
+
+        assert AccountAdapter().get_login_redirect_url(request) == "/"

@@ -1,6 +1,7 @@
 import logging
 import re
 
+import bleach
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -31,6 +32,51 @@ from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 logger = logging.getLogger(__name__)
+
+SAFE_MARKDOWN_TAGS = sorted(
+    set(bleach.sanitizer.ALLOWED_TAGS).union(
+        {
+            "p",
+            "br",
+            "hr",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "pre",
+            "code",
+            "blockquote",
+            "ul",
+            "ol",
+            "li",
+            "table",
+            "thead",
+            "tbody",
+            "tr",
+            "th",
+            "td",
+        }
+    )
+)
+SAFE_MARKDOWN_ATTRIBUTES = {
+    **bleach.sanitizer.ALLOWED_ATTRIBUTES,
+    "a": ["href", "title"],
+    "th": ["colspan", "rowspan", "scope"],
+    "td": ["colspan", "rowspan"],
+}
+SAFE_MARKDOWN_PROTOCOLS = set(bleach.sanitizer.ALLOWED_PROTOCOLS).union({"mailto"})
+
+
+def sanitize_markdown_html(html):
+    return bleach.clean(
+        html or "",
+        tags=SAFE_MARKDOWN_TAGS,
+        attributes=SAFE_MARKDOWN_ATTRIBUTES,
+        protocols=SAFE_MARKDOWN_PROTOCOLS,
+        strip=True,
+    )
 
 
 class HealthService(models.Model):
@@ -227,11 +273,15 @@ class Review(TimeStampedModel):
             models.Index(fields=["active", "-created"]),
         ]
 
+    def _render_markdown_body_html(self):
+        return sanitize_markdown_html(markdownify(self.body))
+
     def get_markdown_body(self, strip=False):
-        return markdownify(self.body) if not strip else strip_tags(markdownify(self.body))
+        html = self._render_markdown_body_html()
+        return html if not strip else strip_tags(html)
 
     def get_plain_body(self, exclude_headings=False):
-        html = markdownify(self.body)
+        html = self._render_markdown_body_html()
         if exclude_headings:
             html = self.heading_tag_re.sub(" ", html)
         text = strip_tags(html).strip()

@@ -1,6 +1,7 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from django.conf import settings
 from django.http import HttpRequest
+from django.utils.http import url_has_allowed_host_and_scheme
 
 
 class AccountAdapter(DefaultAccountAdapter):
@@ -82,8 +83,14 @@ class AccountAdapter(DefaultAccountAdapter):
         return super().login(request, user)
 
     def get_login_redirect_url(self, request):
-        """Respect ?next= when present; otherwise go to home page."""
+        """Respect safe ?next= values; otherwise go to home page."""
         next_url = request.POST.get("next") or request.GET.get("next") or ""
-        if next_url:
+        allowed_hosts = {request.get_host()} if request else set()
+        allowed_hosts.update(host for host in getattr(settings, "ALLOWED_HOSTS", []) if host and host != "*")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts=allowed_hosts,
+            require_https=request.is_secure(),
+        ):
             return next_url
         return "/"

@@ -10,12 +10,8 @@ from .models import Subscriber
 logger = logging.getLogger(__name__)
 
 
-def _get_subscriber(email):
-    try:
-        subscriber = Subscriber.objects.get(email=email)
-    except Subscriber.DoesNotExist:
-        subscriber = None
-    return subscriber
+def _get_subscribers(email):
+    return list(Subscriber.by_email(email))
 
 
 def _parse_json_if_needed(payload):
@@ -113,16 +109,17 @@ def handle_bounce(event):
         return
 
     for recipient in recipients:
-        subscriber = _get_subscriber(recipient)
-        if subscriber:
-            subscriber.bounced = True
-            subscriber.subscribed = False
-            subscriber.save(update_fields=["bounced", "subscribed", "modified"])
-            logger.info(
-                "Email to %s bounced permanently (%s); removed from mailing list",
-                subscriber,
-                bounce_subtype,
-            )
+        subscribers = _get_subscribers(recipient)
+        if subscribers:
+            for subscriber in subscribers:
+                subscriber.bounced = True
+                subscriber.subscribed = False
+                subscriber.save(update_fields=["bounced", "subscribed", "modified"])
+                logger.info(
+                    "Email to %s bounced permanently (%s); removed from mailing list",
+                    subscriber,
+                    bounce_subtype,
+                )
         else:
             logger.warning("No subscriber found for permanent bounced email %s (%s)", recipient, bounce_subtype)
 
@@ -134,12 +131,13 @@ def handle_complaint(event):
         return
 
     for recipient in recipients:
-        subscriber = _get_subscriber(recipient)
-        if subscriber:
-            subscriber.complained = True
-            subscriber.subscribed = False
-            subscriber.save(update_fields=["complained", "subscribed", "modified"])
-            logger.info("Email to %s complained; removed from mailing list", subscriber)
+        subscribers = _get_subscribers(recipient)
+        if subscribers:
+            for subscriber in subscribers:
+                subscriber.complained = True
+                subscriber.subscribed = False
+                subscriber.save(update_fields=["complained", "subscribed", "modified"])
+                logger.info("Email to %s complained; removed from mailing list", subscriber)
         else:
             logger.warning("No subscriber found for complaint event (%s)", recipient)
 
@@ -151,11 +149,12 @@ def handle_unsubscribed(event):
         return
 
     for recipient in recipients:
-        subscriber = _get_subscriber(recipient)
-        if subscriber:
-            subscriber.subscribed = False
-            subscriber.save(update_fields=["subscribed", "modified"])
-            logger.info("Email to %s unsubscribed via ESP event.", subscriber)
+        subscribers = _get_subscribers(recipient)
+        if subscribers:
+            for subscriber in subscribers:
+                subscriber.subscribed = False
+                subscriber.save(update_fields=["subscribed", "modified"])
+                logger.info("Email to %s unsubscribed via ESP event.", subscriber)
         else:
             logger.warning("No subscriber found for unsubscribe event (%s)", recipient)
 

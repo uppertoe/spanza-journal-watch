@@ -42,7 +42,10 @@
 				</form>
 			{% elif newsletter.is_test_sent %}
 				<p>Are you sure you're ready to send the newsletter to all subscribers?</p>
-				<a href="{% url "backend:send_final_newsletter" send_token %}" class="btn btn-outline-danger my-2">Send Newsletter</a>
+				<form method="post" action="{% url "backend:send_final_newsletter" send_token %}">
+					{% csrf_token %}
+					<button type="submit" class="btn btn-outline-danger my-2">Send Newsletter</button>
+				</form>
 			{% else %}
 				<p class="mb-0">You must send a test newsletter first. Only tested newsletters may be published.</p>
 			{% endif %}

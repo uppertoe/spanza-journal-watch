@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -21,11 +22,21 @@ def _unsubscribe_subscriber(request, subscriber):
     request.session["subscribed"] = False
 
 
+def _get_subscriber_by_unsubscribe_token(unsubscribe_token):
+    return Subscriber.objects.filter(unsubscribe_token=unsubscribe_token).order_by("pk").first()
+
+
+def _sync_exact_email_subscription_state(email, subscribed):
+    subscribers = Subscriber.by_email(email)
+    if subscribers.exists():
+        subscribers.update(subscribed=subscribed, modified=timezone.now())
+    return subscribers
+
+
 @csrf_exempt  # Allow POST for list-unsubscribe-post
 def unsubscribe(request, unsubscribe_token):
-    try:
-        subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
-    except Subscriber.DoesNotExist:
+    subscriber = _get_subscriber_by_unsubscribe_token(unsubscribe_token)
+    if not subscriber:
         if request.method == "POST":
             return HttpResponse(status=200)  # Silent success for mailbox-provider one-click POST
         messages.error(request, "Invalid unsubscribe link.")
@@ -44,12 +55,11 @@ def confirm_unsubscribe(request, unsubscribe_token):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
 
-    try:
-        subscriber = Subscriber.objects.get(unsubscribe_token=unsubscribe_token)
+    subscriber = _get_subscriber_by_unsubscribe_token(unsubscribe_token)
+    if subscriber:
         _unsubscribe_subscriber(request, subscriber)
         messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
-
-    except Subscriber.DoesNotExist:
+    else:
         messages.error(request, "Invalid unsubscribe link.")
 
     return redirect("home")
@@ -59,14 +69,15 @@ def confirm_unsubscribe(request, unsubscribe_token):
 @require_POST
 def toggle_subscription(request):
     """Toggle the current user's newsletter subscription."""
-    try:
-        subscriber = Subscriber.objects.get(email__iexact=request.user.email)
+    subscriber = Subscriber.first_by_email(request.user.email)
+    if subscriber:
         if not subscriber.user:
             subscriber.user = request.user
         subscriber.subscribed = not subscriber.subscribed
         subscriber.save(update_fields=["subscribed", "user", "modified"])
+        _sync_exact_email_subscription_state(request.user.email, subscriber.subscribed)
         request.session["subscribed"] = subscriber.subscribed
-    except Subscriber.DoesNotExist:
+    else:
         subscriber = Subscriber.objects.create(
             email=request.user.email,
             user=request.user,
@@ -94,10 +105,11 @@ def subscribe(request):
             email = form.cleaned_data["email"]
 
             # Check if email exists
-            subscriber = Subscriber.objects.filter(email__icontains=email).first()
+            subscriber = Subscriber.first_by_email(email)
             if subscriber:
                 subscriber.subscribed = True
-                subscriber.save()
+                subscriber.save(update_fields=["subscribed", "modified"])
+                _sync_exact_email_subscription_state(email, True)
                 messages.success(request, f"'{email}' subscribed successfully.")
             else:
                 subscriber = form.save()

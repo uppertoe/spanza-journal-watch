@@ -243,35 +243,35 @@ class TestWebhookView:
         )
 
     def test_cardUpdate_records_revision(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         issue = make_issue()
         make_binding(issue, board_id="board-1")
         payload = _webhook_payload(board_id="board-1", description="New", prev_description="Old")
 
-        response = self._post(payload)
+        response = self._post(payload, secret="mysecret")
 
         assert response.status_code == 200
         assert response.json() == {"ok": True}
         assert PlankaCardRevision.objects.filter(card_id="card-1").count() == 1
 
     def test_cardUpdate_no_change_skipped(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         issue = make_issue()
         make_binding(issue, board_id="board-1")
         payload = _webhook_payload(board_id="board-1", description="Same", prev_description="Same")
 
-        response = self._post(payload)
+        response = self._post(payload, secret="mysecret")
 
         assert response.status_code == 200
         assert PlankaCardRevision.objects.count() == 0
 
     def test_cardCreate_records_revision(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         issue = make_issue()
         make_binding(issue, board_id="board-1")
         payload = _webhook_payload(event="cardCreate", board_id="board-1", description="Initial")
 
-        response = self._post(payload)
+        response = self._post(payload, secret="mysecret")
 
         assert response.status_code == 200
         assert PlankaCardRevision.objects.filter(card_id="card-1").count() == 1
@@ -280,28 +280,28 @@ class TestWebhookView:
         assert rev.source == "webhook"
 
     def test_cardDelete_ignored(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         issue = make_issue()
         make_binding(issue, board_id="board-1")
         payload = _webhook_payload(event="cardDelete", board_id="board-1")
 
-        response = self._post(payload)
+        response = self._post(payload, secret="mysecret")
 
         assert response.status_code == 200
         assert PlankaCardRevision.objects.count() == 0
 
     def test_unknown_board_ignored(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         # No binding for board-99
         payload = _webhook_payload(board_id="board-99", description="New", prev_description="Old")
 
-        response = self._post(payload)
+        response = self._post(payload, secret="mysecret")
 
         assert response.status_code == 200
         assert PlankaCardRevision.objects.count() == 0
 
     def test_actor_fields_stored(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         issue = make_issue()
         make_binding(issue, board_id="board-1")
         payload = _webhook_payload(
@@ -313,7 +313,7 @@ class TestWebhookView:
             user_last="Smith",
         )
 
-        self._post(payload)
+        self._post(payload, secret="mysecret")
 
         rev = PlankaCardRevision.objects.get()
         assert rev.actor_email == "alice@example.com"
@@ -351,28 +351,29 @@ class TestWebhookView:
 
         assert response.status_code == 403
 
-    def test_auth_skipped_when_secret_empty(self, settings):
+    def test_missing_secret_returns_503(self, settings):
         settings.PLANKA_WEBHOOK_SECRET = ""
         issue = make_issue()
         make_binding(issue, board_id="board-1")
         payload = _webhook_payload(board_id="board-1", description="New", prev_description="Old")
 
-        # Even sending a wrong header should be fine when secret is empty
         response = self._post(payload, secret="anything")
 
-        assert response.status_code == 200
+        assert response.status_code == 503
+        assert response.json() == {"detail": "Webhook misconfigured"}
 
     def test_bad_json_returns_400(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         response = Client().post(
             WEBHOOK_URL,
             data=b"not json",
             content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer mysecret",
         )
         assert response.status_code == 400
 
     def test_missing_card_id_or_board_id_returns_200_no_revision(self, settings):
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "mysecret"
         payload = {
             "event": "cardUpdate",
             "data": {"item": {"boardId": "board-1"}},  # no id
@@ -382,6 +383,7 @@ class TestWebhookView:
             WEBHOOK_URL,
             data=json.dumps(payload),
             content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer mysecret",
         )
         assert response.status_code == 200
         assert PlankaCardRevision.objects.count() == 0
@@ -601,6 +603,7 @@ class TestPlankaCardRevisionRestoreView:
 class TestRegisterPlankaWebhook:
     def test_reuses_existing_webhook_with_matching_url(self, settings):
         settings.PLANKA_CALLBACK_BASE_URL = "http://django:8000"
+        settings.PLANKA_WEBHOOK_SECRET = "my-secret"
         issue = make_issue()
         binding = make_binding(issue)
         expected_url = "http://django:8000/editorial/webhooks/planka/card-update"
@@ -649,9 +652,22 @@ class TestRegisterPlankaWebhook:
         mock_client.list_webhooks.assert_not_called()
         mock_client.create_webhook.assert_not_called()
 
-    def test_planka_error_on_list_does_not_raise(self, settings):
+    def test_skips_when_secret_missing(self, settings):
         settings.PLANKA_CALLBACK_BASE_URL = "http://django:8000"
         settings.PLANKA_WEBHOOK_SECRET = ""
+        issue = make_issue()
+        binding = make_binding(issue)
+
+        mock_client = MagicMock()
+
+        _register_planka_webhook(mock_client, binding)
+
+        mock_client.list_webhooks.assert_not_called()
+        mock_client.create_webhook.assert_not_called()
+
+    def test_planka_error_on_list_does_not_raise(self, settings):
+        settings.PLANKA_CALLBACK_BASE_URL = "http://django:8000"
+        settings.PLANKA_WEBHOOK_SECRET = "my-secret"
         issue = make_issue()
         binding = make_binding(issue)
 
@@ -668,7 +684,7 @@ class TestRegisterPlankaWebhook:
 
     def test_planka_error_on_create_does_not_raise(self, settings):
         settings.PLANKA_CALLBACK_BASE_URL = "http://django:8000"
-        settings.PLANKA_WEBHOOK_SECRET = ""
+        settings.PLANKA_WEBHOOK_SECRET = "my-secret"
         issue = make_issue()
         binding = make_binding(issue)
 

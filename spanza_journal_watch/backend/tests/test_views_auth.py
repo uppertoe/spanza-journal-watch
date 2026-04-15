@@ -23,6 +23,7 @@ import datetime
 
 import pytest
 from django.contrib.auth.models import Permission
+from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
 
@@ -47,6 +48,7 @@ CHIEF_EDITOR = "submissions.chief_editor"
 MANAGE_CSV = "backend.manage_subscriber_csv"
 SEND_NEWSLETTERS = "backend.send_newsletters"
 VIEW_NEWSLETTER_STATS = "backend.view_newsletter_stats"
+REGIONAL_COORDINATOR = "submissions.regional_coordinator"
 
 
 def _grant(user, *perm_strings):
@@ -339,6 +341,32 @@ class TestNewsletterAuthGuards:
         url = reverse("backend:create_newsletter")
         _redirect_to_login(anon().get(url))
         _forbidden(user_without_perm().get(url))
+
+
+class TestDocsAuthGuards:
+    def test_docs_requires_login(self):
+        url = reverse("backend:docs")
+        _redirect_to_login(anon().get(url))
+
+    def test_docs_forbidden_without_editorial_role(self):
+        url = reverse("backend:docs")
+        _forbidden(user_without_perm().get(url))
+
+    def test_docs_allows_chief_editor(self, monkeypatch):
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.static_serve", lambda *args, **kwargs: HttpResponse("ok")
+        )
+        client = user_with_perm(CHIEF_EDITOR)
+        response = client.get(reverse("backend:docs"))
+        assert response.status_code == 200
+
+    def test_docs_allows_regional_coordinator(self, monkeypatch):
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.static_serve", lambda *args, **kwargs: HttpResponse("ok")
+        )
+        client = user_with_perm(REGIONAL_COORDINATOR)
+        response = client.get(reverse("backend:docs"))
+        assert response.status_code == 200
 
 
 # ---------------------------------------------------------------------------

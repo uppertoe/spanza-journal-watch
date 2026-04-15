@@ -140,7 +140,7 @@ class TestBackendRoutes:
         send_response = route_client.get(
             reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
         )
-        assert send_response.status_code == 200
+        assert send_response.status_code == 400
 
 
 @pytest.mark.django_db
@@ -292,7 +292,7 @@ class TestBackendWorkflows:
 
         monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
 
-        response = route_client.get(
+        response = route_client.post(
             reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
         )
 
@@ -323,7 +323,7 @@ class TestBackendWorkflows:
 
         monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
 
-        blocked_response = route_client.get(
+        blocked_response = route_client.post(
             reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
         )
         assert blocked_response.status_code == 200
@@ -337,7 +337,7 @@ class TestBackendWorkflows:
         newsletter.refresh_from_db()
         assert newsletter.resend_enabled is True
 
-        resend_response = route_client.get(
+        resend_response = route_client.post(
             reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
         )
         assert resend_response.status_code == 200

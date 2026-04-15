@@ -43,7 +43,7 @@ def get_celery_subscriber_form():
 
         def clean_email(self):
             email = self.cleaned_data["email"].lower()
-            if Subscriber.objects.filter(email=email).exists():
+            if Subscriber.objects.filter(email__iexact=email).exists():
                 raise forms.ValidationError(f"Email {email} is already a subscriber")
             return email
 
@@ -180,7 +180,7 @@ def process_subscriber_csv_record(subscriber_csv):
             continue
         seen_in_file.add(email)
 
-        if Subscriber.objects.filter(email=email).exists():
+        if Subscriber.objects.filter(email__iexact=email).exists():
             already_subscribed_count += 1
             continue
 

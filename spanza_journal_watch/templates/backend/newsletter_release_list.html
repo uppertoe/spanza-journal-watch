@@ -102,10 +102,12 @@
       </form>
     {% elif newsletter.is_test_sent %}
       <p class="text-muted small mb-3">Send this newsletter to all subscribers. This cannot be undone.</p>
-      <a href="{% url "backend:send_final_newsletter" newsletter.send_token %}" class="btn btn-danger"
-        onclick="return confirm('Send this newsletter to all subscribers?')">
-        Send newsletter
-      </a>
+      <form method="post" action="{% url "backend:send_final_newsletter" newsletter.send_token %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Send this newsletter to all subscribers?')">
+          Send newsletter
+        </button>
+      </form>
     {% else %}
       <p class="text-muted mb-0">Send a test email first. Only tested newsletters can be published.</p>
     {% endif %}

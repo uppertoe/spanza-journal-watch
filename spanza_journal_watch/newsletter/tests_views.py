@@ -60,6 +60,20 @@ class TestSubscribeView:
         sub.refresh_from_db()
         assert sub.subscribed is True
 
+    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    def test_htmx_post_does_not_match_partial_email(self, mock_task, client):
+        Subscriber.objects.create(email="existing@example.com", subscribed=False)
+
+        response = client.post(
+            reverse("newsletter:subscribe"),
+            {"email": "ing@example.com"},
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert response.status_code == 302
+        assert Subscriber.objects.filter(email="existing@example.com").count() == 1
+        assert Subscriber.objects.filter(email="ing@example.com").count() == 1
+
     def test_htmx_post_sets_session(self, client):
         with patch("spanza_journal_watch.newsletter.views.send_confirmation_email"):
             client.post(
@@ -119,3 +133,16 @@ class TestToggleSubscription:
         client.post(reverse("newsletter:toggle_subscription"))
         sub.refresh_from_db()
         assert sub.user == user
+
+    def test_toggle_syncs_duplicate_exact_email_records(self, client):
+        user = User.objects.create_user(email="toggle-dup@example.com", password="pw")
+        primary = Subscriber.objects.create(email="toggle-dup@example.com", subscribed=True)
+        duplicate = Subscriber.objects.create(email="TOGGLE-DUP@example.com", subscribed=False)
+
+        client.force_login(user)
+        client.post(reverse("newsletter:toggle_subscription"))
+
+        primary.refresh_from_db()
+        duplicate.refresh_from_db()
+        assert primary.subscribed is False
+        assert duplicate.subscribed is False

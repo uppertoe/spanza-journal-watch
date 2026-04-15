@@ -150,6 +150,14 @@ class ReviewModelTest(TestCase):
         self.assertIn("Intro paragraph.", truncated)
         self.assertIn("More body copy.", truncated)
 
+    def test_get_markdown_body_strips_unsafe_html(self):
+        self.review.body = "Intro\n\n<script>alert('x')</script>\n\n**Bold text**"
+
+        html = self.review.get_markdown_body()
+
+        self.assertNotIn("<script", html)
+        self.assertIn("<strong>Bold text</strong>", html)
+
 
 class IssueModelTest(TestCase):
     def setUp(self):

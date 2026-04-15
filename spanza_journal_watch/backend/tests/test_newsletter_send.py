@@ -194,6 +194,18 @@ class TestSendNewsletterTask:
 
 
 class TestSendFinalNewsletter:
+    def test_get_request_returns_400(self):
+        client, user = _make_newsletter_manager()
+        newsletter = _make_newsletter()
+
+        url = reverse(
+            "backend:send_final_newsletter",
+            kwargs={"send_token": newsletter.send_token},
+        )
+        resp = client.get(url)
+
+        assert resp.status_code == 400
+
     def test_ready_newsletter_queues_send_task(self):
         client, user = _make_newsletter_manager()
         newsletter = _make_newsletter()
