@@ -2927,13 +2927,17 @@ def newsletter_stats_detail(request, pk):
 
     automated_opens = max(total_opens - total_human_opens, 0)
     automated_clicks = max(total_clicks - total_human_clicks, 0)
-    automated_open_share = f"{str(round(automated_opens/total_opens*100))}%" if total_opens else "0%"
-    automated_click_share = f"{str(round(automated_clicks/total_clicks*100))}%" if total_clicks else "0%"
+    automated_open_share = f"{str(round(automated_opens / total_opens * 100))}%" if total_opens else "0%"
+    automated_click_share = f"{str(round(automated_clicks / total_clicks * 100))}%" if total_clicks else "0%"
 
-    open_rate = f"{str(round(opens/newsletter.emails_sent*100))}%" if newsletter.emails_sent else "0"
-    click_through_rate = f"{str(round(clicks/opens*100))}%" if opens else "0"
-    human_open_rate = f"{str(round(human_opens/newsletter.emails_sent*100))}%" if newsletter.emails_sent else "0"
-    human_click_through_rate = f"{str(round(human_clicks/human_opens*100))}%" if human_opens else "0"
+    open_rate = _safe_percentage(opens, newsletter.emails_sent)
+    click_through_rate = _safe_percentage(clicks, newsletter.emails_sent)
+    click_to_open_rate = _safe_percentage(clicks, opens)
+    human_open_rate = _safe_percentage(human_opens, newsletter.emails_sent)
+    human_click_through_rate = _safe_percentage(human_clicks, newsletter.emails_sent)
+    human_click_to_open_rate = _safe_percentage(human_clicks, human_opens)
+    partial_site_analytics = _newsletter_predates_site_analytics(newsletter)
+    site_analytics_rollout_date = _site_analytics_rollout_date()
 
     context = {
         "newsletter": newsletter,
@@ -2944,16 +2948,20 @@ def newsletter_stats_detail(request, pk):
         "clicks": clicks,
         "open_rate": open_rate,
         "click_through_rate": click_through_rate,
+        "click_to_open_rate": click_to_open_rate,
         "total_human_opens": total_human_opens,
         "human_opens": human_opens,
         "total_human_clicks": total_human_clicks,
         "human_clicks": human_clicks,
         "human_open_rate": human_open_rate,
         "human_click_through_rate": human_click_through_rate,
+        "human_click_to_open_rate": human_click_to_open_rate,
         "automated_opens": automated_opens,
         "automated_clicks": automated_clicks,
         "automated_open_share": automated_open_share,
         "automated_click_share": automated_click_share,
+        "partial_site_analytics": partial_site_analytics,
+        "site_analytics_rollout_date": site_analytics_rollout_date,
     }
 
     template = "backend/newsletter_stats_detail.html"
@@ -2972,6 +2980,32 @@ def _safe_percentage(numerator, denominator):
     if not denominator:
         return "0%"
     return f"{round((numerator / denominator) * 100)}%"
+
+
+def _site_analytics_rollout_date():
+    first_js_event = (
+        AnalyticsEvent.objects.filter(js_verified=True)
+        .order_by("timestamp")
+        .values_list("timestamp", flat=True)
+        .first()
+    )
+    if not first_js_event:
+        return None
+    if timezone.is_aware(first_js_event):
+        return timezone.localtime(first_js_event).date()
+    return first_js_event.date()
+
+
+def _newsletter_predates_site_analytics(newsletter):
+    if not newsletter or not newsletter.send_date:
+        return False
+    rollout_date = _site_analytics_rollout_date()
+    if rollout_date is None:
+        return False
+    send_date = timezone.localtime(newsletter.send_date).date() if timezone.is_aware(newsletter.send_date) else None
+    if send_date is None:
+        send_date = newsletter.send_date.date()
+    return send_date < rollout_date
 
 
 def _build_rate_row(*, label, opens=0, engaged=0, shares=0, full_text=0, searches=0, result_clicks=0, score=0):
@@ -5447,7 +5481,7 @@ def issue_invite_accept(request, token):
                 granted_count += 1
             except DjangoPerm.DoesNotExist:
                 logger.error(
-                    "Permission %s.%s not found when accepting invite — " "run migrations to create it.",
+                    "Permission %s.%s not found when accepting invite — run migrations to create it.",
                     app_label,
                     codename,
                 )
@@ -6357,7 +6391,7 @@ def planka_import_publish_card(request, issue_id):
                 issue,
                 publish_cards=_filter_board_cards_by_scope(board_cards, card_scope),
                 panel_status=(
-                    "Review already created from this card. " "This card is protected and will not be re-imported."
+                    "Review already created from this card. This card is protected and will not be re-imported."
                 ),
                 panel_status_level="warning",
                 planka_card_scope=card_scope,

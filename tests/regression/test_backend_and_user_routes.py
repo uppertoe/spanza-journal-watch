@@ -374,13 +374,15 @@ class TestBackendWorkflows:
         assert "Distinct (total) emails opened:" in body
         assert "Distinct (total) links clicked:" in body
         assert "20%" in body
+        assert "10%" in body
         assert "50%" in body
         assert response.context["total_opens"] == 3
         assert response.context["opens"] == 2
         assert response.context["total_clicks"] == 2
         assert response.context["clicks"] == 1
         assert response.context["open_rate"] == "20%"
-        assert response.context["click_through_rate"] == "50%"
+        assert response.context["click_through_rate"] == "10%"
+        assert response.context["click_to_open_rate"] == "50%"
 
 
 @pytest.mark.django_db

@@ -7,7 +7,6 @@ from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 from django.views.generic import DetailView, ListView
 
-from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.submissions.models import Review
 from spanza_journal_watch.submissions.views import attach_review_display_fields
 from spanza_journal_watch.utils.functions import get_domain_url
@@ -36,9 +35,6 @@ class HomepageView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListView):
     def get_queryset(self):
         self._homepage = Homepage.get_current_homepage()
         homepage = self._homepage
-        if homepage is not None:
-            subscriber_id = self.request.session.get("subscriber_id")
-            PageView.record_view(homepage, subscriber_id, request=self.request)
 
         queryset = (
             Review.objects.filter(issues__homepage=homepage, active=True, is_featured=False)

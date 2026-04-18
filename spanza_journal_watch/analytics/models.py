@@ -1,13 +1,11 @@
 import logging
 
-from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import models
 from django.template.loader import render_to_string
 
-from spanza_journal_watch.analytics.middleware import _session_exists
 from spanza_journal_watch.analytics.utils import (
     categorize_referrer,
     classify_event_confidence,
@@ -33,6 +31,17 @@ class HumanConfidence(models.TextChoices):
     SUSPECTED_AUTOMATED = "suspected_automated", "Suspected automated"
     PROBABLE_HUMAN = "probable_human", "Probable human"
     KNOWN_SUBSCRIBER_HUMAN = "known_subscriber_human", "Known subscriber human"
+
+
+def _get_subscriber_for_analytics(subscriber_id, *, log_context):
+    if not subscriber_id:
+        return None
+
+    try:
+        return Subscriber.objects.get(id=subscriber_id)
+    except (Subscriber.DoesNotExist, MultipleObjectsReturned) as error:
+        logger.warning("Unable to attach subscriber to %s: %s %s", log_context, error, subscriber_id)
+        return None
 
 
 class NewsletterOpen(models.Model):
@@ -87,101 +96,6 @@ class NewsletterClick(models.Model):
 
     def __str__(self):
         return str(self.subscriber)
-
-
-class PageView(models.Model):
-    HumanConfidence = HumanConfidence  # backward-compatible alias
-
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey("content_type", "object_id")
-    timestamp = models.DateTimeField(auto_now_add=True)
-    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, blank=True, null=True)
-    user_agent = models.TextField(blank=True, default="")
-    automated = models.BooleanField(default=False)
-    session_key = models.CharField(max_length=64, blank=True, default="")
-    human_confidence = models.CharField(
-        max_length=32,
-        choices=HumanConfidence.choices,
-        default=HumanConfidence.PROBABLE_HUMAN,
-    )
-    visitor_id = models.UUIDField(null=True, blank=True, db_index=True)
-    referrer_category = models.CharField(max_length=16, blank=True, default="", choices=REFERRER_CHOICES)
-    referrer_domain = models.CharField(max_length=255, blank=True, default="")
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["content_type", "object_id"]),
-        ]
-        ordering = ("-timestamp",)
-
-    def get_instance(self):
-        return self.content_type.get_object_for_this_type(id=self.object_id)
-
-    @staticmethod
-    def filter_between_timestamps(queryset, start_timestamp, end_timestamp):
-        return queryset.filter(timestamp__gte=start_timestamp, timestamp__lte=end_timestamp)
-
-    @classmethod
-    def get_page_views(cls, content_type, object_id):
-        return cls.objects.filter(content_type=content_type, object_id=object_id)
-
-    @staticmethod
-    def _get_subscriber(subscriber_id, *, log_context):
-        if not subscriber_id:
-            return None
-
-        try:
-            return Subscriber.objects.get(id=subscriber_id)
-        except (Subscriber.DoesNotExist, MultipleObjectsReturned) as error:
-            logger.warning("Unable to attach subscriber to %s: %s %s", log_context, error, subscriber_id)
-            return None
-
-    @classmethod
-    def record_view(cls, object, subscriber_id=None, request=None):
-        content_type = ContentType.objects.get_for_model(object)
-        id = object.id
-
-        subscriber = cls._get_subscriber(subscriber_id, log_context="pageview")
-
-        user_agent = ""
-        automated = False
-        session_key = ""
-        visitor_id = None
-        referrer_category = ""
-        referrer_domain = ""
-        if request is not None:
-            session_cookie_name = getattr(settings, "SESSION_COOKIE_NAME", "sessionid")
-            has_session_cookie = bool(request.COOKIES.get(session_cookie_name))
-            session_key = request.session.session_key or ""
-            has_persisted_session = _session_exists(request.session, session_key)
-            if not has_persisted_session and not has_session_cookie:
-                request.session.create()
-            user_agent = request.headers.get("user-agent", "")
-            automated = is_probable_automated_event(request)
-            session_key = request.session.session_key or ""
-            visitor_id = getattr(request, "analytics_visitor_id", None) or None
-            referrer_category = categorize_referrer(request)
-            referrer_domain = extract_referrer_domain(request)
-        human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
-
-        view = cls(
-            content_type=content_type,
-            object_id=id,
-            subscriber=subscriber,
-            user_agent=user_agent,
-            automated=automated,
-            session_key=session_key,
-            human_confidence=human_confidence,
-            visitor_id=visitor_id,
-            referrer_category=referrer_category,
-            referrer_domain=referrer_domain,
-        )
-        view.save()
-
-    def __str__(self):
-        datetime = self.timestamp.strftime("%d/%m/%Y, %H:%M:%S")
-        return f"{str(self.content_object)}: {datetime}"
 
 
 class AnalyticsEvent(models.Model):
@@ -255,7 +169,7 @@ class AnalyticsEvent(models.Model):
         metadata=None,
         js_verified=False,
     ):
-        subscriber = PageView._get_subscriber(subscriber_id, log_context="analytics event")
+        subscriber = _get_subscriber_for_analytics(subscriber_id, log_context="analytics event")
 
         user_agent = ""
         automated = False
@@ -274,8 +188,6 @@ class AnalyticsEvent(models.Model):
             referrer_category = categorize_referrer(request)
             referrer_domain = extract_referrer_domain(request)
             landing_page = request.session.get("analytics_landing_page", "")
-            if session_key:
-                session_sequence = cls.objects.filter(session_key=session_key).count() + 1
             share_token = request.session.get("analytics_share_token", "")
         human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 

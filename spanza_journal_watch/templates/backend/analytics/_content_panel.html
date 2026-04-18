@@ -35,9 +35,29 @@
 {# ── Content gaps & search demand ──────────────────────────────── #}
 <div class="row g-4 mb-4">
   <div class="col-12 col-lg-5">
+    {% if unmet_demand %}
+    <div class="card mb-3">
+      <div class="card-header">Unmet demand</div>
+      <div class="card-body small text-muted mb-2">Queries that readers searched for, but where you have adjacent topical coverage rather than a clear answer.</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Query</th><th>Searches</th><th>Current topic score</th></tr></thead>
+          <tbody>
+            {% for item in unmet_demand %}
+            <tr>
+              <td class="small">{{ item.query }}</td>
+              <td>{{ item.searches }}</td>
+              <td><span class="badge text-bg-secondary">{{ item.tag_score }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
     {% if zero_result_queries %}
     <div class="card h-100">
-      <div class="card-header">Content gaps — zero-result queries</div>
+      <div class="card-header">Search gaps — zero-result queries</div>
       <div class="list-group list-group-flush">
         {% for item in zero_result_queries %}
         <div class="list-group-item d-flex justify-content-between align-items-center py-2">
@@ -106,46 +126,115 @@
 </div>
 {% endif %}
 
-{# ── Top reviews by engagement ─────────────────────────────────── #}
+{# ── Review performance ────────────────────────────────────────── #}
 <div class="row g-4 mb-4">
   <div class="col-12">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Top reviews by engagement</span>
+        <span>Review performance</span>
         {% if share_attributed_visits %}<span class="badge text-bg-info">{{ share_attributed_visits }} visit{{ share_attributed_visits|pluralize }} from shares</span>{% endif %}
       </div>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Review</th>
-              <th>Opens</th>
-              <th>Engaged</th>
-              <th>Full text</th>
-              <th>Scroll</th>
-              <th>Score</th>
-              <th title="Engagement score per week since publication — normalises for age">Velocity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in top_reviews %}
-            <tr>
-              <td>
-                <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
-                <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}</div>
-              </td>
-              <td class="small">{{ item.opens }}</td>
-              <td class="small">{{ item.engaged_views }}<div class="text-muted" style="font-size:0.72rem">{{ item.engaged_rate }}</div></td>
-              <td class="small">{{ item.full_text_clicks }}</td>
-              <td class="small">{% if item.avg_scroll_depth is not None %}{{ item.avg_scroll_depth }}%{% else %}&mdash;{% endif %}</td>
-              <td><span class="badge text-bg-primary">{{ item.engagement_score }}</span></td>
-              <td class="small">{% if item.velocity is not None %}{{ item.velocity }}<div class="text-muted" style="font-size:0.72rem">{{ item.weeks_since }}w</div>{% else %}<span class="text-muted">—</span>{% endif %}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7" class="text-muted small">No data in this date range.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="card-body small text-muted mb-0 pb-0">
+        Separate rankings for reach, depth, click-through, and sharing. <span class="badge text-bg-light text-dark">Low sample</span> means fewer than 5 opens.
+      </div>
+      <div class="card-header p-0 border-bottom-0">
+        <ul class="nav nav-pills card-header-pills px-3 pt-2" role="tablist">
+          <li class="nav-item"><button class="nav-link active small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-reach" type="button" role="tab">Most opened</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-depth" type="button" role="tab">Most read</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-fulltext" type="button" role="tab">Most clicked through</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-shares" type="button" role="tab">Most shared</button></li>
+        </ul>
+      </div>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-review-reach" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Review</th><th>Opens</th><th>Engaged rate</th><th>Full text CTR</th></tr></thead>
+              <tbody>
+                {% for item in top_reviews_by_reach %}
+                <tr>
+                  <td>
+                    <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                  </td>
+                  <td>{{ item.opens }}</td>
+                  <td>{{ item.engaged_rate }}</td>
+                  <td>{{ item.full_text_ctr }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted small">No data in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-review-depth" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Review</th><th>Engaged</th><th>Avg dwell</th><th>Scroll</th><th>Opens</th></tr></thead>
+              <tbody>
+                {% for item in top_reviews_by_depth %}
+                <tr>
+                  <td>
+                    <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                  </td>
+                  <td>{{ item.engaged_views }} <span class="text-muted small">({{ item.engaged_rate }})</span></td>
+                  <td>{{ item.avg_dwell_seconds }}s</td>
+                  <td>{% if item.avg_scroll_depth is not None %}{{ item.avg_scroll_depth }}%{% else %}&mdash;{% endif %}</td>
+                  <td>{{ item.opens }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-muted small">No data in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-review-fulltext" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Review</th><th>Full text clicks</th><th>Full text CTR</th><th>Opens</th></tr></thead>
+              <tbody>
+                {% for item in top_reviews_by_full_text %}
+                <tr>
+                  <td>
+                    <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                  </td>
+                  <td>{{ item.full_text_clicks }}</td>
+                  <td>{{ item.full_text_ctr }}</td>
+                  <td>{{ item.opens }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted small">No data in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-review-shares" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Review</th><th>Shares</th><th>Share rate</th><th>Opens</th></tr></thead>
+              <tbody>
+                {% for item in top_reviews_by_shares %}
+                <tr>
+                  <td>
+                    <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                  </td>
+                  <td>{{ item.total_shares }}</td>
+                  <td>{{ item.share_rate }}</td>
+                  <td>{{ item.opens }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted small">No data in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -153,9 +242,7 @@
 
 <div class="card bg-body-tertiary mb-4">
   <div class="card-body py-2 small text-muted">
-    <strong>Score</strong> = Opens + (Engaged reads &times; 3) + (Full text clicks &times; 4) + (Shares &times; 5)
-    &nbsp;&bull;&nbsp;
-    <strong>Velocity</strong> = Score &divide; weeks since publication
+    <strong>Composite score</strong> still appears in the topic and journal tables below, but it is now a secondary signal rather than the primary way reviews are ranked.
   </div>
 </div>
 
@@ -179,6 +266,9 @@
     <div class="card">
       <div class="card-header">Share methods</div>
       <div class="card-body">
+        {% if share_attributed_visits %}
+        <p class="small text-muted mb-3">{{ share_attributed_visits }} attributed visit{{ share_attributed_visits|pluralize }} came back through shared links ({{ share_attributed_visit_rate }} of share actions).</p>
+        {% endif %}
         {% if share_breakdown %}
         <div class="d-flex flex-column gap-2">
           {% for item in share_breakdown %}

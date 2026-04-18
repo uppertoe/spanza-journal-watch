@@ -5,7 +5,8 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Value, Window
+from django.db.models.functions import Coalesce, RowNumber
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
@@ -20,7 +21,7 @@ from django.views.generic.base import RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin, DetailBreadcrumbMixin, ListBreadcrumbMixin
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent, PageView
+from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.backend.models import (
     PubmedArticle,
     PubmedArticleUserState,
@@ -101,6 +102,21 @@ IGNORED_PUBLICATION_TYPES = {
     "Historical Article",
     "Lecture",
 }
+
+
+def _curated_tag_queryset_with_review_count():
+    active_review_counts = (
+        Review.objects.filter(active=True, article__tags__id=OuterRef("pk"))
+        .values("article__tags__id")
+        .annotate(total=Count("pk"))
+        .values("total")[:1]
+    )
+    return Tag.objects.filter(active=True, curated=True).annotate(
+        review_count=Coalesce(
+            Subquery(active_review_counts, output_field=IntegerField()),
+            Value(0),
+        )
+    )
 
 
 def _group_articles_by_section(rows):
@@ -509,9 +525,7 @@ class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMi
         query = (self.request.GET.get("q") or "").strip()
         sort = (self.request.GET.get("sort") or "popular").strip()
 
-        queryset = Tag.objects.filter(active=True, curated=True).annotate(
-            review_count=Count("articles__reviews", filter=Q(articles__reviews__active=True), distinct=True)
-        )
+        queryset = _curated_tag_queryset_with_review_count()
 
         # Hide empty tags to keep the list meaningful
         queryset = queryset.filter(review_count__gt=0)
@@ -594,12 +608,8 @@ class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMi
         if show_explore:
             tag_scores = compute_tag_scores()
             # Build featured tags: top 12 curated tags by engagement score
-            scored_tags = (
-                Tag.objects.filter(active=True, curated=True, id__in=tag_scores.keys())
-                .annotate(
-                    review_count=Count("articles__reviews", filter=Q(articles__reviews__active=True), distinct=True)
-                )
-                .filter(review_count__gt=0)
+            scored_tags = _curated_tag_queryset_with_review_count().filter(
+                id__in=tag_scores.keys(), review_count__gt=0
             )
             featured = []
             for tag in scored_tags:
@@ -621,10 +631,16 @@ class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMi
             featured_tag_ids = [t.pk for t in featured]
             tag_review_links = (
                 Review.objects.filter(active=True, article__tags__id__in=featured_tag_ids)
-                .select_related("article__journal")
-                .order_by("-publish_date")
-                .values_list("article__tags__id", "pk")
-                .distinct()
+                .annotate(
+                    featured_tag_id=F("article__tags__id"),
+                    featured_tag_rank=Window(
+                        expression=RowNumber(),
+                        partition_by=[F("article__tags__id")],
+                        order_by=[F("publish_date").desc(nulls_last=True), F("pk").desc()],
+                    ),
+                )
+                .filter(featured_tag_rank__lte=2)
+                .values_list("featured_tag_id", "pk")
             )
             # Collect review PKs per tag, limited to 2 each
             tag_review_pks: dict[int, list[int]] = {}
@@ -634,7 +650,7 @@ class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMi
                     pks.append(review_pk)
             all_review_pks = {pk for pks in tag_review_pks.values() for pk in pks}
             review_map = (
-                {r.pk: r for r in Review.objects.filter(pk__in=all_review_pks).select_related("article__journal")}
+                {r.pk: r for r in Review.objects.filter(pk__in=all_review_pks).select_related("article")}
                 if all_review_pks
                 else {}
             )
@@ -687,10 +703,7 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
     article_cols = 1
 
     def get_object(self, queryset=None):
-        # Record page view
         obj = super().get_object(queryset)
-        subscriber_id = self.request.session.get("subscriber_id")
-        PageView.record_view(obj, subscriber_id, request=self.request)
         return obj
 
     def get_context_data(self, **kwargs):

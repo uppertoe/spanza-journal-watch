@@ -2,6 +2,7 @@ import datetime
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
@@ -15,6 +16,7 @@ from spanza_journal_watch.backend.models import (
 from spanza_journal_watch.layout.models import FeatureArticle, PageHeader
 
 from .models import Author, Comment, Hit, Issue, Journal, Review, Tag
+from .templatetags.tag_scores import CACHE_KEY
 
 User = get_user_model()
 
@@ -56,6 +58,59 @@ class TagModelTest(TestCase):
         article.tags.add(tag)
         tag.delete_if_orphaned()
         self.assertTrue(Tag.objects.filter(pk=tag.pk).exists())
+
+
+class TagListViewTest(TestCase):
+    def setUp(self):
+        cache.delete(CACHE_KEY)
+        self.tag = Tag.objects.create(text="Regional anaesthesia", curated=True, active=True)
+        journal = Journal.objects.create(name="Tag Test Journal")
+        for index in range(3):
+            article = PubmedArticle.objects.create(
+                title=f"Regional article {index}",
+                journal=journal,
+                active=True,
+            )
+            article.tags.add(self.tag)
+            Review.objects.create(
+                article=article,
+                body="body",
+                active=True,
+                slug=f"regional-review-{index}",
+                publish_date=datetime.date(2026, 1, index + 1),
+            )
+        cache.set(
+            CACHE_KEY,
+            {
+                self.tag.id: {
+                    "score": 42,
+                    "opens": 6,
+                    "engaged": 4,
+                    "full_text": 2,
+                    "shares": 1,
+                    "review_count": 3,
+                }
+            },
+            60,
+        )
+
+    def tearDown(self):
+        cache.delete(CACHE_KEY)
+
+    def test_tag_list_counts_reviews_and_limits_featured_previews(self):
+        response = self.client.get(reverse("submissions:tag_list"))
+
+        self.assertEqual(response.status_code, 200)
+        listed_tag = next(tag for tag in response.context["tags"] if tag.id == self.tag.id)
+        self.assertEqual(listed_tag.review_count, 3)
+
+        featured_tag = next(tag for tag in response.context["featured_tags"] if tag.id == self.tag.id)
+        self.assertEqual(featured_tag.review_count, 3)
+        self.assertEqual(len(featured_tag.top_reviews), 2)
+        self.assertEqual(
+            [review.slug for review in featured_tag.top_reviews],
+            ["regional-review-2", "regional-review-1"],
+        )
 
 
 class JournalModelTest(TestCase):
@@ -306,6 +361,29 @@ class JournalBrowserTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Regional anaesthesia in children")
         self.assertContains(response, "Review")
+
+    def test_journal_browser_uses_journal_query_param_for_shelf_selection(self):
+        response = self.client.get(reverse("submissions:journal_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="journal"', html=False)
+        self.assertNotContains(response, 'name="journal-select"', html=False)
+        self.assertContains(
+            response,
+            f'hx-get="{reverse("submissions:journal_list")}?journal={self.watched.pk}"',
+            html=False,
+        )
+        self.assertContains(response, 'hx-params="not journal"', html=False)
+
+    def test_reading_list_shell_shelf_nav_pushes_browser_url(self):
+        response = self.client.get(reverse("submissions:journal_reading_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-journal-nav="shelf"', html=False)
+        self.assertContains(response, 'hx-push-url="true"', html=False)
+        self.assertContains(response, f'hx-get="{reverse("submissions:journal_list")}?journal=', html=False)
+        self.assertContains(response, "&month=", html=False)
+        self.assertContains(response, "&paediatric=1&has_abstract=1", html=False)
 
     def test_logged_in_user_can_star_and_recommend_article(self):
         self.client.force_login(self.user)

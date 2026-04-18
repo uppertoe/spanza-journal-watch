@@ -8,8 +8,15 @@
 	<a href="{% url "backend:analytics_email" %}" class="btn btn-outline-secondary btn-sm">Back to email analytics</a>
 </div>
 
+{% if partial_site_analytics and site_analytics_rollout_date %}
+<div class="alert alert-warning small mb-4">
+	This newsletter was sent before the current site analytics rollout on {{ site_analytics_rollout_date|date:"j M Y" }}.
+	Email open and click metrics are shown here, but downstream site-traffic attribution from this send is only partially instrumented.
+</div>
+{% endif %}
+
 <div class="row g-3 mb-4">
-	<div class="col-12 col-md-4">
+	<div class="col-12 col-md-6 col-xl-3">
 		<div class="card h-100">
 			<div class="card-body">
 				<h6 class="text-muted mb-2">Emails sent</h6>
@@ -17,7 +24,7 @@
 			</div>
 		</div>
 	</div>
-	<div class="col-12 col-md-4">
+	<div class="col-12 col-md-6 col-xl-3">
 		<div class="card h-100 border-primary-subtle">
 			<div class="card-body">
 				<h6 class="text-muted mb-2">Open rate (raw)</h6>
@@ -25,15 +32,25 @@
 			</div>
 		</div>
 	</div>
-	<div class="col-12 col-md-4">
+	<div class="col-12 col-md-6 col-xl-3">
 		<div class="card h-100 border-success-subtle">
 			<div class="card-body">
-				<h6 class="text-muted mb-2">Click-through rate (raw)</h6>
+				<h6 class="text-muted mb-2">CTR (raw)</h6>
 				<p class="display-6 mb-0">{{ click_through_rate }}</p>
 			</div>
 		</div>
 	</div>
+	<div class="col-12 col-md-6 col-xl-3">
+		<div class="card h-100">
+			<div class="card-body">
+				<h6 class="text-muted mb-2">CTOR (raw)</h6>
+				<p class="display-6 mb-0">{{ click_to_open_rate }}</p>
+			</div>
+		</div>
+	</div>
 </div>
+
+<p class="text-muted small mb-4">CTR = distinct clickers / emails sent. CTOR = distinct clickers / distinct openers.</p>
 
 <div class="card mb-4">
 	<div class="card-header">Raw event totals</div>
@@ -72,8 +89,12 @@
 				<p class="mb-0 fs-5">{{ human_clicks }} <span class="text-muted">({{ total_human_clicks }})</span></p>
 			</div>
 			<div class="col-12 col-md-6">
-				<h6 class="mb-1">Human click-through rate</h6>
+				<h6 class="mb-1">Human CTR</h6>
 				<p class="mb-0 fs-5">{{ human_click_through_rate }}</p>
+			</div>
+			<div class="col-12 col-md-6">
+				<h6 class="mb-1">Human CTOR</h6>
+				<p class="mb-0 fs-5">{{ human_click_to_open_rate }}</p>
 			</div>
 		</div>
 	</div>

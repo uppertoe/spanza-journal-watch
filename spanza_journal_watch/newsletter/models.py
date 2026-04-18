@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core import mail
 from django.db import models
+from django.db.models.functions import Upper
 from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.urls import reverse
@@ -37,6 +38,11 @@ class Subscriber(models.Model):
     from_csv = models.ForeignKey(
         SubscriberCSV, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Uploaded via CSV"
     )
+
+    class Meta:
+        indexes = [
+            models.Index(Upper("email"), name="newsletter_sub_email_upper_idx"),
+        ]
 
     @staticmethod
     def normalize_email(email):

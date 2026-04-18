@@ -9,7 +9,7 @@ from django.urls import resolve
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen, PageView
+from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
 from spanza_journal_watch.analytics.utils import (
     classify_event_confidence,
     extract_utm_params,
@@ -126,9 +126,6 @@ def page_view(request, model=None, slug=None):
     if model == "review":
         try:
             review = Review.objects.get(slug=slug)
-            subscriber_id = request.session.get("subscriber_id")
-            PageView.record_view(review, subscriber_id, request=request)
-
             # Keep human-facing hit count resilient to scanners and duplicate viewport triggers
             if not is_probable_automated_event(request):
                 viewed_key = "model_review_viewed"

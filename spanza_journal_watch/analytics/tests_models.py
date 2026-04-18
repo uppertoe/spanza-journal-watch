@@ -2,30 +2,20 @@
 Tests for analytics model methods.
 
 Covers:
-1. PageView.record_view — creates PageView with correct fields, handles no request
-2. PageView._get_subscriber — returns subscriber, handles missing/invalid
-3. AnalyticsEvent.record_event — creates event, clamps scroll_depth/duration_ms,
-   computes session_sequence, captures landing_page and share_token
+1. AnalyticsEvent.record_event — creates events, clamps fields,
+   and captures landing-page/share-token state
+2. Subscriber attachment for analytics events
 """
 
 import pytest
 from django.test import RequestFactory
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent, PageView
+from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.newsletter.models import Subscriber
-from spanza_journal_watch.submissions.models import Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Journal, Review
 
 pytestmark = pytest.mark.django_db
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_issue():
-    return Issue.objects.create(name="Analytics Model Issue", body="body", active=True)
 
 
 def _make_review():
@@ -46,109 +36,11 @@ class _FakeSession(dict):
 
 
 def _request_with_session(path="/", **headers):
-    """Return a request with a real-ish session dict."""
     factory = RequestFactory()
     request = factory.get(path, **headers)
     request.session = _FakeSession()
     request.analytics_visitor_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     return request
-
-
-# ---------------------------------------------------------------------------
-# 1. PageView.record_view
-# ---------------------------------------------------------------------------
-
-
-class TestPageViewRecordView:
-    def test_creates_page_view(self):
-        issue = _make_issue()
-        PageView.record_view(issue)
-
-        pv = PageView.objects.filter(object_id=issue.pk).first()
-        assert pv is not None
-        assert pv.content_object == issue
-
-    def test_with_request_captures_user_agent(self):
-        issue = _make_issue()
-        request = _request_with_session(
-            HTTP_USER_AGENT="Mozilla/5.0 Test Browser",
-        )
-        PageView.record_view(issue, request=request)
-
-        pv = PageView.objects.filter(object_id=issue.pk).latest("timestamp")
-        assert pv.user_agent == "Mozilla/5.0 Test Browser"
-
-    def test_with_request_captures_visitor_id(self):
-        issue = _make_issue()
-        request = _request_with_session()
-        PageView.record_view(issue, request=request)
-
-        pv = PageView.objects.filter(object_id=issue.pk).latest("timestamp")
-        assert str(pv.visitor_id) == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-
-    def test_with_stale_session_cookie_does_not_create_new_session(self):
-        issue = _make_issue()
-        request = _request_with_session()
-        request.session.session_key = None
-        request.COOKIES["sessionid"] = "stale-session-cookie"
-        PageView.record_view(issue, request=request)
-
-        pv = PageView.objects.filter(object_id=issue.pk).latest("timestamp")
-        assert pv.session_key == ""
-
-    def test_with_subscriber_id(self):
-        issue = _make_issue()
-        sub = Subscriber.objects.create(email="pv-sub@example.com", subscribed=True)
-        PageView.record_view(issue, subscriber_id=sub.pk)
-
-        pv = PageView.objects.filter(object_id=issue.pk).latest("timestamp")
-        assert pv.subscriber == sub
-
-    def test_invalid_subscriber_id_does_not_crash(self):
-        issue = _make_issue()
-        PageView.record_view(issue, subscriber_id=999999)
-
-        pv = PageView.objects.filter(object_id=issue.pk).first()
-        assert pv is not None
-        assert pv.subscriber is None
-
-    def test_without_request_defaults(self):
-        issue = _make_issue()
-        PageView.record_view(issue)
-
-        pv = PageView.objects.filter(object_id=issue.pk).first()
-        assert pv.user_agent == ""
-        assert pv.automated is False
-        assert pv.visitor_id is None
-
-
-# ---------------------------------------------------------------------------
-# 2. PageView._get_subscriber
-# ---------------------------------------------------------------------------
-
-
-class TestGetSubscriber:
-    def test_returns_subscriber(self):
-        sub = Subscriber.objects.create(email="gs@example.com", subscribed=True)
-        result = PageView._get_subscriber(sub.pk, log_context="test")
-        assert result == sub
-
-    def test_returns_none_for_missing(self):
-        result = PageView._get_subscriber(999999, log_context="test")
-        assert result is None
-
-    def test_returns_none_for_none(self):
-        result = PageView._get_subscriber(None, log_context="test")
-        assert result is None
-
-    def test_returns_none_for_zero(self):
-        result = PageView._get_subscriber(0, log_context="test")
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# 3. AnalyticsEvent.record_event
-# ---------------------------------------------------------------------------
 
 
 class TestAnalyticsEventRecordEvent:
@@ -196,7 +88,7 @@ class TestAnalyticsEventRecordEvent:
         )
         assert len(event.source) == 64
 
-    def test_session_sequence_increments(self):
+    def test_session_sequence_defaults_without_extra_count_query(self):
         request = _request_with_session()
         e1 = AnalyticsEvent.record_event(
             event_type=AnalyticsEvent.EventType.PAGE_VISIT,
@@ -206,8 +98,8 @@ class TestAnalyticsEventRecordEvent:
             event_type=AnalyticsEvent.EventType.PAGE_VISIT,
             request=request,
         )
-        assert e1.session_sequence == 1
-        assert e2.session_sequence == 2
+        assert e1.session_sequence == 0
+        assert e2.session_sequence == 0
 
     def test_captures_landing_page_from_session(self):
         request = _request_with_session()
@@ -239,3 +131,19 @@ class TestAnalyticsEventRecordEvent:
             metadata={"query": "airway"},
         )
         assert event.metadata == {"query": "airway"}
+
+    def test_valid_subscriber_id_attaches_subscriber(self):
+        subscriber = Subscriber.objects.create(email="event-sub@example.com", subscribed=True)
+        event = AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            subscriber_id=subscriber.pk,
+        )
+        assert event.subscriber == subscriber
+
+    def test_invalid_subscriber_id_does_not_crash(self):
+        event = AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            subscriber_id=999999,
+        )
+        assert event.pk is not None
+        assert event.subscriber is None

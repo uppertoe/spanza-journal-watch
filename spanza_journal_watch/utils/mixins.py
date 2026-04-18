@@ -3,7 +3,6 @@ from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
-from spanza_journal_watch.analytics.models import PageView
 from spanza_journal_watch.analytics.utils import is_probable_automated_event
 from spanza_journal_watch.submissions.models import Hit, Issue, Tag
 from spanza_journal_watch.utils.cache import get_content_cache_version
@@ -16,8 +15,8 @@ class AnonymousCacheMixin:
     content cache version (bumped on publish) so cached pages are automatically
     invalidated when content changes.
 
-    Views that include HitMixin or record PageView analytics should be aware
-    that analytics will only fire on cache misses.
+    Views that include HitMixin should be aware that hit counters only fire on
+    cache misses.
     """
 
     anonymous_cache_timeout = 300  # 5 minutes
@@ -74,10 +73,6 @@ class HitMixin:
 
     def get_object(self, **kwargs):
         obj = super().get_object(**kwargs)
-
-        # All views recorded in PageView
-        subscriber_id = self.request.session.get("subscriber_id")
-        PageView.record_view(obj, subscriber_id, request=self.request)
 
         # Keep human-facing hit counters resilient to scanners/prefetchers
         if is_probable_automated_event(self.request):

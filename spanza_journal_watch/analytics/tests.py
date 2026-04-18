@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from datetime import timedelta
 
 import pytest
@@ -8,7 +9,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent
+from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
 from spanza_journal_watch.analytics.utils import (
     _REFERRER_SESSION_KEY,
     NEWSLETTER_AUTOMATION_WINDOW,
@@ -27,7 +28,7 @@ from spanza_journal_watch.analytics.utils import (
 )
 from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
+from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review, Tag
 
 pytestmark = pytest.mark.django_db
 
@@ -396,6 +397,543 @@ def test_analytics_email_requires_view_newsletter_stats(client):
     client.force_login(user)
     response = client.get(reverse("backend:analytics_email"))
     assert response.status_code == 403
+
+
+def test_analytics_overview_all_traffic_label_is_truthful(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="overview-all@example.com", password="password123")
+    client.force_login(user)
+
+    response = client.get(reverse("backend:analytics_overview"), {"filter": "all"})
+
+    assert response.status_code == 200
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "All traffic" in body
+    assert "Human-filtered" not in body
+
+
+def test_analytics_overview_surfaces_action_summaries_and_sidebar_guidance(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="overview-summary@example.com", password="password123")
+    client.force_login(user)
+
+    review = _make_review()
+    for event_type in [
+        AnalyticsEvent.EventType.REVIEW_OPEN,
+        AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
+    ]:
+        AnalyticsEvent.objects.create(
+            event_type=event_type,
+            automated=False,
+            content_object=review,
+        )
+
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        session_key="overview-search",
+        landing_page="/search",
+        metadata={"page": "search"},
+    )
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.SEARCH,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        session_key="overview-search-dead-end",
+        metadata={"query": "failed search", "result_count": 0},
+    )
+
+    response = client.get(reverse("backend:analytics_overview"))
+
+    assert response.status_code == 200
+    assert response.context["overview_editorial_items"]
+    assert response.context["overview_dev_items"]
+    assert response.context["overview_confidence_items"]
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Editors should know" in body
+    assert "Developers should know" in body
+    assert "Confidence & scope" in body
+    assert "Human is the bot-filtered best estimate" in body
+    assert "90d is usually the most stable default" in body
+    assert "30d" in body
+    assert "90d" in body
+    assert "180d" in body
+
+
+def test_analytics_email_uses_event_counts_for_bot_share_and_marks_partial_site_analytics(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="newsletter-analytics@example.com", password="password123")
+    client.force_login(user)
+
+    rollout_event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        js_verified=True,
+    )
+    rollout_ts = timezone.make_aware(datetime.datetime(2026, 2, 10, 12, 0))
+    AnalyticsEvent.objects.filter(pk=rollout_event.pk).update(timestamp=rollout_ts)
+
+    newsletter = _make_newsletter(send_date=timezone.make_aware(datetime.datetime(2026, 1, 23, 9, 0)))
+    newsletter.is_sent = True
+    newsletter.emails_sent = 10
+    newsletter.save(update_fields=["is_sent", "emails_sent", "send_date"])
+
+    subscribers = [
+        Subscriber.objects.create(email="one@example.com", subscribed=True),
+        Subscriber.objects.create(email="two@example.com", subscribed=True),
+        Subscriber.objects.create(email="three@example.com", subscribed=True),
+    ]
+
+    NewsletterOpen.objects.create(newsletter=newsletter, subscriber=subscribers[0], automated=False)
+    NewsletterOpen.objects.create(newsletter=newsletter, subscriber=subscribers[0], automated=False)
+    NewsletterOpen.objects.create(newsletter=newsletter, subscriber=subscribers[1], automated=False)
+    NewsletterOpen.objects.create(newsletter=newsletter, subscriber=subscribers[2], automated=True)
+
+    NewsletterClick.objects.create(newsletter=newsletter, subscriber=subscribers[0], automated=False)
+
+    response = client.get(reverse("backend:analytics_email"))
+
+    assert response.status_code == 200
+    row = response.context["newsletter_rows"][0]
+    assert row["automated_open_share"] == "25%"
+    assert row["human_ctr"] == "10%"
+    assert row["human_ctor"] == "50%"
+    assert row["site_analytics_partial"] is True
+    assert row["post_send_traffic"] is None
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Partial analytics" in body
+
+
+def test_analytics_editorial_excludes_placeholder_schema_search_queries(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="editorial-search@example.com", password="password123")
+    client.force_login(user)
+
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.SEARCH,
+        automated=False,
+        metadata={"query": "{search_term_string}", "result_count": 0},
+    )
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.SEARCH,
+        automated=False,
+        metadata={"query": "airway", "result_count": 0},
+    )
+
+    response = client.get(reverse("backend:analytics_editorial"))
+
+    assert response.status_code == 200
+    labels = [item["label"] for item in response.context["search_insights"]]
+    assert "airway" in labels
+    assert "{search_term_string}" not in labels
+
+
+def test_analytics_editorial_surfaces_unmet_demand_and_review_rankings(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="editorial-decisions@example.com", password="password123")
+    client.force_login(user)
+
+    review = _make_review()
+    tag = Tag.objects.create(text="Airway", curated=True)
+    review.article.tags.add(tag)
+
+    for event_type in [
+        AnalyticsEvent.EventType.REVIEW_OPEN,
+        AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
+    ]:
+        AnalyticsEvent.objects.create(
+            event_type=event_type,
+            automated=False,
+            content_object=review,
+        )
+
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.SEARCH,
+        automated=False,
+        metadata={"query": "airway", "result_count": 0},
+    )
+
+    response = client.get(reverse("backend:analytics_editorial"))
+
+    assert response.status_code == 200
+    assert response.context["unmet_demand"][0]["query"] == "airway"
+    assert response.context["top_reviews_by_reach"][0]["review"] == review
+    assert response.context["top_reviews_by_shares"][0]["review"] == review
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Unmet demand" in body
+    assert "Most opened" in body
+    assert "Most shared" in body
+
+
+def test_analytics_traffic_excludes_subresource_landing_pages(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="traffic@example.com", password="password123")
+    client.force_login(user)
+
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        session_key="session-one",
+        session_sequence=1,
+        landing_page="/sw.js",
+        metadata={"page": "home"},
+    )
+    AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        session_key="session-two",
+        session_sequence=1,
+        landing_page="/search",
+        metadata={"page": "search"},
+    )
+
+    response = client.get(reverse("backend:analytics_traffic"))
+
+    assert response.status_code == 200
+    landing_paths = [item["path"] for item in response.context["landing_breakdown"]]
+    assert "/search" in landing_paths
+    assert "/sw.js" not in landing_paths
+
+
+def test_analytics_traffic_splits_visits_on_inactivity_gap(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="traffic-gap@example.com", password="password123")
+    client.force_login(user)
+
+    visitor_id = uuid.uuid4()
+    first = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="shared-session",
+        metadata={"page": "home"},
+    )
+    second = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="shared-session",
+        metadata={"page": "search"},
+    )
+    AnalyticsEvent.objects.filter(pk=first.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 9, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=second.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 10, 5))
+    )
+
+    response = client.get(reverse("backend:analytics_traffic"))
+
+    assert response.status_code == 200
+    assert len(response.context["recent_sessions"]) == 2
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Recent visits" in body
+    assert "30 minutes of inactivity" in body
+
+
+def test_analytics_traffic_source_breakdown_uses_visit_starts_not_internal_follow_on_events(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="traffic-sources@example.com", password="password123")
+    client.force_login(user)
+
+    visitor_id = uuid.uuid4()
+    t0 = timezone.make_aware(datetime.datetime(2026, 4, 11, 9, 0))
+    search_start = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="visit-source",
+        referrer_category="search",
+        metadata={"page": "home"},
+        js_verified=True,
+    )
+    internal_follow_up = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="visit-source",
+        referrer_category="internal",
+        js_verified=True,
+    )
+    internal_engaged = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="visit-source",
+        referrer_category="internal",
+        js_verified=True,
+    )
+    AnalyticsEvent.objects.filter(pk=search_start.pk).update(timestamp=t0)
+    AnalyticsEvent.objects.filter(pk=internal_follow_up.pk).update(timestamp=t0 + datetime.timedelta(minutes=2))
+    AnalyticsEvent.objects.filter(pk=internal_engaged.pk).update(timestamp=t0 + datetime.timedelta(minutes=4))
+
+    response = client.get(reverse("backend:analytics_traffic"))
+
+    assert response.status_code == 200
+    breakdown = {item["label"]: item for item in response.context["referrer_breakdown"]}
+    assert breakdown["Search engine"]["visits"] == 1
+    assert breakdown["Search engine"]["visitors"] == 1
+    assert breakdown["Search engine"]["engaged_rate"] == "100%"
+    assert "Internal" not in breakdown
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Where visits start" in body
+    assert "Visit starts:" in body
+
+
+def test_analytics_traffic_campaign_breakdown_uses_first_touch_visits(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="traffic-campaigns@example.com", password="password123")
+    client.force_login(user)
+
+    visitor_id = uuid.uuid4()
+    started = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="utm-visit",
+        metadata={
+            "page": "home",
+            "utm_source": "newsletter",
+            "utm_medium": "email",
+            "utm_campaign": "launch",
+        },
+    )
+    follow_on = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="utm-visit",
+        metadata={
+            "utm_source": "newsletter",
+            "utm_medium": "email",
+            "utm_campaign": "launch",
+        },
+    )
+    AnalyticsEvent.objects.filter(pk=started.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 9, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=follow_on.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 9, 3))
+    )
+
+    response = client.get(reverse("backend:analytics_traffic"))
+
+    assert response.status_code == 200
+    assert response.context["campaign_breakdown"] == [{"label": "newsletter / email / launch", "visits": 1}]
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "First-touch visits tagged with UTM parameters" in body
+
+
+def test_analytics_traffic_surfaces_landing_friction_and_search_dead_ends(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="traffic-friction@example.com", password="password123")
+    client.force_login(user)
+
+    stuck_visitor = uuid.uuid4()
+    successful_visitor = uuid.uuid4()
+
+    stuck_visit = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=stuck_visitor,
+        session_key="search-landing-stuck",
+        landing_page="/search",
+        metadata={"page": "search"},
+    )
+    successful_landing = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=successful_visitor,
+        session_key="search-landing-success",
+        landing_page="/search",
+        metadata={"page": "search"},
+    )
+    successful_engaged = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        automated=False,
+        visitor_id=successful_visitor,
+        session_key="search-landing-success",
+    )
+    dead_end_search = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.SEARCH,
+        automated=False,
+        visitor_id=stuck_visitor,
+        session_key="search-landing-stuck",
+        metadata={"query": "failed search", "result_count": 0},
+    )
+
+    AnalyticsEvent.objects.filter(pk=stuck_visit.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 9, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=successful_landing.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 10, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=successful_engaged.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 10, 3))
+    )
+    AnalyticsEvent.objects.filter(pk=dead_end_search.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 9, 2))
+    )
+
+    response = client.get(reverse("backend:analytics_traffic"))
+
+    assert response.status_code == 200
+    landing = next(item for item in response.context["landing_breakdown"] if item["path"] == "/search")
+    assert landing["visits"] == 2
+    assert landing["engaged_rate"] == "50%"
+    assert landing["one_step_rate"] == "50%"
+    assert response.context["search_dead_ends"][0]["query"] == "failed search"
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Search dead ends" in body
+    assert "1-step rate" in body
+
+
+def test_analytics_traffic_page_breakdown_uses_sections_touched_per_visit(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="traffic-sections@example.com", password="password123")
+    client.force_login(user)
+
+    visitor_id = uuid.uuid4()
+    home = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="page-sections",
+        metadata={"page": "home"},
+    )
+    search = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="page-sections",
+        metadata={"page": "search"},
+    )
+    search_click = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="page-sections",
+        metadata={"query": "airway"},
+    )
+    AnalyticsEvent.objects.filter(pk=home.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 10, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=search.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 10, 3))
+    )
+    AnalyticsEvent.objects.filter(pk=search_click.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 10, 4))
+    )
+
+    response = client.get(reverse("backend:analytics_traffic"))
+
+    assert response.status_code == 200
+    page_breakdown = {item["label"]: item["visits"] for item in response.context["page_breakdown"]}
+    assert page_breakdown["Homepage"] == 1
+    assert page_breakdown["Search"] == 1
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Sections touched" in body
+    assert "included each section at least once" in body
+
+
+def test_analytics_overview_uses_derived_visits_for_visit_count(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="overview-visits@example.com", password="password123")
+    client.force_login(user)
+
+    visitor_id = uuid.uuid4()
+    first = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="sticky-session",
+        metadata={"page": "home"},
+    )
+    second = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor_id,
+        session_key="sticky-session",
+        metadata={"page": "search"},
+    )
+    AnalyticsEvent.objects.filter(pk=first.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 9, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=second.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 10, 5))
+    )
+
+    response = client.get(reverse("backend:analytics_overview"))
+
+    assert response.status_code == 200
+    assert response.context["unique_sessions"] == 2
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Visits" in body
+
+
+def test_analytics_journals_uses_derived_visits_and_prior_history_for_returning_visitors(client):
+    user_model = get_user_model()
+    user = user_model.objects.create_superuser(email="journals-visits@example.com", password="password123")
+    client.force_login(user)
+
+    returning_visitor = uuid.uuid4()
+    new_visitor = uuid.uuid4()
+
+    prior = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT,
+        automated=False,
+        visitor_id=returning_visitor,
+        session_key="journal-prior",
+    )
+    first_current = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT,
+        automated=False,
+        visitor_id=returning_visitor,
+        session_key="journal-current",
+    )
+    same_visit_follow_on = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.JOURNAL_SELECT,
+        automated=False,
+        visitor_id=returning_visitor,
+        session_key="journal-current",
+        metadata={"journal_id": 1, "journal_name": "Test Journal"},
+    )
+    second_visit = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.JOURNAL_BROWSER_VISIT,
+        automated=False,
+        visitor_id=new_visitor,
+        session_key="journal-new",
+    )
+
+    AnalyticsEvent.objects.filter(pk=prior.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 1, 1, 10, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=first_current.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 13, 9, 0))
+    )
+    AnalyticsEvent.objects.filter(pk=same_visit_follow_on.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 13, 9, 5))
+    )
+    AnalyticsEvent.objects.filter(pk=second_visit.pk).update(
+        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 13, 11, 0))
+    )
+
+    response = client.get(reverse("backend:analytics_journals"))
+
+    assert response.status_code == 200
+    assert response.context["total_visits"] == 2
+    assert response.context["unique_visitors"] == 2
+    assert response.context["returning_visitors"] == 1
+    body = response.content.decode("utf-8", errors="ignore")
+    assert "Journal visits are derived" in body
+    assert "Journal visits" in body
 
 
 # ---- extract_referrer_domain ----

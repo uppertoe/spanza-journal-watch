@@ -1290,6 +1290,32 @@ p br {
   overflow: visible;
 }
 
+.nav-scroller .nav-link {
+  color: var(--bs-emphasis-color, #152b3b);
+  border-bottom: 0.125rem solid transparent;
+  -webkit-tap-highlight-color: rgba(21, 43, 59, 0.08);
+}
+
+.nav-scroller .nav-link:visited,
+.nav-scroller .nav-link:hover,
+.nav-scroller .nav-link:focus,
+.nav-scroller .nav-link:active {
+  color: var(--bs-emphasis-color, #152b3b);
+}
+
+.nav-scroller .nav-link.active,
+.nav-scroller .nav-link[aria-current='page'] {
+  color: var(--bs-emphasis-color, #152b3b);
+  border-bottom-color: currentColor;
+  font-weight: 600;
+}
+
+.nav-scroller .nav-link:focus-visible {
+  outline: 2px solid rgba(21, 43, 59, 0.28);
+  outline-offset: 0.2rem;
+  border-radius: 999px;
+}
+
 /* On small screens the nav scrolls horizontally — show edge fade hints */
 @media (max-width: 767.98px) {
   .nav-scroller {

@@ -9,6 +9,13 @@
   </div>
 </div>
 
+{% if has_partial_site_analytics and site_analytics_rollout_date %}
+<div class="alert alert-warning small mb-4">
+  Some newsletters in this range were sent before the current site analytics rollout on {{ site_analytics_rollout_date|date:"j M Y" }}.
+  Email opens and clicks are still shown, but downstream 7-day site traffic for those sends is only partially instrumented.
+</div>
+{% endif %}
+
 {% if segment_counts %}
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-4">
@@ -58,6 +65,9 @@
           <div class="card-body">
             <div class="small text-muted mb-1">{{ item.newsletter.send_date|date:"j M Y" }}</div>
             <div class="fw-semibold small mb-2">{{ item.newsletter }}</div>
+            {% if item.site_analytics_partial %}
+            <span class="badge text-bg-warning text-dark">Partial analytics</span>
+            {% else %}
             <div class="d-flex gap-3 small mb-1">
               <span class="text-muted">Before: {{ item.before }}</span>
               <span>After: {{ item.after }}</span>
@@ -67,12 +77,13 @@
               {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
             </span>
             {% endif %}
+            {% endif %}
           </div>
         </div>
       </div>
       {% endfor %}
     </div>
-    <p class="text-muted mt-2 mb-0" style="font-size:0.7rem">Compares engaged review views in the 7 days before vs after each newsletter send.</p>
+    <p class="text-muted mt-2 mb-0" style="font-size:0.7rem">Compares engaged review views in the 7 days before vs after each newsletter send. Pre-rollout sends are marked as partial analytics instead of showing incomplete traffic comparisons.</p>
   </div>
 </div>
 {% endif %}
@@ -87,10 +98,11 @@
           <th>Newsletter</th>
           <th>Sent</th>
           <th>Emails</th>
-          <th>Human opens</th>
+          <th>{% if filter_mode == "all" %}Unique opens{% else %}Human opens{% endif %}</th>
           <th>Open rate</th>
-          <th>CTR</th>
-          <th title="Percentage of total opens flagged as automated (email clients pre-loading, security scanners, etc.)">Bot opens %</th>
+          <th title="Unique clickers divided by emails sent">CTR</th>
+          <th title="Unique clickers divided by unique openers">CTOR</th>
+          <th title="Percentage of open events flagged as automated (email clients pre-loading, security scanners, etc.)">Bot opens %</th>
           <th>7-day site traffic</th>
           <th></th>
         </tr>
@@ -98,21 +110,33 @@
       <tbody>
         {% for row in newsletter_rows %}
         <tr>
-          <td class="small fw-semibold">{{ row.newsletter }}</td>
+          <td class="small fw-semibold">
+            {{ row.newsletter }}
+            {% if row.site_analytics_partial %}
+            <span class="badge text-bg-warning text-dark ms-1">Partial analytics</span>
+            {% endif %}
+          </td>
           <td class="small text-muted">{{ row.newsletter.send_date|date:"j M Y"|default:"—" }}</td>
           <td class="small">{{ row.emails_sent }}</td>
           <td class="small">{{ row.human_opens }}</td>
           <td class="small">{{ row.human_open_rate }}</td>
           <td class="small">{{ row.human_ctr }}</td>
-          <td class="small text-muted">{{ row.automated_share }}</td>
-          <td class="small">{{ row.post_send_traffic }} <span class="text-muted">engaged</span></td>
+          <td class="small">{{ row.human_ctor }}</td>
+          <td class="small text-muted">{{ row.automated_open_share }}</td>
+          <td class="small">
+            {% if row.site_analytics_partial %}
+            <span class="text-muted">Partial</span>
+            {% else %}
+            {{ row.post_send_traffic }} <span class="text-muted">engaged</span>
+            {% endif %}
+          </td>
           <td class="text-end">
             <a href="{{ row.newsletter.get_stats_absolute_url }}" class="btn btn-sm btn-outline-secondary">Full stats</a>
           </td>
         </tr>
         {% if row.link_clicks %}
         <tr>
-          <td colspan="9" class="p-0">
+          <td colspan="10" class="p-0">
             <div class="px-3 py-2 bg-body-tertiary">
               <div class="small fw-semibold text-muted mb-1">Most clicked links</div>
               <table class="table table-sm table-borderless mb-0" style="font-size:0.8rem">
@@ -132,7 +156,7 @@
         </tr>
         {% endif %}
         {% empty %}
-        <tr><td colspan="9" class="text-muted small p-3">No newsletters sent yet.</td></tr>
+        <tr><td colspan="10" class="text-muted small p-3">No newsletters sent yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -141,6 +165,7 @@
 
 <div class="alert alert-info small mb-0">
   <strong>Note on open rates:</strong> Apple Mail Privacy Protection pre-fetches tracking pixels through proxy servers, which can inflate open counts. The bot filter catches many automated opens, but Apple's proxy uses standard user agents. Treat open rates as directional rather than exact. Click-through rates are more reliable.
+  CTR = unique clickers / emails sent. CTOR = unique clickers / unique openers.
 </div>
 
 {# ── Trend chart script ───────────────────────────────────────── #}

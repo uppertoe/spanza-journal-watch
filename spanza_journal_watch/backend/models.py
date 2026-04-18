@@ -6,6 +6,7 @@ from email.utils import formataddr
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils import timezone
 from django.utils.html import escape, strip_tags
@@ -63,6 +64,11 @@ class EmailThread(models.Model):
 
     class Meta:
         ordering = ["-last_message_at"]
+        indexes = [
+            models.Index(fields=["-last_message_at"], name="backend_email_lastmsg_idx"),
+            GinIndex(fields=["external_address"], name="backend_email_extaddr_trgm", opclasses=["gin_trgm_ops"]),
+            GinIndex(fields=["subject"], name="backend_email_subject_trgm", opclasses=["gin_trgm_ops"]),
+        ]
 
     def __str__(self):
         return f"{self.external_address} — {self.subject or '(no subject)'}"

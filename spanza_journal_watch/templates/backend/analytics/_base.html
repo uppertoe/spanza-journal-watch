@@ -45,9 +45,21 @@
         <div id="filter-toggle">
           {% include "backend/analytics/_filter_toggle.html" %}
         </div>
+        <p class="text-muted mt-2 mb-0" style="font-size:0.72rem">Human is the bot-filtered best estimate. All traffic is useful for debugging noise, but it is not decision-grade.</p>
       </div>
       <div class="border-top pt-3">
         <p class="small text-muted mb-2">Date range</p>
+        {% if date_presets %}
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          {% for preset in date_presets %}
+          <a class="btn btn-sm {% if preset.active %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+             href="?filter={{ filter_mode }}&start={{ preset.start }}&end={{ preset.end }}"
+             hx-get="?filter={{ filter_mode }}&start={{ preset.start }}&end={{ preset.end }}"
+             hx-target="#analytics-content" hx-push-url="true">{{ preset.label }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <p class="text-muted mb-2" style="font-size:0.72rem">Use a wider window when traffic is sparse. 90d is usually the most stable default.</p>
         <form method="get" action="">
           <input type="hidden" name="filter" value="{{ filter_mode }}">
           <div class="mb-2">

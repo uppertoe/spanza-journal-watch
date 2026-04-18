@@ -15,6 +15,9 @@ This repository contains two kinds of non-application files:
 
 - `docker-compose.yml`
   Use when wiring Journal Watch into the server repo under `apps/journalwatch/`.
+- `postgres/init/`
+  Use to bootstrap Postgres query observability such as `pg_stat_statements`
+  on fresh databases.
 - `journalwatch.caddy`
   Use when exposing the app through the server repo's Caddy setup.
 - `.env.example`
@@ -41,3 +44,13 @@ This repository contains two kinds of non-application files:
 Backup and restore automation now belongs to the server repo / VPS layer, not
 this application repo. The old backup scripts and systemd units were removed to
 keep ownership clear.
+
+## Existing Postgres Instances
+
+The compose files now start Postgres with `pg_stat_statements`,
+`track_io_timing=on`, and slow-query logging at `250ms`.
+
+For an existing database volume, the init script will not rerun automatically.
+After restarting Postgres with the new settings, run:
+
+`docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"`

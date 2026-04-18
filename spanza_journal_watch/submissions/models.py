@@ -271,6 +271,7 @@ class Review(TimeStampedModel):
         indexes = [
             GinIndex(fields=("search_vector",)),
             models.Index(fields=["active", "-created"]),
+            models.Index(fields=["active", "-publish_date"], name="submissions_active_91ec4a_idx"),
         ]
 
     def _render_markdown_body_html(self):

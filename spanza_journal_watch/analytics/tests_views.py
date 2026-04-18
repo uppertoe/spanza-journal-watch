@@ -5,7 +5,7 @@ Covers:
 1. track_email_open — returns PNG pixel, creates NewsletterOpen, sets session
 2. track_email_click — redirects, sets subscriber session and newsletter referrer
 3. track_newsletter_link — creates NewsletterClick, redirects
-4. page_view — creates PageView and Hit for review slugs
+4. page_view — preserves hit counts without creating legacy PageView rows
 5. track_event — rejects invalid payload, rejects unknown event type
 """
 
@@ -13,7 +13,7 @@ import pytest
 from django.urls import reverse
 from django.utils import timezone
 
-from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen, PageView
+from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Issue, Journal, Review
@@ -145,14 +145,6 @@ class TestTrackNewsletterLink:
 
 
 class TestPageView:
-    def test_review_page_view_creates_record(self, client):
-        review = _make_review(slug="pv-review")
-        client.get(
-            reverse("analytics:page_view", kwargs={"model": "review", "slug": "pv-review"}),
-            HTTP_USER_AGENT="Mozilla/5.0 Test",
-        )
-        assert PageView.objects.filter(object_id=review.pk).exists()
-
     def test_review_page_view_increments_hit(self, client):
         review = _make_review(slug="pv-hit-review")
         client.get(

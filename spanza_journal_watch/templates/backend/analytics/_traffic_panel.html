@@ -30,14 +30,14 @@
   </div>
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body">
-      <h6 class="text-muted mb-1 small">Journals visits</h6>
+      <h6 class="text-muted mb-1 small">Journal visits</h6>
       <p class="display-6 mb-0">{{ journal_visits }}</p>
     </div></div>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Unique visitors by source — last 26 weeks</div>
+  <div class="card-header">Visits by source — last 26 weeks</div>
   <div class="card-body">
     <canvas id="traffic-trend-chart" height="80"></canvas>
   </div>
@@ -46,21 +46,21 @@
 <div class="row g-4 mb-4">
   <div class="col-12 col-xl-7">
     <div class="card h-100">
-      <div class="card-header">Where users come from</div>
+      <div class="card-header">Where visits start</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Source</th><th>Events</th><th>Opens</th><th>Engaged rate</th><th title="Events sent by a real browser via JavaScript">JS verified</th></tr></thead>
+          <thead><tr><th>Source</th><th>Visits</th><th>Visitors</th><th>Engaged visit rate</th><th title="Visits containing at least one JavaScript-verified event">JS verified</th></tr></thead>
           <tbody>
             {% for item in referrer_breakdown %}
             <tr>
               <td>{{ item.label }}</td>
-              <td>{{ item.events }}</td>
-              <td>{{ item.opens }}</td>
+              <td>{{ item.visits }}</td>
+              <td>{{ item.visitors }}</td>
               <td>{{ item.engaged_rate }}</td>
               <td>{{ item.js_verified }} <span class="text-muted small">({{ item.js_rate }})</span></td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="text-muted small">No referrer data yet — will accumulate as visitors arrive.</td></tr>
+            <tr><td colspan="5" class="text-muted small">No visit-source data yet — will accumulate as visitors arrive.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -69,20 +69,26 @@
   </div>
   <div class="col-12 col-xl-5">
     <div class="card h-100">
-      <div class="card-header">Page visits</div>
+      <div class="card-header">Sections touched</div>
       {% if page_breakdown %}
+      <div class="card-body small text-muted mb-2">Derived visits that included each section at least once. Low engaged rate or high 1-step rate usually means the section needs product attention.</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Page</th><th>Visits</th></tr></thead>
+          <thead><tr><th>Section</th><th>Visits</th><th>Engaged rate</th><th>1-step rate</th></tr></thead>
           <tbody>
             {% for item in page_breakdown %}
-            <tr><td>{{ item.label }}</td><td>{{ item.visits }}</td></tr>
+            <tr>
+              <td>{{ item.label }}{% if item.low_sample %} <span class="badge text-bg-light text-dark">Low sample</span>{% endif %}</td>
+              <td>{{ item.visits }}</td>
+              <td>{{ item.engaged_rate }}</td>
+              <td>{{ item.one_step_rate }}</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
       {% else %}
-      <div class="card-body"><p class="text-muted mb-0 small">Page visit tracking accumulates as the site is used.</p></div>
+      <div class="card-body"><p class="text-muted mb-0 small">Section-level visit data will accumulate as readers move through the site.</p></div>
       {% endif %}
     </div>
   </div>
@@ -93,13 +99,18 @@
   <div class="col-12 col-xl-6">
     <div class="card h-100">
       <div class="card-header">Top landing pages</div>
-      <div class="card-body small text-muted mb-2">The first page visitors see when they arrive.</div>
+      <div class="card-body small text-muted mb-2">The first page visitors see when they arrive. Low engaged rate or high 1-step rate points to landing-page friction.</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Path</th><th>Sessions</th></tr></thead>
+          <thead><tr><th>Path</th><th>Visits</th><th>Engaged rate</th><th>1-step rate</th></tr></thead>
           <tbody>
             {% for item in landing_breakdown %}
-            <tr><td class="small text-break"><code>{{ item.path }}</code></td><td>{{ item.visits }}</td></tr>
+            <tr>
+              <td class="small text-break"><code>{{ item.path }}</code>{% if item.low_sample %} <span class="badge text-bg-light text-dark">Low sample</span>{% endif %}</td>
+              <td>{{ item.visits }}</td>
+              <td>{{ item.engaged_rate }}</td>
+              <td>{{ item.one_step_rate }}</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -112,13 +123,13 @@
   <div class="col-12 col-xl-6">
     <div class="card h-100">
       <div class="card-header">Campaigns (UTM)</div>
-      <div class="card-body small text-muted mb-2">Traffic from links with UTM parameters (source / medium / campaign).</div>
+      <div class="card-body small text-muted mb-2">First-touch visits tagged with UTM parameters (source / medium / campaign).</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Campaign</th><th>Events</th></tr></thead>
+          <thead><tr><th>Campaign</th><th>Visits</th></tr></thead>
           <tbody>
             {% for item in campaign_breakdown %}
-            <tr><td class="small">{{ item.label }}</td><td>{{ item.events }}</td></tr>
+            <tr><td class="small">{{ item.label }}</td><td>{{ item.visits }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -128,13 +139,35 @@
   {% endif %}
 </div>
 
+{% if search_dead_ends %}
+<div class="card mb-4">
+  <div class="card-header">Search dead ends</div>
+  <div class="card-body small text-muted mb-2">Queries that either produced zero results or failed to win a click. These are strong candidates for search tuning, synonym support, or new content.</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Query</th><th>Searches</th><th>Clicks</th><th>Zero results</th></tr></thead>
+      <tbody>
+        {% for item in search_dead_ends %}
+        <tr>
+          <td class="small">{{ item.query }}{% if item.low_sample %} <span class="badge text-bg-light text-dark">Low sample</span>{% endif %}</td>
+          <td>{{ item.searches }}</td>
+          <td>{{ item.result_clicks }}</td>
+          <td>{% if item.zero_results %}<span class="badge text-bg-warning text-dark">{{ item.zero_results }}</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% if other_domains %}
 <div class="card mb-4">
   <div class="card-header">Top "Other" referrer domains</div>
-  <div class="card-body small text-muted mb-2">External domains that aren't search engines or social media — could be institutional portals, partner sites, etc.</div>
+  <div class="card-body small text-muted mb-2">External domains behind first-touch "Other" visits — could be institutional portals, partner sites, or uncategorised sources.</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Domain</th><th>Events</th></tr></thead>
+      <thead><tr><th>Domain</th><th>Visits</th></tr></thead>
       <tbody>
         {% for item in other_domains %}
         <tr><td class="small"><code>{{ item.referrer_domain }}</code></td><td>{{ item.count }}</td></tr>
@@ -146,12 +179,16 @@
 {% endif %}
 
 {% if top_flows %}
+<div class="alert alert-info small mb-4">
+  Visits are derived from the anonymous <code>jwvid</code> cookie and split after {{ visit_timeout_minutes }} minutes of inactivity.
+  This is a better approximation of real visits than the raw Django session cookie, but it is still an estimate.
+</div>
 <div class="card mb-4">
   <div class="card-header">Common user journeys</div>
-  <div class="card-body small text-muted mb-2">Most frequent two-step transitions within a session — shows how users move through the site.</div>
+  <div class="card-body small text-muted mb-2">Most frequent two-step transitions within a derived visit — shows how users move through the site.</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Step 1</th><th></th><th>Step 2</th><th>Sessions</th></tr></thead>
+      <thead><tr><th>Step 1</th><th></th><th>Step 2</th><th>Visits</th></tr></thead>
       <tbody>
         {% for flow in top_flows %}
         <tr>
@@ -218,8 +255,8 @@
 
 {% if recent_sessions %}
 <div class="card mb-4">
-  <div class="card-header">Recent sessions</div>
-  <div class="card-body small text-muted mb-0 pb-0">Chronological event timelines for the 15 most recent sessions.</div>
+  <div class="card-header">Recent visits</div>
+  <div class="card-body small text-muted mb-0 pb-0">Chronological event timelines for the 15 most recent derived visits.</div>
   <div class="accordion accordion-flush" id="session-explorer">
     {% for session in recent_sessions %}
     <div class="accordion-item">
@@ -261,7 +298,7 @@
 {% endif %}
 
 <div class="alert alert-info small mb-0">
-  <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means the visitor's ID appeared before the selected date range.
+  <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means the visitor's ID appeared before the selected date range. "Visits" are split after {{ visit_timeout_minutes }} minutes of inactivity.
 </div>
 
 {% include "backend/analytics/_filter_toggle_oob.html" %}

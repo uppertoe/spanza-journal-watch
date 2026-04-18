@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from django.urls import reverse
 
@@ -162,6 +164,46 @@ class TestPublicRoutes:
         )
         newsletter_click_response = route_client.get(newsletter_click_url)
         assert newsletter_click_response.status_code == 302
+
+    @pytest.mark.parametrize(
+        "url_name,kwargs,query,expected_active_label,expected_active_href",
+        [
+            ("home", None, "", "Home", "/"),
+            ("submissions:issue_list", None, "", "Issues", None),
+            ("submissions:tag_list", None, "", "Explore", None),
+            ("submissions:journal_list", None, "", "Journals", None),
+            ("submissions:search", None, "?q=anaesthesia", "Search", None),
+            ("submissions:about", None, "", "About", None),
+        ],
+    )
+    def test_primary_nav_has_single_exact_active_item(
+        self,
+        route_client,
+        regression_baseline,
+        url_name,
+        kwargs,
+        query,
+        expected_active_label,
+        expected_active_href,
+    ):
+        response = route_client.get(reverse(url_name, kwargs=kwargs) + query)
+
+        assert response.status_code == 200
+        html = response.content.decode("utf-8", errors="ignore")
+        nav_match = re.search(r'<div class="nav-scroller py-1 mb-3 border-bottom">.*?</nav>\s*</div>', html, re.DOTALL)
+
+        assert nav_match is not None
+        nav_html = nav_match.group(0)
+
+        assert nav_html.count('aria-current="page"') == 1
+        assert expected_active_label in nav_html
+
+        expected_href = expected_active_href or reverse(url_name, kwargs=kwargs)
+        active_link_pattern = re.compile(
+            rf'<a class="[^"]*nav-link[^"]* active[^"]*"[^>]*'
+            rf'href="{re.escape(expected_href)}"[^>]*aria-current="page"',
+        )
+        assert active_link_pattern.search(nav_html)
 
     @pytest.mark.parametrize(
         "name,url_name,kwargs,query,headers",

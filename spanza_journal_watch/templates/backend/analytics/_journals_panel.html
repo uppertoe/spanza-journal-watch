@@ -4,6 +4,10 @@
   <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}</p>
 </div>
 {% include "backend/analytics/_confidence_badge.html" %}
+<div class="alert alert-light small mb-4">
+  Journal visits are derived from the anonymous <code>jwvid</code> cookie and split after {{ visit_timeout_minutes }} minutes of inactivity.
+  This keeps the feature tab aligned with the rest of the analytics dashboard.
+</div>
 
 {# ── Feature scorecard ─────────────────────────────────────────── #}
 {% if feature_scorecard %}
@@ -73,7 +77,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-muted mb-0 small">No journal browser visits in this date range.</p>
+    <p class="text-muted mb-0 small">No journal visits in this date range.</p>
     {% endif %}
   </div>
 </div>

@@ -6,6 +6,52 @@
 </div>
 {% include "backend/analytics/_confidence_badge.html" %}
 
+<div class="row g-4 mb-4">
+  <div class="col-12 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">Editors should know</div>
+      <div class="list-group list-group-flush">
+        {% for item in overview_editorial_items %}
+        <div class="list-group-item">
+          <strong class="small d-block mb-1">{{ item.title }}</strong>
+          <p class="small text-muted mb-0">{{ item.detail }}</p>
+        </div>
+        {% empty %}
+        <div class="list-group-item small text-muted">Not enough content activity yet to summarise editorial signals.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">Developers should know</div>
+      <div class="list-group list-group-flush">
+        {% for item in overview_dev_items %}
+        <div class="list-group-item">
+          <strong class="small d-block mb-1">{{ item.title }}</strong>
+          <p class="small text-muted mb-0">{{ item.detail }}</p>
+        </div>
+        {% empty %}
+        <div class="list-group-item small text-muted">Not enough visit or search data yet to point to product friction.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">Confidence & scope</div>
+      <div class="list-group list-group-flush">
+        {% for item in overview_confidence_items %}
+        <div class="list-group-item">
+          <strong class="small d-block mb-1">{{ item.title }}</strong>
+          <p class="small text-muted mb-0">{{ item.detail }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-3 mb-2">
   <div class="col-6 col-md-4 col-xl">
     <div class="card h-100 border-secondary-subtle"><div class="card-body">
@@ -15,8 +61,9 @@
   </div>
   <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
-      <h6 class="text-muted mb-1 small">Sessions</h6>
+      <h6 class="text-muted mb-1 small">Visits</h6>
       <p class="display-6 mb-0">{{ unique_sessions }}</p>
+      <p class="small text-muted mb-0">Derived from visitor ID + 30m inactivity</p>
     </div></div>
   </div>
   <div class="col-6 col-md-4 col-xl">
@@ -95,7 +142,9 @@
       {% for item in newsletter_lift %}
       <div class="d-flex align-items-center gap-2 small">
         <span class="text-muted">{{ item.newsletter.send_date|date:"j M" }}:</span>
-        {% if item.lift_pct is not None %}
+        {% if item.site_analytics_partial %}
+        <span class="badge text-bg-warning text-dark">Partial</span>
+        {% elif item.lift_pct is not None %}
         <span class="badge {% if item.lift_pct >= 0 %}text-bg-success{% else %}text-bg-secondary{% endif %}">
           {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
         </span>

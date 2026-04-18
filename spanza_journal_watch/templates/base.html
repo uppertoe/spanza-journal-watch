@@ -67,7 +67,29 @@
         white-space: nowrap;
         -webkit-overflow-scrolling: touch;
       }
-      .nav-scroller .nav-link { text-decoration: none; }
+      .nav-scroller .nav-link {
+        text-decoration: none;
+        color: var(--bs-emphasis-color, #152b3b);
+        border-bottom: 0.125rem solid transparent;
+        -webkit-tap-highlight-color: rgba(21, 43, 59, 0.08);
+      }
+      .nav-scroller .nav-link:visited,
+      .nav-scroller .nav-link:hover,
+      .nav-scroller .nav-link:focus,
+      .nav-scroller .nav-link:active {
+        color: var(--bs-emphasis-color, #152b3b);
+      }
+      .nav-scroller .nav-link.active,
+      .nav-scroller .nav-link[aria-current="page"] {
+        color: var(--bs-emphasis-color, #152b3b);
+        border-bottom-color: currentColor;
+        font-weight: 600;
+      }
+      .nav-scroller .nav-link:focus-visible {
+        outline: 2px solid rgba(21, 43, 59, 0.28);
+        outline-offset: 0.2rem;
+        border-radius: 999px;
+      }
       .bd-mode-toggle {
         position: fixed;
         right: 0;
@@ -240,21 +262,23 @@
         </div>
       </header>
 
+      {% with current_view=request.resolver_match.view_name|default:'' %}
       <div class="nav-scroller py-1 mb-3 border-bottom">
         <span class="nav-scroller__arrow nav-scroller__arrow--left d-md-none" aria-hidden="true">&#9664;&#xFE0E;</span>
         <span class="nav-scroller__arrow nav-scroller__arrow--right d-md-none" aria-hidden="true">&#9654;&#xFE0E;</span>
         <nav class="nav nav-underline justify-content-between">
-          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'home' %} active{% endif %}" href="{% url "home" %}">Home</a>
-          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:issue_list,submissions:issue_detail,submissions:review_detail' %} active{% endif %}" href="{% url "submissions:issue_list" %}">Issues</a>
-          <a class="nav-item nav-link link-body-emphasis position-relative{% if request.resolver_match.url_name in 'submissions:journal_list' %} active{% endif %}" id="nav-journals-link" href="{% url "submissions:journal_list" %}">Journals<span class="jw-dot-indicator d-none" id="nav-journals-dot"></span></a>
-          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:tag_list,submissions:tag_detail,submissions:collection_detail' %} active{% endif %}" href="{% url "submissions:tag_list" %}">Explore</a>
-          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:search' %} active{% endif %}" href="{% url "submissions:search" %}" aria-label="Search">
+          <a class="nav-item nav-link link-body-emphasis{% if current_view == 'home' %} active{% endif %}" href="{% url "home" %}"{% if current_view == 'home' %} aria-current="page"{% endif %}>Home</a>
+          <a class="nav-item nav-link link-body-emphasis{% if current_view == 'submissions:issue_list' or current_view == 'submissions:issue_detail' or current_view == 'submissions:review_detail' %} active{% endif %}" href="{% url "submissions:issue_list" %}"{% if current_view == 'submissions:issue_list' or current_view == 'submissions:issue_detail' or current_view == 'submissions:review_detail' %} aria-current="page"{% endif %}>Issues</a>
+          <a class="nav-item nav-link link-body-emphasis position-relative{% if current_view == 'submissions:journal_list' %} active{% endif %}" id="nav-journals-link" href="{% url "submissions:journal_list" %}"{% if current_view == 'submissions:journal_list' %} aria-current="page"{% endif %}>Journals<span class="jw-dot-indicator d-none" id="nav-journals-dot"></span></a>
+          <a class="nav-item nav-link link-body-emphasis{% if current_view == 'submissions:tag_list' or current_view == 'submissions:tag_detail' or current_view == 'submissions:collection_detail' %} active{% endif %}" href="{% url "submissions:tag_list" %}"{% if current_view == 'submissions:tag_list' or current_view == 'submissions:tag_detail' or current_view == 'submissions:collection_detail' %} aria-current="page"{% endif %}>Explore</a>
+          <a class="nav-item nav-link link-body-emphasis{% if current_view == 'submissions:search' %} active{% endif %}" href="{% url "submissions:search" %}" aria-label="Search"{% if current_view == 'submissions:search' %} aria-current="page"{% endif %}>
             <svg class="d-inline-flex"xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="mx-3" role="img" viewBox="0 0 24 24"><title>Search</title><circle cx="10.5" cy="10.5" r="7.5"/><path d="M21 21l-5.2-5.2"/></svg>
             Search
           </a>
-          <a class="nav-item nav-link link-body-emphasis{% if request.resolver_match.url_name in 'submissions:about, submissions:author_detail' %} active{% endif %}" href="{% url "submissions:about" %}">About</a>
+          <a class="nav-item nav-link link-body-emphasis{% if current_view == 'submissions:about' or current_view == 'submissions:author_detail' %} active{% endif %}" href="{% url "submissions:about" %}"{% if current_view == 'submissions:about' or current_view == 'submissions:author_detail' %} aria-current="page"{% endif %}>About</a>
         </nav>
       </div>
+      {% endwith %}
 
       {% if frontend_banner %}
         {% if frontend_banner.link_url %}

@@ -1,7 +1,8 @@
 <div class="jw-journal-nav" role="group" aria-label="Journal browser navigation">
   <button type="button" class="btn btn-primary btn-sm jw-journal-nav__btn" data-journal-nav="shelf" data-nav-active="btn-primary" data-nav-inactive="btn-outline-primary"
-    hx-get="{% url 'submissions:journal_list' %}{% if selected_journal_id %}?journal={{ selected_journal_id }}&month={{ selected_month|date:'Y-m' }}{% endif %}"
-    hx-target="#journal-browser-results" hx-swap="innerHTML show:#journal-browser-results:top">
+    hx-get="{% url 'submissions:journal_list' %}{% if selected_journal_id %}?journal={{ selected_journal_id }}&month={{ selected_month|date:'Y-m' }}&paediatric={% if filter_paediatric %}1{% else %}0{% endif %}&has_abstract={% if filter_has_abstract %}1{% else %}0{% endif %}{% endif %}"
+    hx-target="#journal-browser-results" hx-swap="innerHTML show:#journal-browser-results:top"
+    hx-push-url="true">
     <svg class="bi jw-journal-nav__icon" width="1em" height="1em" aria-hidden="true"><use href="#icon-book-stack"></use></svg><span class="jw-journal-nav__label">Shelf</span>
   </button>
   <button type="button" class="btn btn-outline-warning btn-sm jw-journal-nav__btn position-relative" data-journal-nav="reading_list" data-nav-active="btn-warning" data-nav-inactive="btn-outline-warning"

@@ -68,7 +68,7 @@
                 <input
                   class="journal-book__input"
                   type="radio"
-                  name="journal-select"
+                  name="journal"
                   value="{{ journal.pk }}"
                   id="journal-{{ journal.pk }}"
                   {% if journal.pk == selected_journal_id %}checked{% endif %}
@@ -76,6 +76,7 @@
                   hx-target="#journal-browser-results"
                   hx-swap="innerHTML"
                   hx-trigger="change"
+                  hx-params="not journal"
                   hx-push-url="true"
                 >
                 <label class="journal-book__label" for="journal-{{ journal.pk }}">
@@ -247,7 +248,7 @@
   document.body.addEventListener('change', function (e) {
     if (e.target.id !== 'filter-paediatric' && e.target.id !== 'hide-no-abstract') return;
     var params = new URLSearchParams(window.location.search);
-    var checked = document.querySelector('input[name="journal-select"]:checked');
+    var checked = document.querySelector('input[name="journal"]:checked');
     if (checked) params.set('journal', checked.value);
     var paedEl = document.getElementById('filter-paediatric');
     var absEl = document.getElementById('hide-no-abstract');
