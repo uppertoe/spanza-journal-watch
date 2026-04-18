@@ -37,6 +37,11 @@ class _FakeSession(dict):
 
 def _request_with_session(path="/", **headers):
     factory = RequestFactory()
+    headers.setdefault(
+        "HTTP_USER_AGENT",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    )
     request = factory.get(path, **headers)
     request.session = _FakeSession()
     request.analytics_visitor_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"

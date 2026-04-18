@@ -83,7 +83,11 @@ def test_search_pmids_history_uses_history_server(monkeypatch):
         },
     )
 
-    result = client.search_pmids_history("asthma", __import__("datetime").date(2026, 1, 1), __import__("datetime").date(2026, 1, 31))
+    result = client.search_pmids_history(
+        "asthma",
+        __import__("datetime").date(2026, 1, 1),
+        __import__("datetime").date(2026, 1, 31),
+    )
 
     assert result == {
         "count": 42,

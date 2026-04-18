@@ -209,7 +209,13 @@ def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_pageview(cl
     review = _make_review()
     client.cookies["sessionid"] = "stale-session-cookie"
 
-    response = client.get(reverse("analytics:page_view", args=["review", review.slug]))
+    # Use a crawler UA so the pageview code path skips session writes — this
+    # isolates the regression check (Django #11506) from legitimate session
+    # updates that happen on real browser visits.
+    response = client.get(
+        reverse("analytics:page_view", args=["review", review.slug]),
+        HTTP_USER_AGENT="Googlebot/2.1",
+    )
 
     assert response.status_code == 200
     assert response.cookies["sessionid"].value == ""
@@ -508,7 +514,6 @@ def test_analytics_overview_surfaces_action_summaries_and_sidebar_guidance(clien
     assert "Editors should know" in body
     assert "Developers should know" in body
     assert "Confidence & scope" in body
-    assert "Human is the bot-filtered best estimate" in body
     assert "90d is usually the most stable default" in body
     assert "30d" in body
     assert "90d" in body
@@ -1363,6 +1368,24 @@ def test_downgrade_singleton_visitors_dry_run_makes_no_changes():
 def test_record_event_without_request_defaults_to_direct():
     event = AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT)
     assert event.referrer_category == REFERRER_DIRECT
+
+
+# ---- Automated requests are dropped at record_event ----
+
+
+def test_record_event_skips_automated_request(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Googlebot/2.1")
+    result = AnalyticsEvent.record_event(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        request=request,
+    )
+    assert result is None
+    assert AnalyticsEvent.objects.count() == 0
+
+
+def test_page_visit_middleware_drops_bot_requests(client):
+    client.get("/", HTTP_USER_AGENT="Googlebot/2.1")
+    assert not AnalyticsEvent.objects.filter(source="server").exists()
 
 
 # ---- Newsletter click redirectors emit AnalyticsEvent ----

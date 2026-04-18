@@ -105,16 +105,13 @@ def _date_range_from_request(request, default_days=90):
 
 
 def _get_filter_mode(request):
-    """Return 'all' or 'human' based on the ?filter query param."""
-    return "all" if request.GET.get("filter") == "all" else "human"
+    """Analytics dashboards always exclude automated traffic; the toggle is gone."""
+    return "human"
 
 
 def _base_event_qs(request, start_ts, end_ts):
-    """Return AnalyticsEvent queryset filtered by date and optionally by automated=False."""
-    qs = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts)
-    if _get_filter_mode(request) != "all":
-        qs = qs.filter(automated=False)
-    return qs
+    """Return AnalyticsEvent queryset filtered by date, always excluding automated rows."""
+    return AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
 
 
 def _normalise_search_query(raw_query):

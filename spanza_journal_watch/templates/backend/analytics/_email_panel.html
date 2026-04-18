@@ -98,7 +98,7 @@
           <th>Newsletter</th>
           <th>Sent</th>
           <th>Emails</th>
-          <th>{% if filter_mode == "all" %}Unique opens{% else %}Human opens{% endif %}</th>
+          <th>Human opens</th>
           <th>Open rate</th>
           <th title="Unique clickers divided by emails sent">CTR</th>
           <th title="Unique clickers divided by unique openers">CTOR</th>
@@ -233,4 +233,3 @@
 </script>
 {% endif %}
 
-{% include "backend/analytics/_filter_toggle_oob.html" %}

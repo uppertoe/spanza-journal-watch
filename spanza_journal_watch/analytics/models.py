@@ -173,7 +173,6 @@ class AnalyticsEvent(models.Model):
         subscriber = _get_subscriber_for_analytics(subscriber_id, log_context="analytics event")
 
         user_agent = ""
-        automated = False
         session_key = ""
         visitor_id = None
         referrer_category = REFERRER_DIRECT
@@ -182,15 +181,16 @@ class AnalyticsEvent(models.Model):
         session_sequence = 0
         share_token = ""
         if request is not None:
+            if is_probable_automated_event(request, event_type=event_type):
+                return None
             user_agent = request.headers.get("user-agent", "")
-            automated = is_probable_automated_event(request, event_type=event_type)
             session_key = request.session.session_key or ""
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
             referrer_category = categorize_referrer(request)
             referrer_domain = extract_referrer_domain(request)
             landing_page = request.session.get("analytics_landing_page", "")
             share_token = request.session.get("analytics_share_token", "")
-        human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
+        human_confidence = classify_event_confidence(automated=False, subscriber=subscriber)
 
         content_type = None
         object_id = None
@@ -211,7 +211,7 @@ class AnalyticsEvent(models.Model):
             metadata=metadata or {},
             subscriber=subscriber,
             user_agent=user_agent,
-            automated=automated,
+            automated=False,
             session_key=session_key,
             human_confidence=human_confidence,
             visitor_id=visitor_id,
