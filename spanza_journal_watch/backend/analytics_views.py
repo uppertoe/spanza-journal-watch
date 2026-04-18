@@ -15,12 +15,18 @@ from collections import Counter, defaultdict
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Q, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
+from spanza_journal_watch.analytics.models import (
+    AnalyticsEvent,
+    AutomatedRequestCount,
+    NewsletterClick,
+    NewsletterOpen,
+)
 from spanza_journal_watch.backend.views import (
     _build_rate_row,
     _newsletter_predates_site_analytics,
@@ -570,7 +576,13 @@ def analytics_overview(request):
     # Data quality — always across ALL events regardless of filter toggle
     all_period = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts)
     total_all_events = all_period.count()
-    automated_count = all_period.filter(automated=True).count()
+    # Automated requests are no longer persisted per-row; read from the daily
+    # aggregate counter bumped by record_event's bot short-circuit.
+    automated_count = AutomatedRequestCount.objects.filter(
+        date__gte=start_ts.date(),
+        date__lte=end_ts.date(),
+    ).aggregate(total=Coalesce(Sum("count"), 0))["total"]
+    total_attempted_events = total_all_events + automated_count
     js_verified_count = all_period.filter(js_verified=True).count()
     confidence_breakdown = list(all_period.values("human_confidence").annotate(count=Count("id")).order_by("-count"))
 
@@ -927,6 +939,8 @@ def analytics_overview(request):
         "subscriber_share": _safe_percentage(subscriber_events, human_event_count),
         "total_all_events": total_all_events,
         "automated_count": automated_count,
+        "total_attempted_events": total_attempted_events,
+        "automated_share": _safe_percentage(automated_count, total_attempted_events),
         "js_verified_count": js_verified_count,
         "confidence_breakdown": confidence_breakdown,
         "delta_opens": _pct_change(total_opens, prev_opens),

@@ -3,8 +3,10 @@ import logging
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import MultipleObjectsReturned
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models import F
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from spanza_journal_watch.analytics.utils import (
     REFERRER_DIRECT,
@@ -182,6 +184,7 @@ class AnalyticsEvent(models.Model):
         share_token = ""
         if request is not None:
             if is_probable_automated_event(request, event_type=event_type):
+                AutomatedRequestCount.bump(event_type)
                 return None
             user_agent = request.headers.get("user-agent", "")
             session_key = request.session.session_key or ""
@@ -228,3 +231,35 @@ class AnalyticsEvent(models.Model):
         if self.content_object:
             return f"{label}: {self.content_object}"
         return label
+
+
+class AutomatedRequestCount(models.Model):
+    """Daily aggregate of requests dropped by record_event's bot short-circuit.
+
+    Replaces per-row AnalyticsEvent rows for automated traffic (which we no
+    longer persist) so the overview dashboard can still surface a bot-volume
+    signal without the write amplification.
+    """
+
+    date = models.DateField()
+    event_type = models.CharField(max_length=48, choices=AnalyticsEvent.EventType.choices)
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("date", "event_type")
+        indexes = [models.Index(fields=["date"])]
+        ordering = ("-date", "event_type")
+
+    @classmethod
+    def bump(cls, event_type):
+        today = timezone.localdate()
+        updated = cls.objects.filter(date=today, event_type=event_type).update(count=F("count") + 1)
+        if updated:
+            return
+        try:
+            cls.objects.create(date=today, event_type=event_type, count=1)
+        except IntegrityError:
+            cls.objects.filter(date=today, event_type=event_type).update(count=F("count") + 1)
+
+    def __str__(self):
+        return f"{self.date} {self.event_type}: {self.count}"

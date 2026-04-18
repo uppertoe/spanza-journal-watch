@@ -168,8 +168,8 @@
         <div class="fw-semibold">{{ total_all_events }}</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="small text-muted">Filtered as bot</div>
-        <div class="fw-semibold">{{ automated_count }} <span class="text-muted small fw-normal">({% widthratio automated_count total_all_events 100 %}%)</span></div>
+        <div class="small text-muted" title="Requests dropped before persistence by the bot short-circuit.">Filtered as bot</div>
+        <div class="fw-semibold">{{ automated_count }} <span class="text-muted small fw-normal">({{ automated_share }} of attempted)</span></div>
       </div>
       <div class="col-6 col-md-3">
         <div class="small text-muted">JS-verified</div>

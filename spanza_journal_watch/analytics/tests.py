@@ -9,7 +9,12 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
+from spanza_journal_watch.analytics.models import (
+    AnalyticsEvent,
+    AutomatedRequestCount,
+    NewsletterClick,
+    NewsletterOpen,
+)
 from spanza_journal_watch.analytics.utils import (
     _REFERRER_SESSION_KEY,
     NEWSLETTER_AUTOMATION_WINDOW,
@@ -1381,6 +1386,23 @@ def test_record_event_skips_automated_request(rf):
     )
     assert result is None
     assert AnalyticsEvent.objects.count() == 0
+
+
+def test_record_event_bumps_counter_for_automated_request(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Googlebot/2.1")
+    AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT, request=request)
+    AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT, request=request)
+    AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.REVIEW_OPEN, request=request)
+
+    page_visit_row = AutomatedRequestCount.objects.get(event_type=AnalyticsEvent.EventType.PAGE_VISIT)
+    review_open_row = AutomatedRequestCount.objects.get(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)
+    assert page_visit_row.count == 2
+    assert review_open_row.count == 1
+
+
+def test_record_event_does_not_bump_counter_for_human_request(client):
+    client.get("/")
+    assert AutomatedRequestCount.objects.count() == 0
 
 
 def test_page_visit_middleware_drops_bot_requests(client):
