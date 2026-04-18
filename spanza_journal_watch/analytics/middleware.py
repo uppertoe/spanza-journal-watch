@@ -1,6 +1,9 @@
+import logging
 import uuid
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 VISITOR_COOKIE_NAME = "jwvid"
 VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
@@ -157,3 +160,60 @@ class VisitorIdMiddleware:
                 secure=not getattr(settings, "DEBUG", True),
             )
         return response
+
+
+_PAGE_VISIT_EXCLUDED_PREFIXES = ("/editorial/", "/o/", "/__debug__/", "/tinymce/", "/markdownx/")
+
+
+class PageVisitAnalyticsMiddleware:
+    """
+    Record a server-side PAGE_VISIT AnalyticsEvent for every full-page HTML GET.
+
+    The JS-beacon events fire against the same origin, so their Referer header is
+    always same-origin and categorises as "internal" — losing the real traffic
+    source.  By emitting this event during request/response processing, we
+    capture the true HTTP Referer before any client-side JS runs.
+
+    Only fires for successful 2xx GET requests returning text/html that are not
+    HTMX partials and not on staff/OAuth/debug paths.  The admin URL is
+    configurable, so it's checked via settings.ADMIN_URL.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        from spanza_journal_watch.analytics.models import AnalyticsEvent
+
+        self._AnalyticsEvent = AnalyticsEvent
+        admin_url = (getattr(settings, "ADMIN_URL", "admin/") or "").strip("/")
+        self._admin_prefix = f"/{admin_url}/" if admin_url else None
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if self._should_record(request, response):
+            try:
+                self._AnalyticsEvent.record_event(
+                    event_type=self._AnalyticsEvent.EventType.PAGE_VISIT,
+                    request=request,
+                    subscriber_id=request.session.get("subscriber_id"),
+                    source="server",
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Failed to record server-side PAGE_VISIT")
+        return response
+
+    def _should_record(self, request, response):
+        if request.method != "GET":
+            return False
+        if not (200 <= response.status_code < 300):
+            return False
+        if request.headers.get("HX-Request", "").lower() == "true":
+            return False
+        content_type = (response.get("Content-Type") or "").lower()
+        if not content_type.startswith("text/html"):
+            return False
+        path = request.path
+        if self._admin_prefix and path.startswith(self._admin_prefix):
+            return False
+        if any(path.startswith(prefix) for prefix in _PAGE_VISIT_EXCLUDED_PREFIXES):
+            return False
+        return True

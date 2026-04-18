@@ -1355,3 +1355,105 @@ def test_downgrade_singleton_visitors_dry_run_makes_no_changes():
     event.refresh_from_db()
     assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
     assert result == {"would_downgrade": 1, "downgraded": 0, "dry_run": True}
+
+
+# ---- referrer_category default when request is None ----
+
+
+def test_record_event_without_request_defaults_to_direct():
+    event = AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT)
+    assert event.referrer_category == REFERRER_DIRECT
+
+
+# ---- Newsletter click redirectors emit AnalyticsEvent ----
+
+
+def test_track_email_click_records_analytics_event(client):
+    subscriber = Subscriber.objects.create(email="clicker@example.com", subscribed=True)
+    response = client.get(
+        reverse("analytics:track_email_click"),
+        {"email": subscriber.email, "next": "/"},
+    )
+    assert response.status_code == 302
+    events = AnalyticsEvent.objects.filter(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        source="newsletter_click",
+    )
+    assert events.count() == 1
+    event = events.first()
+    assert event.subscriber_id == subscriber.pk
+    assert event.referrer_category == REFERRER_NEWSLETTER
+
+
+def test_track_email_click_skips_event_when_no_subscriber(client):
+    response = client.get(
+        reverse("analytics:track_email_click"),
+        {"email": "unknown@example.com", "next": "/"},
+    )
+    assert response.status_code == 302
+    assert not AnalyticsEvent.objects.filter(source="newsletter_click").exists()
+
+
+def test_track_newsletter_link_records_analytics_event(client):
+    subscriber = Subscriber.objects.create(email="reader@example.com", subscribed=True)
+    newsletter = _make_newsletter(send_date=timezone.now() - NEWSLETTER_AUTOMATION_WINDOW * 2)
+    response = client.get(
+        reverse("analytics:track_newsletter_email_link", args=[newsletter.email_token]),
+        {"email": subscriber.email, "next": "/"},
+    )
+    assert response.status_code == 302
+    events = AnalyticsEvent.objects.filter(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        source="newsletter_click",
+    )
+    assert events.count() == 1
+    event = events.first()
+    assert event.subscriber_id == subscriber.pk
+    assert event.referrer_category == REFERRER_NEWSLETTER
+    assert event.metadata.get("newsletter_id") == newsletter.pk
+
+
+# ---- PageVisitAnalyticsMiddleware ----
+
+
+def test_page_visit_middleware_records_event_for_html_get(client):
+    client.get("/")
+    events = AnalyticsEvent.objects.filter(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        source="server",
+    )
+    assert events.count() == 1
+
+
+def test_page_visit_middleware_captures_external_referer(client):
+    client.get("/", HTTP_REFERER="https://www.google.com/search?q=foo")
+    event = AnalyticsEvent.objects.filter(source="server").first()
+    assert event is not None
+    assert event.referrer_category == REFERRER_SEARCH
+
+
+def test_page_visit_middleware_skips_htmx_requests(client):
+    client.get("/", HTTP_HX_REQUEST="true")
+    assert not AnalyticsEvent.objects.filter(source="server").exists()
+
+
+def test_page_visit_middleware_skips_json_responses(client):
+    _make_review()
+    response = client.post(
+        reverse("reader_action"),
+        data={"event_type": AnalyticsEvent.EventType.PAGE_VISIT},
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    assert not AnalyticsEvent.objects.filter(source="server").exists()
+
+
+def test_page_visit_middleware_skips_redirects(client):
+    subscriber = Subscriber.objects.create(email="redirect@example.com", subscribed=True)
+    response = client.get(
+        reverse("analytics:track_email_click"),
+        {"email": subscriber.email, "next": "/"},
+    )
+    assert response.status_code == 302
+    # The server-side source events should only come from newsletter_click, not server.
+    assert not AnalyticsEvent.objects.filter(source="server").exists()

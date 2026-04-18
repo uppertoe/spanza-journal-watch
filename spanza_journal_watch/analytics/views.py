@@ -119,6 +119,14 @@ def track_newsletter_link(request, newsletter_token):
         request.session["subscriber_id"] = subscriber.pk
         set_newsletter_referrer_in_session(request)
 
+        AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            request=request,
+            subscriber_id=subscriber.pk,
+            source="newsletter_click",
+            metadata={"newsletter_id": newsletter.pk, "destination_url": (next or "")[:512]},
+        )
+
     return _get_next_url(request, next)
 
 
@@ -149,6 +157,13 @@ def track_email_click(request):
     if subscriber:
         request.session["subscriber_id"] = subscriber.pk
         set_newsletter_referrer_in_session(request)
+        AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            request=request,
+            subscriber_id=subscriber.pk,
+            source="newsletter_click",
+            metadata={"destination_url": (next or "")[:512]},
+        )
     else:
         subscriber = None
         logger.warning("No subscriber by this email: %s", email)

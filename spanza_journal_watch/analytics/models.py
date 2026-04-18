@@ -7,6 +7,7 @@ from django.db import models
 from django.template.loader import render_to_string
 
 from spanza_journal_watch.analytics.utils import (
+    REFERRER_DIRECT,
     categorize_referrer,
     classify_event_confidence,
     extract_referrer_domain,
@@ -175,7 +176,7 @@ class AnalyticsEvent(models.Model):
         automated = False
         session_key = ""
         visitor_id = None
-        referrer_category = ""
+        referrer_category = REFERRER_DIRECT
         referrer_domain = ""
         landing_page = ""
         session_sequence = 0

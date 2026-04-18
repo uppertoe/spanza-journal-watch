@@ -176,6 +176,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "spanza_journal_watch.backend.middleware.HtmxMessagesMiddleware",
+    "spanza_journal_watch.analytics.middleware.PageVisitAnalyticsMiddleware",
 ]
 
 # STATIC
