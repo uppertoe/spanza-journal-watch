@@ -182,7 +182,7 @@ class AnalyticsEvent(models.Model):
         share_token = ""
         if request is not None:
             user_agent = request.headers.get("user-agent", "")
-            automated = is_probable_automated_event(request)
+            automated = is_probable_automated_event(request, event_type=event_type)
             session_key = request.session.session_key or ""
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
             referrer_category = categorize_referrer(request)

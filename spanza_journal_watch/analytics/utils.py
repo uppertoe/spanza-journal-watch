@@ -42,6 +42,9 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "screaming frog",
     "petalbot",
     "seranking",
+    "barkrowler",
+    "sogou",
+    "cms-checker",
     # AI crawlers
     "claudebot",
     "gptbot",
@@ -76,12 +79,21 @@ AUTOMATED_USER_AGENT_MARKERS = [
 
 NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=60)
 
+# Event types recorded without JS that modern browsers would always surface with
+# sec-fetch-* headers. Missing those headers on these events strongly implies a
+# non-browser client that still got through the UA markers.
+_SEC_FETCH_STRICT_EVENT_TYPES = frozenset({"search"})
 
-def is_probable_automated_event(request):
+
+def is_probable_automated_event(request, event_type=None):
     user_agent = (request.headers.get("user-agent") or "").lower()
     if not user_agent:
         return True
     if any(marker in user_agent for marker in AUTOMATED_USER_AGENT_MARKERS):
+        return True
+    # Generic crawler convention: UA contains a URL identifying the bot
+    # (e.g. "... +http://example.com/bot"). Real browsers never do this.
+    if "+http://" in user_agent or "+https://" in user_agent:
         return True
 
     # Common prefetch/scanner headers
@@ -96,6 +108,12 @@ def is_probable_automated_event(request):
     sec_fetch_site = (request.headers.get("sec-fetch-site") or "").lower()
     if sec_fetch_mode == "no-cors" and sec_fetch_site == "cross-site":
         # Often image preloading/proxy behavior
+        return True
+
+    # For events that only fire from interactive page loads (e.g. SEARCH), a
+    # modern browser always sends sec-fetch-* headers. Their absence points to
+    # a scripted client whose UA doesn't match our marker list.
+    if event_type in _SEC_FETCH_STRICT_EVENT_TYPES and not sec_fetch_mode:
         return True
 
     return False

@@ -323,6 +323,58 @@ def test_normal_browser_not_automated(rf):
     assert is_probable_automated_event(request) is False
 
 
+def test_barkrowler_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Mozilla/5.0 (compatible; Barkrowler/0.9; +https://babbar.tech/crawler)")
+    assert is_probable_automated_event(request) is True
+
+
+def test_sogou_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Sogou web spider/4.0(+http://www.sogou.com/docs/help/webmasters.htm#07)")
+    assert is_probable_automated_event(request) is True
+
+
+def test_cms_checker_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="CMS-Checker/1.0")
+    assert is_probable_automated_event(request) is True
+
+
+def test_generic_url_in_user_agent_is_automated(rf):
+    # A UA we don't explicitly list but that advertises a URL is virtually
+    # always a crawler (e.g., " +https://some.new.bot/info").
+    request = rf.get(
+        "/",
+        HTTP_USER_AGENT="Mozilla/5.0 (compatible; UnknownBot/1.0; +https://unknownbot.example.com/about)",
+    )
+    assert is_probable_automated_event(request) is True
+
+
+def test_search_event_without_sec_fetch_headers_is_automated(rf):
+    # Real browsers always send sec-fetch-* on navigation requests. A SEARCH
+    # event with none of them points to a scripted client.
+    ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0"
+    request = rf.get("/", HTTP_USER_AGENT=ua)
+    assert is_probable_automated_event(request, event_type=AnalyticsEvent.EventType.SEARCH) is True
+
+
+def test_search_event_with_sec_fetch_headers_is_not_automated(rf):
+    ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0"
+    request = rf.get(
+        "/",
+        HTTP_USER_AGENT=ua,
+        HTTP_SEC_FETCH_MODE="navigate",
+        HTTP_SEC_FETCH_SITE="same-origin",
+    )
+    assert is_probable_automated_event(request, event_type=AnalyticsEvent.EventType.SEARCH) is False
+
+
+def test_non_search_event_without_sec_fetch_headers_is_not_automated(rf):
+    # Only SEARCH enforces the strict sec-fetch-* check; other event types
+    # still pass when sec-fetch headers are absent.
+    ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0"
+    request = rf.get("/", HTTP_USER_AGENT=ua)
+    assert is_probable_automated_event(request, event_type=AnalyticsEvent.EventType.PAGE_VISIT) is False
+
+
 # ---- Newsletter automation window (60s) ----
 
 
@@ -1153,3 +1205,153 @@ def test_visitor_id_still_set_on_sub_resource_paths(client):
     """VisitorIdMiddleware should still set the jwvid cookie on sub-resource paths."""
     response = client.get("/manifest.json")
     assert "jwvid" in response.cookies
+
+
+# ---- downgrade_singleton_visitors_task ----
+
+
+def _backdate(event, *, hours=24):
+    """Move an event's timestamp into the past so it passes the min-age filter."""
+    AnalyticsEvent.objects.filter(pk=event.pk).update(timestamp=timezone.now() - timedelta(hours=hours))
+
+
+def test_downgrade_singleton_visitors_downgrades_non_js_single_event():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+        js_verified=False,
+    )
+    _backdate(event)
+
+    result = downgrade_singleton_visitors_task()
+
+    event.refresh_from_db()
+    assert event.automated is True
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED
+    assert result == {"downgraded": 1, "dry_run": False}
+
+
+def test_downgrade_singleton_visitors_skips_js_verified_events():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+        js_verified=True,
+    )
+    _backdate(event)
+
+    downgrade_singleton_visitors_task()
+
+    event.refresh_from_db()
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+
+
+def test_downgrade_singleton_visitors_skips_multi_event_visitors():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    first = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+    )
+    second = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+    )
+    _backdate(first)
+    _backdate(second)
+
+    downgrade_singleton_visitors_task()
+
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert first.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+    assert second.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+
+
+def test_downgrade_singleton_visitors_skips_recent_events():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+    )
+
+    downgrade_singleton_visitors_task()
+
+    event.refresh_from_db()
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+
+
+def test_downgrade_singleton_visitors_skips_newsletter_referrer():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        referrer_category="newsletter",
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+    )
+    _backdate(event)
+
+    downgrade_singleton_visitors_task()
+
+    event.refresh_from_db()
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+
+
+def test_downgrade_singleton_visitors_is_idempotent():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+    )
+    _backdate(event)
+
+    downgrade_singleton_visitors_task()
+    second_result = downgrade_singleton_visitors_task()
+
+    event.refresh_from_db()
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED
+    assert second_result["downgraded"] == 0
+
+
+def test_downgrade_singleton_visitors_dry_run_makes_no_changes():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    visitor = uuid.uuid4()
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+    )
+    _backdate(event)
+
+    result = downgrade_singleton_visitors_task(dry_run=True)
+
+    event.refresh_from_db()
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+    assert result == {"would_downgrade": 1, "downgraded": 0, "dry_run": True}
