@@ -110,11 +110,6 @@ def _date_range_from_request(request, default_days=90):
     return start_date, end_date, start_ts, end_ts
 
 
-def _get_filter_mode(request):
-    """Analytics dashboards always exclude automated traffic; the toggle is gone."""
-    return "human"
-
-
 def _base_event_qs(request, start_ts, end_ts):
     """Return AnalyticsEvent queryset filtered by date, always excluding automated rows."""
     return AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
@@ -345,7 +340,6 @@ def _confidence_summary(events_qs):
 
 
 def _render_analytics(request, template, context, panel_template=None):
-    context.setdefault("filter_mode", _get_filter_mode(request))
     start_date = context.get("start_date")
     end_date = context.get("end_date")
     if start_date and end_date:
@@ -449,7 +443,6 @@ def _compute_top_flows(visits):
 @permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
 def analytics_overview(request):
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
-    filter_mode = _get_filter_mode(request)
 
     human_events = _base_event_qs(request, start_ts, end_ts)
     review_ct = ContentType.objects.get_for_model(Review)
@@ -494,9 +487,9 @@ def analytics_overview(request):
     prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
     prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
 
-    prev_human = AnalyticsEvent.objects.filter(timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts)
-    if filter_mode != "all":
-        prev_human = prev_human.filter(automated=False)
+    prev_human = AnalyticsEvent.objects.filter(
+        timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
+    )
     prev_review = prev_human.filter(content_type=review_ct)
     prev_opens = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN).count()
     prev_engaged = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).count()
@@ -519,9 +512,7 @@ def analytics_overview(request):
     )
     prev_scroll_depth = round(prev_scroll) if prev_scroll is not None else None
 
-    engaged_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
-    if filter_mode != "all":
-        engaged_qs = engaged_qs.filter(automated=False)
+    engaged_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
     weekly_trend = _weekly_buckets(engaged_qs)
     newsletter_sends = _newsletter_send_weeks(weeks=26)
 
@@ -544,9 +535,7 @@ def analytics_overview(request):
         send_dt = nl.send_date
         before_start = send_dt - datetime.timedelta(days=7)
         after_end = send_dt + datetime.timedelta(days=7)
-        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
-        if filter_mode != "all":
-            lift_qs = lift_qs.filter(automated=False)
+        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
         before_count = lift_qs.filter(timestamp__gte=before_start, timestamp__lt=send_dt).count()
         after_count = lift_qs.filter(timestamp__gte=send_dt, timestamp__lte=after_end).count()
         lift_pct = None
@@ -567,6 +556,11 @@ def analytics_overview(request):
     # Unique visitors and visits
     unique_visitors = human_events.exclude(visitor_id=None).values("visitor_id").distinct().count()
     unique_sessions = len(visits)
+    # Distinct Django session_keys (only written when a request mutates the
+    # session, e.g. a JS beacon fires). Used as the bot-signal denominator:
+    # cookie-only crawlers rarely trigger session writes, so visitor_id /
+    # session_key climbs when they slip through the UA filter.
+    unique_session_keys = human_events.exclude(session_key="").values("session_key").distinct().count()
 
     human_event_count = human_events.count()
     subscriber_events = human_events.filter(
@@ -946,7 +940,8 @@ def analytics_overview(request):
         "total_attempted_events": total_attempted_events,
         "automated_share": _safe_percentage(automated_count, total_attempted_events),
         "automated_breakdown": automated_breakdown,
-        "visitor_session_ratio": (round(unique_visitors / unique_sessions, 1) if unique_sessions else None),
+        "unique_session_keys": unique_session_keys,
+        "visitor_session_ratio": (round(unique_visitors / unique_session_keys, 1) if unique_session_keys else None),
         "js_verified_count": js_verified_count,
         "confidence_breakdown": confidence_breakdown,
         "delta_opens": _pct_change(total_opens, prev_opens),
@@ -1509,7 +1504,6 @@ def analytics_traffic(request):
 @permission_required(VIEW_NEWSLETTER_STATS, raise_exception=True)
 def analytics_email(request):
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request, default_days=180)
-    filter_mode = _get_filter_mode(request)
     site_analytics_rollout_date = _site_analytics_rollout_date()
 
     newsletters = list(
@@ -1526,8 +1520,8 @@ def analytics_email(request):
         clicks_qs = NewsletterClick.objects.filter(newsletter=nl)
         total_opens = opens_qs.count()
         total_clicks = clicks_qs.count()
-        filtered_opens = opens_qs if filter_mode == "all" else opens_qs.filter(automated=False)
-        filtered_clicks = clicks_qs if filter_mode == "all" else clicks_qs.filter(automated=False)
+        filtered_opens = opens_qs.filter(automated=False)
+        filtered_clicks = clicks_qs.filter(automated=False)
         total_filtered_opens = filtered_opens.count()
         total_filtered_clicks = filtered_clicks.count()
         human_opens = filtered_opens.values("subscriber").distinct().count()
@@ -1536,9 +1530,8 @@ def analytics_email(request):
 
         post_traffic_qs = AnalyticsEvent.objects.filter(
             event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+            automated=False,
         )
-        if filter_mode != "all":
-            post_traffic_qs = post_traffic_qs.filter(automated=False)
         post_traffic = None if site_analytics_partial else 0
         if nl.send_date and not site_analytics_partial:
             post_traffic = post_traffic_qs.filter(
@@ -1586,11 +1579,8 @@ def analytics_email(request):
         active_subscribers = list(Subscriber.objects.filter(subscribed=True).values_list("id", flat=True))
         nl_count = len(recent_nl_ids)
 
-        seg_opens_qs = NewsletterOpen.objects.filter(newsletter_id__in=recent_nl_ids)
-        seg_clicks_qs = NewsletterClick.objects.filter(newsletter_id__in=recent_nl_ids)
-        if filter_mode != "all":
-            seg_opens_qs = seg_opens_qs.filter(automated=False)
-            seg_clicks_qs = seg_clicks_qs.filter(automated=False)
+        seg_opens_qs = NewsletterOpen.objects.filter(newsletter_id__in=recent_nl_ids, automated=False)
+        seg_clicks_qs = NewsletterClick.objects.filter(newsletter_id__in=recent_nl_ids, automated=False)
         opens_per_sub = dict(
             seg_opens_qs.values("subscriber_id")
             .annotate(newsletters_opened=Count("newsletter_id", distinct=True))
@@ -1634,9 +1624,7 @@ def analytics_email(request):
         send_dt = nl.send_date
         before_start = send_dt - datetime.timedelta(days=7)
         after_end = send_dt + datetime.timedelta(days=7)
-        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
-        if filter_mode != "all":
-            lift_qs = lift_qs.filter(automated=False)
+        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
         before_count = lift_qs.filter(timestamp__gte=before_start, timestamp__lt=send_dt).count()
         after_count = lift_qs.filter(timestamp__gte=send_dt, timestamp__lte=after_end).count()
         lift_pct = None
@@ -1800,10 +1788,9 @@ def analytics_journals(request):
     prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
     prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
 
-    filter_mode = _get_filter_mode(request)
-    prev_events = AnalyticsEvent.objects.filter(timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts)
-    if filter_mode != "all":
-        prev_events = prev_events.filter(automated=False)
+    prev_events = AnalyticsEvent.objects.filter(
+        timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
+    )
 
     prev_visits = len(_build_derived_visits(prev_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)))
     prev_stars = states_in_range.filter(starred_at__gte=prev_start_ts, starred_at__lte=prev_end_ts).count()

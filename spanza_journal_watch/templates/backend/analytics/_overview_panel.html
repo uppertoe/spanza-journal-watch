@@ -176,10 +176,10 @@
         <div class="fw-semibold">{{ js_verified_count }} <span class="text-muted small fw-normal">({% widthratio js_verified_count total_all_events 100 %}%)</span></div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="small text-muted" title="Unique visitor cookies per active session. Healthy sites sit near 1:1; inflated ratios flag crawlers that carry a cookie but never trigger session writes.">Visitors / sessions</div>
+        <div class="small text-muted" title="Unique visitor cookies per Django session_key write. Sessions are only written when a request mutates them (e.g. a JS beacon fires), so cookie-only crawlers rarely trigger one. Ratios near 1:1 are healthy; inflated ratios flag bots that slipped past the UA filter.">Visitors / session writes</div>
         <div class="fw-semibold">
           {% if visitor_session_ratio %}{{ visitor_session_ratio }}:1{% else %}–{% endif %}
-          <span class="text-muted small fw-normal">({{ unique_visitors }} / {{ unique_sessions }})</span>
+          <span class="text-muted small fw-normal">({{ unique_visitors }} / {{ unique_session_keys }})</span>
         </div>
       </div>
     </div>
@@ -211,7 +211,7 @@
       </tbody>
     </table>
     <p class="text-muted mb-0 mt-2" style="font-size:0.7rem">
-      Data quality metrics always show all events regardless of the traffic filter.
+      Every dashboard metric above is already filtered to human traffic; this card exposes the underlying mix.
       "JS-verified" means the event was sent by a real browser via JavaScript.
     </p>
   </div>
