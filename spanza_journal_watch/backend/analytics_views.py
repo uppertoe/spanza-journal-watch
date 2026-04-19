@@ -578,10 +578,14 @@ def analytics_overview(request):
     total_all_events = all_period.count()
     # Automated requests are no longer persisted per-row; read from the daily
     # aggregate counter bumped by record_event's bot short-circuit.
-    automated_count = AutomatedRequestCount.objects.filter(
+    automated_counter_qs = AutomatedRequestCount.objects.filter(
         date__gte=start_ts.date(),
         date__lte=end_ts.date(),
-    ).aggregate(total=Coalesce(Sum("count"), 0))["total"]
+    )
+    automated_count = automated_counter_qs.aggregate(total=Coalesce(Sum("count"), 0))["total"]
+    automated_breakdown = list(
+        automated_counter_qs.values("event_type").annotate(total=Sum("count")).order_by("-total")
+    )
     total_attempted_events = total_all_events + automated_count
     js_verified_count = all_period.filter(js_verified=True).count()
     confidence_breakdown = list(all_period.values("human_confidence").annotate(count=Count("id")).order_by("-count"))
@@ -941,6 +945,8 @@ def analytics_overview(request):
         "automated_count": automated_count,
         "total_attempted_events": total_attempted_events,
         "automated_share": _safe_percentage(automated_count, total_attempted_events),
+        "automated_breakdown": automated_breakdown,
+        "visitor_session_ratio": (round(unique_visitors / unique_sessions, 1) if unique_sessions else None),
         "js_verified_count": js_verified_count,
         "confidence_breakdown": confidence_breakdown,
         "delta_opens": _pct_change(total_opens, prev_opens),

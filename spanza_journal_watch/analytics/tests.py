@@ -1348,6 +1348,41 @@ def test_downgrade_singleton_visitors_is_idempotent():
     assert second_result["downgraded"] == 0
 
 
+def test_downgrade_singleton_visitors_bumps_counter_per_downgraded_row():
+    from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
+
+    e1 = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+        js_verified=False,
+    )
+    e2 = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+        js_verified=False,
+    )
+    e3 = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+        js_verified=False,
+    )
+    for e in (e1, e2, e3):
+        _backdate(e)
+
+    downgrade_singleton_visitors_task()
+
+    page_row = AutomatedRequestCount.objects.get(event_type=AnalyticsEvent.EventType.PAGE_VISIT)
+    review_row = AutomatedRequestCount.objects.get(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)
+    assert page_row.count == 2
+    assert review_row.count == 1
+
+
 def test_downgrade_singleton_visitors_dry_run_makes_no_changes():
     from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
 

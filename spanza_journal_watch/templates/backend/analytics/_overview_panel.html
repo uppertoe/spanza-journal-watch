@@ -168,7 +168,7 @@
         <div class="fw-semibold">{{ total_all_events }}</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="small text-muted" title="Requests dropped before persistence by the bot short-circuit.">Filtered as bot</div>
+        <div class="small text-muted" title="Requests dropped before persistence by the bot short-circuit, plus events later downgraded as singleton-visitor bots.">Filtered as bot</div>
         <div class="fw-semibold">{{ automated_count }} <span class="text-muted small fw-normal">({{ automated_share }} of attempted)</span></div>
       </div>
       <div class="col-6 col-md-3">
@@ -176,9 +176,28 @@
         <div class="fw-semibold">{{ js_verified_count }} <span class="text-muted small fw-normal">({% widthratio js_verified_count total_all_events 100 %}%)</span></div>
       </div>
       <div class="col-6 col-md-3">
+        <div class="small text-muted" title="Unique visitor cookies per active session. Healthy sites sit near 1:1; inflated ratios flag crawlers that carry a cookie but never trigger session writes.">Visitors / sessions</div>
+        <div class="fw-semibold">
+          {% if visitor_session_ratio %}{{ visitor_session_ratio }}:1{% else %}–{% endif %}
+          <span class="text-muted small fw-normal">({{ unique_visitors }} / {{ unique_sessions }})</span>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3 text-center mb-3">
+      <div class="col-6 col-md-3">
         <div class="small text-muted">Known subscribers</div>
         <div class="fw-semibold">{{ subscriber_events }} <span class="text-muted small fw-normal">({{ subscriber_share }})</span></div>
       </div>
+      {% if automated_breakdown %}
+      <div class="col-12 col-md-9 text-start">
+        <div class="small text-muted mb-1">Bot volume by event type (in range)</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for row in automated_breakdown %}
+          <span class="badge text-bg-light border small fw-normal">{{ row.event_type }}: {{ row.total }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
     </div>
     <table class="table table-sm small mb-0">
       <thead><tr><th>Confidence level</th><th>Events</th></tr></thead>

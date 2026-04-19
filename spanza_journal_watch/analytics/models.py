@@ -251,15 +251,15 @@ class AutomatedRequestCount(models.Model):
         ordering = ("-date", "event_type")
 
     @classmethod
-    def bump(cls, event_type):
-        today = timezone.localdate()
-        updated = cls.objects.filter(date=today, event_type=event_type).update(count=F("count") + 1)
+    def bump(cls, event_type, *, date=None, by=1):
+        target_date = date or timezone.localdate()
+        updated = cls.objects.filter(date=target_date, event_type=event_type).update(count=F("count") + by)
         if updated:
             return
         try:
-            cls.objects.create(date=today, event_type=event_type, count=1)
+            cls.objects.create(date=target_date, event_type=event_type, count=by)
         except IntegrityError:
-            cls.objects.filter(date=today, event_type=event_type).update(count=F("count") + 1)
+            cls.objects.filter(date=target_date, event_type=event_type).update(count=F("count") + by)
 
     def __str__(self):
         return f"{self.date} {self.event_type}: {self.count}"

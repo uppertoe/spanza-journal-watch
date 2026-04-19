@@ -2,16 +2,17 @@ import logging
 from datetime import timedelta
 
 from django.db.models import Count
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from config.celery_app import app as celery_app
-from spanza_journal_watch.analytics.models import AnalyticsEvent, HumanConfidence
+from spanza_journal_watch.analytics.models import AnalyticsEvent, AutomatedRequestCount, HumanConfidence
 
 logger = logging.getLogger(__name__)
 
 
 @celery_app.task
-def downgrade_singleton_visitors_task(min_age_hours=2.0, dry_run=False):
+def downgrade_singleton_visitors_task(min_age_hours=0.5, dry_run=False):
     """
     Reclassify visitors with a single non-JS-verified event as
     ``suspected_automated``.
@@ -46,9 +47,20 @@ def downgrade_singleton_visitors_task(min_age_hours=2.0, dry_run=False):
         logger.info("downgrade_singleton_visitors dry run: would downgrade %d event(s)", count)
         return {"would_downgrade": count, "downgraded": 0, "dry_run": True}
 
+    # Aggregate BEFORE the update so the queryset still resolves; feed the
+    # results into AutomatedRequestCount so the overview's "filtered as bot"
+    # card reflects both record-time rejections AND post-hoc downgrades.
+    bucket_counts = list(
+        candidates.annotate(day=TruncDate("timestamp")).values("day", "event_type").annotate(n=Count("id"))
+    )
+
     downgraded = candidates.update(
         automated=True,
         human_confidence=HumanConfidence.SUSPECTED_AUTOMATED,
     )
+
+    for bucket in bucket_counts:
+        AutomatedRequestCount.bump(bucket["event_type"], date=bucket["day"], by=bucket["n"])
+
     logger.info("downgrade_singleton_visitors: downgraded %d event(s) to suspected_automated", downgraded)
     return {"downgraded": downgraded, "dry_run": False}
