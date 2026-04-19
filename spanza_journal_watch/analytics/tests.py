@@ -1348,6 +1348,94 @@ def test_downgrade_singleton_visitors_is_idempotent():
     assert second_result["downgraded"] == 0
 
 
+def test_downgrade_no_js_burst_visitors_catches_cookie_burst():
+    from spanza_journal_watch.analytics.tasks import downgrade_no_js_burst_visitors_task
+
+    visitor = uuid.uuid4()
+    events = [
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            automated=False,
+            visitor_id=visitor,
+            human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+            js_verified=False,
+        )
+        for _ in range(6)
+    ]
+    for e in events:
+        _backdate(e)
+
+    result = downgrade_no_js_burst_visitors_task()
+
+    for e in events:
+        e.refresh_from_db()
+        assert e.automated is True
+        assert e.human_confidence == AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED
+    assert result["downgraded"] == 6
+    bump = AutomatedRequestCount.objects.get(event_type=AnalyticsEvent.EventType.PAGE_VISIT)
+    assert bump.count == 6
+
+
+def test_downgrade_no_js_burst_visitors_skips_visitors_with_any_js():
+    from spanza_journal_watch.analytics.tasks import downgrade_no_js_burst_visitors_task
+
+    visitor = uuid.uuid4()
+    js_event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=visitor,
+        human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+        js_verified=True,
+    )
+    no_js_events = [
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            automated=False,
+            visitor_id=visitor,
+            human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+            js_verified=False,
+        )
+        for _ in range(5)
+    ]
+    _backdate(js_event)
+    for e in no_js_events:
+        _backdate(e)
+
+    result = downgrade_no_js_burst_visitors_task()
+
+    js_event.refresh_from_db()
+    assert js_event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+    for e in no_js_events:
+        e.refresh_from_db()
+        assert e.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+    assert result["downgraded"] == 0
+
+
+def test_downgrade_no_js_burst_visitors_respects_min_events_threshold():
+    from spanza_journal_watch.analytics.tasks import downgrade_no_js_burst_visitors_task
+
+    visitor = uuid.uuid4()
+    events = [
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            automated=False,
+            visitor_id=visitor,
+            human_confidence=AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN,
+            js_verified=False,
+        )
+        for _ in range(3)
+    ]
+    for e in events:
+        _backdate(e)
+
+    result = downgrade_no_js_burst_visitors_task()
+
+    for e in events:
+        e.refresh_from_db()
+        assert e.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+    assert result["downgraded"] == 0
+
+
 def test_downgrade_singleton_visitors_bumps_counter_per_downgraded_row():
     from spanza_journal_watch.analytics.tasks import downgrade_singleton_visitors_task
 
