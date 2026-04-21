@@ -537,6 +537,14 @@ class IssueBuilderReviewForm(forms.Form):
                 tags_string=self.cleaned_data.get("article_tags_string") or "",
             )
 
+        # Defensive backfill for legacy rows whose journal FK never got linked.
+        # New cache-populated articles already have it set via
+        # upsert_pubmed_article; this covers anything predating that.
+        from .pubmed_cache import ensure_article_journal_link
+
+        if ensure_article_journal_link(article):
+            article.save(update_fields=["journal"])
+
         # Apply curated tags
         curated_tags = self.cleaned_data.get("article_curated_tags")
         if curated_tags is not None:

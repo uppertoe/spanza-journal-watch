@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from ..submissions.models import Journal
 from .models import (
     PubmedArticle,
     PubmedBatchArticle,
@@ -15,6 +16,22 @@ from .models import (
 from .pubmed import PubmedClient, fetch_crossref_journal_articles, fetch_crossref_metadata
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_article_journal_link(article):
+    """Set article.journal from source_journal_name when FK is missing.
+
+    Does not save. Returns True if article.journal was changed so the caller
+    can decide whether a save (or update_fields) is needed.
+    """
+    if article.journal_id:
+        return False
+    name = (article.source_journal_name or "").strip()
+    if not name:
+        return False
+    journal, _ = Journal.objects.get_or_create(name=name)
+    article.journal = journal
+    return True
 
 
 def build_pubmed_client(api_key=""):
@@ -164,6 +181,9 @@ def fill_missing_article_metadata(article, payload):
         if changed:
             article.metadata_json = existing_metadata
 
+    if ensure_article_journal_link(article):
+        changed = True
+
     if changed:
         article.save()
 
@@ -182,7 +202,7 @@ def upsert_pubmed_article(payload):
         article = PubmedArticle.objects.filter(pmid=pmid).first()
 
     if not article:
-        return PubmedArticle.objects.create(
+        article = PubmedArticle.objects.create(
             pmid=pmid,
             doi=doi,
             title=payload.get("title") or "",
@@ -194,6 +214,9 @@ def upsert_pubmed_article(payload):
             pubmed_url=payload.get("pubmed_url") or "",
             metadata_json=payload.get("metadata_json") or {},
         )
+        if ensure_article_journal_link(article):
+            article.save(update_fields=["journal"])
+        return article
 
     fill_missing_article_metadata(article, payload)
     return article

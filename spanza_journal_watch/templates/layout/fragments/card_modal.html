@@ -3,7 +3,7 @@
   {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
   <hr>
   <div class="d-flex align-items-center justify-content-between mb-1">
-    <p class="card-subtitle text-muted fst-italic mb-0">{{ review.article.journal }}</p>
+    <p class="card-subtitle text-muted fst-italic mb-0">{{ review.article.journal|default:review.article.source_journal_name }}</p>
     <span class="badge text-bg-warning-subtle text-warning-emphasis jw-star-count-badge{% if not star_count %} d-none{% endif %}" data-article-id="{{ review.article.pk }}"><svg class="bi me-1" width="0.8em" height="0.8em" aria-hidden="true"><use href="#icon-star-fill"></use></svg><span class="jw-star-count-value">{{ star_count|default:"0" }}</span></span>
   </div>
   <p class="card-subtitle text-muted mb-3">Submitted {{ review.created|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>

@@ -83,7 +83,7 @@
           <a href="{{ tracker }}{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
         </mj-text>
         <mj-text font-size="13px" color="#8a96a2" padding-bottom="8px">
-          Reviewed by {{ review.author }} &middot; <span class="italics">{{ review.article.journal }}</span>
+          Reviewed by {{ review.author }} &middot; <span class="italics">{{ review.article.journal|default:review.article.source_journal_name }}</span>
         </mj-text>
         <mj-text font-size="14px" color="#555555" line-height="1.6" padding-bottom="10px">
           {{ review.get_truncated_body }}
@@ -114,7 +114,7 @@
           <mj-accordion-element>
             <mj-accordion-title>{{ review.article.get_title }}</mj-accordion-title>
             <mj-accordion-text>
-              <p style="margin:0 0 6px; color:#8a96a2; font-size:13px;">Reviewed by {{ review.author }} &middot; <em>{{ review.article.journal }}</em></p>
+              <p style="margin:0 0 6px; color:#8a96a2; font-size:13px;">Reviewed by {{ review.author }} &middot; <em>{{ review.article.journal|default:review.article.source_journal_name }}</em></p>
               <p style="margin:0 0 10px; color:#555555; font-size:14px; line-height:1.6;">{{ review.get_truncated_body }}</p>
               <p style="margin:0;">
                 <a href="{{ tracker }}{{ review.get_absolute_url }}" style="color:#2f5a80; font-weight:600; text-decoration:none; font-size:13px;">Read review &#8594;</a>

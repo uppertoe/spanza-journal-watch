@@ -7,7 +7,7 @@
             <a href="{{ rel_review.get_absolute_url }}" class="related-reviews__card text-decoration-none d-block">
                 <div class="related-reviews__title">{{ rel_review.article.get_title|truncatewords:12 }}</div>
                 <div class="related-reviews__meta">
-                    {{ rel_review.article.journal }}{% if rel_review.author %} &middot; {{ rel_review.author }}{% endif %}{% if rel_review.publish_date %} &middot; {{ rel_review.publish_date|date:"M Y" }}{% endif %}
+                    {{ rel_review.article.journal|default:rel_review.article.source_journal_name }}{% if rel_review.author %} &middot; {{ rel_review.author }}{% endif %}{% if rel_review.publish_date %} &middot; {{ rel_review.publish_date|date:"M Y" }}{% endif %}
                 </div>
             </a>
         </div>

@@ -40,7 +40,6 @@ from spanza_journal_watch.submissions.models import (
     CuratedCollection,
     HealthService,
     Issue,
-    Journal,
     MeshTagMapping,
     Review,
     Tag,
@@ -98,9 +97,6 @@ from .pubmed_cache import (
 )
 from .pubmed_cache import (
     build_pubmed_client as _build_pubmed_client,
-)
-from .pubmed_cache import (
-    fill_missing_article_metadata as _fill_missing_article_metadata,
 )
 from .pubmed_cache import (
     populate_pubmed_batch_from_cache,
@@ -1769,30 +1765,10 @@ def article_intake_add_article(request, batch_id):
             messages.error(request, f"No article found for PMID {pmid}.")
             return _render_article_intake_results_response(request, batch, request.POST)
 
-        payload = payloads[0]
-        doi = (payload.get("doi") or "").strip().lower() or None
-
-        article = None
-        if doi:
-            article = PubmedArticle.objects.filter(doi=doi).first()
-        if not article:
-            article = PubmedArticle.objects.filter(pmid=pmid).first()
-
-        if not article:
-            article = PubmedArticle.objects.create(
-                pmid=pmid,
-                doi=doi,
-                title=payload.get("title") or "",
-                abstract=payload.get("abstract") or "",
-                source_journal_name=payload.get("source_journal_name") or "",
-                publication_date=payload.get("publication_date"),
-                publication_month=payload.get("publication_month"),
-                article_url=payload.get("article_url") or "",
-                pubmed_url=payload.get("pubmed_url") or "",
-                metadata_json=payload.get("metadata_json") or {},
-            )
-        else:
-            _fill_missing_article_metadata(article, payload)
+        article = _upsert_pubmed_article(payloads[0])
+        if article is None:
+            messages.error(request, f"No article found for PMID {pmid}.")
+            return _render_article_intake_results_response(request, batch, request.POST)
 
         PubmedBatchArticle.objects.create(batch=batch, article=article, issue=batch.issue, is_selected=True)
         messages.success(request, f"\u201c{article.title}\u201d added to staging.")
@@ -6091,35 +6067,27 @@ def _sync_planka_card_into_issue(*, request, issue, binding, selected):
     source_article = linked_batch_row.article if linked_batch_row else None
     metadata_manual_review_required = source_article is None
 
-    article_url = ""
-    article_name = (selected.get("name") or "Untitled article").strip()
-    article_citation = ""
-    article_year = datetime.date.today().year
-    journal_name = ""
-
     if source_article:
-        article_name = (source_article.title or article_name).strip()
-        article_url = (source_article.article_url or source_article.pubmed_url or "").strip()
-        article_citation = _build_pubmed_article_citation(source_article)
-        journal_name = (source_article.source_journal_name or "").strip()
-        if source_article.publication_date:
-            article_year = source_article.publication_date.year
-        elif source_article.publication_month:
-            article_year = source_article.publication_month.year
-
-    journal = None
-    if journal_name:
-        journal, _ = Journal.objects.get_or_create(name=journal_name)
-
-    article = PubmedArticle.objects.create(
-        title=article_name,
-        journal=journal,
-        publication_date=datetime.date(article_year, 1, 1),
-        citation=article_citation,
-        article_url=article_url or "",
-        tags_string="",
-        active=False,
-    )
+        # Reuse the cache-populated article so pmid/doi/abstract/mesh_terms
+        # stay attached to the editorial row. Journal FK was linked at intake
+        # by upsert_pubmed_article.
+        article = source_article
+        citation = _build_pubmed_article_citation(article)
+        if citation and not article.citation:
+            article.citation = citation
+            article.save(update_fields=["citation"])
+    else:
+        # Card has no cached PubMed link — synthesise a bare article from the
+        # card's schema fields.
+        article_year = datetime.date.today().year
+        article = PubmedArticle.objects.create(
+            title=(selected.get("name") or "Untitled article").strip(),
+            publication_date=datetime.date(article_year, 1, 1),
+            citation="",
+            article_url="",
+            tags_string="",
+            active=False,
+        )
 
     # --- Resolve reviewer (review.author) ---
     # Primary:  card member(s) — the user(s) assigned to the card.

@@ -177,7 +177,7 @@
                         <tr>
                             <td>
                                 <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">{{ item.review.article.get_title|capfirst }}</a>
-                                <div class="small text-muted">{{ item.review.article.journal }}</div>
+                                <div class="small text-muted">{{ item.review.article.journal|default:item.review.article.source_journal_name }}</div>
                             </td>
                             <td>{{ item.opens }}</td>
                             <td>{{ item.engaged_views }}</td>
