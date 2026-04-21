@@ -19,11 +19,20 @@ class NewsletterNotReadyToSendError(Exception):
 
 
 @celery_app.task()
-def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count):
+def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipient_email=None):
     from .models import Newsletter
 
     newsletter = Newsletter.objects.get(pk=newsletter_pk)
-    staff = get_user_model().objects.filter(is_staff=True)
+
+    if recipient_email:
+        recipients = [recipient_email]
+    else:
+        # Fallback: no sender identified, notify all staff.
+        recipients = list(get_user_model().objects.filter(is_staff=True).values_list("email", flat=True))
+
+    recipients = [r for r in recipients if r]
+    if not recipients:
+        return
 
     context = {
         "newsletter": newsletter,
@@ -34,13 +43,8 @@ def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count):
     subject = "Journal Watch - Newsletter send statistics"
     body = render_to_string(template, context)
 
-    for member in staff:
-        send_mail(
-            subject,
-            body,
-            None,
-            [member.email],
-        )
+    for email in recipients:
+        send_mail(subject, body, None, [email])
 
 
 BATCH_SIZE = 50  # Adjust this batch size as needed
@@ -98,7 +102,7 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
 
 
 @celery_app.task()
-def send_newsletter(newsletter_pk):
+def send_newsletter(newsletter_pk, sender_email=None):
     from .models import Newsletter, Subscriber
 
     newsletter = Newsletter.objects.get(pk=newsletter_pk)
@@ -131,7 +135,7 @@ def send_newsletter(newsletter_pk):
         send_newsletter_batch.delay(newsletter_pk, batch_pks, False)
         batch_count += 1
 
-    send_newsletter_stats.delay(newsletter_pk, len(subscriber_pks), batch_count)
+    send_newsletter_stats.delay(newsletter_pk, len(subscriber_pks), batch_count, sender_email)
 
 
 @celery_app.task()

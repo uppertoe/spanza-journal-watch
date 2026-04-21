@@ -224,18 +224,15 @@ class TestBackendWorkflows:
         )
         csv_obj = SubscriberCSV.objects.create(name="Process test", file=csv_upload, header=True)
 
-        def _fake_process(_pk):
-            return {
-                "email_column": "email",
-                "rows_parsed": 1,
-                "records_added": 1,
-                "records_skipped": 0,
-                "invalid_email_count": 0,
-                "duplicate_in_file_count": 0,
-                "already_subscribed_count": 0,
-            }
+        queued = {"pk": None}
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views.process_subscriber_csv", _fake_process)
+        def _fake_delay(pk):
+            queued["pk"] = pk
+
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.process_subscriber_csv.delay",
+            _fake_delay,
+        )
 
         response = route_client.get(
             reverse("backend:process_csv", kwargs={"save_token": csv_obj.save_token}),
@@ -243,12 +240,11 @@ class TestBackendWorkflows:
         )
 
         assert response.status_code == 200
-        body = response.content.decode("utf-8", errors="ignore")
-        assert "Rows parsed:" in body
-        assert "Added:" in body
+        assert queued["pk"] == csv_obj.pk
         csv_obj.refresh_from_db()
         assert csv_obj.confirmed is True
         assert csv_obj.processed is False
+        assert csv_obj.task_state == SubscriberCSV.TASK_STATE_PENDING
 
     def test_subscriber_list_page_filters(self, route_client, regression_baseline):
         admin_user = User.objects.filter(is_superuser=True).order_by("pk").first()
@@ -290,10 +286,8 @@ class TestBackendWorkflows:
 
         response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
 
-        assert response.status_code == 200
-        body = response.content.decode("utf-8", errors="ignore")
-        assert "Newsletter send" in body
-        assert "currently selected newsletter" in body
+        assert response.status_code == 302
+        assert response.url == reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk})
         assert called["value"] is True
 
     def test_newsletter_resend_requires_explicit_enable(self, route_client, regression_baseline, monkeypatch):
@@ -318,7 +312,7 @@ class TestBackendWorkflows:
         monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
 
         blocked_response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
-        assert blocked_response.status_code == 200
+        assert blocked_response.status_code == 302
         assert called["value"] is False
 
         enable_response = route_client.post(reverse("backend:enable_newsletter_resend", kwargs={"pk": newsletter.pk}))
@@ -328,7 +322,7 @@ class TestBackendWorkflows:
         assert newsletter.resend_enabled is True
 
         resend_response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
-        assert resend_response.status_code == 200
+        assert resend_response.status_code == 302
         assert called["value"] is True
 
     def test_newsletter_stats_detail_math(self, route_client, regression_baseline):

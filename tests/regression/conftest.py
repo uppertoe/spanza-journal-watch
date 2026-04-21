@@ -30,6 +30,15 @@ def regression_baseline(django_db_setup, django_db_blocker):
         latest_homepage = Homepage.objects.filter(publication_ready=True).order_by("-created").first()
         Homepage.CURRENT_HOMEPAGE = latest_homepage
 
+    yield
+
+    # Flush the test DB so `--reuse-db` doesn't carry baseline rows (subscribers,
+    # issues, etc.) into the next session, where they would break tests that
+    # assume empty tables.
+    with django_db_blocker.unblock():
+        call_command("flush", "--no-input", verbosity=0)
+        Homepage.CURRENT_HOMEPAGE = None
+
 
 @pytest.fixture(autouse=True)
 def patch_async_tasks(monkeypatch):

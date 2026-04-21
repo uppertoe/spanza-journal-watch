@@ -557,7 +557,10 @@ class TestStage7Newsletter:
         with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             client.post(url)
-        mock_task.apply_async.assert_called_once_with((newsletter.pk,), countdown=1)
+        mock_task.apply_async.assert_called_once()
+        args, kwargs = mock_task.apply_async.call_args
+        assert args[0] == (newsletter.pk,)
+        assert kwargs.get("countdown") == 1
 
     @override_settings(
         CELERY_TASK_ALWAYS_EAGER=True,
@@ -792,8 +795,11 @@ class TestChainedWorkflow:
         with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             response = editor_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
-        assert response.status_code == 200
-        mock_task.apply_async.assert_called_once_with((newsletter.pk,), countdown=1)
+        assert response.status_code == 302
+        mock_task.apply_async.assert_called_once()
+        args, kwargs = mock_task.apply_async.call_args
+        assert args[0] == (newsletter.pk,)
+        assert kwargs.get("countdown") == 1
 
         # ── Stage 8: Frontend ───────────────────────────────────────────────
         response = Client().get(reverse("submissions:issue_detail", kwargs={"slug": issue.slug}))

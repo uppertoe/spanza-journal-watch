@@ -2885,18 +2885,28 @@ def send_final_newsletter(request, pk):
 
     try:
         newsletter = Newsletter.objects.get(pk=pk)
-        if newsletter.is_ready_to_send():
-            # Celery task re-checks and atomically claims the send
-            send_newsletter.apply_async((newsletter.pk,), countdown=1)
-            messages.success(request, f"Newsletter {newsletter} queued for sending")
-        else:
-            messages.error(request, f"Newsletter {newsletter} not sent: not ready")
-
     except Newsletter.DoesNotExist:
         messages.error(request, "Newsletter not found. Please refresh and try again.")
-        newsletter = {}
+        return redirect("backend:newsletter_release_list")
 
-    return render(request, "backend/send_final_newsletter.html", {"newsletter": newsletter})
+    if newsletter.is_ready_to_send():
+        # Celery task re-checks and atomically claims the send. The stats
+        # email goes back to the admin who triggered the send.
+        send_newsletter.apply_async(
+            (newsletter.pk,),
+            {"sender_email": request.user.email or None},
+            countdown=1,
+        )
+        messages.success(request, f"Newsletter {newsletter} queued for sending")
+    elif newsletter.is_sent and not newsletter.resend_enabled:
+        messages.warning(
+            request,
+            f"Newsletter {newsletter} has already been sent. " "Use 'Enable one resend' below to dispatch it again.",
+        )
+    else:
+        messages.error(request, f"Newsletter {newsletter} not sent: not ready")
+
+    return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
 
 
 @login_required

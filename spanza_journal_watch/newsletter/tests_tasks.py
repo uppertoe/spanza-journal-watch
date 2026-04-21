@@ -4,7 +4,7 @@ Tests for newsletter Celery tasks.
 Covers:
 1. send_confirmation_email — sends email, retries on DoesNotExist
 2. send_newsletter_batch — sends batch, updates emails_sent, re-raises on error
-3. send_newsletter_stats — sends stats email to staff
+3. send_newsletter_stats — sends stats email to sender (or all staff as fallback)
 4. send_newsletter — orchestration, validation guards, batching
 5. get_subscriber_batches — batch slicing helper
 """
@@ -117,12 +117,25 @@ class TestSendNewsletterBatch:
 
 
 class TestSendNewsletterStats:
-    def test_sends_to_all_staff(self, newsletter, staff_user):
+    def test_falls_back_to_all_staff_when_no_sender(self, newsletter, staff_user):
         from spanza_journal_watch.newsletter.tasks import send_newsletter_stats
 
         staff_count = User.objects.filter(is_staff=True).count()
         send_newsletter_stats(newsletter.pk, subscriber_count=100, batch_count=2)
         assert len(mail.outbox) == staff_count
+
+    def test_sends_only_to_sender_when_provided(self, newsletter, staff_user):
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_stats
+
+        User.objects.create_user(email="another-staff@example.com", password="pw", is_staff=True)
+        send_newsletter_stats(
+            newsletter.pk,
+            subscriber_count=10,
+            batch_count=1,
+            recipient_email="sender@example.com",
+        )
+        assert len(mail.outbox) == 1
+        assert mail.outbox[0].to == ["sender@example.com"]
 
     def test_email_contains_stats(self, newsletter, staff_user):
         from spanza_journal_watch.newsletter.tasks import send_newsletter_stats

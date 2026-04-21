@@ -221,7 +221,8 @@ class TestSendFinalNewsletter:
             )
             resp = client.post(url)
 
-        assert resp.status_code == 200
+        assert resp.status_code == 302
+        assert resp.url == reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk})
         mock_task.apply_async.assert_called_once()
 
     def test_not_ready_newsletter_blocks_send(self):
@@ -238,7 +239,7 @@ class TestSendFinalNewsletter:
             )
             resp = client.post(url)
 
-        assert resp.status_code == 200
+        assert resp.status_code == 302
         mock_task.apply_async.assert_not_called()
 
     def test_test_sent_but_not_ready_blocks_send(self):
