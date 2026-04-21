@@ -31,7 +31,7 @@ MODEL_LABELS = [
 
 TOKEN_FIELDS = {
     "newsletter.subscriber": ["unsubscribe_token"],
-    "newsletter.newsletter": ["email_token", "send_token"],
+    "newsletter.newsletter": ["email_token"],
     "backend.subscribercsv": ["save_token"],
 }
 

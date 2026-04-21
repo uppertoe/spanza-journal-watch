@@ -5,9 +5,8 @@ Covers:
 1. send_confirmation_email — sends email, retries on DoesNotExist
 2. send_newsletter_batch — sends batch, updates emails_sent, re-raises on error
 3. send_newsletter_stats — sends stats email to staff
-4. send_newsletter_distribution_link — sends distribution link to staff
-5. send_newsletter — orchestration, validation guards, batching
-6. get_subscriber_batches — batch slicing helper
+4. send_newsletter — orchestration, validation guards, batching
+5. get_subscriber_batches — batch slicing helper
 """
 
 from unittest.mock import patch
@@ -134,70 +133,25 @@ class TestSendNewsletterStats:
 
 
 # ---------------------------------------------------------------------------
-# 4. send_newsletter_distribution_link
-# ---------------------------------------------------------------------------
-
-
-class TestSendNewsletterDistributionLink:
-    def test_sends_to_staff(self, newsletter, staff_user):
-        from spanza_journal_watch.newsletter.tasks import send_newsletter_distribution_link
-
-        staff_count = User.objects.filter(is_staff=True).count()
-        send_newsletter_distribution_link(newsletter.pk)
-        assert len(mail.outbox) == staff_count
-
-    def test_subject_mentions_distribution(self, newsletter, staff_user):
-        from spanza_journal_watch.newsletter.tasks import send_newsletter_distribution_link
-
-        send_newsletter_distribution_link(newsletter.pk)
-        assert "distribution" in mail.outbox[0].subject.lower()
-
-
-# ---------------------------------------------------------------------------
-# 5. send_newsletter — orchestration
+# 4. send_newsletter — orchestration
 # ---------------------------------------------------------------------------
 
 
 class TestSendNewsletter:
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
-    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_distribution_link")
-    def test_test_send_sets_is_test_sent(self, mock_dist, mock_batch, newsletter, subscriber):
-        from spanza_journal_watch.newsletter.tasks import send_newsletter
-
-        send_newsletter(newsletter.pk, test_email=True)
-        newsletter.refresh_from_db()
-        assert newsletter.is_test_sent is True
-
-    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
-    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_distribution_link")
-    def test_test_send_dispatches_batch(self, mock_dist, mock_batch, newsletter, subscriber):
-        from spanza_journal_watch.newsletter.tasks import send_newsletter
-
-        send_newsletter(newsletter.pk, test_email=True)
-        mock_batch.delay.assert_called()
-
-    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
-    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_distribution_link")
-    def test_test_send_triggers_distribution_link(self, mock_dist, mock_batch, newsletter, subscriber):
-        from spanza_journal_watch.newsletter.tasks import send_newsletter
-
-        send_newsletter(newsletter.pk, test_email=True)
-        mock_dist.delay.assert_called_once_with(newsletter.pk)
-
-    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
-    def test_real_send_requires_test_sent(self, mock_stats, mock_batch, newsletter):
+    def test_send_requires_test_sent(self, mock_stats, mock_batch, newsletter):
         from spanza_journal_watch.newsletter.tasks import (
             NewsletterNotReadyToSendError,
             send_newsletter,
         )
 
         with pytest.raises(NewsletterNotReadyToSendError):
-            send_newsletter(newsletter.pk, test_email=False)
+            send_newsletter(newsletter.pk)
 
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
-    def test_real_send_requires_ready_to_send(self, mock_stats, mock_batch, newsletter):
+    def test_send_requires_ready_to_send(self, mock_stats, mock_batch, newsletter):
         from spanza_journal_watch.newsletter.tasks import (
             NewsletterNotReadyToSendError,
             send_newsletter,
@@ -208,11 +162,11 @@ class TestSendNewsletter:
         newsletter.save(update_fields=["is_test_sent", "ready_to_send"])
 
         with pytest.raises(NewsletterNotReadyToSendError):
-            send_newsletter(newsletter.pk, test_email=False)
+            send_newsletter(newsletter.pk)
 
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
-    def test_real_send_blocks_duplicate_send(self, mock_stats, mock_batch, newsletter):
+    def test_send_blocks_duplicate_send(self, mock_stats, mock_batch, newsletter):
         from spanza_journal_watch.newsletter.tasks import (
             NewsletterNotReadyToSendError,
             send_newsletter,
@@ -225,11 +179,45 @@ class TestSendNewsletter:
         newsletter.save(update_fields=["is_test_sent", "ready_to_send", "is_sent", "resend_enabled"])
 
         with pytest.raises(NewsletterNotReadyToSendError):
-            send_newsletter(newsletter.pk, test_email=False)
+            send_newsletter(newsletter.pk)
+
+    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
+    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
+    def test_send_resend_path_consumes_flag(self, mock_stats, mock_batch, newsletter):
+        from spanza_journal_watch.newsletter.tasks import send_newsletter
+
+        newsletter.is_test_sent = True
+        newsletter.ready_to_send = True
+        newsletter.is_sent = True
+        newsletter.resend_enabled = True
+        newsletter.save(update_fields=["is_test_sent", "ready_to_send", "is_sent", "resend_enabled"])
+
+        send_newsletter(newsletter.pk)
+
+        newsletter.refresh_from_db()
+        assert newsletter.is_sent is True
+        assert newsletter.resend_enabled is False
+
+    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
+    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
+    def test_concurrent_send_claims_once(self, mock_stats, mock_batch, newsletter):
+        """Two eager send_newsletter calls: second must raise, emails_sent not double-counted."""
+        from spanza_journal_watch.newsletter.tasks import (
+            NewsletterNotReadyToSendError,
+            send_newsletter,
+        )
+
+        newsletter.is_test_sent = True
+        newsletter.ready_to_send = True
+        newsletter.save(update_fields=["is_test_sent", "ready_to_send"])
+
+        send_newsletter(newsletter.pk)
+        with pytest.raises(NewsletterNotReadyToSendError):
+            send_newsletter(newsletter.pk)
 
 
 # ---------------------------------------------------------------------------
-# 6. get_subscriber_batches
+# 5. get_subscriber_batches
 # ---------------------------------------------------------------------------
 
 

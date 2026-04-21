@@ -175,7 +175,6 @@ class Newsletter(models.Model):
     header_image_processed = models.BooleanField(default=False)
     non_featured_review_count = models.PositiveIntegerField(default=5, blank=True, null=True)
     email_token = models.CharField(max_length=64, default="", editable=False, unique=True)
-    send_token = models.CharField(max_length=64, default="", editable=False, unique=True)
     emails_sent = models.PositiveIntegerField(default=0, editable=False)
 
     # Newsletter stats
@@ -303,9 +302,6 @@ class Newsletter(models.Model):
 
             if content_changed:
                 self.is_test_sent = False
-
-        # Refresh send token on every save
-        self.send_token = self.generate_email_token()
 
         super().save(*args, **kwargs)
 

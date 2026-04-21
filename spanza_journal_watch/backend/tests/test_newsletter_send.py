@@ -5,7 +5,7 @@ Covers:
   - send_test_newsletter: valid POST queues send_newsletter_test_email task
   - send_test_newsletter: invalid email shows error
   - send_test_newsletter: requires send_newsletters permission
-  - send_test_newsletter: invalid send_token redirects to dashboard
+  - send_test_newsletter: unknown pk redirects to dashboard
   - send_newsletter_test_email (Celery task): sets is_test_sent=True after sending
   - send_final_newsletter: queues send_newsletter task when newsletter is ready
   - send_final_newsletter: blocks send when not ready (no test send)
@@ -73,7 +73,7 @@ class TestSendTestNewsletter:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_test_newsletter",
-                kwargs={"send_token": newsletter.send_token},
+                kwargs={"pk": newsletter.pk},
             )
             resp = client.post(url, {"email": "test@example.com"})
 
@@ -91,16 +91,16 @@ class TestSendTestNewsletter:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_test_newsletter",
-                kwargs={"send_token": newsletter.send_token},
+                kwargs={"pk": newsletter.pk},
             )
             resp = client.post(url, {"email": "not-an-email"})
 
         assert resp.status_code == 302
         mock_task.apply_async.assert_not_called()
 
-    def test_invalid_send_token_redirects(self):
+    def test_unknown_pk_redirects(self):
         client, user = _make_newsletter_manager()
-        url = reverse("backend:send_test_newsletter", kwargs={"send_token": "bad-token-xyz"})
+        url = reverse("backend:send_test_newsletter", kwargs={"pk": 999999})
         resp = client.post(url, {"email": "test@example.com"})
         assert resp.status_code == 302
 
@@ -111,7 +111,7 @@ class TestSendTestNewsletter:
         newsletter = _make_newsletter()
         url = reverse(
             "backend:send_test_newsletter",
-            kwargs={"send_token": newsletter.send_token},
+            kwargs={"pk": newsletter.pk},
         )
         resp = c.post(url, {"email": "test@example.com"})
         assert resp.status_code == 403
@@ -121,7 +121,7 @@ class TestSendTestNewsletter:
         newsletter = _make_newsletter()
         url = reverse(
             "backend:send_test_newsletter",
-            kwargs={"send_token": newsletter.send_token},
+            kwargs={"pk": newsletter.pk},
         )
         resp = client.get(url)
         assert resp.status_code == 400
@@ -181,7 +181,7 @@ class TestSendNewsletterTask:
         ) as mock_stats:
             mock_batch.delay = MagicMock()
             mock_stats.delay = MagicMock()
-            send_newsletter(newsletter.pk, test_email=False)
+            send_newsletter(newsletter.pk)
 
         newsletter.refresh_from_db()
         assert newsletter.is_sent is True
@@ -200,7 +200,7 @@ class TestSendFinalNewsletter:
 
         url = reverse(
             "backend:send_final_newsletter",
-            kwargs={"send_token": newsletter.send_token},
+            kwargs={"pk": newsletter.pk},
         )
         resp = client.get(url)
 
@@ -217,7 +217,7 @@ class TestSendFinalNewsletter:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_final_newsletter",
-                kwargs={"send_token": newsletter.send_token},
+                kwargs={"pk": newsletter.pk},
             )
             resp = client.post(url)
 
@@ -234,7 +234,7 @@ class TestSendFinalNewsletter:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_final_newsletter",
-                kwargs={"send_token": newsletter.send_token},
+                kwargs={"pk": newsletter.pk},
             )
             resp = client.post(url)
 
@@ -253,7 +253,7 @@ class TestSendFinalNewsletter:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_final_newsletter",
-                kwargs={"send_token": newsletter.send_token},
+                kwargs={"pk": newsletter.pk},
             )
             client.post(url)
 

@@ -74,7 +74,7 @@ class TestBackendRoutes:
         urls = [
             reverse("backend:dashboard"),
             reverse("backend:upload_subscribers"),
-            reverse("backend:final_newsletter", kwargs={"send_token": newsletter.send_token}),
+            reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}),
             reverse("backend:newsletter_stats_detail", kwargs={"pk": newsletter.pk}),
         ]
 
@@ -109,9 +109,7 @@ class TestBackendRoutes:
         assert upload_response.status_code == 200
         assert "Subscriber list" in upload_response.content.decode("utf-8", errors="ignore")
 
-        final_response = route_client.get(
-            reverse("backend:final_newsletter", kwargs={"send_token": newsletter.send_token})
-        )
+        final_response = route_client.get(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
         assert final_response.status_code == 200
         final_body = final_response.content.decode("utf-8", errors="ignore")
         assert "Newsletter release check" in final_body
@@ -137,9 +135,7 @@ class TestBackendRoutes:
         assert edit_response.status_code == 400
         assert process_response.status_code == 400
 
-        send_response = route_client.get(
-            reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
-        )
+        send_response = route_client.get(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
         assert send_response.status_code == 400
 
 
@@ -292,9 +288,7 @@ class TestBackendWorkflows:
 
         monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
 
-        response = route_client.post(
-            reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
-        )
+        response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
 
         assert response.status_code == 200
         body = response.content.decode("utf-8", errors="ignore")
@@ -323,23 +317,17 @@ class TestBackendWorkflows:
 
         monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
 
-        blocked_response = route_client.post(
-            reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
-        )
+        blocked_response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
         assert blocked_response.status_code == 200
         assert called["value"] is False
 
-        enable_response = route_client.post(
-            reverse("backend:enable_newsletter_resend", kwargs={"send_token": newsletter.send_token})
-        )
+        enable_response = route_client.post(reverse("backend:enable_newsletter_resend", kwargs={"pk": newsletter.pk}))
         assert enable_response.status_code == 302
 
         newsletter.refresh_from_db()
         assert newsletter.resend_enabled is True
 
-        resend_response = route_client.post(
-            reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
-        )
+        resend_response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
         assert resend_response.status_code == 200
         assert called["value"] is True
 

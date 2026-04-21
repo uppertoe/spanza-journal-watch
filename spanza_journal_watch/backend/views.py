@@ -2801,11 +2801,10 @@ def create_newsletter(request):
 
 @login_required
 @permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
-def final_newsletter(request, send_token):
+def final_newsletter(request, pk):
     # Provides last check before sending
-    newsletter = Newsletter.objects.filter(send_token=send_token).first()
+    newsletter = Newsletter.objects.filter(pk=pk).first()
     context = {
-        "send_token": send_token,
         "newsletter": newsletter,
         "test_form": NewsletterTestSendForm(),
     }
@@ -2814,10 +2813,10 @@ def final_newsletter(request, send_token):
 
 @login_required
 @permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
-def send_test_newsletter(request, send_token):
-    newsletter = Newsletter.objects.filter(send_token=send_token).first()
+def send_test_newsletter(request, pk):
+    newsletter = Newsletter.objects.filter(pk=pk).first()
     if not newsletter:
-        messages.error(request, "This token is no longer valid. Please refresh and try again.")
+        messages.error(request, "Newsletter not found.")
         return redirect("backend:dashboard")
 
     if request.method != "POST":
@@ -2831,15 +2830,15 @@ def send_test_newsletter(request, send_token):
     else:
         messages.error(request, "Please enter a valid test email address.")
 
-    return redirect(reverse("backend:final_newsletter", kwargs={"send_token": send_token}))
+    return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
 
 
 @login_required
 @permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
-def enable_newsletter_resend(request, send_token):
-    newsletter = Newsletter.objects.filter(send_token=send_token).first()
+def enable_newsletter_resend(request, pk):
+    newsletter = Newsletter.objects.filter(pk=pk).first()
     if not newsletter:
-        messages.error(request, "This token is no longer valid. Please refresh and try again.")
+        messages.error(request, "Newsletter not found.")
         return redirect("backend:dashboard")
 
     if request.method != "POST":
@@ -2849,29 +2848,29 @@ def enable_newsletter_resend(request, send_token):
         messages.error(request, "This newsletter has not been sent yet.")
     else:
         newsletter.resend_enabled = True
-        newsletter.save(update_fields=["resend_enabled", "send_token"])
+        newsletter.save(update_fields=["resend_enabled"])
         messages.warning(request, "Resend enabled for this newsletter. It can now be sent once more.")
 
-    return redirect(reverse("backend:final_newsletter", kwargs={"send_token": newsletter.send_token}))
+    return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
 
 
 @login_required
 @permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
-def send_final_newsletter(request, send_token):
+def send_final_newsletter(request, pk):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
 
     try:
-        newsletter = Newsletter.objects.get(send_token=send_token)
+        newsletter = Newsletter.objects.get(pk=pk)
         if newsletter.is_ready_to_send():
-            # Celery task also checks is_ready_to_send
-            send_newsletter.apply_async((newsletter.pk,), {"test_email": False}, countdown=1)
+            # Celery task re-checks and atomically claims the send
+            send_newsletter.apply_async((newsletter.pk,), countdown=1)
             messages.success(request, f"Newsletter {newsletter} queued for sending")
         else:
             messages.error(request, f"Newsletter {newsletter} not sent: not ready")
 
     except Newsletter.DoesNotExist:
-        messages.error(request, "This token is no longer valid. Please re-send a test newsletter")
+        messages.error(request, "Newsletter not found. Please refresh and try again.")
         newsletter = {}
 
     return render(request, "backend/send_final_newsletter.html", {"newsletter": newsletter})

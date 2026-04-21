@@ -5,7 +5,7 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.mail import send_mail
-from django.db.models import F
+from django.db.models import F, Q
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -32,31 +32,6 @@ def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count):
     }
     template = "newsletter/email_newsletter_stats.txt"
     subject = "Journal Watch - Newsletter send statistics"
-    body = render_to_string(template, context)
-
-    for member in staff:
-        send_mail(
-            subject,
-            body,
-            None,
-            [member.email],
-        )
-
-
-@celery_app.task()
-def send_newsletter_distribution_link(newsletter_pk):
-    from .models import Newsletter
-
-    staff = get_user_model().objects.filter(is_staff=True)
-    newsletter = Newsletter.objects.get(pk=newsletter_pk)
-
-    context = {
-        "send_token": newsletter.send_token,
-        "newsletter": newsletter,
-        "domain": Newsletter.get_domain(),
-    }
-    template = "newsletter/email_newsletter_distribution_link.txt"
-    subject = "Distribution link for SPANZA newsletter"
     body = render_to_string(template, context)
 
     for member in staff:
@@ -123,46 +98,40 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
 
 
 @celery_app.task()
-def send_newsletter(newsletter_pk, test_email=True):
-    # Get models
+def send_newsletter(newsletter_pk):
     from .models import Newsletter, Subscriber
 
-    # Get querysets
-    newsletter_queryset = Newsletter.objects.filter(pk=newsletter_pk)
-    newsletter = newsletter_queryset.get()  # Retain queryset to allow .update()
-    subscribers = Subscriber.get_valid_subscribers(test_email=test_email)
+    newsletter = Newsletter.objects.get(pk=newsletter_pk)
 
-    # Perform checks before sending
-    if test_email:
-        newsletter_queryset.update(is_test_sent=True)
-    elif not newsletter.is_test_sent:
+    # Informative pre-checks; the real guard is the atomic claim below.
+    if not newsletter.is_test_sent:
         raise NewsletterNotReadyToSendError(f"Newsletter {newsletter} has not been test sent")
-    elif not newsletter.ready_to_send:
+    if not newsletter.ready_to_send:
         raise NewsletterNotReadyToSendError(f"Newsletter {newsletter} not marked ready to send")
-    elif newsletter.is_sent and not newsletter.resend_enabled:
+
+    # Atomic claim: a single conditional UPDATE either flips is_sent False→True
+    # or consumes resend_enabled. Guarantees at-most-once dispatch even if two
+    # send requests arrive concurrently.
+    claimed = (
+        Newsletter.objects.filter(pk=newsletter_pk)
+        .filter(Q(is_sent=False) | Q(resend_enabled=True))
+        .update(is_sent=True, resend_enabled=False, send_date=timezone.now())
+    )
+    if claimed == 0:
         raise NewsletterNotReadyToSendError(
             f"Newsletter {newsletter} already sent to {newsletter.emails_sent} recipients; sending aborted"
         )
-    else:
-        newsletter_queryset.update(is_sent=True, resend_enabled=False, send_date=timezone.now())
 
-    # Serialise queryset for Celery
+    subscribers = Subscriber.get_valid_subscribers(test_email=False)
     subscriber_pks = list(subscribers.values_list("pk", flat=True))
 
-    # Send emails to each batch of subscribers
     batch_count = 0
     for subscribers_batch in get_subscriber_batches(subscriber_pks, BATCH_SIZE):
-        batch_pks = list(subscribers_batch.values_list("pk", flat=True))  # Ensure serialisable for Celery
-        send_newsletter_batch.delay(newsletter_pk, batch_pks, test_email)
+        batch_pks = list(subscribers_batch.values_list("pk", flat=True))
+        send_newsletter_batch.delay(newsletter_pk, batch_pks, False)
         batch_count += 1
 
-    if test_email:
-        # Send the distribution link to the administrator
-        send_newsletter_distribution_link.delay(newsletter_pk)
-    else:
-        # Send statistics of the operation to the administrator
-        subscriber_count = len(subscriber_pks)
-        send_newsletter_stats.delay(newsletter_pk, subscriber_count, batch_count)
+    send_newsletter_stats.delay(newsletter_pk, len(subscriber_pks), batch_count)
 
 
 @celery_app.task()
@@ -180,7 +149,6 @@ def send_newsletter_test_email(newsletter_pk, recipient_email):
 
     if successful:
         newsletter_queryset.update(is_test_sent=True)
-        send_newsletter_distribution_link.delay(newsletter_pk)
 
 
 @celery_app.task(bind=True, max_retries=3)

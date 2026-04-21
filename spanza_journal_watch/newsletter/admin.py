@@ -19,4 +19,4 @@ class NewsletterAdmin(admin.ModelAdmin):
     search_fields = ("subject", "issue__name")
     date_hierarchy = "send_date"
     autocomplete_fields = ["issue"]
-    readonly_fields = ("emails_sent", "email_token", "send_token", "header_image_processed")
+    readonly_fields = ("emails_sent", "email_token", "header_image_processed")

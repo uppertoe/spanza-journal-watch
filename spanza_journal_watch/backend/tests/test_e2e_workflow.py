@@ -553,11 +553,11 @@ class TestStage7Newsletter:
             is_test_sent=True,
         )
         client, _ = _make_editor()
-        url = reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
+        url = reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk})
         with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             client.post(url)
-        mock_task.apply_async.assert_called_once_with((newsletter.pk,), {"test_email": False}, countdown=1)
+        mock_task.apply_async.assert_called_once_with((newsletter.pk,), countdown=1)
 
     @override_settings(
         CELERY_TASK_ALWAYS_EAGER=True,
@@ -592,7 +592,7 @@ class TestStage7Newsletter:
             "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
             return_value="Newsletter",
         ):
-            send_newsletter(newsletter.pk, test_email=True)
+            send_newsletter(newsletter.pk)
 
         recipients = [msg.to[0] for msg in django_mail.outbox]
         assert "reader@example.com" in recipients
@@ -791,11 +791,9 @@ class TestChainedWorkflow:
 
         with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
-            response = editor_client.post(
-                reverse("backend:send_final_newsletter", kwargs={"send_token": newsletter.send_token})
-            )
+            response = editor_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
         assert response.status_code == 200
-        mock_task.apply_async.assert_called_once_with((newsletter.pk,), {"test_email": False}, countdown=1)
+        mock_task.apply_async.assert_called_once_with((newsletter.pk,), countdown=1)
 
         # ── Stage 8: Frontend ───────────────────────────────────────────────
         response = Client().get(reverse("submissions:issue_detail", kwargs={"slug": issue.slug}))

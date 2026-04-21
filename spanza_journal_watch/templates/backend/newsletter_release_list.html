@@ -83,7 +83,7 @@
   <div class="card-header">Send test email</div>
   <div class="card-body">
     <p class="text-muted small mb-3">Send a test to verify layout before publishing to subscribers.</p>
-    <form method="post" action="{% url "backend:send_test_newsletter" newsletter.send_token %}">
+    <form method="post" action="{% url "backend:send_test_newsletter" newsletter.pk %}">
       {% csrf_token %}
       {{ test_form|crispy }}
       <button type="submit" class="btn btn-outline-primary">Send test email</button>
@@ -96,13 +96,13 @@
   <div class="card-body">
     {% if newsletter.is_sent and not newsletter.resend_enabled %}
       <p class="text-muted small mb-3">This newsletter has already been sent. Enable a one-time resend below.</p>
-      <form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.send_token %}">
+      <form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.pk %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-danger">Enable one resend</button>
       </form>
     {% elif newsletter.is_test_sent %}
       <p class="text-muted small mb-3">Send this newsletter to all subscribers. This cannot be undone.</p>
-      <form method="post" action="{% url "backend:send_final_newsletter" newsletter.send_token %}">
+      <form method="post" action="{% url "backend:send_final_newsletter" newsletter.pk %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-danger" onclick="return confirm('Send this newsletter to all subscribers?')">
           Send newsletter
@@ -208,7 +208,7 @@
 
     {% if not newsletter.resend_enabled %}
     <div class="mt-4 pt-3 border-top">
-      <form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.send_token %}">
+      <form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.pk %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-sm btn-outline-secondary">Enable one resend</button>
       </form>

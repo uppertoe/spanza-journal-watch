@@ -23,7 +23,7 @@
 		<div class="card-header">Send test newsletter</div>
 		<div class="card-body">
 			<p class="text-muted">Send a test email to verify layout/rendering in a mail client before publishing.</p>
-			<form method="post" action="{% url "backend:send_test_newsletter" send_token %}">
+			<form method="post" action="{% url "backend:send_test_newsletter" newsletter.pk %}">
 				{% csrf_token %}
 				{{ test_form|crispy }}
 				<button type="submit" class="btn btn-outline-primary">Send test email</button>
@@ -36,13 +36,13 @@
 		<div class="card-body">
 			{% if newsletter.is_sent and not newsletter.resend_enabled %}
 				<p>This newsletter has already been sent. Resending is disabled by default.</p>
-				<form method="post" action="{% url "backend:enable_newsletter_resend" send_token %}">
+				<form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.pk %}">
 					{% csrf_token %}
 					<button type="submit" class="btn btn-outline-danger my-2">Enable one resend</button>
 				</form>
 			{% elif newsletter.is_test_sent %}
 				<p>Are you sure you're ready to send the newsletter to all subscribers?</p>
-				<form method="post" action="{% url "backend:send_final_newsletter" send_token %}">
+				<form method="post" action="{% url "backend:send_final_newsletter" newsletter.pk %}">
 					{% csrf_token %}
 					<button type="submit" class="btn btn-outline-danger my-2">Send Newsletter</button>
 				</form>
