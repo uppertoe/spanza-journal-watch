@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import TrigramSimilarity
+from django.core.cache import cache
 from django.core.exceptions import MultipleObjectsReturned, PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
@@ -3943,6 +3944,30 @@ def _panel_role_from_request(request, contributor=None):
     return IssueContributor.Role.REVIEWER
 
 
+_PLANKA_PROJECT_PRIVATE_CACHE_TTL = 60
+_PLANKA_PROJECT_PRIVATE_SENTINEL = object()
+
+
+def _get_planka_project_private(project_id):
+    """Return whether a Planka project is private, cached briefly.
+
+    The builder pages render this indicator on every load; without caching we
+    pay a synchronous HTTP round-trip to Planka on each request (~600ms cold).
+    """
+    cache_key = f"planka:project_private:{project_id}"
+    cached = cache.get(cache_key, _PLANKA_PROJECT_PRIVATE_SENTINEL)
+    if cached is not _PLANKA_PROJECT_PRIVATE_SENTINEL:
+        return cached
+    try:
+        client = _build_planka_client()
+        project = client.get_project(project_id)
+        value = bool(project.get("ownerProjectManagerId"))
+    except PlankaAPIError:
+        value = None
+    cache.set(cache_key, value, _PLANKA_PROJECT_PRIVATE_CACHE_TTL)
+    return value
+
+
 def _issue_builder_base_context(
     issue=None,
     review_form=None,
@@ -3962,7 +3987,7 @@ def _issue_builder_base_context(
     planka_board_missing=False,
     issue_contributor_invite_form=None,
 ):
-    issue_qs = Issue.objects.prefetch_related("reviews__article", "reviews__author").order_by("-modified")
+    issue_qs = Issue.objects.only("id", "name", "active", "modified").order_by("-modified")
     credential = _get_planka_integration_credential()
     background_assets = PlankaBoardBackgroundAsset.objects.order_by("name")
     context = {
@@ -4002,12 +4027,7 @@ def _issue_builder_base_context(
             context["planka_background_form"].fields["background_asset"].initial = binding.background_asset_id
         if binding:
             context["planka_project_name_form"].fields["project_name"].initial = binding.project_name
-            try:
-                client = _build_planka_client()
-                project = client.get_project(binding.project_id)
-                context["planka_project_private"] = bool(project.get("ownerProjectManagerId"))
-            except PlankaAPIError:
-                context["planka_project_private"] = None
+            context["planka_project_private"] = _get_planka_project_private(binding.project_id)
 
         context["review_form"] = review_form or IssueBuilderReviewForm(issue=issue)
         context["review_form_action"] = form_action or reverse(

@@ -281,11 +281,15 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
     context_object_name = "review"
     template_name = "submissions/review_detail.html"
 
+    def get_queryset(self):
+        return super().get_queryset().select_related("article__journal", "author")
+
     # Breadcrumb
     @cached_property
     def crumbs(self):
-        issue = Issue.objects.filter(reviews=self.object).latest("created")
-
+        issue = self.object.issues.only("id", "name", "date", "slug").order_by("-created").first()
+        if issue is None:
+            return [("Issues", reverse("submissions:issue_list")), (self.object, "")]
         return [("Issues", reverse("submissions:issue_list")), (issue, issue.get_absolute_url()), (self.object, "")]
 
     # HTMX
@@ -299,7 +303,7 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
         share_title = f"SPANZA Journal Watch - {article_title}"
         share_description = self.object.get_truncated_body().strip()
         share_email_summary = self.object.get_plain_body().strip()
-        attach_review_display_fields([self.object], request=self.request)
+        self.object.display_review_date = self.object.get_review_date()
         review_date = self.object.display_review_date
         share_context = build_share_urls(
             share_title,
