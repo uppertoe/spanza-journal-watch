@@ -103,6 +103,13 @@ class TestUploadSubscriberCSV:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def _celery_eager(settings):
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.CELERY_TASK_EAGER_PROPAGATES = True
+
+
+@pytest.mark.usefixtures("_celery_eager")
 class TestProcessCSV:
     def test_process_csv_adds_subscribers(self):
         client, user = _make_csv_manager()

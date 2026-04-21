@@ -210,8 +210,33 @@ def process_subscriber_csv(subscriber_csv_pk):
     # Prevent circular import
     from .models import SubscriberCSV
 
-    subscriber_csv = SubscriberCSV.objects.get(pk=subscriber_csv_pk)
-    return process_subscriber_csv_record(subscriber_csv)
+    try:
+        subscriber_csv = SubscriberCSV.objects.get(pk=subscriber_csv_pk)
+    except SubscriberCSV.DoesNotExist:
+        return None
+
+    subscriber_csv.task_state = SubscriberCSV.TASK_STATE_RUNNING
+    subscriber_csv.task_note = "Processing subscriber list..."
+    subscriber_csv.save(update_fields=["task_state", "task_note", "modified"])
+
+    try:
+        summary = process_subscriber_csv_record(subscriber_csv)
+    except Exception as error:
+        logger.exception("Subscriber CSV processing failed (pk=%s)", subscriber_csv_pk)
+        SubscriberCSV.objects.filter(pk=subscriber_csv_pk).update(
+            task_state=SubscriberCSV.TASK_STATE_ERROR,
+            task_note=f"Import failed: {error}",
+            modified=timezone.now(),
+        )
+        raise
+
+    SubscriberCSV.objects.filter(pk=subscriber_csv_pk).update(
+        task_state=SubscriberCSV.TASK_STATE_SUCCESS,
+        task_note=f"Added {summary.get('records_added', 0)} subscriber(s).",
+        task_summary=summary,
+        modified=timezone.now(),
+    )
+    return summary
 
 
 @celery_app.task(bind=True)

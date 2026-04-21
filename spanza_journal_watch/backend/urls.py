@@ -238,6 +238,11 @@ urlpatterns = [
     path("users/<int:user_id>/toggle-chief-editor", views.user_toggle_chief_editor, name="user_toggle_chief_editor"),
     path("subscribers/upload/change-header/<str:save_token>", views.edit_csv_header, name="edit_csv_header"),
     path("subscribers/upload/process-csv/<str:save_token>", views.process_csv, name="process_csv"),
+    path(
+        "subscribers/upload/process-csv/<str:save_token>/status",
+        views.process_csv_status,
+        name="process_csv_status",
+    ),
     path("newsletter/release", views.newsletter_release_list, name="newsletter_release_list"),
     path("newsletter/release/create", views.create_newsletter, name="create_newsletter"),
     path("newsletter/send/<int:pk>", views.final_newsletter, name="final_newsletter"),

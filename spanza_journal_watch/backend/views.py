@@ -365,17 +365,40 @@ def process_csv(request, save_token):
         return render(request, "fragments/messages.html")
 
     subscriber_csv.confirmed = True
+    subscriber_csv.task_state = SubscriberCSV.TASK_STATE_PENDING
+    subscriber_csv.task_note = "Queued for processing..."
+    subscriber_csv.task_summary = {}
     subscriber_csv.save()
 
-    summary = None
-    if subscriber_csv.is_ready_to_process:
-        try:
-            summary = process_subscriber_csv(subscriber_csv.pk)
-            messages.success(request, "Subscriber import complete.")
-        except Exception as error:
-            messages.error(request, f"Subscriber import failed: {_safe_planka_error(error)}")
+    if subscriber_csv.is_ready_to_process():
+        process_subscriber_csv.delay(subscriber_csv.pk)
 
-    return render(request, "backend/process_csv_success.html", {"summary": summary})
+    return render(
+        request,
+        "backend/process_csv_status.html",
+        {"instance": subscriber_csv},
+    )
+
+
+@login_required
+@permission_required("backend.manage_subscriber_csv", raise_exception=True)
+def process_csv_status(request, save_token):
+    """HTMX polling endpoint: returns current task state for a SubscriberCSV."""
+    if not request.headers.get("HX-Request") == "true":
+        return HttpResponseBadRequest("Bad Request - HTMX only")
+
+    try:
+        subscriber_csv = SubscriberCSV.objects.get(save_token=save_token)
+    except (SubscriberCSV.DoesNotExist, MultipleObjectsReturned):
+        messages.error(request, "Could not find that CSV upload. Please refresh and try again.")
+        return render(request, "fragments/messages.html")
+
+    if subscriber_csv.task_state == SubscriberCSV.TASK_STATE_SUCCESS:
+        messages.success(request, subscriber_csv.task_note or "Subscriber import complete.")
+    elif subscriber_csv.task_state == SubscriberCSV.TASK_STATE_ERROR:
+        messages.error(request, subscriber_csv.task_note or "Subscriber import failed.")
+
+    return render(request, "backend/process_csv_status.html", {"instance": subscriber_csv})
 
 
 @login_required

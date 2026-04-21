@@ -1,0 +1,43 @@
+<div
+  id="process-csv"
+  class="py-3"
+  {% if instance.task_state == "pending" or instance.task_state == "running" %}
+    hx-get="{% url 'backend:process_csv_status' instance.save_token %}"
+    hx-trigger="every 1s"
+    hx-target="#process-csv"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  {% if instance.task_state == "pending" or instance.task_state == "running" %}
+    <div class="alert alert-info d-flex align-items-center mb-2">
+      <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      <span>{{ instance.task_note|default:"Processing subscriber list..." }}</span>
+    </div>
+    <button class="btn btn-outline-primary disabled" type="button" disabled>Submit CSV for processing</button>
+  {% elif instance.task_state == "success" %}
+    {% with summary=instance.task_summary %}
+      <div class="alert alert-success">
+        <div><strong>Email column:</strong> {{ summary.email_column }}</div>
+        <div><strong>Rows parsed:</strong> {{ summary.rows_parsed }}</div>
+        <div><strong>Added:</strong> {{ summary.records_added }}</div>
+        <div><strong>Skipped:</strong> {{ summary.records_skipped }}</div>
+        <hr class="my-2">
+        <div class="small">
+          Invalid email values: {{ summary.invalid_email_count }} ·
+          Duplicates in file: {{ summary.duplicate_in_file_count }} ·
+          Already subscribed: {{ summary.already_subscribed_count }}
+        </div>
+      </div>
+    {% endwith %}
+    <button class="btn btn-outline-primary disabled" type="button" disabled>Submit CSV for processing</button>
+  {% elif instance.task_state == "error" %}
+    <div class="alert alert-danger">
+      {{ instance.task_note|default:"Subscriber import failed." }}
+    </div>
+    <button class="btn btn-outline-primary disabled" type="button" disabled>Submit CSV for processing</button>
+  {% else %}
+    <button class="btn btn-outline-primary disabled" type="button" disabled>Submit CSV for processing</button>
+  {% endif %}
+
+  {% include "fragments/messages.html" %}
+</div>

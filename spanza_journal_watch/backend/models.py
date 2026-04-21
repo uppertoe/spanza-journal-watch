@@ -16,6 +16,19 @@ from spanza_journal_watch.utils.models import TimeStampedModel
 
 
 class SubscriberCSV(models.Model):
+    TASK_STATE_IDLE = "idle"
+    TASK_STATE_PENDING = "pending"
+    TASK_STATE_RUNNING = "running"
+    TASK_STATE_SUCCESS = "success"
+    TASK_STATE_ERROR = "error"
+    TASK_STATE_CHOICES = (
+        (TASK_STATE_IDLE, "Idle"),
+        (TASK_STATE_PENDING, "Pending"),
+        (TASK_STATE_RUNNING, "Running"),
+        (TASK_STATE_SUCCESS, "Success"),
+        (TASK_STATE_ERROR, "Error"),
+    )
+
     name = models.CharField(max_length=255)
     file = models.FileField(upload_to=name_csv)
     confirmed = models.BooleanField(default=False)
@@ -26,6 +39,9 @@ class SubscriberCSV(models.Model):
     email_added_count = models.PositiveIntegerField(null=True, blank=True)
     save_token = models.CharField(max_length=64, blank=True, null=True)
     header = models.BooleanField(default=False)
+    task_state = models.CharField(max_length=16, choices=TASK_STATE_CHOICES, default=TASK_STATE_IDLE)
+    task_note = models.TextField(blank=True)
+    task_summary = models.JSONField(default=dict, blank=True)
 
     class Meta:
         permissions = [

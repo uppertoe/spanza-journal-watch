@@ -1,7 +1,12 @@
 {% extends "backend/backend_base.html" %}
 
 {% block content %}
-<h1>Users &amp; Subscribers</h1>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Users &amp; Subscribers</h1>
+  {% if perms.backend.manage_subscriber_csv %}
+    <a href="{% url 'backend:upload_subscribers' %}" class="btn btn-outline-primary">Upload CSV</a>
+  {% endif %}
+</div>
 <p class="text-muted">Manage user accounts, permissions, and newsletter subscriptions.</p>
 
 {# ── View mode tabs ──────────────────────────── #}
