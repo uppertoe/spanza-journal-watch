@@ -56,21 +56,11 @@ def _generate_token():
 
 
 def get_subscriber_batches(subscriber_pks, batch_size):
-    from .models import Subscriber
-
-    subscribers = Subscriber.objects.filter(pk__in=subscriber_pks)
-
-    num_subscribers = subscribers.count()
-
-    # Ensure that we round up to the nearest batch
-    num_batches = (num_subscribers + batch_size - 1) // batch_size
-
-    # Generator which yields a sliced queryset
-    for batch_number in range(num_batches):
-        start_index = batch_number * batch_size
-        end_index = min((batch_number + 1) * batch_size, num_subscribers)
-        subscribers_batch = subscribers[start_index:end_index]
-        yield subscribers_batch
+    # Slice the materialized PK list directly. Re-querying and slicing an
+    # unordered QuerySet lets Postgres return different rows per LIMIT/OFFSET
+    # query, causing some subscribers to be duplicated and others skipped.
+    for start in range(0, len(subscriber_pks), batch_size):
+        yield subscriber_pks[start : start + batch_size]
 
 
 @celery_app.task()
@@ -130,8 +120,7 @@ def send_newsletter(newsletter_pk, sender_email=None):
     subscriber_pks = list(subscribers.values_list("pk", flat=True))
 
     batch_count = 0
-    for subscribers_batch in get_subscriber_batches(subscriber_pks, BATCH_SIZE):
-        batch_pks = list(subscribers_batch.values_list("pk", flat=True))
+    for batch_pks in get_subscriber_batches(subscriber_pks, BATCH_SIZE):
         send_newsletter_batch.delay(newsletter_pk, batch_pks, False)
         batch_count += 1
 

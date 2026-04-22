@@ -384,8 +384,14 @@ class TestSetupSNS:
         call_kwargs = ses_v2.create_configuration_set_event_destination.call_args[1]
         assert call_kwargs["ConfigurationSetName"] == "TrackingConfigSet"
         dest = call_kwargs["EventDestination"]
-        assert "BOUNCE" in dest["MatchingEventTypes"]
-        assert "COMPLAINT" in dest["MatchingEventTypes"]
+        assert set(dest["MatchingEventTypes"]) == {
+            "BOUNCE",
+            "COMPLAINT",
+            "DELIVERY_DELAY",
+            "REJECT",
+            "RENDERING_FAILURE",
+            "SUBSCRIPTION",
+        }
 
     def test_wires_ses_event_destination_with_suffix(self, sns, ses_v2):
         setup_sns(
@@ -400,7 +406,7 @@ class TestSetupSNS:
         )
         call_kwargs = ses_v2.create_configuration_set_event_destination.call_args[1]
         assert call_kwargs["ConfigurationSetName"] == "TrackingConfigSet-staging"
-        assert call_kwargs["EventDestinationName"] == "BounceComplaintSNS-staging"
+        assert call_kwargs["EventDestinationName"] == "TrackingToSNS-staging"
 
     def test_idempotent(self, sns, ses_v2):
         """SNS create_topic is idempotent by spec; event destination handles AlreadyExists."""

@@ -242,7 +242,7 @@ class TestGetSubscriberBatches:
         pks = [s.pk for s in subs]
         batches = list(get_subscriber_batches(pks, batch_size=10))
         assert len(batches) == 1
-        assert batches[0].count() == 3
+        assert batches[0] == pks
 
     def test_multiple_batches(self):
         from spanza_journal_watch.newsletter.tasks import get_subscriber_batches
@@ -251,8 +251,7 @@ class TestGetSubscriberBatches:
         pks = [s.pk for s in subs]
         batches = list(get_subscriber_batches(pks, batch_size=2))
         assert len(batches) == 3
-        counts = [b.count() for b in batches]
-        assert sum(counts) == 5
+        assert [b for batch in batches for b in batch] == pks
 
     def test_empty_list(self):
         from spanza_journal_watch.newsletter.tasks import get_subscriber_batches

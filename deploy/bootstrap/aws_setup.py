@@ -28,8 +28,8 @@ What this script does:
   - Creates the SES email identity (ses-domain) and prints DKIM DNS records
     (skipped when --ses-domain differs from --domain — identity already exists)
   - Creates the SES configuration set (TrackingConfigSet[-suffix])
-  - Creates the SNS topic for bounce/complaint events (journalwatch-ses-events[-suffix])
-  - Wires SES → SNS for Bounce + Complaint event types
+  - Creates the SNS topic for SES tracking events (journalwatch-ses-events[-suffix])
+  - Wires SES → SNS for Bounce, Complaint, DeliveryDelay, Reject, RenderingFailure, Subscription
   - Optionally creates SES inbound resources:
     - SNS topic for inbound events (journalwatch-ses-inbound[-suffix])
     - receipt rule set + active receipt rule writing to S3 email/*
@@ -443,16 +443,24 @@ def setup_sns(sns, ses_v2, region, account_id, domain, webhook_secret, suffix=""
     topic_arn = resp["TopicArn"]
     ok(f"Topic ready: {topic_arn}")
 
-    # Wire SES → SNS for Bounce + Complaint
+    # Wire SES → SNS for all tracking events we care about
     section("SES → SNS event destination")
-    dest_name = f"BounceComplaintSNS{sfx}"
+    dest_name = f"TrackingToSNS{sfx}"
+    event_types = [
+        "BOUNCE",
+        "COMPLAINT",
+        "DELIVERY_DELAY",
+        "REJECT",
+        "RENDERING_FAILURE",
+        "SUBSCRIPTION",
+    ]
     try:
         ses_v2.create_configuration_set_event_destination(
             ConfigurationSetName=config_set_name,
             EventDestinationName=dest_name,
             EventDestination={
                 "Enabled": True,
-                "MatchingEventTypes": ["BOUNCE", "COMPLAINT"],
+                "MatchingEventTypes": event_types,
                 "SnsDestination": {"TopicArn": topic_arn},
             },
         )
@@ -494,11 +502,14 @@ def setup_inbound_ses(ses, sns, bucket, region, account_id, domain, suffix=""):
         else:
             raise
 
+    # Empty Recipients = catch-all for every address at the domain. Needed so
+    # out-of-office auto-replies and mail to addresses other than the single
+    # documented inbox (queries@, newsletter@, unsubscribe@, ...) are accepted.
     rule = {
         "Name": rule_name,
         "Enabled": True,
         "TlsPolicy": "Optional",
-        "Recipients": [recipient],
+        "Recipients": [],
         "Actions": [
             {"S3Action": {"BucketName": bucket, "ObjectKeyPrefix": "email/"}},
             {"SNSAction": {"TopicArn": topic_arn, "Encoding": "UTF-8"}},
@@ -508,7 +519,7 @@ def setup_inbound_ses(ses, sns, bucket, region, account_id, domain, suffix=""):
 
     try:
         ses.create_receipt_rule(RuleSetName=rule_set_name, Rule=rule)
-        ok(f"Receipt rule created: {rule_name} for {recipient}")
+        ok(f"Receipt rule created: {rule_name} (catch-all for {domain})")
     except ClientError as e:
         if e.response["Error"]["Code"] == "AlreadyExists":
             ses.update_receipt_rule(RuleSetName=rule_set_name, Rule=rule)
@@ -828,7 +839,7 @@ def parse_args(argv=None):
     p.add_argument(
         "--enable-inbound",
         action="store_true",
-        help="Create/update SES inbound SNS topic + receipt rule set and make it active for hello@<domain>.",
+        help="Create/update SES inbound SNS topic + receipt rule set and make it active (catch-all for the domain).",
     )
     return p.parse_args(argv)
 
