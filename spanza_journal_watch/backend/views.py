@@ -913,6 +913,11 @@ def _import_pubmed_batch(batch, watched_journals):
 
 
 def _build_article_intake_queryset(batch, params):
+    """Return (rows, tab_rows, flags) where tab_rows ignores the journal filter.
+
+    `rows` and `tab_rows` are either lists (when Python-side topic filters force
+    materialization) or QuerySets (the fast path, letting Paginator use SQL COUNT).
+    """
     query = (params.get("q") or "").strip()
     watched_journal_id = (params.get("journal") or "").strip()
     selected = (params.get("filter_selected") or params.get("selected") or "").strip().lower()
@@ -925,7 +930,7 @@ def _build_article_intake_queryset(batch, params):
     cardiac_only = _param_enabled(params, "cardiac_only", default=False)
     neonatal_only = _param_enabled(params, "neonatal_only", default=False)
 
-    rows = (
+    base = (
         batch.batch_articles.select_related("article", "watched_journal", "issue")
         .annotate(
             recommendation_count=Count(
@@ -938,118 +943,128 @@ def _build_article_intake_queryset(batch, params):
     )
 
     if query:
-        rows = rows.filter(
+        base = base.filter(
             Q(article__title__icontains=query)
             | Q(article__abstract__icontains=query)
             | Q(article__doi__icontains=query)
             | Q(article__pmid__icontains=query)
         )
-    if watched_journal_id.isdigit():
-        rows = rows.filter(watched_journal_id=int(watched_journal_id))
     if selected in {"true", "false"}:
-        rows = rows.filter(is_selected=(selected == "true"))
+        base = base.filter(is_selected=(selected == "true"))
 
-    filtered_rows = list(rows)
-    if paediatric_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_topic(row.article, mesh_terms=PAEDIATRIC_MESH_TERMS, text_terms=PAEDIATRIC_TEXT_TERMS)
-        ]
-    if humans_only:
-        filtered_rows = [
-            row for row in filtered_rows if _article_matches_metadata(row.article, "mesh_terms", {HUMANS_MESH_TERM})
-        ]
-    if review_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_metadata(row.article, "publication_types", REVIEW_PUBLICATION_TYPES)
-        ]
-    if trial_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_metadata(row.article, "publication_types", TRIAL_PUBLICATION_TYPES)
-        ]
-    if pain_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_topic(row.article, mesh_terms=PAIN_MESH_TERMS, text_terms=PAIN_TEXT_TERMS)
-        ]
-    if icu_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_topic(row.article, mesh_terms=ICU_MESH_TERMS, text_terms=ICU_TEXT_TERMS)
-        ]
-    if cardiac_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_topic(row.article, mesh_terms=CARDIAC_MESH_TERMS, text_terms=CARDIAC_TEXT_TERMS)
-        ]
-    if neonatal_only:
-        filtered_rows = [
-            row
-            for row in filtered_rows
-            if _article_matches_topic(row.article, mesh_terms=NEONATAL_MESH_TERMS, text_terms=NEONATAL_TEXT_TERMS)
-        ]
-
-    return (
-        filtered_rows,
-        query,
-        watched_journal_id,
-        selected,
-        paediatric_only,
-        humans_only,
-        review_only,
-        trial_only,
-        pain_only,
-        icu_only,
-        cardiac_only,
-        neonatal_only,
+    has_python_filter = any(
+        [paediatric_only, humans_only, review_only, trial_only, pain_only, icu_only, cardiac_only, neonatal_only]
     )
+
+    if has_python_filter:
+        # Materialize once (without journal filter) so rows and tab_rows share a pass.
+        materialized = list(base)
+
+        def _apply_python_filters(rows_list):
+            if paediatric_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_topic(
+                        r.article, mesh_terms=PAEDIATRIC_MESH_TERMS, text_terms=PAEDIATRIC_TEXT_TERMS
+                    )
+                ]
+            if humans_only:
+                rows_list = [
+                    r for r in rows_list if _article_matches_metadata(r.article, "mesh_terms", {HUMANS_MESH_TERM})
+                ]
+            if review_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_metadata(r.article, "publication_types", REVIEW_PUBLICATION_TYPES)
+                ]
+            if trial_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_metadata(r.article, "publication_types", TRIAL_PUBLICATION_TYPES)
+                ]
+            if pain_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_topic(r.article, mesh_terms=PAIN_MESH_TERMS, text_terms=PAIN_TEXT_TERMS)
+                ]
+            if icu_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_topic(r.article, mesh_terms=ICU_MESH_TERMS, text_terms=ICU_TEXT_TERMS)
+                ]
+            if cardiac_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_topic(r.article, mesh_terms=CARDIAC_MESH_TERMS, text_terms=CARDIAC_TEXT_TERMS)
+                ]
+            if neonatal_only:
+                rows_list = [
+                    r
+                    for r in rows_list
+                    if _article_matches_topic(
+                        r.article, mesh_terms=NEONATAL_MESH_TERMS, text_terms=NEONATAL_TEXT_TERMS
+                    )
+                ]
+            return rows_list
+
+        tab_rows = _apply_python_filters(materialized)
+        if watched_journal_id.isdigit():
+            wj = int(watched_journal_id)
+            rows = [r for r in tab_rows if r.watched_journal_id == wj]
+        else:
+            rows = tab_rows
+    else:
+        tab_rows = base
+        if watched_journal_id.isdigit():
+            rows = base.filter(watched_journal_id=int(watched_journal_id))
+        else:
+            rows = base
+
+    flags = {
+        "query": query,
+        "watched_journal_id": watched_journal_id,
+        "selected": selected,
+        "paediatric_only": paediatric_only,
+        "humans_only": humans_only,
+        "review_only": review_only,
+        "trial_only": trial_only,
+        "pain_only": pain_only,
+        "icu_only": icu_only,
+        "cardiac_only": cardiac_only,
+        "neonatal_only": neonatal_only,
+    }
+    return rows, tab_rows, flags
 
 
 def _article_intake_results_context(batch, params):
     watched_options = list(batch.watched_journals.order_by("name"))
 
-    (
-        rows,
-        query,
-        watched_journal_id,
-        selected,
-        paediatric_only,
-        humans_only,
-        review_only,
-        trial_only,
-        pain_only,
-        icu_only,
-        cardiac_only,
-        neonatal_only,
-    ) = _build_article_intake_queryset(batch, params)
+    rows, tab_rows, flags = _build_article_intake_queryset(batch, params)
 
-    tab_params = params.copy()
-    tab_params["journal"] = ""
-    tab_rows, *_ = _build_article_intake_queryset(batch, tab_params)
-    journal_counts = {}
-    for row in tab_rows:
-        journal_counts[row.watched_journal_id] = journal_counts.get(row.watched_journal_id, 0) + 1
+    if isinstance(tab_rows, list):
+        journal_counts = Counter(r.watched_journal_id for r in tab_rows)
+        all_journals_count = len(tab_rows)
+    else:
+        journal_counts = dict(
+            tab_rows.values_list("watched_journal_id").annotate(c=Count("id")).values_list("watched_journal_id", "c")
+        )
+        all_journals_count = tab_rows.count()
 
     watched_journal_tabs = [
-        {
-            "journal": watched,
-            "count": journal_counts.get(watched.pk, 0),
-        }
-        for watched in watched_options
+        {"journal": watched, "count": journal_counts.get(watched.pk, 0)} for watched in watched_options
     ]
 
     paginator = Paginator(rows, 25)
     page_obj = paginator.get_page(params.get("page") or 1)
     visible_rows = list(page_obj.object_list)
     all_visible_selected = bool(visible_rows) and all(row.is_selected for row in visible_rows)
+    result_total = len(rows) if isinstance(rows, list) else rows.count()
     staged_rows = list(
         batch.batch_articles.select_related("article", "watched_journal", "issue")
         .annotate(
@@ -1067,22 +1082,22 @@ def _article_intake_results_context(batch, params):
         "page_obj": page_obj,
         "result_rows": visible_rows,
         "all_visible_selected": all_visible_selected,
-        "all_journals_count": len(tab_rows),
+        "all_journals_count": all_journals_count,
         "staged_rows": staged_rows,
-        "result_total": len(rows),
+        "result_total": result_total,
         "selected_total": batch.batch_articles.filter(is_selected=True).count(),
         "pushed_total": batch.batch_articles.exclude(planka_card_id="").count(),
-        "filter_query": query,
-        "filter_journal": watched_journal_id,
-        "filter_selected": selected,
-        "filter_paediatric_only": paediatric_only,
-        "filter_humans_only": humans_only,
-        "filter_review_only": review_only,
-        "filter_trial_only": trial_only,
-        "filter_pain_only": pain_only,
-        "filter_icu_only": icu_only,
-        "filter_cardiac_only": cardiac_only,
-        "filter_neonatal_only": neonatal_only,
+        "filter_query": flags["query"],
+        "filter_journal": flags["watched_journal_id"],
+        "filter_selected": flags["selected"],
+        "filter_paediatric_only": flags["paediatric_only"],
+        "filter_humans_only": flags["humans_only"],
+        "filter_review_only": flags["review_only"],
+        "filter_trial_only": flags["trial_only"],
+        "filter_pain_only": flags["pain_only"],
+        "filter_icu_only": flags["icu_only"],
+        "filter_cardiac_only": flags["cardiac_only"],
+        "filter_neonatal_only": flags["neonatal_only"],
         "watched_journal_options": watched_options,
         "watched_journal_tabs": watched_journal_tabs,
     }
@@ -4765,11 +4780,15 @@ def author_edit(request, author_id):
     else:
         form = AuthorForm(instance=author)
 
+    authors_qs = Author.objects.prefetch_related("health_services").order_by("name")
+    paginator = Paginator(authors_qs, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
     return render(
         request,
         "backend/authors.html",
         {
-            "authors": Author.objects.prefetch_related("health_services").order_by("name"),
+            "authors": page_obj,
             "form": form,
             "editing": author,
             "q": "",
@@ -5034,6 +5053,38 @@ def review_tag_suggestions(request, article_id):
         request,
         "backend/issue_builder/_review_tag_grid_container.html",
         {"curated_tags": curated_tags},
+    )
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def review_existing_article_search(request):
+    """HTMX GET: return filtered PubmedArticle list for the existing-article picker."""
+    query = (request.GET.get("q") or "").strip()
+    qs = PubmedArticle.objects.only("id", "title").order_by("title")
+    if query:
+        qs = qs.filter(title__icontains=query)
+    articles = list(qs[:50])
+    return render(
+        request,
+        "backend/issue_builder/_review_existing_article_options.html",
+        {"articles": articles, "query": query},
+    )
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def review_author_search(request):
+    """HTMX GET: return filtered Author list for the author picker."""
+    query = (request.GET.get("q") or "").strip()
+    qs = Author.objects.prefetch_related("health_services").order_by("name")
+    if query:
+        qs = qs.filter(Q(name__icontains=query) | Q(health_services__name__icontains=query)).distinct()
+    authors = list(qs[:50])
+    return render(
+        request,
+        "backend/issue_builder/_review_author_options.html",
+        {"authors": authors, "query": query},
     )
 
 

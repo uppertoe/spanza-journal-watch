@@ -151,6 +151,16 @@ urlpatterns = [
         name="review_tag_suggestions",
     ),
     path(
+        "issues/builder/existing-article-search",
+        views.review_existing_article_search,
+        name="review_existing_article_search",
+    ),
+    path(
+        "issues/builder/author-search",
+        views.review_author_search,
+        name="review_author_search",
+    ),
+    path(
         "issues/builder/<int:issue_id>/reviews/<int:review_id>/edit",
         views.edit_issue_review_form,
         name="edit_issue_review_form",

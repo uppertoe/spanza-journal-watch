@@ -1,0 +1,14 @@
+{% for art in articles %}
+  <button
+    type="button"
+    class="list-group-item list-group-item-action existing-article-picker-item d-flex justify-content-between align-items-center py-2"
+    data-article-id="{{ art.pk }}"
+    data-article-title="{{ art.title }}"
+  >
+    <span class="small text-break">{{ art.title }}</span>
+  </button>
+{% empty %}
+  <div class="list-group-item text-muted small">
+    {% if query %}No articles match "{{ query }}".{% else %}Start typing to search articles.{% endif %}
+  </div>
+{% endfor %}

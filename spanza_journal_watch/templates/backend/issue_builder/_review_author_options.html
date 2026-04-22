@@ -1,0 +1,20 @@
+{% for author in authors %}
+  <button
+    type="button"
+    class="list-group-item list-group-item-action author-picker-item d-flex justify-content-between align-items-center py-2"
+    data-author-id="{{ author.pk }}"
+    data-author-name="{{ author.title }} {{ author.name }}"
+    data-affiliations="{% for hs in author.health_services.all %}{{ hs.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+  >
+    <span>{{ author.title }} {{ author.name }}</span>
+    <span class="text-muted small">
+      {% for hs in author.health_services.all %}
+        <span class="badge text-bg-light text-dark border ms-1">{{ hs.name }}</span>
+      {% endfor %}
+    </span>
+  </button>
+{% empty %}
+  <div class="list-group-item text-muted small">
+    {% if query %}No authors match "{{ query }}".{% else %}Start typing to search authors.{% endif %}
+  </div>
+{% endfor %}

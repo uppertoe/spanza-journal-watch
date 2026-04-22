@@ -15,32 +15,41 @@
 
         {# --- Existing article mode --- #}
         <div class="col-12 article-existing-fields">
-          <div style="display:none">{{ review_form.existing_article }}</div>
+          {{ review_form.existing_article }}
           <label class="form-label">Article</label>
           <input
             type="text"
             id="existing-article-picker-search"
+            name="q"
             class="form-control mb-2"
             placeholder="Search by title…"
             autocomplete="off"
+            hx-get="{% url 'backend:review_existing_article_search' %}"
+            hx-trigger="input changed delay:250ms, search"
+            hx-target="#existing-article-picker-list"
+            hx-swap="innerHTML"
           >
           <div
             id="existing-article-picker-list"
             class="list-group mb-1"
             style="max-height:220px; overflow-y:auto; border:1px solid var(--bs-border-color); border-radius:var(--bs-border-radius);"
           >
-            {% for art in review_form.fields.existing_article.queryset %}
+            {% if review_form.review and review_form.review.article %}
               <button
                 type="button"
-                class="list-group-item list-group-item-action existing-article-picker-item d-flex justify-content-between align-items-center py-2"
-                data-article-id="{{ art.pk }}"
-                data-article-title="{{ art.title }}"
+                class="list-group-item list-group-item-action existing-article-picker-item d-flex justify-content-between align-items-center py-2 active"
+                data-article-id="{{ review_form.review.article.pk }}"
+                data-article-title="{{ review_form.review.article.title }}"
               >
-                <span class="small text-break">{{ art.title }}</span>
+                <span class="small text-break">{{ review_form.review.article.title }}</span>
               </button>
-            {% endfor %}
+            {% else %}
+              <div class="list-group-item text-muted small">Start typing to search articles.</div>
+            {% endif %}
           </div>
-          <div id="existing-article-picker-selected" class="text-muted small mt-1" style="min-height:1.2em;"></div>
+          <div id="existing-article-picker-selected" class="text-muted small mt-1" style="min-height:1.2em;">
+            {% if review_form.review and review_form.review.article %}Selected: {{ review_form.review.article.title }}{% endif %}
+          </div>
         </div>
 
         {# --- New article mode: PubMed search (default sub-mode) --- #}
@@ -142,23 +151,30 @@
 
         <div class="col-12">{{ review_form.author_mode|as_crispy_field }}</div>
         <div class="col-12 author-existing-fields">
+          {{ review_form.author }}
           <label class="form-label">Author</label>
           <input
             type="text"
             id="author-picker-search"
+            name="q"
             class="form-control mb-2"
             placeholder="Search by name or affiliation…"
             autocomplete="off"
+            hx-get="{% url 'backend:review_author_search' %}"
+            hx-trigger="input changed delay:250ms, search"
+            hx-target="#author-picker-list"
+            hx-swap="innerHTML"
           >
           <div
             id="author-picker-list"
             class="list-group mb-1"
             style="max-height:220px; overflow-y:auto; border:1px solid var(--bs-border-color); border-radius:var(--bs-border-radius);"
           >
-            {% for author in review_form.fields.author.queryset %}
+            {% if review_form.review and review_form.review.author %}
+              {% with author=review_form.review.author %}
               <button
                 type="button"
-                class="list-group-item list-group-item-action author-picker-item d-flex justify-content-between align-items-center py-2"
+                class="list-group-item list-group-item-action author-picker-item d-flex justify-content-between align-items-center py-2 active"
                 data-author-id="{{ author.pk }}"
                 data-author-name="{{ author.title }} {{ author.name }}"
                 data-affiliations="{% for hs in author.health_services.all %}{{ hs.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
@@ -170,14 +186,27 @@
                   {% endfor %}
                 </span>
               </button>
-            {% endfor %}
+              {% endwith %}
+            {% else %}
+              <div class="list-group-item text-muted small">Start typing to search authors.</div>
+            {% endif %}
           </div>
-          <div id="author-picker-selected" class="text-muted small mt-1" style="min-height:1.2em;"></div>
-          {# Hidden select keeps the actual form value #}
-          <div style="display:none">{{ review_form.author }}</div>
+          <div id="author-picker-selected" class="text-muted small mt-1" style="min-height:1.2em;">
+            {% if review_form.review and review_form.review.author %}Selected: {{ review_form.review.author.title }} {{ review_form.review.author.name }}{% endif %}
+          </div>
         </div>
         <div class="col-md-4 author-new-fields">{{ review_form.new_author_title|as_crispy_field }}</div>
         <div class="col-md-8 author-new-fields">{{ review_form.new_author_name|as_crispy_field }}</div>
+        <div class="col-12 author-new-fields">
+          <label class="form-label fw-semibold">Affiliations</label>
+          <div class="row g-1">
+            {% for checkbox in review_form.new_author_health_services %}
+              <div class="col-6 col-md-4 col-lg-3">
+                <div class="form-check form-check-sm">{{ checkbox }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
 
         {# Side-by-side markdown editor + preview #}
         <div class="col-12">
@@ -489,49 +518,25 @@
     setAuthorModeVisibility();
     updatePreview();
 
-    // Author picker
+    // Author picker (server-side HTMX search)
     (function () {
-      const searchInput = form.querySelector('#author-picker-search');
       const list = form.querySelector('#author-picker-list');
       const selectedLabel = form.querySelector('#author-picker-selected');
-      const hiddenSelect = form.querySelector('select[name="author"]');
-      if (!searchInput || !list || !hiddenSelect) return;
+      const hiddenInput = form.querySelector('[name="author"]');
+      if (!list || !hiddenInput) return;
 
-      function getItems() {
-        return Array.from(list.querySelectorAll('.author-picker-item'));
-      }
-
-      function filterItems() {
-        const q = (searchInput.value || '').trim().toLowerCase();
-        getItems().forEach(function (item) {
-          const name = (item.dataset.authorName || '').toLowerCase();
-          const affs = (item.dataset.affiliations || '').toLowerCase();
-          const visible = !q || name.includes(q) || affs.includes(q);
-          item.classList.toggle('d-none', !visible);
+      function markActive() {
+        const val = hiddenInput.value || '';
+        list.querySelectorAll('.author-picker-item').forEach(function (item) {
+          item.classList.toggle('active', val && item.dataset.authorId === String(val));
         });
       }
 
       function selectAuthor(id, label) {
-        hiddenSelect.value = id || '';
-        if (selectedLabel) {
-          selectedLabel.textContent = id ? `Selected: ${label}` : '';
-        }
-        getItems().forEach(function (item) {
-          item.classList.toggle('active', item.dataset.authorId === String(id));
-        });
+        hiddenInput.value = id || '';
+        if (selectedLabel) selectedLabel.textContent = id ? 'Selected: ' + label : '';
+        markActive();
       }
-
-      // Pre-select if there is an initial value
-      const initialVal = hiddenSelect.value;
-      if (initialVal) {
-        const initialItem = list.querySelector(`[data-author-id="${initialVal}"]`);
-        if (initialItem) {
-          initialItem.classList.add('active');
-          if (selectedLabel) selectedLabel.textContent = `Selected: ${initialItem.dataset.authorName}`;
-        }
-      }
-
-      searchInput.addEventListener('input', filterItems);
 
       list.addEventListener('click', function (e) {
         const item = e.target.closest('.author-picker-item');
@@ -539,56 +544,36 @@
         const alreadyActive = item.classList.contains('active');
         selectAuthor(alreadyActive ? '' : item.dataset.authorId, item.dataset.authorName);
       });
+
+      list.addEventListener('htmx:afterSwap', markActive);
     })();
 
-    // Existing article picker (with tag suggestion fetch on select)
+    // Existing article picker (server-side HTMX search + tag suggestion fetch on select)
     (function () {
-      const searchInput = form.querySelector('#existing-article-picker-search');
       const list = form.querySelector('#existing-article-picker-list');
       const selectedLabel = form.querySelector('#existing-article-picker-selected');
-      const hiddenSelect = form.querySelector('select[name="existing_article"]');
-      if (!searchInput || !list || !hiddenSelect) return;
+      const hiddenInput = form.querySelector('[name="existing_article"]');
+      if (!list || !hiddenInput) return;
 
-      function getItems() {
-        return Array.from(list.querySelectorAll('.existing-article-picker-item'));
-      }
-
-      function filterItems() {
-        const q = (searchInput.value || '').trim().toLowerCase();
-        getItems().forEach(function (item) {
-          const title = (item.dataset.articleTitle || '').toLowerCase();
-          item.classList.toggle('d-none', q && !title.includes(q));
+      function markActive() {
+        const val = hiddenInput.value || '';
+        list.querySelectorAll('.existing-article-picker-item').forEach(function (item) {
+          item.classList.toggle('active', val && item.dataset.articleId === String(val));
         });
       }
 
       function selectArticle(id, title) {
-        hiddenSelect.value = id || '';
-        if (selectedLabel) {
-          selectedLabel.textContent = id ? 'Selected: ' + title : '';
-        }
-        getItems().forEach(function (item) {
-          item.classList.toggle('active', item.dataset.articleId === String(id));
-        });
-        // Fetch tag suggestions for the selected article
+        hiddenInput.value = id || '';
+        if (selectedLabel) selectedLabel.textContent = id ? 'Selected: ' + title : '';
+        markActive();
         if (id) {
-          htmx.ajax('GET', '/backend/issues/builder/article/' + id + '/tag-suggestions/', {
+          const tagSuggestionsUrl = '{% url "backend:review_tag_suggestions" 0 %}'.replace(/\/0$/, '/' + id);
+          htmx.ajax('GET', tagSuggestionsUrl, {
             target: '#tag-grid-container',
             swap: 'outerHTML'
           });
         }
       }
-
-      // Pre-select if there is an initial value
-      const initialVal = hiddenSelect.value;
-      if (initialVal) {
-        const initialItem = list.querySelector('[data-article-id="' + initialVal + '"]');
-        if (initialItem) {
-          initialItem.classList.add('active');
-          if (selectedLabel) selectedLabel.textContent = 'Selected: ' + initialItem.dataset.articleTitle;
-        }
-      }
-
-      searchInput.addEventListener('input', filterItems);
 
       list.addEventListener('click', function (e) {
         const item = e.target.closest('.existing-article-picker-item');
@@ -596,6 +581,8 @@
         const alreadyActive = item.classList.contains('active');
         selectArticle(alreadyActive ? '' : item.dataset.articleId, item.dataset.articleTitle);
       });
+
+      list.addEventListener('htmx:afterSwap', markActive);
     })();
   })();
 </script>

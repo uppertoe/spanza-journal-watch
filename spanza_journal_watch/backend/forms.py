@@ -435,8 +435,9 @@ class IssueBuilderReviewForm(forms.Form):
 
     article_mode = forms.ChoiceField(choices=ARTICLE_MODE_CHOICES, initial=ARTICLE_MODE_NEW)
     existing_article = forms.ModelChoiceField(
-        queryset=PubmedArticle.objects.order_by("title"),
+        queryset=PubmedArticle.objects.all(),
         required=False,
+        widget=forms.HiddenInput(),
         help_text="Use an existing article instead of creating a new one.",
     )
 
@@ -455,11 +456,18 @@ class IssueBuilderReviewForm(forms.Form):
 
     author_mode = forms.ChoiceField(choices=AUTHOR_MODE_CHOICES, initial=AUTHOR_MODE_EXISTING, required=False)
     author = forms.ModelChoiceField(
-        queryset=Author.objects.prefetch_related("health_services").order_by("name"),
+        queryset=Author.objects.all(),
         required=False,
+        widget=forms.HiddenInput(),
     )
     new_author_title = forms.CharField(required=False, initial="Dr")
     new_author_name = forms.CharField(required=False)
+    new_author_health_services = forms.ModelMultipleChoiceField(
+        queryset=HealthService.objects.order_by("name"),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Affiliations",
+    )
     body = forms.CharField(widget=forms.Textarea(attrs={"rows": 20, "style": "resize:vertical;"}), required=True)
     is_featured = forms.BooleanField(required=False)
     feature_image = forms.ImageField(required=False)
@@ -558,6 +566,9 @@ class IssueBuilderReviewForm(forms.Form):
                 title=self.cleaned_data.get("new_author_title") or "Dr",
                 name=self.cleaned_data["new_author_name"],
             )
+            new_affiliations = self.cleaned_data.get("new_author_health_services")
+            if new_affiliations:
+                author.health_services.set(new_affiliations)
         else:
             author = self.cleaned_data["author"]
 
