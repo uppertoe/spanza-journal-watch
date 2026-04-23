@@ -1,11 +1,21 @@
 Thank you for subscribing to SPANZA Journal Watch.
 
 You will receive updates with each issue of Journal Watch,
-which is published every two months.
+which is published every few months.
 
 You are receiving this email because you subscribed at
 https://journalwatch.org.au using the email {{ subscriber.email }}
+{% if not subscriber.user %}
+---
 
+Want more than the newsletter? Create a free account to track your
+CPD, save articles to a reading list, and manage your subscription
+preferences:
+
+{{ domain }}{% url 'account_signup' %}?email={{ subscriber.email|urlencode }}
+
+---
+{% endif %}
 You can unsubscribe at any time by visiting the following address:
 
 {{ subscriber.get_unsubscribe_link }}

@@ -16,13 +16,11 @@
     </div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card h-100 border-success-subtle"><div class="card-body">
+    <div class="card h-100 border-success-subtle" title="Visitors with 2+ visits in the selected period. Visits split after {{ visit_timeout_minutes }} min of inactivity."><div class="card-body">
       <h6 class="text-muted mb-1 small">Returning</h6>
       <p class="display-6 mb-0">{{ returning_visitors }}</p>
       <p class="small text-muted mb-0">{{ returning_rate }}</p>
-      {% if not site_analytics_rollout_mature and site_analytics_rollout_date %}
-      <p class="small text-warning-emphasis mb-0 mt-1" style="font-size:0.7rem" title="Visitor IDs only exist since the site analytics rollout. Returning counts will trend up until this cohort is ≥90d old.">Since {{ site_analytics_rollout_date|date:"j M Y" }}</p>
-      {% endif %}
+      <p class="small text-muted mb-0 mt-1" style="font-size:0.72rem">{{ multi_day_visitors }} active on ≥2 days</p>
     </div></div>
   </div>
   <div class="col-6 col-md-3">
@@ -191,7 +189,7 @@
   <div class="card-body small text-muted mb-2">Most frequent two-step transitions within a derived visit — shows how users move through the site.</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Step 1</th><th></th><th>Step 2</th><th>Visits</th></tr></thead>
+      <thead><tr><th>Step 1</th><th></th><th>Step 2</th><th>Visits</th><th>% of visits</th></tr></thead>
       <tbody>
         {% for flow in top_flows %}
         <tr>
@@ -199,6 +197,7 @@
           <td class="text-muted small">&rarr;</td>
           <td class="small">{{ flow.to }}</td>
           <td>{{ flow.count }}</td>
+          <td class="text-muted small">{{ flow.pct }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -330,6 +329,6 @@
 {% endif %}
 
 <div class="alert alert-info small mb-0">
-  <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means the visitor's ID appeared before the selected date range. "Visits" are split after {{ visit_timeout_minutes }} minutes of inactivity.
+  <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means a visitor had two or more visits in the selected period. "Visits" are split after {{ visit_timeout_minutes }} minutes of inactivity.
 </div>
 

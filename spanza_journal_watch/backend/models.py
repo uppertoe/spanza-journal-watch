@@ -1084,6 +1084,4 @@ class PubmedBatchArticle(TimeStampedModel):
 
 
 def can_recommend_pubmed_articles(user):
-    if not getattr(user, "is_authenticated", False):
-        return False
-    return user.has_perm("submissions.can_recommend")
+    return bool(getattr(user, "is_authenticated", False))

@@ -1,9 +1,11 @@
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
 from spanza_journal_watch.analytics.utils import is_probable_automated_event
+from spanza_journal_watch.newsletter.cookies import has_subscribed_cookie
 from spanza_journal_watch.submissions.models import Hit, Issue, Tag
 from spanza_journal_watch.utils.cache import get_content_cache_version
 
@@ -25,9 +27,18 @@ class AnonymousCacheMixin:
         if request.method != "GET" or request.user.is_authenticated:
             return super().dispatch(request, *args, **kwargs)
 
+        # Skip cache when the session personalises the drawer with a subscriber
+        # email — otherwise one user's email would be served to another. Only
+        # touch request.session when there's actually a session cookie, so
+        # sub-resource responses stay cacheable (no Vary: Cookie added).
+        session_cookie_name = getattr(settings, "SESSION_COOKIE_NAME", "sessionid")
+        if request.COOKIES.get(session_cookie_name) and request.session.get("subscriber_id"):
+            return super().dispatch(request, *args, **kwargs)
+
         is_htmx = request.headers.get("HX-Request") == "true"
+        sub_flag = int(has_subscribed_cookie(request))
         version = get_content_cache_version()
-        cache_key = f"page:v{version}:{request.get_full_path()}:htmx={is_htmx}"
+        cache_key = f"page:v{version}:{request.get_full_path()}:htmx={is_htmx}:sub={sub_flag}"
 
         response = cache.get(cache_key)
         if response is not None:

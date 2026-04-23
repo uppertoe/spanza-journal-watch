@@ -122,7 +122,13 @@ class AnalyticsEvent(models.Model):
         JOURNAL_ARTICLE_INTERACT = "journal_article_interact", "Journal article interaction"
         JOURNAL_FULL_TEXT_CLICK = "journal_full_text_click", "Journal full text click"
         JOURNAL_STAR = "journal_star", "Journal article starred"
+        JOURNAL_RECOMMEND = "journal_recommend", "Journal article recommended"
+        JOURNAL_MARK_READ = "journal_mark_read", "Journal article marked read"
+        JOURNAL_ARCHIVE = "journal_archive", "Journal article archived"
+        JOURNAL_SEARCH = "journal_search", "Journal browser search"
         JOURNAL_SELECT = "journal_select", "Journal selected"
+        NEWSLETTER_SUBSCRIBE = "newsletter_subscribe", "Newsletter subscribe"
+        CPD_TRACKING_TOGGLE = "cpd_tracking_toggle", "CPD tracking toggled"
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
     object_id = models.PositiveIntegerField(blank=True, null=True)

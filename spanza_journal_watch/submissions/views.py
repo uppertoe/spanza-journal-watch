@@ -1084,6 +1084,7 @@ class HealthServiceListView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMix
         authors_qs = (
             Author.objects.exclude(anonymous=True)
             .annotate(review_count=Count("reviews", filter=Q(reviews__active=True), distinct=True))
+            .filter(review_count__gt=0)
             .order_by("name")
         )
 

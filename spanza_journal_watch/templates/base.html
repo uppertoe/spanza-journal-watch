@@ -248,17 +248,7 @@
           <div class="jw-masthead__title text-center flex-grow-1">
             <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text">Journal Watch</span></a>
           </div>
-          <div class="jw-masthead__profile flex-shrink-0">
-            <button class="jw-profile-btn" type="button"
-                    data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
-                    aria-controls="user-profile-drawer" aria-label="User menu">
-              <span class="jw-profile-btn__icon">
-                <svg class="bi" width="1.2em" height="1.2em"><use href="#icon-person"></use></svg>
-              </span>
-              <span class="jw-profile-btn__label d-none d-md-inline small fw-semibold">Profile</span>
-              <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
-            </button>
-          </div>
+          {% include "fragments/masthead_profile_button.html" %}
         </div>
       </header>
 

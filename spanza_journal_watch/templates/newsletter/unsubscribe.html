@@ -1,19 +1,38 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content %}
-<div class="row">
-    <div class="col-md-6 offset-md-3">
-        <div class="p-3">
-            <img src="{% static "images/errors/bell-slash.svg" %}" alt="Unsubscribe?" width="100px">
-        </div>
-        <h1>Unsubscribe from Journal Watch?</h1>
+{% block title %}Unsubscribe{% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
 
-        <p>Confirm that you want to unsubscribe {{ email }} from the Journal Watch newsletter.</p>
-        <form method="post" action="{% url "newsletter:confirm-unsubscribe" unsubscribe_token=unsubscribe_token %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-warning">Unsubscribe</button>
-        </form>
+{% block content %}
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+                <div class="mb-3">
+                    <img src="{% static 'images/errors/bell-slash.svg' %}" alt="" width="72" height="72">
+                </div>
+                <p class="text-uppercase text-secondary fw-semibold mb-2">Newsletter</p>
+                <h1 class="h3 mb-3">Unsubscribe from Journal Watch?</h1>
+                <p class="text-body-secondary mb-4">
+                    Confirm that you want to unsubscribe
+                    <span class="fw-semibold text-body">{{ email }}</span>
+                    from the Journal Watch newsletter.
+                </p>
+
+                <form method="post" action="{% url 'newsletter:confirm-unsubscribe' unsubscribe_token=unsubscribe_token %}"
+                      class="d-flex flex-wrap justify-content-center gap-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-warning">Unsubscribe</button>
+                    <a class="btn btn-outline-secondary" href="{% url 'home' %}">Cancel</a>
+                </form>
+
+                <p class="small text-body-secondary mt-4 mb-0">You can resubscribe at any time from the homepage.</p>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

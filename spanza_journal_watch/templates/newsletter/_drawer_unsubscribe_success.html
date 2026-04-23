@@ -1,0 +1,22 @@
+{% load static %}
+<div id="drawer-subscribe-container">
+  <div class="alert alert-secondary mb-3" role="status">
+    <p class="small mb-0">You've been unsubscribed. Changed your mind?</p>
+  </div>
+  <form hx-post="{% url 'newsletter:subscribe' %}?source=drawer"
+        hx-target="#drawer-subscribe-container"
+        hx-swap="outerHTML"
+        hx-indicator="#drawer-subscribe-spinner">
+    {% csrf_token %}
+    <input type="hidden" name="source" value="drawer">
+    <div class="input-group input-group-sm">
+      {{ form.email }}
+      <button class="btn btn-primary" type="submit">Subscribe</button>
+    </div>
+    <img id="drawer-subscribe-spinner"
+         class="htmx-indicator d-block mx-auto mt-2"
+         width="28" height="28"
+         src="{% static 'images/spinners/pulse-rings-multiple.svg' %}"
+         alt="">
+  </form>
+</div>

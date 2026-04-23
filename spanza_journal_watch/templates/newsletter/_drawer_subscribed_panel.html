@@ -1,0 +1,31 @@
+{% load static %}
+<div id="drawer-subscribe-container">
+  <div class="alert alert-success mb-3" role="status">
+    <p class="fw-semibold mb-1">
+      <svg class="bi me-1" width="1em" height="1em"><use href="#icon-check"></use></svg>
+      You're subscribed
+    </p>
+    {% if subscriber_email %}
+      <p class="small mb-0">Reviews go to <span class="fw-semibold">{{ subscriber_email }}</span>.</p>
+    {% else %}
+      <p class="small mb-0">Manage your subscription via the link in any of our emails.</p>
+    {% endif %}
+  </div>
+
+  {% if can_unsubscribe_from_drawer %}
+    <form hx-post="{% url 'newsletter:drawer_unsubscribe' %}"
+          hx-target="#drawer-subscribe-container"
+          hx-swap="outerHTML"
+          hx-indicator="#drawer-unsub-spinner">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+        Unsubscribe
+      </button>
+      <img id="drawer-unsub-spinner"
+           class="htmx-indicator d-block mx-auto mt-2"
+           width="22" height="22"
+           src="{% static 'images/spinners/pulse-rings-multiple.svg' %}"
+           alt="">
+    </form>
+  {% endif %}
+</div>

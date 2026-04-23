@@ -175,6 +175,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "spanza_journal_watch.newsletter.middleware.SubscriberCookieMiddleware",
     "spanza_journal_watch.backend.middleware.HtmxMessagesMiddleware",
     "spanza_journal_watch.analytics.middleware.PageVisitAnalyticsMiddleware",
 ]
@@ -226,6 +227,7 @@ TEMPLATES = [
                 "spanza_journal_watch.utils.context_processors.content_cache_version",
                 "spanza_journal_watch.backend.context_processors.selected_issue",
                 "spanza_journal_watch.backend.context_processors.frontend_banner",
+                "spanza_journal_watch.newsletter.context_processors.subscriber_state",
             ],
             "builtins": [
                 "spanza_journal_watch.submissions.templatetags.wrapchars",  # Add your app's templatetags module here

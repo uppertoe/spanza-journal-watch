@@ -17,6 +17,7 @@ from spanza_journal_watch.analytics.utils import (
     is_probable_automated_newsletter_event,
     set_newsletter_referrer_in_session,
 )
+from spanza_journal_watch.newsletter.cookies import set_subscribed_cookie
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Review
 
@@ -82,6 +83,7 @@ def track_email_open(request):
 
         # Identify the subscriber in the session
         request.session["subscriber_id"] = subscriber.pk
+        request.session["subscriber_email"] = subscriber.email
 
     response = HttpResponse(_get_tracking_pixel(), content_type="image/png")
     return response
@@ -117,6 +119,7 @@ def track_newsletter_link(request, newsletter_token):
 
         # Identify the subscriber in the session
         request.session["subscriber_id"] = subscriber.pk
+        request.session["subscriber_email"] = subscriber.email
         set_newsletter_referrer_in_session(request)
 
         AnalyticsEvent.record_event(
@@ -127,7 +130,10 @@ def track_newsletter_link(request, newsletter_token):
             metadata={"newsletter_id": newsletter.pk, "destination_url": (next or "")[:512]},
         )
 
-    return _get_next_url(request, next)
+    response = _get_next_url(request, next)
+    if subscriber:
+        set_subscribed_cookie(response)
+    return response
 
 
 def page_view(request, model=None, slug=None):
@@ -156,6 +162,7 @@ def track_email_click(request):
     subscriber = Subscriber.first_by_email(email)
     if subscriber:
         request.session["subscriber_id"] = subscriber.pk
+        request.session["subscriber_email"] = subscriber.email
         set_newsletter_referrer_in_session(request)
         AnalyticsEvent.record_event(
             event_type=AnalyticsEvent.EventType.PAGE_VISIT,
@@ -168,7 +175,10 @@ def track_email_click(request):
         subscriber = None
         logger.warning("No subscriber by this email: %s", email)
 
-    return _get_next_url(request, next)
+    response = _get_next_url(request, next)
+    if subscriber:
+        set_subscribed_cookie(response)
+    return response
 
 
 @csrf_exempt

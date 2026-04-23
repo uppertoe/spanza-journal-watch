@@ -75,6 +75,8 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "telegrambot",
     "whatsapp",
     "applebot",
+    # Miscellaneous crawlers observed in prod analytics
+    "leads-enricher",
 ]
 
 NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=60)
@@ -94,6 +96,13 @@ def is_probable_automated_event(request, event_type=None):
     # Generic crawler convention: UA contains a URL identifying the bot
     # (e.g. "... +http://example.com/bot"). Real browsers never do this.
     if "+http://" in user_agent or "+https://" in user_agent:
+        return True
+    # Research-bot self-identification ("+contact: ..." in UA body).
+    if "+contact:" in user_agent:
+        return True
+    # Real Chrome UAs always carry AppleWebKit/ and Safari/ tokens. Bots often
+    # fabricate a "Chrome/NNN.0.0.0" stub — catch the mismatch.
+    if "chrome/" in user_agent and "applewebkit/" not in user_agent:
         return True
 
     # Common prefetch/scanner headers

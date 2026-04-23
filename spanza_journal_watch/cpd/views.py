@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 
+from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.backend.models import PubmedArticleUserState
 from spanza_journal_watch.cpd.models import CPDReport
 from spanza_journal_watch.submissions.models import Issue
@@ -18,6 +19,13 @@ logger = logging.getLogger(__name__)
 def toggle_cpd_tracking(request):
     request.user.cpd_tracking_enabled = not request.user.cpd_tracking_enabled
     request.user.save(update_fields=["cpd_tracking_enabled"])
+    AnalyticsEvent.record_event(
+        event_type=AnalyticsEvent.EventType.CPD_TRACKING_TOGGLE,
+        request=request,
+        subscriber_id=request.session.get("subscriber_id"),
+        source="profile_drawer",
+        metadata={"enabled": bool(request.user.cpd_tracking_enabled)},
+    )
     response = render(request, "fragments/cpd_tracking_toggle.html", {"user": request.user})
     response["HX-Trigger"] = "cpdTrackingChanged"
     return response

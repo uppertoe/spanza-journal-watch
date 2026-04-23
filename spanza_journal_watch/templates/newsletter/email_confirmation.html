@@ -27,11 +27,23 @@
           Thank you for subscribing to SPANZA Journal Watch.
         </mj-text>
         <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="8px">
-          You will receive updates with each new issue, published every two months. Each issue features editorial reviews of notable articles from the paediatric anaesthesia literature.
+          You will receive updates with each new issue, published every few months. Each issue features editorial reviews of notable articles from the paediatric anaesthesia literature.
         </mj-text>
         <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="20px">
           In the meantime, you can browse previous issues and the journal shelf at <a href="{{ tracker }}/" style="color:#2f5a80;">journalwatch.org.au</a>
         </mj-text>
+        {% if not subscriber.user %}
+        <mj-divider border-color="#e3e8ef" border-width="1px" padding="0 0 20px" />
+        <mj-text font-size="15px" font-weight="600" color="#1e4468" padding-bottom="6px">
+          Want more than the newsletter?
+        </mj-text>
+        <mj-text font-size="14px" color="#444444" line-height="1.6" padding-bottom="14px">
+          Create a free account to track your CPD, save articles to a reading list, and manage your subscription preferences.
+        </mj-text>
+        <mj-button background-color="#1e4468" color="#ffffff" border-radius="6px" font-size="14px" font-weight="600" href="{{ domain }}{% url 'account_signup' %}?email={{ subscriber.email|urlencode }}" padding="0 0 20px" inner-padding="10px 22px">
+          Create an account
+        </mj-button>
+        {% endif %}
         <mj-text font-size="14px" color="#8a96a2" line-height="1.55">
           Sincerely,<br>The SPANZA Journal Watch team
         </mj-text>

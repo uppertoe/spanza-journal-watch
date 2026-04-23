@@ -1707,17 +1707,64 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     );
   });
 
-  // Track star toggles via HTMX
+  // Track article action toggles (star, recommend, mark-read, archive) via HTMX
+  var ARTICLE_ACTION_PATTERNS = [
+    { re: /\/journals\/articles\/(\d+)\/star/, event: 'journal_star' },
+    {
+      re: /\/journals\/articles\/(\d+)\/recommend/,
+      event: 'journal_recommend',
+    },
+    {
+      re: /\/journals\/articles\/(\d+)\/mark-read/,
+      event: 'journal_mark_read',
+    },
+    { re: /\/journals\/articles\/(\d+)\/archive/, event: 'journal_archive' },
+  ];
   document.body.addEventListener('htmx:afterRequest', function (e) {
     var path = (e.detail.pathInfo && e.detail.pathInfo.requestPath) || '';
-    if (path.indexOf('toggle-star') === -1) return;
+    if (path.indexOf('/journals/articles/') === -1) return;
     if (e.detail.successful !== true) return;
 
-    var match = path.match(/\/journals\/(\d+)\/toggle-star/);
-    var articleId = match ? Number(match[1]) : 0;
+    for (var i = 0; i < ARTICLE_ACTION_PATTERNS.length; i++) {
+      var match = path.match(ARTICLE_ACTION_PATTERNS[i].re);
+      if (match) {
+        sendAnalyticsEvent({
+          event_type: ARTICLE_ACTION_PATTERNS[i].event,
+          metadata: { article_id: Number(match[1]) || 0 },
+        });
+        return;
+      }
+    }
+  });
+
+  // Track in-browser journal search queries (dedupe identical consecutive queries)
+  var lastJournalSearchSignature = '';
+  document.body.addEventListener('htmx:afterRequest', function (e) {
+    var path = (e.detail.pathInfo && e.detail.pathInfo.requestPath) || '';
+    if (path.indexOf('/journals/search') === -1) return;
+    if (e.detail.successful !== true) return;
+
+    var url = e.detail.xhr && e.detail.xhr.responseURL;
+    if (!url) return;
+    var params;
+    try {
+      params = new URL(url).searchParams;
+    } catch (_err) {
+      return;
+    }
+    var query = (params.get('q') || '').trim();
+    var journalId = params.get('journal') || '';
+    if (!query && !journalId) return;
+    var signature = query + '|' + journalId;
+    if (signature === lastJournalSearchSignature) return;
+    lastJournalSearchSignature = signature;
+
     sendAnalyticsEvent({
-      event_type: 'journal_star',
-      metadata: { article_id: articleId },
+      event_type: 'journal_search',
+      metadata: {
+        query: query.slice(0, 128),
+        journal_id: Number(journalId) || null,
+      },
     });
   });
 })();

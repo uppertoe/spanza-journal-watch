@@ -1,4 +1,5 @@
 {% load static %}
+{% load newsletter_tags %}
 
 <div class="offcanvas offcanvas-end" tabindex="-1" id="user-profile-drawer" aria-labelledby="user-profile-drawer-label">
   <div class="offcanvas-header border-bottom">
@@ -40,11 +41,31 @@
       </div>
 
     {% else %}
-      {# ── Anonymous user ────────────────────────────── #}
-      <p class="text-muted mb-4">Create an account to subscribe to our newsletter and manage your reading list.</p>
-      <div class="d-grid gap-2 mb-4">
-        <a href="{% url 'account_login' %}" class="btn btn-outline-primary">Log in</a>
-        <a href="{% url 'account_signup' %}" class="btn btn-primary">Sign up</a>
+      {# ── Anonymous ──────────────────────────────────── #}
+      <div class="mb-4">
+        <h6 class="fw-semibold mb-2">
+          <svg class="bi me-1" width="1em" height="1em"><use href="#icon-email"></use></svg>
+          Newsletter
+        </h6>
+        {% if is_known_subscriber %}
+          {% drawer_subscribed_panel %}
+        {% else %}
+          {% drawer_subscribe_form %}
+        {% endif %}
+      </div>
+
+      <hr class="my-4">
+
+      {# ── Anonymous: secondary account ──────────────── #}
+      <div>
+        <h6 class="fw-semibold mb-2">Want more?</h6>
+        <p class="text-muted small mb-3">
+          Create an account to track CPD, save articles, and manage your subscription.
+        </p>
+        <div class="d-grid gap-2">
+          <a href="{% url 'account_signup' %}" class="btn btn-outline-primary btn-sm">Sign up</a>
+          <a href="{% url 'account_login' %}" class="btn btn-link btn-sm text-decoration-none">Already have an account? Log in</a>
+        </div>
       </div>
     {% endif %}
   </div>

@@ -105,9 +105,9 @@ class TestFreshUserHasNoAccess:
         user = UserFactory()
         assert user.has_perm("submissions.can_recommend") is False
 
-    def test_cannot_recommend(self):
+    def test_any_authenticated_user_can_recommend(self):
         user = UserFactory()
-        assert can_recommend_pubmed_articles(user) is False
+        assert can_recommend_pubmed_articles(user) is True
 
     def test_cannot_access_backend(self):
         user = UserFactory()
@@ -276,9 +276,9 @@ class TestCanRecommendGating:
 
         assert can_recommend_pubmed_articles(AnonymousUser()) is False
 
-    def test_plain_user_cannot_recommend(self):
+    def test_plain_user_can_recommend(self):
         user = UserFactory()
-        assert can_recommend_pubmed_articles(user) is False
+        assert can_recommend_pubmed_articles(user) is True
 
     def test_user_with_permission_can_recommend(self):
         from django.contrib.auth.models import Permission
@@ -289,7 +289,6 @@ class TestCanRecommendGating:
             codename="can_recommend",
         )
         user.user_permissions.add(perm)
-        # Refresh to clear cached permissions
         user = User.objects.get(pk=user.pk)
         assert can_recommend_pubmed_articles(user) is True
 

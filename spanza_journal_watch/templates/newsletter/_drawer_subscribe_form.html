@@ -1,0 +1,29 @@
+{% load static %}
+<div id="drawer-subscribe-container">
+  <form hx-post="{% url 'newsletter:subscribe' %}?source=drawer"
+        hx-target="#drawer-subscribe-container"
+        hx-swap="outerHTML"
+        hx-indicator="#drawer-subscribe-spinner">
+    {% csrf_token %}
+    <input type="hidden" name="source" value="drawer">
+    <div class="input-group input-group-sm">
+      {{ form.email }}
+      <button class="btn btn-primary" type="submit">
+        Subscribe
+      </button>
+    </div>
+    <img id="drawer-subscribe-spinner"
+         class="htmx-indicator d-block mx-auto mt-2"
+         width="28" height="28"
+         src="{% static 'images/spinners/pulse-rings-multiple.svg' %}"
+         alt="">
+    {% if form.email.errors %}
+      <div class="text-danger small mt-2">
+        {% for error in form.email.errors %}
+          {{ error|escape }}
+        {% endfor %}
+      </div>
+    {% endif %}
+    <p class="text-muted small mb-0 mt-2">Reviews in your inbox every few months. No account needed.</p>
+  </form>
+</div>

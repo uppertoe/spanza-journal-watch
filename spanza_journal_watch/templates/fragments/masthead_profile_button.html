@@ -1,0 +1,23 @@
+<div class="jw-masthead__profile flex-shrink-0" id="masthead-profile-button"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% if is_known_subscriber %}
+    <button class="jw-profile-btn" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
+            aria-controls="user-profile-drawer" aria-label="User menu">
+      <span class="jw-profile-btn__icon">
+        <svg class="bi" width="1.2em" height="1.2em"><use href="#icon-person"></use></svg>
+      </span>
+      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold">Profile</span>
+      <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
+    </button>
+  {% else %}
+    <button class="jw-profile-btn" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
+            aria-controls="user-profile-drawer" aria-label="Subscribe">
+      <span class="jw-profile-btn__icon">
+        <svg class="bi" width="1.2em" height="1.2em"><use href="#icon-email"></use></svg>
+      </span>
+      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold">Subscribe</span>
+      <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
+    </button>
+  {% endif %}
+</div>

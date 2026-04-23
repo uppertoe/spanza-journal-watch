@@ -78,6 +78,10 @@ _JOURNAL_EVENT_TYPES = frozenset(
         AnalyticsEvent.EventType.JOURNAL_ARTICLE_INTERACT,
         AnalyticsEvent.EventType.JOURNAL_FULL_TEXT_CLICK,
         AnalyticsEvent.EventType.JOURNAL_STAR,
+        AnalyticsEvent.EventType.JOURNAL_RECOMMEND,
+        AnalyticsEvent.EventType.JOURNAL_MARK_READ,
+        AnalyticsEvent.EventType.JOURNAL_ARCHIVE,
+        AnalyticsEvent.EventType.JOURNAL_SEARCH,
         AnalyticsEvent.EventType.JOURNAL_SELECT,
     ]
 )
@@ -95,7 +99,11 @@ _VISIT_PROGRESSION_EVENT_TYPES = frozenset(
         AnalyticsEvent.EventType.JOURNAL_ARTICLE_INTERACT,
         AnalyticsEvent.EventType.JOURNAL_FULL_TEXT_CLICK,
         AnalyticsEvent.EventType.JOURNAL_STAR,
+        AnalyticsEvent.EventType.JOURNAL_RECOMMEND,
+        AnalyticsEvent.EventType.JOURNAL_MARK_READ,
+        AnalyticsEvent.EventType.JOURNAL_ARCHIVE,
         AnalyticsEvent.EventType.JOURNAL_SELECT,
+        AnalyticsEvent.EventType.NEWSLETTER_SUBSCRIBE,
     ]
 )
 
@@ -158,6 +166,10 @@ def _derive_visit_landing_page(row):
         AnalyticsEvent.EventType.JOURNAL_ARTICLE_INTERACT,
         AnalyticsEvent.EventType.JOURNAL_FULL_TEXT_CLICK,
         AnalyticsEvent.EventType.JOURNAL_STAR,
+        AnalyticsEvent.EventType.JOURNAL_RECOMMEND,
+        AnalyticsEvent.EventType.JOURNAL_MARK_READ,
+        AnalyticsEvent.EventType.JOURNAL_ARCHIVE,
+        AnalyticsEvent.EventType.JOURNAL_SEARCH,
         AnalyticsEvent.EventType.JOURNAL_SELECT,
     }:
         return "/journals"
@@ -426,7 +438,13 @@ _FLOW_LABELS = {
     "journal_article_interact": "Journal article",
     "journal_select": "Journal selected",
     "journal_star": "Journal starred",
+    "journal_recommend": "Journal recommended",
+    "journal_mark_read": "Journal marked read",
+    "journal_archive": "Journal archived",
+    "journal_search": "Journal search",
     "journal_full_text_click": "Journal full text",
+    "newsletter_subscribe": "Newsletter subscribe",
+    "cpd_tracking_toggle": "CPD tracking toggle",
 }
 
 
@@ -558,24 +576,36 @@ def _format_event_detail(event_row, extra, title):
 
 
 def _compute_top_flows(visits):
-    """Return the top 8 two-step transitions across derived visits."""
+    """Return the top two-step transitions across derived visits.
+
+    Self-transitions (X → X) are dropped — they're usually page_visit / scroll
+    flush noise and crowd out genuinely informative movement between surfaces.
+    """
     transition_counter = Counter()
+    total_visits_with_transition = 0
     for visit in visits:
         event_types = [row["event_type"] for row in visit["events"][:10]]
         seen = set()
+        had_transition = False
         for i in range(len(event_types) - 1):
+            if event_types[i] == event_types[i + 1]:
+                continue
             pair = (event_types[i], event_types[i + 1])
             if pair not in seen:
                 transition_counter[pair] += 1
                 seen.add(pair)
+                had_transition = True
+        if had_transition:
+            total_visits_with_transition += 1
 
     return [
         {
             "from": _FLOW_LABELS.get(a, a),
             "to": _FLOW_LABELS.get(b, b),
             "count": count,
+            "pct": _safe_percentage(count, total_visits_with_transition),
         }
-        for (a, b), count in transition_counter.most_common(8)
+        for (a, b), count in transition_counter.most_common(12)
     ]
 
 
@@ -1486,19 +1516,22 @@ def analytics_traffic(request):
     ]
 
     visitor_ids_in_period = set(human_events.exclude(visitor_id=None).values_list("visitor_id", flat=True).distinct())
-    returning_count = 0
-    new_count = 0
-    if visitor_ids_in_period:
-        returning_ids = set(
-            AnalyticsEvent.objects.filter(
-                visitor_id__in=visitor_ids_in_period,
-                timestamp__lt=start_ts,
-            )
-            .values_list("visitor_id", flat=True)
-            .distinct()
-        )
-        returning_count = len(returning_ids)
-        new_count = len(visitor_ids_in_period) - returning_count
+
+    # "Returning" = visitor had 2+ derived visits in the period (matches the recent
+    # visits list below). This replaces the older pre-period definition, which
+    # couldn't produce results until the jwvid cookie history aged past the
+    # typical lookback window.
+    visits_per_visitor = Counter()
+    visitor_dates = defaultdict(set)
+    for visit in visits:
+        vid = visit["visitor_id"]
+        if not vid:
+            continue
+        visits_per_visitor[vid] += 1
+        visitor_dates[vid].add(visit["first_event"].date())
+    returning_count = sum(1 for v in visits_per_visitor.values() if v >= 2)
+    multi_day_count = sum(1 for ds in visitor_dates.values() if len(ds) >= 2)
+    new_count = len(visitor_ids_in_period) - returning_count
 
     page_counts = Counter()
     section_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "single_event_visits": 0})
@@ -1682,6 +1715,7 @@ def analytics_traffic(request):
         "other_domains": other_domains,
         "new_visitors": new_count,
         "returning_visitors": returning_count,
+        "multi_day_visitors": multi_day_count,
         "total_visitors": len(visitor_ids_in_period),
         "returning_rate": _safe_percentage(returning_count, len(visitor_ids_in_period)),
         "site_analytics_rollout_date": rollout_date,
