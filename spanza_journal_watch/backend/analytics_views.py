@@ -53,6 +53,7 @@ _LANDING_PAGE_EXACT_EXCLUSIONS = frozenset(
     ["/manifest.json", "/sw.js", "/robots.txt", "/healthz", "/site.webmanifest", "/favicon.ico"]
 )
 _LANDING_PAGE_SUFFIX_EXCLUSIONS = (".png", ".svg", ".xml", ".ico", ".js", ".json", ".webmanifest")
+_LANDING_PAGE_PREFIX_EXCLUSIONS = ("/analytics/link/",)
 _VISIT_INACTIVITY_GAP = datetime.timedelta(minutes=30)
 _LOW_SAMPLE_THRESHOLD = 5
 _VISIT_PAGE_PATHS = {
@@ -129,6 +130,8 @@ def _is_reportable_landing_page(path):
     if not cleaned_path:
         return False
     if cleaned_path in _LANDING_PAGE_EXACT_EXCLUSIONS:
+        return False
+    if cleaned_path.startswith(_LANDING_PAGE_PREFIX_EXCLUSIONS):
         return False
     return not cleaned_path.endswith(_LANDING_PAGE_SUFFIX_EXCLUSIONS)
 
@@ -414,6 +417,9 @@ _FLOW_LABELS = {
     "page_visit": "Page visit",
     "journal_browser_visit": "Journals browser",
     "journal_article_interact": "Journal article",
+    "journal_select": "Journal selected",
+    "journal_star": "Journal starred",
+    "journal_full_text_click": "Journal full text",
 }
 
 
@@ -495,11 +501,13 @@ def _format_event_detail(event_row, extra, title):
     if share_token:
         parts.append(f"share {share_token[:8]}")
     metadata = event_row.get("metadata") or {}
-    for key in ("query", "page"):
-        value = metadata.get(key)
-        if value and value not in parts:
-            parts.append(str(value))
-            break
+    query = metadata.get("query")
+    if query:
+        parts.append(str(query))
+    elif not title:
+        page = metadata.get("page")
+        if page:
+            parts.append(_VISIT_PAGE_PATHS.get(page, str(page)))
     return " · ".join(parts)
 
 
@@ -1545,7 +1553,11 @@ def analytics_traffic(request):
     recent_sessions = []
     for visit in recent_visit_rows:
         events = visit["events"]
-        duration_s = (visit["last_event"] - visit["first_event"]).total_seconds() if len(events) > 1 else 0
+        if len(events) > 1:
+            duration_s = (visit["last_event"] - visit["first_event"]).total_seconds()
+            duration_label = f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m"
+        else:
+            duration_label = "—"
         recent_sessions.append(
             {
                 "session_key": visit["visit_key"][:12],
@@ -1557,7 +1569,7 @@ def analytics_traffic(request):
                 "event_count": len(events),
                 "first_event": visit["first_event"],
                 "last_event": visit["last_event"],
-                "duration": f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m",
+                "duration": duration_label,
                 "engaged": _visit_is_engaged(visit),
                 "events": [
                     {
@@ -1582,6 +1594,11 @@ def analytics_traffic(request):
         if parts:
             referrer_insight = "Visit starts: " + ", ".join(parts) + "."
 
+    rollout_date = _site_analytics_rollout_date()
+    rollout_mature = False
+    if rollout_date is not None:
+        rollout_mature = (timezone.localdate() - rollout_date).days >= 90
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -1592,6 +1609,8 @@ def analytics_traffic(request):
         "returning_visitors": returning_count,
         "total_visitors": len(visitor_ids_in_period),
         "returning_rate": _safe_percentage(returning_count, len(visitor_ids_in_period)),
+        "site_analytics_rollout_date": rollout_date,
+        "site_analytics_rollout_mature": rollout_mature,
         "page_breakdown": page_breakdown,
         "journal_visits": journal_visits,
         "traffic_chart_labels_json": json.dumps(traffic_chart_labels),
@@ -2038,12 +2057,16 @@ def analytics_visitor(request, visitor_id):
 
     visit_rows = []
     for visit in visits:
-        duration_s = (visit["last_event"] - visit["first_event"]).total_seconds() if len(visit["events"]) > 1 else 0
+        if len(visit["events"]) > 1:
+            duration_s = (visit["last_event"] - visit["first_event"]).total_seconds()
+            duration_label = f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m"
+        else:
+            duration_label = "—"
         visit_rows.append(
             {
                 "first_event": visit["first_event"],
                 "last_event": visit["last_event"],
-                "duration": f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m",
+                "duration": duration_label,
                 "event_count": len(visit["events"]),
                 "referrer": referrer_labels.get(visit["referrer_category"], visit["referrer_category"] or "Unknown"),
                 "referrer_domain": visit["referrer_domain"] or "",

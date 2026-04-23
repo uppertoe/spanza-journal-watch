@@ -20,6 +20,9 @@
       <h6 class="text-muted mb-1 small">Returning</h6>
       <p class="display-6 mb-0">{{ returning_visitors }}</p>
       <p class="small text-muted mb-0">{{ returning_rate }}</p>
+      {% if not site_analytics_rollout_mature and site_analytics_rollout_date %}
+      <p class="small text-warning-emphasis mb-0 mt-1" style="font-size:0.7rem" title="Visitor IDs only exist since the site analytics rollout. Returning counts will trend up until this cohort is ≥90d old.">Since {{ site_analytics_rollout_date|date:"j M Y" }}</p>
+      {% endif %}
     </div></div>
   </div>
   <div class="col-6 col-md-3">

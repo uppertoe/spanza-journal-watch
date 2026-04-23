@@ -100,7 +100,7 @@
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Shares</h6>
       <p class="display-6 mb-0">{{ total_shares }}</p>
-      <p class="small text-muted mb-0">{{ share_rate }} of opens</p>
+      <p class="small text-muted mb-0">{{ share_rate }} of impressions</p>
       {% if delta_shares is not None %}<p class="small mb-0 {% if delta_shares >= 0 %}text-success{% else %}text-danger{% endif %}">{% if delta_shares > 0 %}+{% endif %}{{ delta_shares }}%</p>{% endif %}
     </div></div>
   </div>

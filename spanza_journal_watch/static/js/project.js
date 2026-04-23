@@ -359,6 +359,7 @@ const flushReviewSession = (element, { beacon = true } = {}) => {
       review_id: session.reviewId,
       source: session.source,
       duration_ms: session.totalVisibleMs,
+      scroll_depth: pageScrollDepthMax || null,
     },
     { beacon },
   );
