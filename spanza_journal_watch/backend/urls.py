@@ -270,6 +270,16 @@ urlpatterns = [
     path("analytics/traffic/", analytics_views.analytics_traffic, name="analytics_traffic"),
     path("analytics/email/", analytics_views.analytics_email, name="analytics_email"),
     path("analytics/journals/", analytics_views.analytics_journals, name="analytics_journals"),
+    path(
+        "analytics/visitor/<uuid:visitor_id>/",
+        analytics_views.analytics_visitor,
+        name="analytics_visitor",
+    ),
+    path(
+        "analytics/review/<int:review_pk>/timeline/",
+        analytics_views.analytics_review_timeline,
+        name="analytics_review_timeline",
+    ),
     # Legacy redirects
     path("analytics/content/", analytics_views.analytics_content, name="analytics_content"),
     path("analytics/search/", analytics_views.analytics_search, name="analytics_search"),

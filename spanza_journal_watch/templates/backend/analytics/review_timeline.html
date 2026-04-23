@@ -1,0 +1,77 @@
+{% extends "backend/analytics/_base.html" %}
+{% block analytics_content %}
+<div class="mb-3">
+  <a href="{% url 'backend:analytics_editorial' %}" class="small text-decoration-none">&larr; Back to Editorial</a>
+</div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">{{ review }}</h1>
+    <p class="text-muted small mb-0">Event timeline · last {{ lookback_days }} days</p>
+  </div>
+  <div>
+    <a href="{{ review.get_absolute_url }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">View review</a>
+  </div>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body py-2">
+      <div class="text-muted small" title="Review scrolled into view (≥25% visible)">Impressions</div>
+      <div class="h4 mb-0">{{ impressions }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body py-2">
+      <div class="text-muted small" title="Review visible for ≥5 seconds">Sustained views</div>
+      <div class="h4 mb-0">{{ sustained_views }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body py-2">
+      <div class="text-muted small">Full-text clicks</div>
+      <div class="h4 mb-0">{{ full_text_clicks }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100"><div class="card-body py-2">
+      <div class="text-muted small">Avg dwell</div>
+      <div class="h4 mb-0">{{ avg_duration_s }}s</div>
+    </div></div>
+  </div>
+</div>
+
+{% if timeline %}
+<div class="card mb-3">
+  <div class="card-header">Events ({{ total_events }} in window)</div>
+  <table class="table table-sm small mb-0">
+    <thead><tr><th>Time</th><th>Event</th><th>Visitor</th><th>Referrer</th><th>Detail</th></tr></thead>
+    <tbody>
+      {% for event in timeline %}
+      <tr>
+        <td class="text-nowrap text-muted">{{ event.timestamp|date:"j M H:i:s" }}</td>
+        <td>{{ event.type }}</td>
+        <td>
+          {% if event.visitor_id %}
+          <a href="{% url 'backend:analytics_visitor' visitor_id=event.visitor_id %}" class="text-decoration-none"><code>{{ event.visitor_id_short }}</code></a>
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        </td>
+        <td class="text-muted">{{ event.referrer_domain|default:event.referrer|default:"—" }}</td>
+        <td class="text-muted text-break">{{ event.detail }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if total_pages > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center small">
+    <span class="text-muted">Page {{ page }} of {{ total_pages }}</span>
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary {% if not has_prev %}disabled{% endif %}" href="?page={{ page|add:'-1' }}">Previous</a>
+      <a class="btn btn-outline-secondary {% if not has_next %}disabled{% endif %}" href="?page={{ page|add:'1' }}">Next</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<p class="text-muted">No events recorded for this review in the last {{ lookback_days }} days.</p>
+{% endif %}
+{% endblock %}

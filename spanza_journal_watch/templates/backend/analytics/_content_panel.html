@@ -10,11 +10,11 @@
     {% if total_opens %}
     <div class="d-flex flex-column gap-2">
       <div>
-        <div class="d-flex justify-content-between small mb-1"><span>Opens</span><span>{{ total_opens }}</span></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Impressions</span><span>{{ total_opens }}</span></div>
         <div class="progress" style="height:8px"><div class="progress-bar bg-secondary" style="width:100%"></div></div>
       </div>
       <div>
-        <div class="d-flex justify-content-between small mb-1"><span>Engaged (5s+)</span><span>{{ total_engaged }} <span class="text-muted">({{ engaged_rate }})</span></span></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Sustained views</span><span>{{ total_engaged }} <span class="text-muted">({{ engaged_rate }})</span></span></div>
         <div class="progress" style="height:8px"><div class="progress-bar" style="width:{% widthratio total_engaged total_opens 100 %}%"></div></div>
       </div>
       <div>
@@ -27,7 +27,7 @@
       </div>
     </div>
     {% else %}
-    <p class="text-muted mb-0 small">No review opens in this date range.</p>
+    <p class="text-muted mb-0 small">No impressions in this date range.</p>
     {% endif %}
   </div>
 </div>
@@ -155,7 +155,10 @@
                 <tr>
                   <td>
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
-                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                    <div class="text-muted" style="font-size:0.75rem">
+                      {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                    </div>
                   </td>
                   <td>{{ item.opens }}</td>
                   <td>{{ item.engaged_rate }}</td>
@@ -177,7 +180,10 @@
                 <tr>
                   <td>
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
-                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                    <div class="text-muted" style="font-size:0.75rem">
+                      {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                    </div>
                   </td>
                   <td>{{ item.engaged_views }} <span class="text-muted small">({{ item.engaged_rate }})</span></td>
                   <td>{{ item.avg_dwell_seconds }}s</td>
@@ -200,7 +206,10 @@
                 <tr>
                   <td>
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
-                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                    <div class="text-muted" style="font-size:0.75rem">
+                      {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                    </div>
                   </td>
                   <td>{{ item.full_text_clicks }}</td>
                   <td>{{ item.full_text_ctr }}</td>
@@ -222,7 +231,10 @@
                 <tr>
                   <td>
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
-                    <div class="text-muted" style="font-size:0.75rem">{{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}</div>
+                    <div class="text-muted" style="font-size:0.75rem">
+                      {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                    </div>
                   </td>
                   <td>{{ item.total_shares }}</td>
                   <td>{{ item.share_rate }}</td>

@@ -13,6 +13,11 @@
       a { color: #2f5a80; }
       .featured-card a { color: #2f5a80; }
       .hero-title div { text-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+      /* Gmail dark-mode overrides: preserve white text + dark-blue hero background */
+      [data-ogsc] .hero-label div,
+      [data-ogsc] .hero-title div,
+      [data-ogsc] .hero-sub div { color: #ffffff !important; }
+      [data-ogsb] .hero-section { background-color: #2f5a80 !important; }
     </mj-style>
     <mj-attributes>
       <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
@@ -36,19 +41,19 @@
 
     {# ── Hero banner ──────────────────────────────── #}
     {% if newsletter.header_image %}
-    <mj-section background-url="{{ image_domain }}{{ newsletter.header_image.url }}" background-color="#2f5a80" background-size="cover" background-position="center center" border-radius="12px 12px 0 0" padding="48px 32px 44px">
+    <mj-section background-url="{{ image_domain }}{{ newsletter.header_image.url }}" background-color="#2f5a80" background-size="cover" background-position="center center" border-radius="12px 12px 0 0" padding="48px 32px 44px" css-class="hero-section">
     {% else %}
-    <mj-section background-color="#2f5a80" border-radius="12px 12px 0 0" padding="48px 32px 44px">
+    <mj-section background-color="#2f5a80" border-radius="12px 12px 0 0" padding="48px 32px 44px" css-class="hero-section">
     {% endif %}
       <mj-column>
-        <mj-text align="center" color="rgba(255,255,255,0.7)" font-size="11px" letter-spacing="0.12em" font-weight="600" text-transform="uppercase" padding-bottom="8px">
+        <mj-text align="center" color="rgba(255,255,255,0.7)" font-size="11px" letter-spacing="0.12em" font-weight="600" text-transform="uppercase" padding-bottom="8px" css-class="hero-label">
           New Issue
         </mj-text>
         <mj-text align="center" color="#ffffff" font-size="30px" font-weight="700" line-height="1.15" padding-bottom="12px" css-class="hero-title">
           {{ newsletter.issue }}
         </mj-text>
         {% if newsletter.content_heading %}
-        <mj-text align="center" color="rgba(255,255,255,0.88)" font-size="16px" line-height="1.5" padding-bottom="0">
+        <mj-text align="center" color="rgba(255,255,255,0.88)" font-size="16px" line-height="1.5" padding-bottom="0" css-class="hero-sub">
           {{ newsletter.content_heading }}
         </mj-text>
         {% endif %}

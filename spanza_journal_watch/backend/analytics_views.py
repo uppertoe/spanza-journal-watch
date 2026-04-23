@@ -400,8 +400,8 @@ def _newsletter_send_weeks(weeks=26):
 
 
 _FLOW_LABELS = {
-    "review_open": "View review",
-    "review_engaged": "Read review",
+    "review_open": "Impression",
+    "review_engaged": "Sustained view",
     "review_full_text_click": "Full text",
     "review_share_copy_link": "Share (copy)",
     "review_share_email": "Share (email)",
@@ -415,6 +415,92 @@ _FLOW_LABELS = {
     "journal_browser_visit": "Journals browser",
     "journal_article_interact": "Journal article",
 }
+
+
+_ENGAGED_VISIT_EVENT_TYPES = {
+    AnalyticsEvent.EventType.REVIEW_ENGAGED,
+    AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
+}
+_ENGAGED_VISIT_MIN_DURATION_S = 30
+
+
+def _visit_is_engaged(visit):
+    if any(row["event_type"] in _ENGAGED_VISIT_EVENT_TYPES for row in visit["events"]):
+        return True
+    duration = (visit["last_event"] - visit["first_event"]).total_seconds()
+    return duration >= _ENGAGED_VISIT_MIN_DURATION_S
+
+
+def _resolve_content_titles(event_ids):
+    """Bulk-resolve content_object labels for the given event ids.
+
+    Returns {event_id: "label"}. Labels fall back to the object's __str__.
+    """
+    if not event_ids:
+        return {}
+    rows = list(AnalyticsEvent.objects.filter(id__in=event_ids).values("id", "content_type_id", "object_id"))
+    # Group event ids by (content_type_id, object_id) to load each object once.
+    ids_by_ct = defaultdict(set)
+    for row in rows:
+        if row["content_type_id"] and row["object_id"]:
+            ids_by_ct[row["content_type_id"]].add(row["object_id"])
+
+    titles = {}
+    for ct_id, obj_ids in ids_by_ct.items():
+        try:
+            ct = ContentType.objects.get_for_id(ct_id)
+            model = ct.model_class()
+        except (ContentType.DoesNotExist, LookupError):
+            continue
+        if model is None:
+            continue
+        try:
+            for obj_id, obj in model._default_manager.in_bulk(obj_ids).items():
+                titles[(ct_id, obj_id)] = str(obj)
+        except Exception:
+            continue
+
+    result = {}
+    for row in rows:
+        key = (row["content_type_id"], row["object_id"])
+        if key in titles:
+            result[row["id"]] = titles[key]
+    return result
+
+
+def _enrich_event_details(event_rows):
+    """Fetch duration_ms / scroll_depth / share_token + content titles for event rows."""
+    if not event_rows:
+        return {}, {}
+    ids = [row["id"] for row in event_rows]
+    extras = {
+        row["id"]: row
+        for row in AnalyticsEvent.objects.filter(id__in=ids).values("id", "duration_ms", "scroll_depth", "share_token")
+    }
+    titles = _resolve_content_titles(ids)
+    return extras, titles
+
+
+def _format_event_detail(event_row, extra, title):
+    parts = []
+    if title:
+        parts.append(title)
+    duration_ms = extra.get("duration_ms") if extra else None
+    if duration_ms:
+        parts.append(f"{duration_ms / 1000:.1f}s")
+    scroll = extra.get("scroll_depth") if extra else None
+    if scroll is not None and scroll > 0:
+        parts.append(f"scroll {scroll}%")
+    share_token = (extra or {}).get("share_token")
+    if share_token:
+        parts.append(f"share {share_token[:8]}")
+    metadata = event_row.get("metadata") or {}
+    for key in ("query", "page"):
+        value = metadata.get(key)
+        if value and value not in parts:
+            parts.append(str(value))
+            break
+    return " · ".join(parts)
 
 
 def _compute_top_flows(visits):
@@ -1434,7 +1520,28 @@ def analytics_traffic(request):
     flow_counts = _compute_top_flows(visits)
 
     # Recent visit explorer
-    recent_visit_rows = sorted(visits, key=lambda visit: visit["last_event"], reverse=True)[:15]
+    engaged_only = request.GET.get("engaged_only") in ("1", "true", "yes")
+    try:
+        page = max(1, int(request.GET.get("page", "1")))
+    except (TypeError, ValueError):
+        page = 1
+    page_size = 50
+
+    sorted_visits = sorted(visits, key=lambda visit: visit["last_event"], reverse=True)
+    if engaged_only:
+        filtered_visits = [v for v in sorted_visits if _visit_is_engaged(v)]
+    else:
+        filtered_visits = sorted_visits
+    recent_session_total = len(filtered_visits)
+    total_pages = max(1, (recent_session_total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    start_idx = (page - 1) * page_size
+    recent_visit_rows = filtered_visits[start_idx : start_idx + page_size]
+
+    # Bulk-fetch enrichment (duration, scroll, share token, content title) for rendered events.
+    rendered_events = [e for visit in recent_visit_rows for e in visit["events"][:50]]
+    event_extras, event_titles = _enrich_event_details(rendered_events)
+
     recent_sessions = []
     for visit in recent_visit_rows:
         events = visit["events"]
@@ -1442,18 +1549,21 @@ def analytics_traffic(request):
         recent_sessions.append(
             {
                 "session_key": visit["visit_key"][:12],
-                "visitor_id": str(visit["visitor_id"])[:8] if visit["visitor_id"] else "—",
+                "visitor_id_short": str(visit["visitor_id"])[:8] if visit["visitor_id"] else "—",
+                "visitor_id": str(visit["visitor_id"]) if visit["visitor_id"] else "",
                 "referrer": referrer_labels.get(visit["referrer_category"], visit["referrer_category"] or "Unknown"),
+                "referrer_domain": visit["referrer_domain"] or "",
                 "landing_page": visit["landing_page"] or "—",
                 "event_count": len(events),
                 "first_event": visit["first_event"],
                 "last_event": visit["last_event"],
                 "duration": f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m",
+                "engaged": _visit_is_engaged(visit),
                 "events": [
                     {
                         "type": _FLOW_LABELS.get(e["event_type"], e["event_type"]),
                         "timestamp": e["timestamp"],
-                        "detail": (e["metadata"] or {}).get("query") or (e["metadata"] or {}).get("page") or "",
+                        "detail": _format_event_detail(e, event_extras.get(e["id"]), event_titles.get(e["id"])),
                     }
                     for e in events[:50]
                 ],
@@ -1491,6 +1601,12 @@ def analytics_traffic(request):
         "search_dead_ends": search_dead_ends,
         "top_flows": flow_counts,
         "recent_sessions": recent_sessions,
+        "recent_session_total": recent_session_total,
+        "recent_session_page": page,
+        "recent_session_total_pages": total_pages,
+        "recent_session_has_prev": page > 1,
+        "recent_session_has_next": page < total_pages,
+        "engaged_only": engaged_only,
         "visit_timeout_minutes": int(_VISIT_INACTIVITY_GAP.total_seconds() // 60),
         "active_tab": "traffic",
     }
@@ -1889,3 +2005,152 @@ def analytics_journals(request):
     return _render_analytics(
         request, "backend/analytics/journals.html", context, "backend/analytics/_journals_panel.html"
     )
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_visitor(request, visitor_id):
+    """Per-visitor journey: all visits from a given visitor_id, reverse-chrono."""
+    today = timezone.localdate()
+    lookback_days = 365
+    start_ts = timezone.make_aware(
+        datetime.datetime.combine(today - datetime.timedelta(days=lookback_days), datetime.time.min)
+    )
+    end_ts = timezone.make_aware(datetime.datetime.combine(today, datetime.time.max))
+
+    events_qs = AnalyticsEvent.objects.filter(
+        visitor_id=visitor_id, timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False
+    )
+    visits = sorted(_build_derived_visits(events_qs), key=lambda v: v["last_event"], reverse=True)
+
+    referrer_labels = {
+        "newsletter": "Newsletter",
+        "search": "Search engine",
+        "social": "Social media",
+        "direct": "Direct",
+        "internal": "Internal",
+        "other": "Other",
+        "": "Unknown",
+    }
+
+    rendered_events = [e for visit in visits for e in visit["events"][:50]]
+    event_extras, event_titles = _enrich_event_details(rendered_events)
+
+    visit_rows = []
+    for visit in visits:
+        duration_s = (visit["last_event"] - visit["first_event"]).total_seconds() if len(visit["events"]) > 1 else 0
+        visit_rows.append(
+            {
+                "first_event": visit["first_event"],
+                "last_event": visit["last_event"],
+                "duration": f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m",
+                "event_count": len(visit["events"]),
+                "referrer": referrer_labels.get(visit["referrer_category"], visit["referrer_category"] or "Unknown"),
+                "referrer_domain": visit["referrer_domain"] or "",
+                "landing_page": visit["landing_page"] or "—",
+                "engaged": _visit_is_engaged(visit),
+                "events": [
+                    {
+                        "type": _FLOW_LABELS.get(e["event_type"], e["event_type"]),
+                        "timestamp": e["timestamp"],
+                        "detail": _format_event_detail(e, event_extras.get(e["id"]), event_titles.get(e["id"])),
+                    }
+                    for e in visit["events"][:50]
+                ],
+            }
+        )
+
+    first_seen = events_qs.order_by("timestamp").values_list("timestamp", flat=True).first()
+    last_seen = events_qs.order_by("-timestamp").values_list("timestamp", flat=True).first()
+
+    context = {
+        "visitor_id": str(visitor_id),
+        "visit_count": len(visit_rows),
+        "visits": visit_rows,
+        "first_seen": first_seen,
+        "last_seen": last_seen,
+        "lookback_days": lookback_days,
+        "active_tab": "traffic",
+    }
+    return render(request, "backend/analytics/visitor.html", context)
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_review_timeline(request, review_pk):
+    """Per-review event timeline: recent events that hit this review."""
+    review = Review.objects.filter(pk=review_pk).first()
+    if review is None:
+        return redirect("backend:analytics_editorial")
+
+    today = timezone.localdate()
+    lookback_days = 180
+    start_ts = timezone.make_aware(
+        datetime.datetime.combine(today - datetime.timedelta(days=lookback_days), datetime.time.min)
+    )
+    end_ts = timezone.make_aware(datetime.datetime.combine(today, datetime.time.max))
+
+    review_ct = ContentType.objects.get_for_model(Review)
+    events_qs = AnalyticsEvent.objects.filter(
+        content_type=review_ct,
+        object_id=review.pk,
+        timestamp__gte=start_ts,
+        timestamp__lte=end_ts,
+        automated=False,
+    ).order_by("-timestamp")
+
+    try:
+        page = max(1, int(request.GET.get("page", "1")))
+    except (TypeError, ValueError):
+        page = 1
+    page_size = 100
+    total_events = events_qs.count()
+    total_pages = max(1, (total_events + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    start_idx = (page - 1) * page_size
+
+    page_events = list(
+        events_qs.values(
+            "id", "event_type", "timestamp", "visitor_id", "referrer_category", "referrer_domain", "metadata"
+        )[start_idx : start_idx + page_size]
+    )
+    event_extras, _ = _enrich_event_details(page_events)
+
+    totals = events_qs.aggregate(
+        impressions=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)),
+        sustained=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
+        full_text=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)),
+        avg_duration=Avg("duration_ms", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
+    )
+
+    timeline = []
+    for row in page_events:
+        extra = event_extras.get(row["id"])
+        timeline.append(
+            {
+                "timestamp": row["timestamp"],
+                "type": _FLOW_LABELS.get(row["event_type"], row["event_type"]),
+                "visitor_id": str(row["visitor_id"]) if row["visitor_id"] else "",
+                "visitor_id_short": str(row["visitor_id"])[:8] if row["visitor_id"] else "—",
+                "referrer": row["referrer_category"] or "",
+                "referrer_domain": row["referrer_domain"] or "",
+                "detail": _format_event_detail(row, extra, None),
+            }
+        )
+
+    context = {
+        "review": review,
+        "lookback_days": lookback_days,
+        "total_events": total_events,
+        "impressions": totals["impressions"] or 0,
+        "sustained_views": totals["sustained"] or 0,
+        "full_text_clicks": totals["full_text"] or 0,
+        "avg_duration_s": round((totals["avg_duration"] or 0) / 1000, 1),
+        "timeline": timeline,
+        "page": page,
+        "total_pages": total_pages,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+        "active_tab": "content",
+    }
+    return render(request, "backend/analytics/review_timeline.html", context)

@@ -255,8 +255,23 @@
 
 {% if recent_sessions %}
 <div class="card mb-4">
-  <div class="card-header">Recent visits</div>
-  <div class="card-body small text-muted mb-0 pb-0">Chronological event timelines for the 15 most recent derived visits.</div>
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Recent visits</span>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Visit filter">
+      <a href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}engaged_only=0#session-explorer"
+         class="btn btn-outline-secondary {% if not engaged_only %}active{% endif %}">All</a>
+      <a href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}engaged_only=1#session-explorer"
+         class="btn btn-outline-secondary {% if engaged_only %}active{% endif %}">Engaged only</a>
+    </div>
+  </div>
+  <div class="card-body small text-muted mb-0 pb-0">
+    Chronological event timelines for the {{ recent_session_total }} most recent {% if engaged_only %}engaged {% endif %}visits.
+    <span class="d-block mt-1">
+      <strong>Impression</strong>: review scrolled into view (≥25% visible).
+      <strong>Sustained view</strong>: review visible ≥5 s.
+      <strong>Engaged</strong> visits have ≥1 sustained view, full-text click, or ≥30 s total duration.
+    </span>
+  </div>
   <div class="accordion accordion-flush" id="session-explorer">
     {% for session in recent_sessions %}
     <div class="accordion-item">
@@ -264,16 +279,23 @@
         <button class="accordion-button collapsed py-2 small" type="button"
                 data-bs-toggle="collapse" data-bs-target="#session-{{ forloop.counter }}">
           <span class="d-flex gap-3 align-items-center flex-wrap w-100">
-            <code>{{ session.visitor_id }}</code>
+            <code>{{ session.visitor_id_short }}</code>
             <span class="text-muted">{{ session.first_event|date:"j M H:i" }}</span>
             <span class="badge text-bg-secondary">{{ session.event_count }} event{{ session.event_count|pluralize }}</span>
             <span class="text-muted">{{ session.duration }}</span>
             <span class="badge text-bg-light text-dark">{{ session.referrer }}</span>
+            {% if session.engaged %}<span class="badge text-bg-primary-subtle text-primary-emphasis">Engaged</span>{% endif %}
           </span>
         </button>
       </h2>
       <div id="session-{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#session-explorer">
         <div class="accordion-body p-0">
+          {% if session.visitor_id %}
+          <div class="px-3 py-1 bg-body-tertiary small">
+            <a href="{% url 'backend:analytics_visitor' visitor_id=session.visitor_id %}" class="text-decoration-none">See all visits from this visitor &rarr;</a>
+            {% if session.referrer_domain %}<span class="text-muted ms-2">via {{ session.referrer_domain }}</span>{% endif %}
+          </div>
+          {% endif %}
           {% if session.landing_page != "—" %}
           <div class="px-3 py-1 bg-body-tertiary small text-muted">Landing: <code>{{ session.landing_page }}</code></div>
           {% endif %}
@@ -294,6 +316,17 @@
     </div>
     {% endfor %}
   </div>
+  {% if recent_session_total_pages > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center small">
+    <span class="text-muted">Page {{ recent_session_page }} of {{ recent_session_total_pages }}</span>
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary {% if not recent_session_has_prev %}disabled{% endif %}"
+         href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}{% if engaged_only %}engaged_only=1&amp;{% endif %}page={{ recent_session_page|add:'-1' }}#session-explorer">Previous</a>
+      <a class="btn btn-outline-secondary {% if not recent_session_has_next %}disabled{% endif %}"
+         href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}{% if engaged_only %}engaged_only=1&amp;{% endif %}page={{ recent_session_page|add:'1' }}#session-explorer">Next</a>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 
