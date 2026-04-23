@@ -17,6 +17,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import Coalesce
+from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -220,8 +221,13 @@ def _build_derived_visits(events_qs):
             "metadata",
             "session_key",
             "js_verified",
-        ).order_by("visitor_id", "session_key", "timestamp", "id")
+        )
     )
+    # Group by visit_key then timestamp. A single visitor_id can span multiple
+    # session_keys (e.g. when Django rotates the session cookie), so ordering
+    # in SQL by (visitor_id, session_key, timestamp) would zigzag timestamps
+    # within one visit and produce negative durations.
+    rows.sort(key=lambda r: (_visit_partition_key(r), r["timestamp"], r["id"]))
 
     visits = []
     current_visit = None
@@ -406,6 +412,7 @@ _FLOW_LABELS = {
     "review_open": "Impression",
     "review_engaged": "Sustained view",
     "review_full_text_click": "Full text",
+    "review_related_click": "Related click",
     "review_share_copy_link": "Share (copy)",
     "review_share_email": "Share (email)",
     "review_share_native": "Share (native)",
@@ -484,6 +491,41 @@ def _enrich_event_details(event_rows):
         for row in AnalyticsEvent.objects.filter(id__in=ids).values("id", "duration_ms", "scroll_depth", "share_token")
     }
     titles = _resolve_content_titles(ids)
+    # Enrich from metadata foreign-key hints that aren't captured via
+    # content_object (e.g. journal_select stores journal_id in metadata, not
+    # as a GenericForeignKey).
+    journal_ids = set()
+    article_ids = set()
+    for row in event_rows:
+        if row["id"] in titles:
+            continue
+        metadata = row.get("metadata") or {}
+        jid = metadata.get("journal_id")
+        aid = metadata.get("article_id")
+        if isinstance(jid, int) and jid > 0:
+            journal_ids.add(jid)
+        if isinstance(aid, int) and aid > 0:
+            article_ids.add(aid)
+    journal_labels = {}
+    if journal_ids:
+        from spanza_journal_watch.submissions.models import Journal
+
+        journal_labels = {j.pk: str(j) for j in Journal.objects.filter(pk__in=journal_ids)}
+    article_labels = {}
+    if article_ids:
+        from spanza_journal_watch.backend.models import PubmedArticle
+
+        article_labels = {a.pk: a.get_title() for a in PubmedArticle.objects.filter(pk__in=article_ids)}
+    for row in event_rows:
+        if row["id"] in titles:
+            continue
+        metadata = row.get("metadata") or {}
+        jid = metadata.get("journal_id")
+        aid = metadata.get("article_id")
+        if isinstance(jid, int) and jid in journal_labels:
+            titles[row["id"]] = journal_labels[jid]
+        elif isinstance(aid, int) and aid in article_labels:
+            titles[row["id"]] = article_labels[aid]
     return extras, titles
 
 
@@ -505,9 +547,13 @@ def _format_event_detail(event_row, extra, title):
     if query:
         parts.append(str(query))
     elif not title:
-        page = metadata.get("page")
-        if page:
-            parts.append(_VISIT_PAGE_PATHS.get(page, str(page)))
+        path = metadata.get("path") or metadata.get("destination_url")
+        if path:
+            parts.append(str(path))
+        else:
+            page = metadata.get("page")
+            if page:
+                parts.append(_VISIT_PAGE_PATHS.get(page, str(page)))
     return " · ".join(parts)
 
 
@@ -1297,6 +1343,40 @@ def analytics_editorial(request):
                 }
             )
 
+    # ── Archive discovery via "Related reviews" clicks ──────────────────
+    related_click_events = human_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_RELATED_CLICK)
+    related_clicks_total = related_click_events.count()
+    related_by_surface = Counter()
+    for source in related_click_events.values_list("source", flat=True):
+        related_by_surface[source or "unknown"] += 1
+    _SURFACE_LABELS = {
+        "review_detail": "Review page",
+        "card_modal": "Home/card modal",
+        "issue": "Issue page",
+        "journal_browser": "Journal browser",
+        "unknown": "Unknown",
+    }
+    related_surface_breakdown = sorted(
+        ({"label": _SURFACE_LABELS.get(s, s), "count": c} for s, c in related_by_surface.items()),
+        key=lambda x: -x["count"],
+    )
+    # Top archive destinations reached via a Related click.
+    related_dest_rows = list(
+        related_click_events.filter(content_type=review_ct)
+        .values("object_id")
+        .annotate(clicks=Count("id"))
+        .order_by("-clicks")[:10]
+    )
+    related_dest_ids = [r["object_id"] for r in related_dest_rows if r["object_id"]]
+    related_dest_reviews = {
+        r.id: r for r in Review.objects.filter(id__in=related_dest_ids).select_related("article__journal")
+    }
+    top_related_destinations = [
+        {"review": related_dest_reviews[r["object_id"]], "clicks": r["clicks"]}
+        for r in related_dest_rows
+        if r["object_id"] in related_dest_reviews
+    ]
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -1332,6 +1412,10 @@ def analytics_editorial(request):
         "zero_result_queries": zero_result_queries[:10],
         "weekly_searches": weekly_searches,
         "unmet_demand": unmet_demand,
+        # Archive discovery
+        "related_clicks_total": related_clicks_total,
+        "related_surface_breakdown": related_surface_breakdown,
+        "top_related_destinations": top_related_destinations,
         "active_tab": "content",
     }
     context.update(_confidence_summary(human_events))
@@ -1546,23 +1630,22 @@ def analytics_traffic(request):
     start_idx = (page - 1) * page_size
     recent_visit_rows = filtered_visits[start_idx : start_idx + page_size]
 
-    # Bulk-fetch enrichment (duration, scroll, share token, content title) for rendered events.
-    rendered_events = [e for visit in recent_visit_rows for e in visit["events"][:50]]
-    event_extras, event_titles = _enrich_event_details(rendered_events)
-
     recent_sessions = []
     for visit in recent_visit_rows:
         events = visit["events"]
         if len(events) > 1:
-            duration_s = (visit["last_event"] - visit["first_event"]).total_seconds()
+            duration_s = max(0.0, (visit["last_event"] - visit["first_event"]).total_seconds())
             duration_label = f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m"
         else:
             duration_label = "—"
+        session_key = ""
+        if not visit["visitor_id"] and visit["visit_key"].startswith("session:"):
+            session_key = visit["visit_key"][len("session:") :]
         recent_sessions.append(
             {
-                "session_key": visit["visit_key"][:12],
                 "visitor_id_short": str(visit["visitor_id"])[:8] if visit["visitor_id"] else "—",
                 "visitor_id": str(visit["visitor_id"]) if visit["visitor_id"] else "",
+                "session_key": session_key,
                 "referrer": referrer_labels.get(visit["referrer_category"], visit["referrer_category"] or "Unknown"),
                 "referrer_domain": visit["referrer_domain"] or "",
                 "landing_page": visit["landing_page"] or "—",
@@ -1571,14 +1654,6 @@ def analytics_traffic(request):
                 "last_event": visit["last_event"],
                 "duration": duration_label,
                 "engaged": _visit_is_engaged(visit),
-                "events": [
-                    {
-                        "type": _FLOW_LABELS.get(e["event_type"], e["event_type"]),
-                        "timestamp": e["timestamp"],
-                        "detail": _format_event_detail(e, event_extras.get(e["id"]), event_titles.get(e["id"])),
-                    }
-                    for e in events[:50]
-                ],
             }
         )
 
@@ -2052,13 +2127,10 @@ def analytics_visitor(request, visitor_id):
         "": "Unknown",
     }
 
-    rendered_events = [e for visit in visits for e in visit["events"][:50]]
-    event_extras, event_titles = _enrich_event_details(rendered_events)
-
     visit_rows = []
     for visit in visits:
         if len(visit["events"]) > 1:
-            duration_s = (visit["last_event"] - visit["first_event"]).total_seconds()
+            duration_s = max(0.0, (visit["last_event"] - visit["first_event"]).total_seconds())
             duration_label = f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m"
         else:
             duration_label = "—"
@@ -2072,14 +2144,6 @@ def analytics_visitor(request, visitor_id):
                 "referrer_domain": visit["referrer_domain"] or "",
                 "landing_page": visit["landing_page"] or "—",
                 "engaged": _visit_is_engaged(visit),
-                "events": [
-                    {
-                        "type": _FLOW_LABELS.get(e["event_type"], e["event_type"]),
-                        "timestamp": e["timestamp"],
-                        "detail": _format_event_detail(e, event_extras.get(e["id"]), event_titles.get(e["id"])),
-                    }
-                    for e in visit["events"][:50]
-                ],
             }
         )
 
@@ -2177,3 +2241,42 @@ def analytics_review_timeline(request, review_pk):
         "active_tab": "content",
     }
     return render(request, "backend/analytics/review_timeline.html", context)
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_visit_events(request):
+    """HTMX fragment: events for a single derived visit, bounded by timestamps."""
+    start_iso = (request.GET.get("start") or "").strip()
+    end_iso = (request.GET.get("end") or "").strip()
+    visitor_id = (request.GET.get("visitor_id") or "").strip()
+    session_key = (request.GET.get("session_key") or "").strip()
+    if not start_iso or not end_iso:
+        return HttpResponseBadRequest("start and end required")
+    if not visitor_id and not session_key:
+        return HttpResponseBadRequest("visitor_id or session_key required")
+    try:
+        start_ts = datetime.datetime.fromisoformat(start_iso)
+        end_ts = datetime.datetime.fromisoformat(end_iso)
+    except ValueError:
+        return HttpResponseBadRequest("Invalid timestamps")
+
+    qs = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False).order_by(
+        "timestamp", "id"
+    )
+    if visitor_id:
+        qs = qs.filter(visitor_id=visitor_id)
+    else:
+        qs = qs.filter(session_key=session_key)
+
+    event_rows = list(qs.values("id", "event_type", "timestamp", "metadata")[:50])
+    extras, titles = _enrich_event_details(event_rows)
+    events = [
+        {
+            "type": _FLOW_LABELS.get(e["event_type"], e["event_type"]),
+            "timestamp": e["timestamp"],
+            "detail": _format_event_detail(e, extras.get(e["id"]), titles.get(e["id"])),
+        }
+        for e in event_rows
+    ]
+    return render(request, "backend/analytics/_visit_events.html", {"events": events})

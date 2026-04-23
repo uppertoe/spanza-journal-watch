@@ -95,6 +95,63 @@
   </div>
 </div>
 
+{# ── Archive discovery via "Related reviews" clicks ─────────────── #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Archive discovery</span>
+    <span class="badge text-bg-secondary">{{ related_clicks_total }} related click{{ related_clicks_total|pluralize }}</span>
+  </div>
+  <div class="card-body small text-muted mb-0 pb-0">
+    Clicks on the "Related reviews" links — how readers are pulled from a current review into the archive.
+  </div>
+  {% if related_clicks_total %}
+  <div class="row g-0">
+    <div class="col-12 col-lg-5 border-end">
+      <div class="p-3">
+        <h6 class="text-muted small mb-2">By surface</h6>
+        <div class="d-flex flex-column gap-2">
+          {% for item in related_surface_breakdown %}
+          <div>
+            <div class="d-flex justify-content-between small mb-1"><span>{{ item.label }}</span><span class="text-muted">{{ item.count }}</span></div>
+            <div class="progress" style="height:5px"><div class="progress-bar bg-info" style="width:{% widthratio item.count related_clicks_total 100 %}%"></div></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-7">
+      <div class="p-3">
+        <h6 class="text-muted small mb-2">Top archive destinations</h6>
+        {% if top_related_destinations %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Review</th><th>Journal</th><th>Related clicks</th></tr></thead>
+            <tbody>
+              {% for item in top_related_destinations %}
+              <tr>
+                <td class="small">
+                  <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}"
+                     class="text-decoration-none"
+                     title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:60 }}</a>
+                </td>
+                <td class="small text-muted">{{ item.review.article.journal|default:"—" }}</td>
+                <td>{{ item.clicks }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0 small">No destination data yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card-body"><p class="text-muted mb-0 small">No related-review clicks in this date range. Data will accumulate as readers click "Related reviews" links under each review.</p></div>
+  {% endif %}
+</div>
+
 {# ── Search volume chart ──────────────────────────────────────── #}
 <div class="card mb-4">
   <div class="card-header">Search volume — last 26 weeks</div>

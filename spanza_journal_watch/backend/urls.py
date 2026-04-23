@@ -280,6 +280,11 @@ urlpatterns = [
         analytics_views.analytics_review_timeline,
         name="analytics_review_timeline",
     ),
+    path(
+        "analytics/visit-events/",
+        analytics_views.analytics_visit_events,
+        name="analytics_visit_events",
+    ),
     # Legacy redirects
     path("analytics/content/", analytics_views.analytics_content, name="analytics_content"),
     path("analytics/search/", analytics_views.analytics_search, name="analytics_search"),

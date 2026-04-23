@@ -275,50 +275,46 @@
       <strong>Engaged</strong> visits have ≥1 sustained view, full-text click, or ≥30 s total duration.
     </span>
   </div>
-  <div class="accordion accordion-flush" id="session-explorer">
+  <ul class="list-group list-group-flush" id="session-explorer">
     {% for session in recent_sessions %}
-    <div class="accordion-item">
-      <h2 class="accordion-header">
-        <button class="accordion-button collapsed py-2 small" type="button"
-                data-bs-toggle="collapse" data-bs-target="#session-{{ forloop.counter }}">
-          <span class="d-flex gap-3 align-items-center flex-wrap w-100">
-            <code>{{ session.visitor_id_short }}</code>
-            <span class="text-muted">{{ session.first_event|date:"j M H:i" }}</span>
-            <span class="badge text-bg-secondary">{{ session.event_count }} event{{ session.event_count|pluralize }}</span>
-            <span class="text-muted">{{ session.duration }}</span>
-            <span class="badge text-bg-light text-dark">{{ session.referrer }}</span>
-            {% if session.engaged %}<span class="badge text-bg-primary-subtle text-primary-emphasis">Engaged</span>{% endif %}
-          </span>
-        </button>
-      </h2>
-      <div id="session-{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#session-explorer">
-        <div class="accordion-body p-0">
-          {% if session.visitor_id %}
-          <div class="px-3 py-1 bg-body-tertiary small">
-            <a href="{% url 'backend:analytics_visitor' visitor_id=session.visitor_id %}" class="text-decoration-none">See all visits from this visitor &rarr;</a>
-            {% if session.referrer_domain %}<span class="text-muted ms-2">via {{ session.referrer_domain }}</span>{% endif %}
-          </div>
-          {% endif %}
-          {% if session.landing_page != "—" %}
-          <div class="px-3 py-1 bg-body-tertiary small text-muted">Landing: <code>{{ session.landing_page }}</code></div>
-          {% endif %}
-          <table class="table table-sm small mb-0">
-            <thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead>
-            <tbody>
-              {% for event in session.events %}
-              <tr>
-                <td class="text-muted text-nowrap">{{ event.timestamp|date:"H:i:s" }}</td>
-                <td>{{ event.type }}</td>
-                <td class="text-muted text-break">{{ event.detail }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    <li class="list-group-item p-0">
+      <a class="d-block text-reset text-decoration-none px-3 py-2 collapsed"
+         role="button"
+         data-bs-toggle="collapse" href="#session-{{ forloop.counter }}"
+         aria-expanded="false" aria-controls="session-{{ forloop.counter }}"
+         hx-get="{% url 'backend:analytics_visit_events' %}?{% if session.visitor_id %}visitor_id={{ session.visitor_id }}{% else %}session_key={{ session.session_key }}{% endif %}&amp;start={{ session.first_event|date:'c'|urlencode }}&amp;end={{ session.last_event|date:'c'|urlencode }}"
+         hx-trigger="click once"
+         hx-target="#session-{{ forloop.counter }}-events"
+         hx-swap="innerHTML">
+        <div class="d-flex gap-3 align-items-center flex-wrap small">
+          <code class="text-body">{{ session.visitor_id_short }}</code>
+          <span class="text-muted">{{ session.first_event|date:"j M H:i" }}</span>
+          <span class="badge text-bg-secondary">{{ session.event_count }} event{{ session.event_count|pluralize }}</span>
+          <span class="text-muted">{{ session.duration }}</span>
+          <span class="badge text-bg-light text-dark">{{ session.referrer }}</span>
+          {% if session.engaged %}<span class="badge text-bg-primary-subtle text-primary-emphasis">Engaged</span>{% endif %}
         </div>
+      </a>
+      <div id="session-{{ forloop.counter }}" class="collapse">
+        {% if session.visitor_id %}
+        <div class="px-3 py-1 bg-body-tertiary small">
+          <a href="{% url 'backend:analytics_visitor' visitor_id=session.visitor_id %}" class="text-decoration-none">See all visits from this visitor &rarr;</a>
+          {% if session.referrer_domain %}<span class="text-muted ms-2">via {{ session.referrer_domain }}</span>{% endif %}
+        </div>
+        {% endif %}
+        {% if session.landing_page != "—" %}
+        <div class="px-3 py-1 bg-body-tertiary small text-muted">Landing: <code>{{ session.landing_page }}</code></div>
+        {% endif %}
+        <ul class="list-group list-group-flush" id="session-{{ forloop.counter }}-events">
+          <li class="list-group-item small text-muted py-2 px-3 bg-transparent">
+            <span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>
+            Loading events…
+          </li>
+        </ul>
       </div>
-    </div>
+    </li>
     {% endfor %}
-  </div>
+  </ul>
   {% if recent_session_total_pages > 1 %}
   <div class="card-footer d-flex justify-content-between align-items-center small">
     <span class="text-muted">Page {{ recent_session_page }} of {{ recent_session_total_pages }}</span>

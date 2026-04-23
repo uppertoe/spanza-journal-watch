@@ -20,7 +20,7 @@
     <p class="text-break">{{ review.get_markdown_body|safe }}</p>
     {% include 'fragments/review_tags_inline.html' %}
     {% with related_reviews=review.related_reviews %}
-    {% include 'fragments/related_reviews.html' %}
+    {% include 'fragments/related_reviews.html' with related_source_context='issue' %}
     {% endwith %}
     </article>
     {% if not forloop.last %}

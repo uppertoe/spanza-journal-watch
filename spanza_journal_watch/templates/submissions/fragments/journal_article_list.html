@@ -84,6 +84,9 @@
                      data-review-modal-url="{{ rel.get_absolute_url }}"
                      data-review-modal-slug="{{ rel.slug }}"
                      data-review-modal-shell="journal-review-modal"
+                     data-analytics-related-link
+                     data-review-id="{{ rel.pk }}"
+                     data-source-context="journal_browser"
                      hx-get="{{ rel.get_absolute_url }}"
                      hx-indicator="#journal-review-modal-indicator"
                      hx-target="#journal-review-modal-container">{{ rel.article.title|truncatewords:8 }}</a>{% if not forloop.last %}<span class="related-reviews--inline__sep">&middot;</span>{% endif %}

@@ -959,6 +959,28 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
+  const relatedLink = event.target.closest('[data-analytics-related-link]');
+  if (relatedLink) {
+    const reviewId = Number(relatedLink.dataset.reviewId || 0);
+    const sourceContext = relatedLink.dataset.sourceContext || '';
+    const sourceReviewRoot = relatedLink.closest('[data-analytics-review-id]');
+    const sourceReviewId = sourceReviewRoot
+      ? Number(sourceReviewRoot.dataset.analyticsReviewId) || null
+      : null;
+    if (reviewId) {
+      sendAnalyticsEvent(
+        {
+          event_type: 'review_related_click',
+          review_id: reviewId,
+          source: sourceContext,
+          metadata: sourceReviewId ? { source_review_id: sourceReviewId } : {},
+        },
+        { beacon: true },
+      );
+    }
+    // Don't `return` — existing htmx/modal handlers for this link must still run.
+  }
+
   const searchResultLink = event.target.closest('[data-search-result-click]');
   if (searchResultLink) {
     const reviewId = Number(searchResultLink.dataset.reviewId || 0);

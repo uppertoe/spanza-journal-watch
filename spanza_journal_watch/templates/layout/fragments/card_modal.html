@@ -19,5 +19,5 @@
   {% endif %}
   {% include 'fragments/review_tags_inline.html' %}
   {{ review.get_markdown_body|safe }}
-  {% include 'fragments/related_reviews.html' %}
+  {% include 'fragments/related_reviews.html' with related_source_context='card_modal' %}
 </div>

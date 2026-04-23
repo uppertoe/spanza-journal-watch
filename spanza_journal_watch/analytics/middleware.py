@@ -196,6 +196,7 @@ class PageVisitAnalyticsMiddleware:
                     request=request,
                     subscriber_id=request.session.get("subscriber_id"),
                     source="server",
+                    metadata={"path": request.path[:512]},
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("Failed to record server-side PAGE_VISIT")

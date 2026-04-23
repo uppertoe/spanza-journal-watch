@@ -22,46 +22,42 @@
 </div>
 
 {% if visits %}
-<div class="accordion accordion-flush" id="visitor-visits">
+<ul class="list-group list-group-flush" id="visitor-visits">
   {% for visit in visits %}
-  <div class="accordion-item">
-    <h2 class="accordion-header">
-      <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-2 small" type="button"
-              data-bs-toggle="collapse" data-bs-target="#visit-{{ forloop.counter }}">
-        <span class="d-flex gap-3 align-items-center flex-wrap w-100">
-          <span class="text-muted">{{ visit.first_event|date:"j M Y H:i" }}</span>
-          <span class="badge text-bg-secondary">{{ visit.event_count }} event{{ visit.event_count|pluralize }}</span>
-          <span class="text-muted">{{ visit.duration }}</span>
-          <span class="badge text-bg-light text-dark">{{ visit.referrer }}</span>
-          {% if visit.engaged %}<span class="badge text-bg-primary-subtle text-primary-emphasis">Engaged</span>{% endif %}
-        </span>
-      </button>
-    </h2>
-    <div id="visit-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#visitor-visits">
-      <div class="accordion-body p-0">
-        {% if visit.landing_page != "—" %}
-        <div class="px-3 py-1 bg-body-tertiary small text-muted">
-          Landing: <code>{{ visit.landing_page }}</code>
-          {% if visit.referrer_domain %}<span class="ms-2">via {{ visit.referrer_domain }}</span>{% endif %}
-        </div>
-        {% endif %}
-        <table class="table table-sm small mb-0">
-          <thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead>
-          <tbody>
-            {% for event in visit.events %}
-            <tr>
-              <td class="text-muted text-nowrap">{{ event.timestamp|date:"H:i:s" }}</td>
-              <td>{{ event.type }}</td>
-              <td class="text-muted text-break">{{ event.detail }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+  <li class="list-group-item p-0">
+    <a class="d-block text-reset text-decoration-none px-3 py-2 {% if not forloop.first %}collapsed{% endif %}"
+       role="button"
+       data-bs-toggle="collapse" href="#visit-{{ forloop.counter }}"
+       aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="visit-{{ forloop.counter }}"
+       hx-get="{% url 'backend:analytics_visit_events' %}?visitor_id={{ visitor_id }}&amp;start={{ visit.first_event|date:'c'|urlencode }}&amp;end={{ visit.last_event|date:'c'|urlencode }}"
+       hx-trigger="{% if forloop.first %}load once, click once{% else %}click once{% endif %}"
+       hx-target="#visit-{{ forloop.counter }}-events"
+       hx-swap="innerHTML">
+      <div class="d-flex gap-3 align-items-center flex-wrap small">
+        <span class="text-muted">{{ visit.first_event|date:"j M Y H:i" }}</span>
+        <span class="badge text-bg-secondary">{{ visit.event_count }} event{{ visit.event_count|pluralize }}</span>
+        <span class="text-muted">{{ visit.duration }}</span>
+        <span class="badge text-bg-light text-dark">{{ visit.referrer }}</span>
+        {% if visit.engaged %}<span class="badge text-bg-primary-subtle text-primary-emphasis">Engaged</span>{% endif %}
       </div>
+    </a>
+    <div id="visit-{{ forloop.counter }}" class="collapse {% if forloop.first %}show{% endif %}">
+      {% if visit.landing_page != "—" %}
+      <div class="px-3 py-1 bg-body-tertiary small text-muted">
+        Landing: <code>{{ visit.landing_page }}</code>
+        {% if visit.referrer_domain %}<span class="ms-2">via {{ visit.referrer_domain }}</span>{% endif %}
+      </div>
+      {% endif %}
+      <ul class="list-group list-group-flush" id="visit-{{ forloop.counter }}-events">
+        <li class="list-group-item small text-muted py-2 px-3 bg-transparent">
+          <span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>
+          Loading events…
+        </li>
+      </ul>
     </div>
-  </div>
+  </li>
   {% endfor %}
-</div>
+</ul>
 {% else %}
 <p class="text-muted">No visits recorded for this visitor in the last {{ lookback_days }} days.</p>
 {% endif %}

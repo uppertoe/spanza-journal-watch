@@ -1,0 +1,11 @@
+{% for event in events %}
+<li class="list-group-item py-2 px-3 bg-transparent">
+  <div class="d-flex align-items-baseline gap-3 small">
+    <time class="text-muted text-nowrap font-monospace">{{ event.timestamp|date:"H:i:s" }}</time>
+    <span class="fw-semibold flex-shrink-0">{{ event.type }}</span>
+    <span class="text-muted text-break">{{ event.detail|default:"—" }}</span>
+  </div>
+</li>
+{% empty %}
+<li class="list-group-item small text-muted py-2 px-3 bg-transparent">No events.</li>
+{% endfor %}

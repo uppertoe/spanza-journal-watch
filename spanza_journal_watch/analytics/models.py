@@ -108,6 +108,7 @@ class AnalyticsEvent(models.Model):
         REVIEW_OPEN = "review_open", "Review open"
         REVIEW_ENGAGED = "review_engaged", "Review engaged"
         REVIEW_FULL_TEXT_CLICK = "review_full_text_click", "Review full text click"
+        REVIEW_RELATED_CLICK = "review_related_click", "Review related-link click"
         REVIEW_SHARE_COPY_LINK = "review_share_copy_link", "Review shared via copy link"
         REVIEW_SHARE_EMAIL = "review_share_email", "Review shared via email"
         REVIEW_SHARE_NATIVE = "review_share_native", "Review shared via native share"
