@@ -20,6 +20,13 @@ from spanza_journal_watch.utils.modelmethods import name_image
 
 
 class Subscriber(models.Model):
+    class Source(models.TextChoices):
+        UNKNOWN = "unknown", "Unknown"
+        DRAWER = "drawer", "Drawer"
+        SUBSCRIBE_FORM = "subscribe_form", "Subscribe form"
+        CSV_IMPORT = "csv_import", "CSV import"
+        USER_SIGNUP = "user_signup", "User signup"
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -38,10 +45,17 @@ class Subscriber(models.Model):
     from_csv = models.ForeignKey(
         SubscriberCSV, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Uploaded via CSV"
     )
+    source = models.CharField(
+        max_length=32,
+        choices=Source.choices,
+        default=Source.UNKNOWN,
+        db_index=True,
+    )
 
     class Meta:
         indexes = [
             models.Index(Upper("email"), name="newsletter_sub_email_upper_idx"),
+            models.Index(fields=["created"], name="newsletter_sub_created_idx"),
         ]
 
     @staticmethod

@@ -28,6 +28,7 @@ from spanza_journal_watch.analytics.models import (
     NewsletterClick,
     NewsletterOpen,
 )
+from spanza_journal_watch.backend.models import SubscriberCSV
 from spanza_journal_watch.backend.views import (
     _build_rate_row,
     _newsletter_predates_site_analytics,
@@ -1744,6 +1745,60 @@ def analytics_traffic(request):
     )
 
 
+def _acquisition_summary(start_ts, end_ts):
+    """Counts of newly-created subscribers in window, grouped by source."""
+    qs = Subscriber.objects.filter(created__gte=start_ts, created__lte=end_ts)
+    totals = dict(qs.values_list("source").annotate(c=Count("id")).values_list("source", "c"))
+    by_source = [
+        {"source": value, "label": label, "count": totals.get(value, 0)} for value, label in Subscriber.Source.choices
+    ]
+    total = sum(row["count"] for row in by_source)
+    unsubscribed = Subscriber.objects.filter(modified__gte=start_ts, modified__lte=end_ts, subscribed=False).count()
+    return {"by_source": by_source, "total": total, "unsubscribed": unsubscribed}
+
+
+def _recent_subscriber_feed(start_ts, end_ts, limit=20):
+    """Feed of recent subscriber activity — CSV imports collapsed to one row per batch."""
+    individual = list(
+        Subscriber.objects.filter(created__gte=start_ts, created__lte=end_ts)
+        .exclude(source=Subscriber.Source.CSV_IMPORT)
+        .order_by("-created")
+        .values("email", "source", "created")[:limit]
+    )
+    csvs = list(
+        SubscriberCSV.objects.filter(created__gte=start_ts, created__lte=end_ts, processed=True)
+        .order_by("-created")
+        .values("id", "name", "email_added_count", "created")[:limit]
+    )
+
+    source_labels = dict(Subscriber.Source.choices)
+    entries = []
+    for row in individual:
+        entries.append(
+            {
+                "kind": "individual",
+                "email": row["email"],
+                "source": row["source"],
+                "source_label": source_labels.get(row["source"], row["source"]),
+                "when": row["created"],
+            }
+        )
+    for row in csvs:
+        entries.append(
+            {
+                "kind": "csv",
+                "csv_id": row["id"],
+                "name": row["name"],
+                "count": row["email_added_count"] or 0,
+                "source": "csv_import",
+                "source_label": source_labels.get("csv_import", "CSV import"),
+                "when": row["created"],
+            }
+        )
+    entries.sort(key=lambda e: e["when"], reverse=True)
+    return entries[:limit]
+
+
 @login_required
 @permission_required(VIEW_NEWSLETTER_STATS, raise_exception=True)
 def analytics_email(request):
@@ -1893,6 +1948,9 @@ def analytics_email(request):
         [row["human_ctr"].rstrip("%") if row["human_ctr"] != "0%" else "0" for row in newsletter_rows]
     )
 
+    acquisition = _acquisition_summary(start_ts, end_ts)
+    recent_feed = _recent_subscriber_feed(start_ts, end_ts, limit=20)
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
@@ -1907,6 +1965,8 @@ def analytics_email(request):
         "trend_ctrs": trend_ctrs,
         "has_partial_site_analytics": any(row["site_analytics_partial"] for row in newsletter_rows),
         "site_analytics_rollout_date": site_analytics_rollout_date,
+        "acquisition": acquisition,
+        "recent_subscriber_feed": recent_feed,
         "active_tab": "email",
     }
     return _render_analytics(request, "backend/analytics/email.html", context, "backend/analytics/_email_panel.html")

@@ -184,7 +184,12 @@ def process_subscriber_csv_record(subscriber_csv):
             already_subscribed_count += 1
             continue
 
-        Subscriber.objects.create(email=email, subscribed=True, from_csv=subscriber_csv)
+        Subscriber.objects.create(
+            email=email,
+            subscribed=True,
+            from_csv=subscriber_csv,
+            source=Subscriber.Source.CSV_IMPORT,
+        )
         records_added += 1
 
     subscriber_csv.processed = True

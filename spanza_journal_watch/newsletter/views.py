@@ -100,8 +100,16 @@ def toggle_subscription(request):
             email=request.user.email,
             user=request.user,
             subscribed=True,
+            source=Subscriber.Source.USER_SIGNUP,
         )
         request.session["subscribed"] = True
+        AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.NEWSLETTER_SUBSCRIBE,
+            request=request,
+            subscriber_id=subscriber.pk,
+            source="user_signup",
+            metadata={"resubscribe": False},
+        )
         send_confirmation_email.delay(subscriber.pk)
 
     return render(
@@ -132,7 +140,9 @@ def subscribe(request):
                 _sync_exact_email_subscription_state(email, True)
                 subscriber = existing
             else:
-                subscriber = form.save()
+                subscriber = form.save(commit=False)
+                subscriber.source = Subscriber.Source.DRAWER if is_drawer else Subscriber.Source.SUBSCRIBE_FORM
+                subscriber.save()
             messages.success(request, f"'{email}' subscribed successfully.")
 
             # Set subscribed flag in session
