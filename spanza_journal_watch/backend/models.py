@@ -1032,21 +1032,30 @@ class PubmedArticle(TimeStampedModel):
             self.tags.add(*tag_pks)
 
     def get_related_reviews(self, limit=4, min_shared=1):
-        from django.db.models import Count, Q
+        from django.db.models import Count, Exists, IntegerField, OuterRef, Subquery
 
-        from spanza_journal_watch.submissions.models import Review
+        from spanza_journal_watch.submissions.models import Review, Tag
 
         tag_ids = list(self.tags.filter(curated=True).values_list("id", flat=True))
         if not tag_ids:
             return Review.objects.none()
+
+        TagArticle = Tag.articles.through
+        shared_count_sq = Subquery(
+            TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=tag_ids)
+            .values("pubmedarticle_id")
+            .annotate(cnt=Count("tag_id"))
+            .values("cnt"),
+            output_field=IntegerField(),
+        )
         return (
-            Review.objects.filter(active=True, article__tags__id__in=tag_ids)
+            Review.objects.filter(active=True)
+            .filter(Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=tag_ids)))
             .exclude(article=self)
-            .annotate(shared_tag_count=Count("article__tags", filter=Q(article__tags__id__in=tag_ids)))
+            .annotate(shared_tag_count=shared_count_sq)
             .filter(shared_tag_count__gte=min_shared)
             .order_by("-shared_tag_count", "-created")
-            .select_related("article__journal", "author")
-            .distinct()[:limit]
+            .select_related("article__journal", "author")[:limit]
         )
 
 

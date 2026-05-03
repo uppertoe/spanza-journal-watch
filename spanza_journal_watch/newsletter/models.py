@@ -142,7 +142,6 @@ class Subscriber(models.Model):
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
             "List-Id": "SPANZA Journal Watch <newsletter.journalwatch.org.au>",
             "Precedence": "list",
-            "Auto-Submitted": "auto-generated",
             "X-Auto-Response-Suppress": "All",
             "Feedback-ID": "journalwatch:newsletter:spanza",
         }

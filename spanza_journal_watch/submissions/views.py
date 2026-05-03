@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.db.models import Count, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Value, Window
+from django.db.models import Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Value, Window
 from django.db.models.functions import Coalesce, RowNumber
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -768,17 +768,19 @@ class CuratedCollectionDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcr
             )
         else:
             tag_ids = list(collection.tags.values_list("id", flat=True))
-            reviews = (
-                list(
-                    Review.objects.filter(active=True, article__tags__id__in=tag_ids)
+            if tag_ids:
+                TagArticle = Tag.articles.through
+                reviews = list(
+                    Review.objects.filter(active=True)
+                    .filter(
+                        Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=tag_ids))
+                    )
                     .select_related("author", "article__journal")
                     .prefetch_related("article__tags", "issues")
-                    .distinct()
                     .order_by("-publish_date")
                 )
-                if tag_ids
-                else []
-            )
+            else:
+                reviews = []
         attach_review_display_fields(reviews)
         context["tag_reviews"] = reviews
         context["article_cols"] = self.article_cols
@@ -858,7 +860,13 @@ class SearchView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMix
             reviews = reviews.filter(publish_date__year=int(selected_year))
 
         if selected_tags:
-            reviews = reviews.filter(article__tags__slug__in=selected_tags).distinct()
+            tag_ids = list(Tag.objects.filter(slug__in=selected_tags).values_list("id", flat=True))
+            if tag_ids:
+                TagArticle = Tag.articles.through
+                # EXISTS avoids M2M join fan-out; don't replace with .filter(article__tags__slug__in=...).distinct()
+                reviews = reviews.filter(
+                    Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=tag_ids))
+                )
 
         return reviews
 
@@ -1347,12 +1355,13 @@ def _attach_related_reviews(rows):
 
     # 2) Fetch all candidate related reviews in one query, excluding current page articles
     article_id_set = set(article_ids)
+    TagArticle = Tag.articles.through
     candidate_reviews = list(
-        Review.objects.filter(active=True, article__tags__id__in=all_tag_ids)
+        Review.objects.filter(active=True)
+        .filter(Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=all_tag_ids)))
         .exclude(article_id__in=article_id_set)
         .select_related("article__journal", "author")
         .prefetch_related("article__tags")
-        .distinct()
     )
 
     # Build review → tag_id set lookup from prefetched tags
@@ -1398,12 +1407,13 @@ def _attach_related_reviews_to_issue_page(reviews):
         return
 
     article_id_set = set(article_ids)
+    TagArticle = Tag.articles.through
     candidate_reviews = list(
-        Review.objects.filter(active=True, article__tags__id__in=all_tag_ids)
+        Review.objects.filter(active=True)
+        .filter(Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=all_tag_ids)))
         .exclude(article_id__in=article_id_set)
         .select_related("article__journal", "author")
         .prefetch_related("article__tags")
-        .distinct()
     )
 
     review_tag_map: dict[int, set[int]] = {}
