@@ -5061,10 +5061,11 @@ def review_tag_suggestions(request, article_id):
 def review_existing_article_search(request):
     """HTMX GET: return filtered PubmedArticle list for the existing-article picker."""
     query = (request.GET.get("q") or "").strip()
-    qs = PubmedArticle.objects.only("id", "title").order_by("title")
-    if query:
-        qs = qs.filter(title__icontains=query)
-    articles = list(qs[:50])
+    if not query:
+        return render(
+            request, "backend/issue_builder/_review_existing_article_options.html", {"articles": [], "query": ""}
+        )
+    articles = list(PubmedArticle.objects.only("id", "title").filter(title__icontains=query).order_by("title")[:50])
     return render(
         request,
         "backend/issue_builder/_review_existing_article_options.html",
