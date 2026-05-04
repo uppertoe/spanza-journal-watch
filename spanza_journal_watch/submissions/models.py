@@ -275,7 +275,9 @@ class Review(TimeStampedModel):
         ]
 
     def _render_markdown_body_html(self):
-        return sanitize_markdown_html(markdownify(self.body))
+        if not hasattr(self, "_markdown_html_cache"):
+            self._markdown_html_cache = sanitize_markdown_html(markdownify(self.body))
+        return self._markdown_html_cache
 
     def get_markdown_body(self, strip=False):
         html = self._render_markdown_body_html()
