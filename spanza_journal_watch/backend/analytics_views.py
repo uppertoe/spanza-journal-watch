@@ -291,43 +291,52 @@ def _build_derived_visits(events_qs):
 
 def _weekly_visits_by_referrer(visits, categories, weeks=26):
     today = timezone.localdate()
+    tz = timezone.get_current_timezone()
+    non_other = frozenset(c for c in categories if c != "other")
+
+    # Single pass: bucket visits by week-start date and tally per-category counts.
+    week_cat_counts: dict = {}
+    for visit in visits:
+        visit_date = visit["first_event"].astimezone(tz).date()
+        ws = visit_date - datetime.timedelta(days=visit_date.weekday())
+        cat = visit["referrer_category"] or ""
+        if ws not in week_cat_counts:
+            week_cat_counts[ws] = Counter()
+        week_cat_counts[ws][cat] += 1
+
     labels = []
     series = {cat: [] for cat in categories}
     for i in range(weeks - 1, -1, -1):
         week_start = today - datetime.timedelta(days=today.weekday() + 7 * i)
-        week_end = week_start + datetime.timedelta(days=6)
         labels.append(week_start.strftime("%-d %b"))
-        week_visits = [
-            visit for visit in visits if week_start <= timezone.localtime(visit["first_event"]).date() <= week_end
-        ]
+        cat_counts = week_cat_counts.get(week_start, {})
         for cat in categories:
             if cat == "other":
-                count = sum(
-                    1
-                    for visit in week_visits
-                    if (visit["referrer_category"] or "") not in [c for c in categories if c != "other"]
-                )
+                count = sum(v for k, v in cat_counts.items() if k not in non_other)
             else:
-                count = sum(1 for visit in week_visits if (visit["referrer_category"] or "") == cat)
+                count = cat_counts.get(cat, 0)
             series[cat].append(count)
     return labels, series
 
 
 def _weekly_visit_buckets(visits, weeks=26):
     today = timezone.localdate()
-    buckets = []
-    for i in range(weeks - 1, -1, -1):
-        week_start = today - datetime.timedelta(days=today.weekday() + 7 * i)
-        week_end = week_start + datetime.timedelta(days=6)
-        count = sum(1 for visit in visits if week_start <= timezone.localtime(visit["first_event"]).date() <= week_end)
-        buckets.append(
-            {
-                "label": week_start.strftime("%-d %b"),
-                "count": count,
-                "week_start": week_start.isoformat(),
-            }
-        )
-    return buckets
+    tz = timezone.get_current_timezone()
+
+    week_counts: Counter = Counter()
+    for visit in visits:
+        visit_date = visit["first_event"].astimezone(tz).date()
+        ws = visit_date - datetime.timedelta(days=visit_date.weekday())
+        week_counts[ws] += 1
+
+    return [
+        {
+            "label": (ws := today - datetime.timedelta(days=today.weekday() + 7 * i)).strftime("%-d %b"),
+            "count": week_counts.get(ws, 0),
+            "week_start": ws.isoformat(),
+        }
+        for i in range(weeks - 1, -1, -1)
+    ]
 
 
 def _rank_rows(rows, sort_fields, limit=8):
@@ -1539,7 +1548,7 @@ def analytics_traffic(request):
         {"referrer_domain": domain, "count": count} for domain, count in other_domain_counts.most_common(10)
     ]
 
-    visitor_ids_in_period = set(human_events.exclude(visitor_id=None).values_list("visitor_id", flat=True).distinct())
+    visitor_ids_in_period = {visit["visitor_id"] for visit in visits if visit["visitor_id"]}
 
     # "Returning" = visitor had 2+ derived visits in the period (matches the recent
     # visits list below). This replaces the older pre-period definition, which
