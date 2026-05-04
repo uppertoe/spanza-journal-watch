@@ -319,10 +319,34 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
             if self.object.feature_image
             else self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png"))
         )
+        article = self.object.article
+        item_reviewed = {
+            "@type": "ScholarlyArticle",
+            "name": article.title or article_title,
+        }
+        if article.doi:
+            item_reviewed["identifier"] = {
+                "@type": "PropertyValue",
+                "propertyID": "DOI",
+                "value": article.doi,
+            }
+        if article.pmid:
+            item_reviewed.setdefault("identifier", [])
+            if isinstance(item_reviewed["identifier"], dict):
+                item_reviewed["identifier"] = [item_reviewed["identifier"]]
+            item_reviewed["identifier"].append({"@type": "PropertyValue", "propertyID": "PMID", "value": article.pmid})
+        journal_name = article.source_journal_name or (str(article.journal) if article.journal else "")
+        if journal_name:
+            item_reviewed["isPartOf"] = {"@type": "Periodical", "name": journal_name}
+        if article.publication_date:
+            item_reviewed["datePublished"] = article.publication_date.isoformat()
+        source_url = article.pubmed_url or article.article_url
+        if source_url:
+            item_reviewed["url"] = source_url
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
-                "@type": "Article",
+                "@type": "Review",
                 "headline": share_title,
                 "description": share_description,
                 "url": canonical_url,
@@ -340,6 +364,7 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
                         "url": self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png")),
                     },
                 },
+                "itemReviewed": item_reviewed,
             }
         )
         context["share_title"] = share_title
@@ -416,15 +441,21 @@ class IssueDetailView(
             "from the paediatric anaesthesia literature."
         )
         context["canonical_url"] = self.request.build_absolute_uri()
-        context["structured_data"] = json.dumps(
-            {
-                "@context": "https://schema.org",
-                "@type": "CollectionPage",
-                "name": self.object.name,
-                "url": build_request_absolute_url(self.request, self.object.get_absolute_url()),
-                "description": context["page_meta_description"],
-            }
-        )
+        issue_sd = {
+            "@context": "https://schema.org",
+            "@type": "PublicationIssue",
+            "name": self.object.name,
+            "url": build_request_absolute_url(self.request, self.object.get_absolute_url()),
+            "description": context["page_meta_description"],
+            "isPartOf": {
+                "@type": "Periodical",
+                "name": "SPANZA Journal Watch",
+                "url": self.request.build_absolute_uri(reverse("submissions:issue_list")),
+            },
+        }
+        if self.object.date:
+            issue_sd["datePublished"] = self.object.date.isoformat()
+        context["structured_data"] = json.dumps(issue_sd)
 
         # Rearrange the sidebar to ensure on top in mobile
         context["arrange_sidebar_top"] = self.arrange_sidebar_top
