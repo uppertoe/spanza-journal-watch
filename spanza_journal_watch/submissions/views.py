@@ -1454,7 +1454,7 @@ def _journal_article_actions_context(request, article):
     }
 
 
-class JournalListView(TemplateView):
+class JournalListView(AnonymousCacheMixin, TemplateView):
     template_name = "submissions/journal_list.html"
 
     def get_context_data(self, **kwargs):
