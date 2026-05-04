@@ -738,7 +738,7 @@ def analytics_overview(request):
     visits = _build_derived_visits(human_events)
 
     # Unique visitors and visits
-    unique_visitors = human_events.exclude(visitor_id=None).values("visitor_id").distinct().count()
+    unique_visitors = len({v["visitor_id"] for v in visits if v["visitor_id"]})
     unique_sessions = len(visits)
     # Distinct Django session_keys (only written when a request mutates the
     # session, e.g. a JS beacon fires). Used as the bot-signal denominator:
@@ -746,14 +746,22 @@ def analytics_overview(request):
     # session_key climbs when they slip through the UA filter.
     unique_session_keys = human_events.exclude(session_key="").values("session_key").distinct().count()
 
-    human_event_count = human_events.count()
-    subscriber_events = human_events.filter(
-        human_confidence=AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
-    ).count()
+    human_agg = human_events.aggregate(
+        human_event_count=Count("id"),
+        subscriber_events=Count(
+            "id", filter=Q(human_confidence=AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN)
+        ),
+    )
+    human_event_count = human_agg["human_event_count"]
+    subscriber_events = human_agg["subscriber_events"]
 
     # Data quality — always across ALL events regardless of filter toggle
     all_period = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts)
-    total_all_events = all_period.count()
+    all_agg = all_period.aggregate(
+        total_all_events=Count("id"),
+        js_verified_count=Count("id", filter=Q(js_verified=True)),
+    )
+    total_all_events = all_agg["total_all_events"]
     # Automated requests are no longer persisted per-row; read from the daily
     # aggregate counter bumped by record_event's bot short-circuit.
     automated_counter_qs = AutomatedRequestCount.objects.filter(
@@ -765,7 +773,7 @@ def analytics_overview(request):
         automated_counter_qs.values("event_type").annotate(total=Sum("count")).order_by("-total")
     )
     total_attempted_events = total_all_events + automated_count
-    js_verified_count = all_period.filter(js_verified=True).count()
+    js_verified_count = all_agg["js_verified_count"]
     confidence_breakdown = list(all_period.values("human_confidence").annotate(count=Count("id")).order_by("-count"))
 
     review_summary_rows = list(
@@ -780,7 +788,10 @@ def analytics_overview(request):
     )
     review_ids = [row["object_id"] for row in review_summary_rows if row["object_id"]]
     reviews_by_id = {
-        review.id: review for review in Review.objects.filter(id__in=review_ids).select_related("article__journal")
+        review.id: review
+        for review in Review.objects.filter(id__in=review_ids)
+        .select_related("article__journal")
+        .defer("body", "search_vector", "article__abstract", "article__metadata_json", "article__tags_string")
     }
     review_rows = []
     for row in review_summary_rows:
@@ -1211,6 +1222,7 @@ def analytics_editorial(request):
         for r in Review.objects.filter(id__in=review_ids)
         .select_related("article__journal", "author")
         .prefetch_related("article__tags")
+        .defer("body", "search_vector", "article__abstract", "article__metadata_json", "article__tags_string")
     }
 
     top_reviews = []
