@@ -384,27 +384,29 @@ def _render_analytics(request, template, context, panel_template=None):
 
 
 def _weekly_buckets(qs, timestamp_field="timestamp", weeks=26):
+    from django.db.models.functions import TruncWeek
+
     today = timezone.localdate()
-    buckets = []
-    for i in range(weeks - 1, -1, -1):
-        week_start = today - datetime.timedelta(days=today.weekday() + 7 * i)
-        week_end = week_start + datetime.timedelta(days=6)
-        start_ts = timezone.make_aware(datetime.datetime.combine(week_start, datetime.time.min))
-        end_ts = timezone.make_aware(datetime.datetime.combine(week_end, datetime.time.max))
-        count = qs.filter(
-            **{
-                f"{timestamp_field}__gte": start_ts,
-                f"{timestamp_field}__lte": end_ts,
-            }
-        ).count()
-        buckets.append(
-            {
-                "label": week_start.strftime("%-d %b"),
-                "count": count,
-                "week_start": week_start.isoformat(),
-            }
-        )
-    return buckets
+    tz = timezone.get_current_timezone()
+    cutoff_date = today - datetime.timedelta(days=today.weekday() + 7 * (weeks - 1))
+    cutoff_dt = timezone.make_aware(datetime.datetime.combine(cutoff_date, datetime.time.min))
+
+    raw = {
+        entry["week"].astimezone(tz).date(): entry["count"]
+        for entry in qs.filter(**{f"{timestamp_field}__gte": cutoff_dt})
+        .annotate(week=TruncWeek(timestamp_field, tzinfo=tz))
+        .values("week")
+        .annotate(count=Count("id"))
+    }
+
+    return [
+        {
+            "label": (week_start := today - datetime.timedelta(days=today.weekday() + 7 * i)).strftime("%-d %b"),
+            "count": raw.get(week_start, 0),
+            "week_start": week_start.isoformat(),
+        }
+        for i in range(weeks - 1, -1, -1)
+    ]
 
 
 def _newsletter_send_weeks(weeks=26):
@@ -628,28 +630,29 @@ def analytics_overview(request):
         AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
     ]
 
-    total_opens = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN).count()
-    total_engaged = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).count()
-    total_full_text = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK).count()
-    total_shares = review_events.filter(event_type__in=share_event_types).count()
-    avg_dwell_ms = (
-        review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).aggregate(avg=Avg("duration_ms"))[
-            "avg"
-        ]
-        or 0
+    E = AnalyticsEvent.EventType
+    period_agg = review_events.aggregate(
+        total_opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+        total_engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+        total_full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+        total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
+        avg_dwell=Avg("duration_ms", filter=Q(event_type=E.REVIEW_ENGAGED)),
+        avg_scroll=Avg("scroll_depth", filter=Q(event_type=E.REVIEW_ENGAGED, scroll_depth__isnull=False)),
     )
+    total_opens = period_agg["total_opens"]
+    total_engaged = period_agg["total_engaged"]
+    total_full_text = period_agg["total_full_text"]
+    total_shares = period_agg["total_shares"]
+    avg_dwell_ms = period_agg["avg_dwell"] or 0
+    avg_scroll = period_agg["avg_scroll"]
+    avg_scroll_depth = round(avg_scroll) if avg_scroll is not None else None
+
     search_count = (
-        human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
+        human_events.filter(event_type=E.SEARCH)
         .exclude(metadata__query="")
         .exclude(metadata__query__isnull=True)
         .count()
     )
-    avg_scroll = (
-        review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
-        .exclude(scroll_depth=None)
-        .aggregate(avg=Avg("scroll_depth"))["avg"]
-    )
-    avg_scroll_depth = round(avg_scroll) if avg_scroll is not None else None
 
     # Previous period for comparison
     period_days = (end_date - start_date).days
@@ -662,26 +665,27 @@ def analytics_overview(request):
         timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
     )
     prev_review = prev_human.filter(content_type=review_ct)
-    prev_opens = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN).count()
-    prev_engaged = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).count()
-    prev_dwell_ms = (
-        prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).aggregate(avg=Avg("duration_ms"))["avg"]
-        or 0
+    prev_agg = prev_review.aggregate(
+        total_opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+        total_engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+        total_full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+        total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
+        avg_dwell=Avg("duration_ms", filter=Q(event_type=E.REVIEW_ENGAGED)),
+        avg_scroll=Avg("scroll_depth", filter=Q(event_type=E.REVIEW_ENGAGED, scroll_depth__isnull=False)),
     )
-    prev_full_text = prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK).count()
-    prev_shares = prev_review.filter(event_type__in=share_event_types).count()
+    prev_opens = prev_agg["total_opens"]
+    prev_engaged = prev_agg["total_engaged"]
+    prev_full_text = prev_agg["total_full_text"]
+    prev_shares = prev_agg["total_shares"]
+    prev_dwell_ms = prev_agg["avg_dwell"] or 0
+    prev_scroll = prev_agg["avg_scroll"]
+    prev_scroll_depth = round(prev_scroll) if prev_scroll is not None else None
     prev_searches = (
-        prev_human.filter(event_type=AnalyticsEvent.EventType.SEARCH)
+        prev_human.filter(event_type=E.SEARCH)
         .exclude(metadata__query="")
         .exclude(metadata__query__isnull=True)
         .count()
     )
-    prev_scroll = (
-        prev_review.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
-        .exclude(scroll_depth=None)
-        .aggregate(avg=Avg("scroll_depth"))["avg"]
-    )
-    prev_scroll_depth = round(prev_scroll) if prev_scroll is not None else None
 
     engaged_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
     weekly_trend = _weekly_buckets(engaged_qs)
@@ -758,9 +762,9 @@ def analytics_overview(request):
     review_summary_rows = list(
         review_events.values("object_id")
         .annotate(
-            opens=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)),
-            engaged_views=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
-            full_text_clicks=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)),
+            opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+            engaged_views=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            full_text_clicks=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
             total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
         )
         .order_by("-opens", "-engaged_views", "-full_text_clicks")
@@ -795,13 +799,19 @@ def analytics_overview(request):
     best_full_text_review = _rank_rows(review_rows, ("full_text_clicks", "full_text_ctr_value", "opens"), limit=1)
     most_shared_review = _rank_rows(review_rows, ("total_shares", "share_rate_value", "opens"), limit=1)
 
+    share_count_map = dict(
+        review_events.filter(event_type__in=share_event_types)
+        .values_list("event_type")
+        .annotate(count=Count("id"))
+        .values_list("event_type", "count")
+    )
     share_counts = {
-        "Copy link": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK).count(),
-        "Email": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL).count(),
-        "Native share": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE).count(),
-        "Bluesky": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY).count(),
-        "X": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_X).count(),
-        "Facebook": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK).count(),
+        "Copy link": share_count_map.get(E.REVIEW_SHARE_COPY_LINK, 0),
+        "Email": share_count_map.get(E.REVIEW_SHARE_EMAIL, 0),
+        "Native share": share_count_map.get(E.REVIEW_SHARE_NATIVE, 0),
+        "Bluesky": share_count_map.get(E.REVIEW_SHARE_BLUESKY, 0),
+        "X": share_count_map.get(E.REVIEW_SHARE_X, 0),
+        "Facebook": share_count_map.get(E.REVIEW_SHARE_FACEBOOK, 0),
     }
     top_share_method = None
     for label, count in sorted(share_counts.items(), key=lambda item: item[1], reverse=True):
@@ -1153,27 +1163,34 @@ def analytics_editorial(request):
     review_ct = ContentType.objects.get_for_model(Review)
     review_events = human_events.filter(content_type=review_ct)
 
+    E = AnalyticsEvent.EventType
     share_event_types = [
-        AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
-        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
-        AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE,
-        AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY,
-        AnalyticsEvent.EventType.REVIEW_SHARE_X,
-        AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
+        E.REVIEW_SHARE_COPY_LINK,
+        E.REVIEW_SHARE_EMAIL,
+        E.REVIEW_SHARE_NATIVE,
+        E.REVIEW_SHARE_BLUESKY,
+        E.REVIEW_SHARE_X,
+        E.REVIEW_SHARE_FACEBOOK,
     ]
-    total_opens = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN).count()
-    total_engaged = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED).count()
-    total_full_text = review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK).count()
-    total_shares = review_events.filter(event_type__in=share_event_types).count()
+    editorial_agg = review_events.aggregate(
+        total_opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+        total_engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+        total_full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+        total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
+    )
+    total_opens = editorial_agg["total_opens"]
+    total_engaged = editorial_agg["total_engaged"]
+    total_full_text = editorial_agg["total_full_text"]
+    total_shares = editorial_agg["total_shares"]
 
     review_summary_rows = list(
         review_events.values("object_id")
         .annotate(
-            opens=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)),
-            engaged_views=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
-            avg_dwell_ms=Avg("duration_ms", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
-            avg_scroll=Avg("scroll_depth", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)),
-            full_text_clicks=Count("id", filter=Q(event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)),
+            opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+            engaged_views=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            avg_dwell_ms=Avg("duration_ms", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            avg_scroll=Avg("scroll_depth", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            full_text_clicks=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
             total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
         )
         .order_by("-opens", "-engaged_views", "-full_text_clicks")
@@ -1276,13 +1293,19 @@ def analytics_editorial(request):
             label=label, opens=opens, engaged=engaged, shares=shares, full_text=full_text, score=score
         )
 
+    editorial_share_map = dict(
+        review_events.filter(event_type__in=share_event_types)
+        .values_list("event_type")
+        .annotate(count=Count("id"))
+        .values_list("event_type", "count")
+    )
     share_counts = {
-        "Copy link": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK).count(),
-        "Email": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL).count(),
-        "Native share": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE).count(),
-        "Bluesky": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY).count(),
-        "X": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_X).count(),
-        "Facebook": review_events.filter(event_type=AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK).count(),
+        "Copy link": editorial_share_map.get(E.REVIEW_SHARE_COPY_LINK, 0),
+        "Email": editorial_share_map.get(E.REVIEW_SHARE_EMAIL, 0),
+        "Native share": editorial_share_map.get(E.REVIEW_SHARE_NATIVE, 0),
+        "Bluesky": editorial_share_map.get(E.REVIEW_SHARE_BLUESKY, 0),
+        "X": editorial_share_map.get(E.REVIEW_SHARE_X, 0),
+        "Facebook": editorial_share_map.get(E.REVIEW_SHARE_FACEBOOK, 0),
     }
     share_breakdown = [{"label": k, "count": v} for k, v in share_counts.items() if v]
 
@@ -1813,41 +1836,66 @@ def analytics_email(request):
         ).order_by("-send_date")
     )
 
+    # Batch all open/click stats so we issue 3 queries for all newsletters combined
+    # rather than 7+ per newsletter.
+    from itertools import groupby as _groupby
+
+    newsletter_ids = [nl.pk for nl in newsletters]
+
+    open_stats = {
+        row["newsletter_id"]: row
+        for row in NewsletterOpen.objects.filter(newsletter_id__in=newsletter_ids)
+        .values("newsletter_id")
+        .annotate(
+            total=Count("id"),
+            human=Count("id", filter=Q(automated=False)),
+            human_unique=Count("subscriber", distinct=True, filter=Q(automated=False)),
+        )
+    }
+
+    click_stats = {
+        row["newsletter_id"]: row
+        for row in NewsletterClick.objects.filter(newsletter_id__in=newsletter_ids)
+        .values("newsletter_id")
+        .annotate(
+            total=Count("id"),
+            human=Count("id", filter=Q(automated=False)),
+            human_unique=Count("subscriber", distinct=True, filter=Q(automated=False)),
+        )
+    }
+
+    # Per-link breakdowns — one query, top 8 per newsletter applied in Python
+    link_rows = list(
+        NewsletterClick.objects.filter(newsletter_id__in=newsletter_ids, automated=False)
+        .exclude(destination_url="")
+        .values("newsletter_id", "destination_url")
+        .annotate(clicks=Count("id"), unique_subscribers=Count("subscriber", distinct=True))
+        .order_by("newsletter_id", "-clicks")
+    )
+    link_clicks_by_nl = {}
+    for nl_id, group in _groupby(link_rows, key=lambda r: r["newsletter_id"]):
+        link_clicks_by_nl[nl_id] = list(group)[:8]
+
     newsletter_rows = []
     for nl in newsletters:
-        opens_qs = NewsletterOpen.objects.filter(newsletter=nl)
-        clicks_qs = NewsletterClick.objects.filter(newsletter=nl)
-        total_opens = opens_qs.count()
-        total_clicks = clicks_qs.count()
-        filtered_opens = opens_qs.filter(automated=False)
-        filtered_clicks = clicks_qs.filter(automated=False)
-        total_filtered_opens = filtered_opens.count()
-        total_filtered_clicks = filtered_clicks.count()
-        human_opens = filtered_opens.values("subscriber").distinct().count()
-        human_clicks = filtered_clicks.values("subscriber").distinct().count()
+        ostats = open_stats.get(nl.pk, {})
+        cstats = click_stats.get(nl.pk, {})
+        total_opens_nl = ostats.get("total", 0)
+        total_clicks_nl = cstats.get("total", 0)
+        total_filtered_opens = ostats.get("human", 0)
+        total_filtered_clicks = cstats.get("human", 0)
+        human_opens = ostats.get("human_unique", 0)
+        human_clicks = cstats.get("human_unique", 0)
         site_analytics_partial = _newsletter_predates_site_analytics(nl)
 
-        post_traffic_qs = AnalyticsEvent.objects.filter(
-            event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
-            automated=False,
-        )
         post_traffic = None if site_analytics_partial else 0
         if nl.send_date and not site_analytics_partial:
-            post_traffic = post_traffic_qs.filter(
+            post_traffic = AnalyticsEvent.objects.filter(
+                event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+                automated=False,
                 timestamp__gte=nl.send_date,
                 timestamp__lte=nl.send_date + datetime.timedelta(days=7),
             ).count()
-
-        # Per-link click breakdown for this newsletter
-        link_clicks = list(
-            filtered_clicks.exclude(destination_url="")
-            .values("destination_url")
-            .annotate(
-                clicks=Count("id"),
-                unique_subscribers=Count("subscriber", distinct=True),
-            )
-            .order_by("-clicks")[:8]
-        )
 
         newsletter_rows.append(
             {
@@ -1858,10 +1906,14 @@ def analytics_email(request):
                 "human_clicks": human_clicks,
                 "human_ctr": _safe_percentage(human_clicks, nl.emails_sent),
                 "human_ctor": _safe_percentage(human_clicks, human_opens),
-                "automated_open_share": _safe_percentage(max(total_opens - total_filtered_opens, 0), total_opens),
-                "automated_click_share": _safe_percentage(max(total_clicks - total_filtered_clicks, 0), total_clicks),
+                "automated_open_share": _safe_percentage(
+                    max(total_opens_nl - total_filtered_opens, 0), total_opens_nl
+                ),
+                "automated_click_share": _safe_percentage(
+                    max(total_clicks_nl - total_filtered_clicks, 0), total_clicks_nl
+                ),
                 "post_send_traffic": post_traffic,
-                "link_clicks": link_clicks,
+                "link_clicks": link_clicks_by_nl.get(nl.pk, []),
                 "site_analytics_partial": site_analytics_partial,
             }
         )

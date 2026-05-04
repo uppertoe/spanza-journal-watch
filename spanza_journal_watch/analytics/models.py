@@ -162,6 +162,7 @@ class AnalyticsEvent(models.Model):
             models.Index(fields=["content_type", "object_id", "timestamp"]),
             models.Index(fields=["source", "timestamp"]),
             models.Index(fields=["session_key"]),
+            models.Index(fields=["automated", "timestamp"], name="analytics_a_auto_ts_idx"),
         ]
         ordering = ("-timestamp",)
 
