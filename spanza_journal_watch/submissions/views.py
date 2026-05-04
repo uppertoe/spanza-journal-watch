@@ -346,7 +346,7 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
-                "@type": "Review",
+                "@type": "Article",
                 "headline": share_title,
                 "description": share_description,
                 "url": canonical_url,
@@ -364,7 +364,7 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
                         "url": self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png")),
                     },
                 },
-                "itemReviewed": item_reviewed,
+                "about": item_reviewed,
             }
         )
         context["share_title"] = share_title
