@@ -293,6 +293,81 @@ def run_pubmed_batch_import_task(self, batch_id):
 
 
 @celery_app.task(bind=True)
+def check_batch_for_new_articles_task(self, batch_id):
+    """Refresh the PubMed cache for a batch's range, then re-import into the batch.
+
+    Updates `batch.last_pubmed_fetched_at` after the PubMed step completes.
+    """
+    from .models import FetchLog, PubmedImportBatch
+    from .pubmed import PubmedAPIError
+    from .pubmed_cache import populate_pubmed_batch_from_cache, refresh_pubmed_journal_cache
+    from .views import _safe_planka_error
+
+    batch = PubmedImportBatch.objects.get(pk=batch_id)
+    batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
+    batch.task_id = self.request.id or batch.task_id
+    batch.task_action = "check_for_new"
+    batch.task_note = "Checking PubMed for new articles..."
+    batch.save(update_fields=["task_state", "task_id", "task_action", "task_note", "modified"])
+
+    fetch_log = FetchLog.objects.create(
+        task_type=FetchLog.TASK_BATCH_IMPORT,
+        celery_task_id=self.request.id or "",
+        details={"batch_id": batch_id, "action": "check_for_new"},
+    )
+
+    watched_journals = list(batch.watched_journals.filter(active=True))
+    if not watched_journals:
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        batch.task_note = "No active watched journals on this batch."
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        fetch_log.finish(FetchLog.STATUS_ERROR, error_message=batch.task_note)
+        return {"status": "error", "note": batch.task_note}
+
+    def _report_progress(done, total, journal_name):
+        # Updates run from worker threads — keep it to a single short UPDATE.
+        PubmedImportBatch.objects.filter(pk=batch_id).update(
+            task_note=f"Checking PubMed ({done}/{total}) - finished {journal_name}",
+            modified=timezone.now(),
+        )
+
+    try:
+        refresh_pubmed_journal_cache(
+            watched_journals=watched_journals,
+            from_month=batch.from_month,
+            to_month=batch.to_month,
+            progress_callback=_report_progress,
+        )
+        batch.last_pubmed_fetched_at = timezone.now()
+        batch.save(update_fields=["last_pubmed_fetched_at", "modified"])
+
+        before_count = batch.batch_articles.count()
+        populate_pubmed_batch_from_cache(batch, watched_journals)
+        new_count = batch.batch_articles.count() - before_count
+
+        batch.task_state = PubmedImportBatch.TASK_STATE_SUCCESS
+        if new_count > 0:
+            batch.task_note = f"Found {new_count} new article(s) since last check."
+        else:
+            batch.task_note = "No new articles found."
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        fetch_log.finish(
+            FetchLog.STATUS_SUCCESS,
+            journal_count=len(watched_journals),
+            articles_created=new_count,
+            details={"batch_id": batch_id, "result_count": batch.result_count, "new_count": new_count},
+        )
+        return {"status": "success", "new_count": new_count, "result_count": batch.result_count}
+    except PubmedAPIError as error:
+        batch.task_state = PubmedImportBatch.TASK_STATE_ERROR
+        batch.task_note = f"PubMed fetch failed: {_safe_planka_error(error)}"
+        batch.save(update_fields=["task_state", "task_note", "modified"])
+        logger.error("Check-for-new failed for batch %s: %s", batch_id, error)
+        fetch_log.finish(FetchLog.STATUS_ERROR, error_message=str(error))
+        return {"status": "error", "note": batch.task_note}
+
+
+@celery_app.task(bind=True)
 def refresh_pubmed_journal_cache_task(self, from_month=None, to_month=None):
     from .models import FetchLog
     from .pubmed_cache import default_pubmed_cache_window, refresh_pubmed_journal_cache

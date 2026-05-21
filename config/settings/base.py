@@ -315,7 +315,8 @@ PLANKA_DB_URL = env("PLANKA_DB_URL", default="")
 
 # PUBMED
 # ------------------------------------------------------------------------------
-PUBMED_TIMEOUT_SECONDS = env.int("PUBMED_TIMEOUT_SECONDS", default=20)
+PUBMED_TIMEOUT_SECONDS = env.int("PUBMED_TIMEOUT_SECONDS", default=30)
+PUBMED_PARALLEL_JOURNALS = env.int("PUBMED_PARALLEL_JOURNALS", default=3)
 PUBMED_CREDENTIAL_ENCRYPTION_KEY = env("PUBMED_CREDENTIAL_ENCRYPTION_KEY", default="")
 
 # ADMIN

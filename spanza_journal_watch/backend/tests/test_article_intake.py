@@ -466,3 +466,165 @@ class TestArticleIntakePushToPlanka:
         url = reverse("backend:article_intake_push_to_planka", kwargs={"batch_id": batch.pk})
         resp = client.get(url)
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Tests: check-for-new flow ("new since your last look")
+# ---------------------------------------------------------------------------
+
+
+def _make_batch_with_watched(user):
+    today = datetime.date.today().replace(day=1)
+    batch = PubmedImportBatch.objects.create(from_month=today, to_month=today, created_by=user)
+    watched = WatchedJournal.objects.create(name="WJ Check", active=True)
+    batch.watched_journals.add(watched)
+    return batch, watched
+
+
+class TestArticleIntakeCheckForNew:
+    def test_check_for_new_queues_task_when_gate_open(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+        with patch("spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay") as mock_delay:
+            mock_delay.return_value = MagicMock(id="task-1")
+            resp = client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
+        assert resp.status_code in (200, 302)
+        mock_delay.assert_called_once_with(batch.pk)
+        # user_view created lazily on results render; here we just ensure no error.
+        _ = PubmedBatchUserView
+
+    def test_check_for_new_blocked_when_recently_fetched(self):
+        from django.utils import timezone
+
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+        batch.last_pubmed_fetched_at = timezone.now()
+        batch.save(update_fields=["last_pubmed_fetched_at", "modified"])
+
+        with patch("spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay") as mock_delay:
+            resp = client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
+        assert resp.status_code in (200, 302)
+        mock_delay.assert_not_called()
+
+    def test_check_for_new_allowed_after_window_expires(self):
+        from django.utils import timezone
+
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+        batch.last_pubmed_fetched_at = timezone.now() - datetime.timedelta(minutes=20)
+        batch.save(update_fields=["last_pubmed_fetched_at", "modified"])
+
+        with patch("spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay") as mock_delay:
+            mock_delay.return_value = MagicMock(id="task-2")
+            client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
+        mock_delay.assert_called_once_with(batch.pk)
+
+
+class TestArticleIntakeUserView:
+    def test_results_create_user_view_with_now_baseline(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+
+        resp = client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+        assert resp.status_code == 200
+        assert PubmedBatchUserView.objects.filter(batch=batch, user=user).exists()
+
+    def test_per_user_baselines_are_isolated(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+
+        client_a, user_a = _make_manager()
+        client_b, user_b = _make_manager()
+        batch, _ = _make_batch_with_watched(user_a)
+
+        client_a.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+        client_b.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+
+        views = {v.user_id: v for v in PubmedBatchUserView.objects.filter(batch=batch)}
+        assert user_a.pk in views and user_b.pk in views
+        # Independent rows.
+        assert views[user_a.pk].pk != views[user_b.pk].pk
+
+    def test_mark_all_seen_advances_baseline_and_clears_seen_ids(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+
+        client, user = _make_manager()
+        batch, watched = _make_batch_with_watched(user)
+        # Trigger user_view creation, then plant a stale baseline + a per-row ack.
+        client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+        view = PubmedBatchUserView.objects.get(batch=batch, user=user)
+        old_baseline = view.last_seen_at - datetime.timedelta(days=1)
+        view.last_seen_at = old_baseline
+        view.seen_batch_article_ids = [999]
+        view.save(update_fields=["last_seen_at", "seen_batch_article_ids", "modified"])
+
+        resp = client.post(reverse("backend:article_intake_mark_all_seen", kwargs={"batch_id": batch.pk}))
+        assert resp.status_code in (200, 302)
+
+        view.refresh_from_db()
+        assert view.last_seen_at > old_baseline
+        assert view.seen_batch_article_ids == []
+
+    def test_mark_row_seen_appends_row_id(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+
+        client, user = _make_manager()
+        batch, watched = _make_batch_with_watched(user)
+        article = PubmedArticle.objects.create(pmid="11112222", title="A")
+        row = PubmedBatchArticle.objects.create(batch=batch, article=article, watched_journal=watched)
+
+        # Create the user_view first.
+        client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+
+        resp = client.post(
+            reverse("backend:article_intake_mark_row_seen", kwargs={"batch_id": batch.pk, "item_id": row.pk})
+        )
+        assert resp.status_code == 204
+        view = PubmedBatchUserView.objects.get(batch=batch, user=user)
+        assert row.pk in (view.seen_batch_article_ids or [])
+
+    def test_toggle_selection_implicitly_acknowledges_row(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+
+        client, user = _make_manager()
+        batch, watched = _make_batch_with_watched(user)
+        article = PubmedArticle.objects.create(pmid="33334444", title="B")
+        row = PubmedBatchArticle.objects.create(batch=batch, article=article, watched_journal=watched)
+
+        client.post(
+            reverse("backend:article_intake_toggle_selection", kwargs={"batch_id": batch.pk, "item_id": row.pk}),
+            data={"selected": "1"},
+        )
+        view = PubmedBatchUserView.objects.get(batch=batch, user=user)
+        assert row.pk in (view.seen_batch_article_ids or [])
+
+    def test_is_new_flag_set_on_rows_created_after_baseline(self):
+        from spanza_journal_watch.backend.models import PubmedBatchUserView
+        from spanza_journal_watch.backend.views import _article_intake_results_context
+
+        client, user = _make_manager()
+        batch, watched = _make_batch_with_watched(user)
+
+        # Seed user_view with an early baseline.
+        view = PubmedBatchUserView.objects.create(
+            batch=batch, user=user, last_seen_at=datetime.datetime(2000, 1, 1, tzinfo=datetime.UTC)
+        )
+
+        article = PubmedArticle.objects.create(pmid="55556666", title="C")
+        row = PubmedBatchArticle.objects.create(batch=batch, article=article, watched_journal=watched)
+
+        ctx = _article_intake_results_context(batch, {}, user=user)
+        result_row = next(r for r in ctx["result_rows"] if r.pk == row.pk)
+        assert result_row.is_new is True
+        assert ctx["new_count"] == 1
+
+        # Acknowledge the row → no longer flagged new.
+        view.seen_batch_article_ids = [row.pk]
+        view.save(update_fields=["seen_batch_article_ids", "modified"])
+        ctx2 = _article_intake_results_context(batch, {}, user=user)
+        result_row2 = next(r for r in ctx2["result_rows"] if r.pk == row.pk)
+        assert result_row2.is_new is False
+        assert ctx2["new_count"] == 0

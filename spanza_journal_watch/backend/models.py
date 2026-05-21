@@ -890,6 +890,7 @@ class PubmedImportBatch(TimeStampedModel):
     task_action = models.CharField(max_length=24, blank=True)
     task_id = models.CharField(max_length=64, blank=True)
     task_note = models.TextField(blank=True)
+    last_pubmed_fetched_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ("-created",)
@@ -1091,6 +1092,25 @@ class PubmedBatchArticle(TimeStampedModel):
 
     def __str__(self):
         return f"{self.batch_id}: {self.article}"
+
+
+class PubmedBatchUserView(TimeStampedModel):
+    batch = models.ForeignKey(PubmedImportBatch, on_delete=models.CASCADE, related_name="user_views")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pubmed_batch_views",
+    )
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    seen_batch_article_ids = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["batch", "user"], name="uniq_pubmed_batch_user_view"),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} viewing batch {self.batch_id}"
 
 
 def can_recommend_pubmed_articles(user):

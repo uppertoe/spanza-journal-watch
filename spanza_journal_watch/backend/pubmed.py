@@ -2,6 +2,8 @@ import calendar
 import datetime
 import email.utils
 import json
+import socket
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -16,7 +18,7 @@ class PubmedAPIError(Exception):
 class PubmedClient:
     BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
-    def __init__(self, api_key="", timeout=20, max_retries=3, tool="spanza-journal-watch", email=""):
+    def __init__(self, api_key="", timeout=30, max_retries=3, tool="spanza-journal-watch", email=""):
         self.api_key = (api_key or "").strip()
         self.timeout = timeout
         self.max_retries = max_retries
@@ -24,14 +26,18 @@ class PubmedClient:
         self.email = (email or "").strip()
         self.min_interval_seconds = 0.11 if self.api_key else 0.34
         self._next_request_at = 0.0
+        # Held while computing the next-allowed-fire-time, so concurrent threads
+        # pace their request issuance correctly. Released before urlopen() so
+        # responses can return in parallel.
+        self._rate_lock = threading.Lock()
 
-    def _respect_rate_limit(self):
-        delay = self._next_request_at - time.monotonic()
-        if delay > 0:
-            time.sleep(delay)
-
-    def _mark_request_complete(self):
-        self._next_request_at = time.monotonic() + self.min_interval_seconds
+    def _claim_request_slot(self):
+        """Block until we're allowed to fire the next request, then reserve the next slot."""
+        with self._rate_lock:
+            delay = self._next_request_at - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+            self._next_request_at = time.monotonic() + self.min_interval_seconds
 
     def _parse_retry_after(self, value):
         if not value:
@@ -69,26 +75,24 @@ class PubmedClient:
 
         last_error = None
         for attempt in range(self.max_retries + 1):
-            self._respect_rate_limit()
+            self._claim_request_slot()
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                    payload = response.read().decode("utf-8")
-                self._mark_request_complete()
-                return payload
+                    return response.read().decode("utf-8")
             except urllib.error.HTTPError as error:
                 last_error = error
                 if error.code == 429 and attempt < self.max_retries:
-                    self._next_request_at = 0.0
                     retry_after = self._parse_retry_after(error.headers.get("Retry-After"))
                     time.sleep(retry_after if retry_after is not None else min(2**attempt, 8))
                     continue
-
-                self._mark_request_complete()
-                if error.code != 429 or attempt >= self.max_retries:
-                    break
-            except Exception as error:
-                self._mark_request_complete()
-                raise PubmedAPIError(f"PubMed request failed: {error}") from error
+                break
+            except (socket.timeout, urllib.error.URLError, TimeoutError) as error:
+                # Transient network failures (read timeout, connection reset, DNS blip).
+                last_error = error
+                if attempt < self.max_retries:
+                    time.sleep(min(2**attempt, 8))
+                    continue
+                break
 
         raise PubmedAPIError(f"PubMed request failed: {last_error}")
 

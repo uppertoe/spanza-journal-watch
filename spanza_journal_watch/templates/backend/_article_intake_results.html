@@ -1,7 +1,29 @@
 <div class="card">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <span>Retrieved articles (select then stage)</span>
-    <small class="text-muted">{{ result_total }} shown · {{ selected_total }} staged · {{ pushed_total }} pushed</small>
+    <div class="d-flex align-items-center gap-2 small text-muted flex-wrap">
+      <span>{{ result_total }} shown · {{ selected_total }} staged · {{ pushed_total }} pushed</span>
+      {% if user_view %}
+        <span class="vr"></span>
+        <span>
+          {% if new_count %}
+            <span class="badge text-bg-primary">{{ new_count }} new</span> since your last look
+          {% else %}
+            No new since your last look
+          {% endif %}
+        </span>
+        <form
+          hx-post="{% url "backend:article_intake_mark_all_seen" batch.pk %}"
+          hx-target="#article-intake-results"
+          hx-swap="innerHTML"
+          hx-include="#intake-toggle-context"
+          class="m-0"
+        >
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-link p-0" {% if not new_count %}disabled{% endif %}>Mark all seen</button>
+        </form>
+      {% endif %}
+    </div>
   </div>
   <div class="card-body">
     <ul class="nav nav-tabs mb-3">
@@ -9,7 +31,7 @@
         <a
           class="nav-link {% if not filter_journal %}active{% endif %}"
           href="#"
-          hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal=&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}"
+          hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal=&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}&new_only={% if filter_new_only %}1{% else %}0{% endif %}"
           hx-target="#article-intake-results"
           hx-swap="innerHTML"
         >All journals ({{ all_journals_count }})</a>
@@ -19,7 +41,7 @@
           <a
             class="nav-link {% if filter_journal == tab.journal.pk|stringformat:'s' %}active{% endif %}"
             href="#"
-            hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal={{ tab.journal.pk }}&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}"
+            hx-get="{% url "backend:article_intake_results" batch.pk %}?q={{ filter_query|urlencode }}&journal={{ tab.journal.pk }}&filter_selected={{ filter_selected }}&paediatric_only={% if filter_paediatric_only %}1{% else %}0{% endif %}&review_only={% if filter_review_only %}1{% else %}0{% endif %}&trial_only={% if filter_trial_only %}1{% else %}0{% endif %}&pain_only={% if filter_pain_only %}1{% else %}0{% endif %}&icu_only={% if filter_icu_only %}1{% else %}0{% endif %}&cardiac_only={% if filter_cardiac_only %}1{% else %}0{% endif %}&neonatal_only={% if filter_neonatal_only %}1{% else %}0{% endif %}&new_only={% if filter_new_only %}1{% else %}0{% endif %}"
             hx-target="#article-intake-results"
             hx-swap="innerHTML"
           >{{ tab.journal.name }} ({{ tab.count }})</a>
@@ -75,6 +97,12 @@
             <input class="form-check-input intake-filter-checkbox" type="checkbox" name="neonatal_only" value="1" id="filter-neonatal" {% if filter_neonatal_only %}checked{% endif %}>
             <label class="form-check-label" for="filter-neonatal">Neonatal anaesthesia</label>
           </div>
+          {% if user_view %}
+            <div class="form-check">
+              <input class="form-check-input intake-filter-checkbox" type="checkbox" name="new_only" value="1" id="filter-new" {% if filter_new_only %}checked{% endif %}>
+              <label class="form-check-label" for="filter-new">New only</label>
+            </div>
+          {% endif %}
         </div>
       </div>
     </form>
@@ -99,6 +127,7 @@
         <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="new_only" value="{% if filter_new_only %}1{% else %}0{% endif %}">
         <button type="submit" class="btn btn-sm btn-outline-primary">Stage all (filtered)</button>
       </form>
       <form
@@ -119,9 +148,26 @@
         <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="new_only" value="{% if filter_new_only %}1{% else %}0{% endif %}">
         <button type="submit" class="btn btn-sm btn-outline-secondary">Unstage all (filtered)</button>
       </form>
     </div>
+
+    <form id="intake-toggle-context">
+      {% csrf_token %}
+      <input type="hidden" name="q" value="{{ filter_query }}">
+      <input type="hidden" name="journal" value="{{ filter_journal }}">
+      <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
+      <input type="hidden" name="page" value="{{ page_obj.number|default:1 }}">
+      <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+      <input type="hidden" name="new_only" value="{% if filter_new_only %}1{% else %}0{% endif %}">
+    </form>
 
     {% if result_rows %}
       <form
@@ -145,6 +191,7 @@
         <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="new_only" value="{% if filter_new_only %}1{% else %}0{% endif %}">
         {% for row in result_rows %}
           <input type="hidden" name="row_ids" value="{{ row.pk }}">
         {% endfor %}
@@ -171,24 +218,10 @@
         <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
         <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
+        <input type="hidden" name="new_only" value="{% if filter_new_only %}1{% else %}0{% endif %}">
         {% for row in result_rows %}
           <input type="hidden" name="row_ids" value="{{ row.pk }}">
         {% endfor %}
-      </form>
-
-      <form id="intake-toggle-context">
-        {% csrf_token %}
-        <input type="hidden" name="q" value="{{ filter_query }}">
-        <input type="hidden" name="journal" value="{{ filter_journal }}">
-        <input type="hidden" name="filter_selected" value="{{ filter_selected }}">
-        <input type="hidden" name="page" value="{{ page_obj.number }}">
-        <input type="hidden" name="paediatric_only" value="{% if filter_paediatric_only %}1{% else %}0{% endif %}">
-        <input type="hidden" name="review_only" value="{% if filter_review_only %}1{% else %}0{% endif %}">
-        <input type="hidden" name="trial_only" value="{% if filter_trial_only %}1{% else %}0{% endif %}">
-        <input type="hidden" name="pain_only" value="{% if filter_pain_only %}1{% else %}0{% endif %}">
-        <input type="hidden" name="icu_only" value="{% if filter_icu_only %}1{% else %}0{% endif %}">
-        <input type="hidden" name="cardiac_only" value="{% if filter_cardiac_only %}1{% else %}0{% endif %}">
-        <input type="hidden" name="neonatal_only" value="{% if filter_neonatal_only %}1{% else %}0{% endif %}">
       </form>
 
       <div class="table-responsive">
@@ -225,7 +258,12 @@
                   >
                 </td>
                 <td>
-                  <div class="fw-semibold">{{ row.article.title|default:"(Untitled)" }}</div>
+                  <div class="fw-semibold">
+                    {% if row.is_new %}
+                      <span class="d-inline-block rounded-circle bg-primary me-1 align-middle" style="width: 0.5rem; height: 0.5rem;" title="New since your last look"></span>
+                    {% endif %}
+                    {{ row.article.title|default:"(Untitled)" }}
+                  </div>
                   {% if row.article.abstract %}
                     <button
                       class="btn btn-link btn-sm p-0 text-decoration-none"
@@ -234,6 +272,7 @@
                       data-bs-target="#abstract-{{ row.pk }}"
                       aria-expanded="false"
                       aria-controls="abstract-{{ row.pk }}"
+                      {% if row.is_new %}hx-post="{% url "backend:article_intake_mark_row_seen" batch.pk row.pk %}" hx-trigger="click once" hx-swap="none"{% endif %}
                     >
                       View abstract
                     </button>

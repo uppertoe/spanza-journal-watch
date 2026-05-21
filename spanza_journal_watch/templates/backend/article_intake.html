@@ -100,8 +100,8 @@
         </div>
       </div>
       <div class="col-12">
-        <button type="submit" class="btn btn-primary">Load from cache</button>
-        <p class="text-muted small mt-2 mb-0">Loads previously fetched articles from the local cache. To fetch new articles from PubMed, use "Fetch from PubMed" in step 2.</p>
+        <button type="submit" class="btn btn-primary">Start intake</button>
+        <p class="text-muted small mt-2 mb-0">Loads cached articles immediately, then automatically checks PubMed for newer ones in the background.</p>
       </div>
     </form>
   </div>
@@ -117,16 +117,18 @@
       <div class="text-muted small mb-3">
         Loaded {{ batch.result_count }} articles · Selected {{ batch.selected_count }} in staging
       </div>
-      <div class="d-flex flex-wrap gap-2 mb-3">
-        <form method="post" action="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_batch" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <form method="post" action="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-post="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
           {% csrf_token %}
-          <input type="hidden" name="async" value="1">
-          <button type="submit" class="btn btn-outline-secondary" title="Reload this batch from already-cached articles (no PubMed API call)">Reload from cache</button>
+          <button type="submit" class="btn btn-primary" title="Check PubMed for any new articles published in this date range">Check for new articles</button>
         </form>
-        <form method="post" action="{% url "backend:article_intake_refresh_cache" batch.pk %}" hx-post="{% url "backend:article_intake_refresh_cache" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-primary" title="Fetch new articles from PubMed API, update the local cache, then reload this batch">Fetch new articles from PubMed</button>
-        </form>
+        <span class="text-muted small">
+          {% if last_pubmed_fetched_at %}
+            Last checked {{ last_pubmed_fetched_at|timesince }} ago
+          {% else %}
+            Not yet checked
+          {% endif %}
+        </span>
       </div>
 
       <div id="article-intake-task-status" {% if show_stage2_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>

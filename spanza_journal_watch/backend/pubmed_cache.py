@@ -1,8 +1,9 @@
 import datetime
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from ..submissions.models import Journal
@@ -202,21 +203,32 @@ def upsert_pubmed_article(payload):
         article = PubmedArticle.objects.filter(pmid=pmid).first()
 
     if not article:
-        article = PubmedArticle.objects.create(
-            pmid=pmid,
-            doi=doi,
-            title=payload.get("title") or "",
-            abstract=payload.get("abstract") or "",
-            source_journal_name=payload.get("source_journal_name") or "",
-            publication_date=payload.get("publication_date"),
-            publication_month=payload.get("publication_month"),
-            article_url=payload.get("article_url") or "",
-            pubmed_url=payload.get("pubmed_url") or "",
-            metadata_json=payload.get("metadata_json") or {},
-        )
-        if ensure_article_journal_link(article):
-            article.save(update_fields=["journal"])
-        return article
+        try:
+            article = PubmedArticle.objects.create(
+                pmid=pmid,
+                doi=doi,
+                title=payload.get("title") or "",
+                abstract=payload.get("abstract") or "",
+                source_journal_name=payload.get("source_journal_name") or "",
+                publication_date=payload.get("publication_date"),
+                publication_month=payload.get("publication_month"),
+                article_url=payload.get("article_url") or "",
+                pubmed_url=payload.get("pubmed_url") or "",
+                metadata_json=payload.get("metadata_json") or {},
+            )
+        except IntegrityError:
+            # Another concurrent worker just created this article; re-fetch and fall through to update.
+            article = None
+            if doi:
+                article = PubmedArticle.objects.filter(doi=doi).first()
+            if not article and pmid:
+                article = PubmedArticle.objects.filter(pmid=pmid).first()
+            if article is None:
+                raise
+        else:
+            if ensure_article_journal_link(article):
+                article.save(update_fields=["journal"])
+            return article
 
     fill_missing_article_metadata(article, payload)
     return article
@@ -336,45 +348,84 @@ def refresh_crossref_journal_cache(watched_journal, from_month, to_month, *, see
     return {"created_links": created_links, "touched_links": touched_links, "rejected": rejected}
 
 
-def refresh_pubmed_journal_cache(*, watched_journals=None, from_month=None, to_month=None, client=None):
+def refresh_pubmed_journal_cache(
+    *,
+    watched_journals=None,
+    from_month=None,
+    to_month=None,
+    client=None,
+    progress_callback=None,
+    max_workers=None,
+):
+    """Refresh cached articles across watched journals.
+
+    progress_callback(done_count, total_count, journal_name) is invoked once a
+    journal completes (success or skipped). It runs on whichever worker thread
+    finishes the journal, so callers should be tolerant of cross-thread calls.
+
+    Fetches run in parallel up to `max_workers` (default
+    settings.PUBMED_PARALLEL_JOURNALS). The shared PubmedClient enforces
+    NCBI's request-per-second cap via an internal lock, so concurrent workers
+    still pace correctly.
+    """
+    from django.db import connection
+
     watched_journals = list(watched_journals or WatchedJournal.objects.filter(active=True).order_by("name", "pk"))
     if from_month is None or to_month is None:
         from_month, to_month = default_pubmed_cache_window()
     client = client or build_pubmed_client()
-    seen_pmids = set()
-    seen_dois = set()
-    totals = {
-        "journal_count": len(watched_journals),
-        "created_links": 0,
-        "touched_links": 0,
-    }
+    if max_workers is None:
+        max_workers = int(getattr(settings, "PUBMED_PARALLEL_JOURNALS", 3))
+    max_workers = max(1, min(max_workers, len(watched_journals) or 1))
 
-    for watched_journal in watched_journals:
-        if watched_journal.source == WatchedJournal.Source.CROSSREF:
-            stats = refresh_crossref_journal_cache(
-                watched_journal,
-                from_month,
-                to_month,
-                seen_dois=seen_dois,
-            )
-        else:
-            stats = refresh_watched_journal_cache(
-                watched_journal,
-                from_month,
-                to_month,
-                client=client,
-                seen_pmids=seen_pmids,
-            )
-        totals["created_links"] += stats["created_links"]
-        totals["touched_links"] += stats["touched_links"]
+    total = len(watched_journals)
+    totals = {"journal_count": total, "created_links": 0, "touched_links": 0}
+
+    def _process(journal):
+        try:
+            if journal.source == WatchedJournal.Source.CROSSREF:
+                return refresh_crossref_journal_cache(journal, from_month, to_month)
+            return refresh_watched_journal_cache(journal, from_month, to_month, client=client)
+        finally:
+            # Each thread gets a thread-local Django DB connection; release it
+            # so we don't leak persistent connections from the worker pool.
+            connection.close()
+
+    if max_workers == 1:
+        for idx, journal in enumerate(watched_journals, start=1):
+            stats = _process(journal)
+            totals["created_links"] += stats["created_links"]
+            totals["touched_links"] += stats["touched_links"]
+            if progress_callback is not None:
+                progress_callback(idx, total, journal.name)
+        return totals
+
+    done = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        future_to_journal = {pool.submit(_process, j): j for j in watched_journals}
+        for future in as_completed(future_to_journal):
+            journal = future_to_journal[future]
+            stats = future.result()
+            totals["created_links"] += stats["created_links"]
+            totals["touched_links"] += stats["touched_links"]
+            done += 1
+            if progress_callback is not None:
+                progress_callback(done, total, journal.name)
 
     return totals
 
 
 def populate_pubmed_batch_from_cache(batch, watched_journals):
+    """Add cache articles missing from this batch, preserving existing rows.
+
+    Existing PubmedBatchArticle rows (and their `created` timestamps, selection
+    state, Planka push state) are left untouched. Only previously-unseen
+    articles are inserted, so the per-row `created` timestamp accurately marks
+    when each article first entered the batch.
+    """
     watched_journals = list(watched_journals)
-    batch.batch_articles.all().delete()
-    seen_article_ids = set()
+    existing_article_ids = set(batch.batch_articles.values_list("article_id", flat=True))
+    seen_article_ids = set(existing_article_ids)
     new_rows = []
 
     for watched_journal in watched_journals:
@@ -403,8 +454,8 @@ def populate_pubmed_batch_from_cache(batch, watched_journals):
     if new_rows:
         PubmedBatchArticle.objects.bulk_create(new_rows)
 
-    batch.result_count = len(new_rows)
-    batch.selected_count = 0
+    batch.result_count = batch.batch_articles.count()
+    batch.selected_count = batch.batch_articles.filter(is_selected=True).count()
     batch.save(update_fields=["result_count", "selected_count", "modified"])
     return batch.result_count
 

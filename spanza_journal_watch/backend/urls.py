@@ -55,14 +55,19 @@ urlpatterns = [
         name="article_intake_assign_issue",
     ),
     path(
-        "articles/intake/<int:batch_id>/refresh",
-        views.article_intake_refresh_batch,
-        name="article_intake_refresh_batch",
+        "articles/intake/<int:batch_id>/check-for-new",
+        views.article_intake_check_for_new,
+        name="article_intake_check_for_new",
     ),
     path(
-        "articles/intake/<int:batch_id>/refresh-cache",
-        views.article_intake_refresh_cache,
-        name="article_intake_refresh_cache",
+        "articles/intake/<int:batch_id>/mark-all-seen",
+        views.article_intake_mark_all_seen,
+        name="article_intake_mark_all_seen",
+    ),
+    path(
+        "articles/intake/<int:batch_id>/mark-row-seen/<int:item_id>",
+        views.article_intake_mark_row_seen,
+        name="article_intake_mark_row_seen",
     ),
     path(
         "articles/intake/<int:batch_id>/push-to-planka",

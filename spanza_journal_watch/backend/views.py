@@ -22,7 +22,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Avg, Count, Q
-from django.http import HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -83,6 +83,7 @@ from .models import (
     PubmedArticle,
     PubmedArticleUserState,
     PubmedBatchArticle,
+    PubmedBatchUserView,
     PubmedImportBatch,
     PubmedIntegrationCredential,
     SubscriberCSV,
@@ -109,9 +110,8 @@ from .pubmed_cache import (
     upsert_pubmed_article as _upsert_pubmed_article,
 )
 from .tasks import (
+    check_batch_for_new_articles_task,
     process_subscriber_csv,
-    refresh_pubmed_journal_cache_task,
-    run_pubmed_batch_import_task,
     run_pubmed_batch_push_task,
 )
 
@@ -908,6 +908,27 @@ def _param_enabled(params, key, default=False):
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
+PUBMED_FETCH_FRESHNESS = datetime.timedelta(minutes=15)
+
+
+def _get_or_create_user_view(batch, user):
+    if not getattr(user, "is_authenticated", False):
+        return None
+    user_view, _ = PubmedBatchUserView.objects.get_or_create(batch=batch, user=user)
+    return user_view
+
+
+def _pubmed_fetch_gate_remaining(batch):
+    """Return timedelta until next PubMed fetch is allowed, or None if allowed now."""
+    last = batch.last_pubmed_fetched_at
+    if last is None:
+        return None
+    elapsed = timezone.now() - last
+    if elapsed >= PUBMED_FETCH_FRESHNESS:
+        return None
+    return PUBMED_FETCH_FRESHNESS - elapsed
+
+
 def _import_pubmed_batch(batch, watched_journals):
     populate_pubmed_batch_from_cache(batch, watched_journals)
 
@@ -1042,10 +1063,20 @@ def _build_article_intake_queryset(batch, params):
     return rows, tab_rows, flags
 
 
-def _article_intake_results_context(batch, params):
+def _article_intake_results_context(batch, params, user=None):
     watched_options = list(batch.watched_journals.order_by("name"))
 
     rows, tab_rows, flags = _build_article_intake_queryset(batch, params)
+    new_only = _param_enabled(params, "new_only", default=False)
+
+    user_view = _get_or_create_user_view(batch, user) if user is not None else None
+    seen_baseline = user_view.last_seen_at if user_view else None
+    seen_ids = set(user_view.seen_batch_article_ids or []) if user_view else set()
+
+    def _row_is_new(row):
+        if seen_baseline is None:
+            return False
+        return row.created > seen_baseline and row.pk not in seen_ids
 
     if isinstance(tab_rows, list):
         journal_counts = Counter(r.watched_journal_id for r in tab_rows)
@@ -1059,6 +1090,24 @@ def _article_intake_results_context(batch, params):
         )
         all_journals_count = tab_rows.count()
 
+    new_count = 0
+    if seen_baseline is not None:
+        if isinstance(tab_rows, list):
+            new_count = sum(1 for r in tab_rows if _row_is_new(r))
+        else:
+            new_count = sum(
+                1
+                for pk, created in tab_rows.values_list("id", "created").iterator()
+                if created > seen_baseline and pk not in seen_ids
+            )
+
+    if new_only and seen_baseline is not None:
+        if isinstance(rows, list):
+            rows = [r for r in rows if _row_is_new(r)]
+        else:
+            rows = list(rows)
+            rows = [r for r in rows if _row_is_new(r)]
+
     watched_journal_tabs = [
         {"journal": watched, "count": journal_counts.get(watched.pk, 0)} for watched in watched_options
     ]
@@ -1066,6 +1115,8 @@ def _article_intake_results_context(batch, params):
     paginator = Paginator(rows, 25)
     page_obj = paginator.get_page(params.get("page") or 1)
     visible_rows = list(page_obj.object_list)
+    for row in visible_rows:
+        row.is_new = _row_is_new(row)
     all_visible_selected = bool(visible_rows) and all(row.is_selected for row in visible_rows)
     result_total = len(rows) if isinstance(rows, list) else rows.count()
     staged_rows = list(
@@ -1103,6 +1154,15 @@ def _article_intake_results_context(batch, params):
         "filter_neonatal_only": flags["neonatal_only"],
         "watched_journal_options": watched_options,
         "watched_journal_tabs": watched_journal_tabs,
+        "new_count": new_count,
+        "filter_new_only": new_only,
+        "user_view": user_view,
+        "last_pubmed_fetched_at": batch.last_pubmed_fetched_at,
+        "fetch_gate_remaining_seconds": (
+            int(_pubmed_fetch_gate_remaining(batch).total_seconds())
+            if _pubmed_fetch_gate_remaining(batch) is not None
+            else 0
+        ),
     }
 
 
@@ -1123,7 +1183,7 @@ def _enrich_find_articles(articles, batch_article_map):
 
 
 def _render_article_intake_results_response(request, batch, params, *, message_target="global"):
-    context = _article_intake_results_context(batch, params)
+    context = _article_intake_results_context(batch, params, user=request.user)
     context["batch_task_running"] = batch.task_state in {
         PubmedImportBatch.TASK_STATE_PENDING,
         PubmedImportBatch.TASK_STATE_RUNNING,
@@ -1613,22 +1673,26 @@ def article_intake(request):
             preference.save()
             preference.default_watched_journals.set(watched_journals)
 
-            if _param_enabled(request.POST, "async", default=False):
-                _queue_batch_task(
-                    batch,
-                    action="fetch",
-                    note="Queued intake batch build from cached journal articles.",
-                    task_callable=run_pubmed_batch_import_task,
-                    task_args=[batch.pk],
-                )
-            else:
-                try:
-                    _import_pubmed_batch(batch, watched_journals)
-                    messages.success(request, f"Loaded {batch.result_count} cached article(s) into the intake batch.")
-                except PubmedAPIError as error:
-                    messages.error(request, f"Could not build batch from cache: {_safe_planka_error(error)}")
+            try:
+                _import_pubmed_batch(batch, watched_journals)
+            except PubmedAPIError as error:
+                messages.error(request, f"Could not build batch from cache: {_safe_planka_error(error)}")
+                return redirect(f"{reverse('backend:article_intake')}?issue={selected_issue.pk}&batch={batch.pk}")
 
-                    return redirect(f"{reverse('backend:article_intake')}?issue={selected_issue.pk}&batch={batch.pk}")
+            # Kick off a PubMed check in the background so new articles flow in
+            # without the user having to click anything for the first look.
+            _queue_batch_task(
+                batch,
+                action="check_for_new",
+                note="Queued PubMed check for new articles.",
+                task_callable=check_batch_for_new_articles_task,
+                task_args=[batch.pk],
+            )
+            messages.success(
+                request,
+                f"Loaded {batch.result_count} cached article(s). "
+                "Checking PubMed for newer articles in the background.",
+            )
 
             return redirect(f"{reverse('backend:article_intake')}?issue={selected_issue.pk}&batch={batch.pk}")
 
@@ -1684,7 +1748,7 @@ def article_intake(request):
         }
         context["show_stage2_task_status"] = context["batch_task_running"] and (batch.task_action != "push")
         context["show_push_task_status"] = context["batch_task_running"] and (batch.task_action == "push")
-        context.update(_article_intake_results_context(batch, request.GET))
+        context.update(_article_intake_results_context(batch, request.GET, user=request.user))
 
     return render(request, "backend/article_intake.html", context)
 
@@ -1727,7 +1791,7 @@ def pubmed_save_api_key(request):
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
 def article_intake_results(request, batch_id):
     batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
-    context = _article_intake_results_context(batch, request.GET)
+    context = _article_intake_results_context(batch, request.GET, user=request.user)
     return render(request, "backend/_article_intake_results.html", context)
 
 
@@ -1823,7 +1887,7 @@ def article_intake_add_article(request, batch_id):
     highlighted_pmid = pmid if new_selected else None
 
     # Build results table HTML
-    results_context = _article_intake_results_context(batch, request.POST)
+    results_context = _article_intake_results_context(batch, request.POST, user=request.user)
     results_context["highlighted_pmid"] = highlighted_pmid
     results_context["batch_task_running"] = False
     results_context["batch_task_done"] = False
@@ -1876,6 +1940,15 @@ def article_intake_toggle_selection(request, batch_id, item_id):
 
     batch.selected_count = batch.batch_articles.filter(is_selected=True).count()
     batch.save(update_fields=["selected_count", "modified"])
+
+    # Engaging with a row implicitly acknowledges its "new" indicator.
+    user_view = _get_or_create_user_view(batch, request.user)
+    if user_view is not None:
+        seen = list(user_view.seen_batch_article_ids or [])
+        if item.pk not in seen:
+            seen.append(item.pk)
+            user_view.seen_batch_article_ids = seen
+            user_view.save(update_fields=["seen_batch_article_ids", "modified"])
 
     return _render_article_intake_results_response(request, batch, request.POST)
 
@@ -2048,7 +2121,8 @@ def article_intake_assign_issue(request, batch_id):
 
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
-def article_intake_refresh_batch(request, batch_id):
+def article_intake_check_for_new(request, batch_id):
+    """Gated PubMed check: if cache is fresh, no API call; otherwise queue a refresh."""
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
 
@@ -2061,56 +2135,65 @@ def article_intake_refresh_batch(request, batch_id):
             return _render_article_intake_results_response(request, batch, request.POST)
         return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
 
-    if _param_enabled(request.POST, "async", default=False):
-        _queue_batch_task(
-            batch,
-            action="refresh",
-            note="Queued rebuild from cached journal articles.",
-            task_callable=run_pubmed_batch_import_task,
-            task_args=[batch.pk],
+    remaining = _pubmed_fetch_gate_remaining(batch)
+    if remaining is not None:
+        minutes = max(1, int(remaining.total_seconds() // 60) + (1 if remaining.total_seconds() % 60 else 0))
+        messages.info(
+            request,
+            f"PubMed was checked recently. Try again in about {minutes} minute(s).",
         )
         if request.headers.get("HX-Request") == "true":
             return _render_article_intake_results_response(request, batch, request.POST)
         return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
 
-    try:
-        _import_pubmed_batch(batch, watched_journals)
-        messages.success(request, f"Batch rebuilt from cache. {batch.result_count} article(s) now in this batch.")
-    except PubmedAPIError as error:
-        messages.error(request, f"Could not rebuild batch from cache: {_safe_planka_error(error)}")
+    _queue_batch_task(
+        batch,
+        action="check_for_new",
+        note="Queued PubMed check for new articles.",
+        task_callable=check_batch_for_new_articles_task,
+        task_args=[batch.pk],
+    )
 
     if request.headers.get("HX-Request") == "true":
         return _render_article_intake_results_response(request, batch, request.POST)
-
     return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
 
 
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
-def article_intake_refresh_cache(request, batch_id):
-    """Trigger a PubMed API cache refresh for the batch's journals and date range."""
+def article_intake_mark_all_seen(request, batch_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
 
     batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
-
-    from_month = batch.from_month.isoformat() if batch.from_month else None
-    to_month = batch.to_month.isoformat() if batch.to_month else None
-
-    if not from_month or not to_month:
-        messages.error(request, "Batch has no date range set.")
-    else:
-        refresh_pubmed_journal_cache_task.delay(from_month=from_month, to_month=to_month)
-        messages.success(
-            request,
-            f"PubMed cache refresh queued for {batch.from_month:%b %Y} - {batch.to_month:%b %Y}. "
-            "Once complete, click 'Reload from cache' to load new articles into this batch.",
-        )
+    user_view = _get_or_create_user_view(batch, request.user)
+    if user_view is not None:
+        user_view.last_seen_at = timezone.now()
+        user_view.seen_batch_article_ids = []
+        user_view.save(update_fields=["last_seen_at", "seen_batch_article_ids", "modified"])
 
     if request.headers.get("HX-Request") == "true":
         return _render_article_intake_results_response(request, batch, request.POST)
-
     return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+def article_intake_mark_row_seen(request, batch_id, item_id):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
+    # Validate row belongs to batch.
+    get_object_or_404(PubmedBatchArticle, pk=item_id, batch=batch)
+    user_view = _get_or_create_user_view(batch, request.user)
+    if user_view is not None:
+        seen = list(user_view.seen_batch_article_ids or [])
+        if item_id not in seen:
+            seen.append(item_id)
+            user_view.seen_batch_article_ids = seen
+            user_view.save(update_fields=["seen_batch_article_ids", "modified"])
+    return HttpResponse(status=204)
 
 
 @login_required
@@ -2477,7 +2560,7 @@ def article_intake_task_status(request, batch_id):
             messages.error(request, batch.task_note)
         else:
             messages.success(request, batch.task_note)
-        context.update(_article_intake_results_context(batch, request.GET))
+        context.update(_article_intake_results_context(batch, request.GET, user=request.user))
 
     return render(request, "backend/_article_intake_task_status.html", context)
 

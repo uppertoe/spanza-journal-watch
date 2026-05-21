@@ -1503,7 +1503,7 @@ class TestArticleIntakeWorkflow:
         assert "Airway rescue in paediatric critical care" in filtered_body
         assert "Adult perioperative paper" not in filtered_body
 
-    def test_article_intake_refresh_batch(self, route_client, regression_baseline, monkeypatch):
+    def test_article_intake_check_for_new_queues_task(self, route_client, regression_baseline, monkeypatch):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
@@ -1516,8 +1516,8 @@ class TestArticleIntakeWorkflow:
         credential.configured_by = user
         credential.save()
 
-        issue = Issue.objects.create(name="Refresh Batch Issue", body="Issue body")
-        watched = WatchedJournal.objects.create(name="Watch Refresh", issn_print="5555-6666")
+        issue = Issue.objects.create(name="Check For New Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Check New", issn_print="5555-6666")
         batch = PubmedImportBatch.objects.create(
             issue=issue,
             created_by=user,
@@ -1526,22 +1526,29 @@ class TestArticleIntakeWorkflow:
         )
         batch.watched_journals.add(watched)
 
-        called = {"value": False}
+        called = {"args": None}
 
-        def _fake_import(target_batch, watched_journals):
-            called["value"] = True
-            assert target_batch.pk == batch.pk
-            assert watched in watched_journals
+        class _FakeResult:
+            id = "task-123"
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+        def _fake_delay(*args, **kwargs):
+            called["args"] = (args, kwargs)
+            return _FakeResult()
 
-        response = route_client.post(reverse("backend:article_intake_refresh_batch", kwargs={"batch_id": batch.pk}))
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay",
+            _fake_delay,
+        )
+
+        response = route_client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
 
         assert response.status_code == 302
-        assert called["value"] is True
+        assert called["args"] == ((batch.pk,), {})
         assert f"batch={batch.pk}" in response.headers.get("Location", "")
 
-    def test_article_intake_refresh_batch_without_api_key(self, route_client, regression_baseline, monkeypatch):
+    def test_article_intake_check_for_new_is_rate_limited(self, route_client, regression_baseline, monkeypatch):
+        from django.utils import timezone
+
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
@@ -1549,30 +1556,32 @@ class TestArticleIntakeWorkflow:
         user.user_permissions.add(permission)
         route_client.force_login(user)
 
-        issue = Issue.objects.create(name="Refresh No Key Issue", body="Issue body")
-        watched = WatchedJournal.objects.create(name="Watch Refresh No Key", issn_print="1010-2020")
+        issue = Issue.objects.create(name="Gate Issue", body="Issue body")
+        watched = WatchedJournal.objects.create(name="Watch Gate", issn_print="1010-2020")
         batch = PubmedImportBatch.objects.create(
             issue=issue,
             created_by=user,
             from_month=issue.created.date().replace(day=1),
             to_month=issue.created.date().replace(day=1),
+            last_pubmed_fetched_at=timezone.now(),
         )
         batch.watched_journals.add(watched)
 
-        called = {"value": False}
+        called = {"hit": False}
 
-        def _fake_import(target_batch, watched_journals):
-            called["value"] = True
-            assert target_batch.pk == batch.pk
-            assert watched in watched_journals
+        def _fake_delay(*args, **kwargs):
+            called["hit"] = True
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay",
+            _fake_delay,
+        )
 
-        response = route_client.post(reverse("backend:article_intake_refresh_batch", kwargs={"batch_id": batch.pk}))
+        response = route_client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
 
         assert response.status_code == 302
-        assert called["value"] is True
-        assert f"batch={batch.pk}" in response.headers.get("Location", "")
+        # Gate should have blocked the task from being queued.
+        assert called["hit"] is False
 
     def test_article_intake_push_to_planka_stores_card_id(self, route_client, regression_baseline, monkeypatch):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
