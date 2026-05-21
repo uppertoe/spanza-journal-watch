@@ -1052,7 +1052,10 @@ def _article_intake_results_context(batch, params):
         all_journals_count = len(tab_rows)
     else:
         journal_counts = dict(
-            tab_rows.values_list("watched_journal_id").annotate(c=Count("id")).values_list("watched_journal_id", "c")
+            tab_rows.order_by()
+            .values("watched_journal_id")
+            .annotate(c=Count("id"))
+            .values_list("watched_journal_id", "c")
         )
         all_journals_count = tab_rows.count()
 
