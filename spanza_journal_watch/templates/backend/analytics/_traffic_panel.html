@@ -16,7 +16,7 @@
     </div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card h-100 border-success-subtle" title="Visitors with 2+ visits in the selected period. Visits split after {{ visit_timeout_minutes }} min of inactivity."><div class="card-body">
+    <div class="card h-100 border-success-subtle" title="{% if returning_basis == 'history' %}Visitors already seen before this period (via the anonymous jwvid cookie).{% else %}Visitors with 2+ visits in the selected period — history before analytics rollout is unavailable, so seen-before can't be used. Visits split after {{ visit_timeout_minutes }} min of inactivity.{% endif %}"><div class="card-body">
       <h6 class="text-muted mb-1 small">Returning</h6>
       <p class="display-6 mb-0">{{ returning_visitors }}</p>
       <p class="small text-muted mb-0">{{ returning_rate }}</p>
@@ -24,7 +24,7 @@
     </div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card h-100"><div class="card-body">
+    <div class="card h-100" title="{% if returning_basis == 'history' %}Visitors seen for the first time in this period (no earlier jwvid history).{% else %}Visitors with a single visit in the selected period.{% endif %}"><div class="card-body">
       <h6 class="text-muted mb-1 small">New visitors</h6>
       <p class="display-6 mb-0">{{ new_visitors }}</p>
     </div></div>
@@ -329,6 +329,6 @@
 {% endif %}
 
 <div class="alert alert-info small mb-0">
-  <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. "Returning" means a visitor had two or more visits in the selected period. "Visits" are split after {{ visit_timeout_minutes }} minutes of inactivity.
+  <strong>Visitor identification</strong> uses an anonymous cookie (<code>jwvid</code>). No personal data is stored — only a random UUID. {% if returning_basis == 'history' %}"Returning" means the visitor was already seen before this period; "New" means first seen within it.{% else %}"Returning" means a visitor had two or more visits in the selected period (the window reaches back before analytics rollout, so earlier history isn't available).{% endif %} "{{ multi_day_visitors }} active on ≥2 days" counts visitors who came back on a different calendar day. "Visits" are split after {{ visit_timeout_minutes }} minutes of inactivity.
 </div>
 

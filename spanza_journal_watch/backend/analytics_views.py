@@ -126,6 +126,40 @@ def _base_event_qs(request, start_ts, end_ts):
     return AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
 
 
+def _split_new_returning(visitor_ids_in_period, *, start_ts, start_date, rollout_date, visits_per_visitor):
+    """Split the period's visitors into (new_count, returning_count, basis).
+
+    Returning is defined by whether a visitor was already seen *before* the
+    period — the genuine loyalty signal, and the same definition the journals
+    panel already uses. This replaces the older "2+ visits within the period",
+    which counted a same-day repeat session as returning and labelled every
+    single-visit visitor (including long-time readers) as "new".
+
+    Seen-before is only meaningful once the jwvid cookie's history predates the
+    period start. For windows reaching back to before analytics rollout there is
+    no history to check, so we fall back to the in-period frequency heuristic and
+    return basis="frequency" so the UI can describe what it's showing.
+    """
+    total = len(visitor_ids_in_period)
+    history_reliable = rollout_date is not None and start_date > rollout_date
+    if history_reliable and visitor_ids_in_period:
+        returning_count = (
+            AnalyticsEvent.objects.filter(
+                automated=False,
+                timestamp__lt=start_ts,
+                visitor_id__in=visitor_ids_in_period,
+            )
+            .values("visitor_id")
+            .distinct()
+            .count()
+        )
+        basis = "history"
+    else:
+        returning_count = sum(1 for v in visits_per_visitor.values() if v >= 2)
+        basis = "frequency"
+    return total - returning_count, returning_count, basis
+
+
 def _normalise_search_query(raw_query):
     query = (raw_query or "").strip()
     if not query:
@@ -1562,10 +1596,7 @@ def analytics_traffic(request):
 
     visitor_ids_in_period = {visit["visitor_id"] for visit in visits if visit["visitor_id"]}
 
-    # "Returning" = visitor had 2+ derived visits in the period (matches the recent
-    # visits list below). This replaces the older pre-period definition, which
-    # couldn't produce results until the jwvid cookie history aged past the
-    # typical lookback window.
+    # Per-visitor visit frequency and distinct active days within the period.
     visits_per_visitor = Counter()
     visitor_dates = defaultdict(set)
     for visit in visits:
@@ -1574,9 +1605,16 @@ def analytics_traffic(request):
             continue
         visits_per_visitor[vid] += 1
         visitor_dates[vid].add(visit["first_event"].date())
-    returning_count = sum(1 for v in visits_per_visitor.values() if v >= 2)
     multi_day_count = sum(1 for ds in visitor_dates.values() if len(ds) >= 2)
-    new_count = len(visitor_ids_in_period) - returning_count
+
+    rollout_date = _site_analytics_rollout_date()
+    new_count, returning_count, returning_basis = _split_new_returning(
+        visitor_ids_in_period,
+        start_ts=start_ts,
+        start_date=start_date,
+        rollout_date=rollout_date,
+        visits_per_visitor=visits_per_visitor,
+    )
 
     page_counts = Counter()
     section_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "single_event_visits": 0})
@@ -1747,7 +1785,7 @@ def analytics_traffic(request):
         if parts:
             referrer_insight = "Visit starts: " + ", ".join(parts) + "."
 
-    rollout_date = _site_analytics_rollout_date()
+    # rollout_date is computed above for the new/returning split.
     rollout_mature = False
     if rollout_date is not None:
         rollout_mature = (timezone.localdate() - rollout_date).days >= 90
@@ -1760,6 +1798,7 @@ def analytics_traffic(request):
         "other_domains": other_domains,
         "new_visitors": new_count,
         "returning_visitors": returning_count,
+        "returning_basis": returning_basis,
         "multi_day_visitors": multi_day_count,
         "total_visitors": len(visitor_ids_in_period),
         "returning_rate": _safe_percentage(returning_count, len(visitor_ids_in_period)),
