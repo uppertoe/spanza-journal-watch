@@ -3,10 +3,16 @@ import uuid
 from collections import Counter
 
 import pytest
+from django.core.cache import cache
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent
-from spanza_journal_watch.backend.analytics_views import _split_new_returning
+from spanza_journal_watch.backend.analytics_views import (
+    _build_derived_visits_cached,
+    _split_new_returning,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -104,3 +110,50 @@ def test_falls_back_to_frequency_when_no_rollout_date():
     assert basis == "frequency"
     assert returning_count == 0
     assert new_count == 1
+
+
+# ---- _build_derived_visits_cached ----
+
+
+def test_derived_visits_cached_serves_warm_call_without_queries(settings):
+    settings.ANALYTICS_DERIVED_VISITS_CACHE_TTL = 600
+    cache.clear()
+    _event(uuid.uuid4(), timezone.now())
+    qs = AnalyticsEvent.objects.filter(automated=False)
+
+    with CaptureQueriesContext(connection) as cold:
+        first = _build_derived_visits_cached(qs)
+    with CaptureQueriesContext(connection) as warm:
+        second = _build_derived_visits_cached(qs)
+
+    assert len(cold.captured_queries) >= 1  # cold build hits the DB
+    assert len(warm.captured_queries) == 0  # warm call served from cache
+    assert first == second
+    assert len(first) == 1
+
+
+def test_derived_visits_cache_keyed_by_queryset_scope(settings):
+    settings.ANALYTICS_DERIVED_VISITS_CACHE_TTL = 600
+    cache.clear()
+    _event(uuid.uuid4(), timezone.now())
+    _event(uuid.uuid4(), timezone.now(), automated=True)
+
+    humans = _build_derived_visits_cached(AnalyticsEvent.objects.filter(automated=False))
+    everyone = _build_derived_visits_cached(AnalyticsEvent.objects.all())
+
+    # Different scope → different cache key → not cross-contaminated.
+    assert len(humans) == 1
+    assert len(everyone) == 2
+
+
+def test_derived_visits_cache_disabled_with_zero_ttl(settings):
+    settings.ANALYTICS_DERIVED_VISITS_CACHE_TTL = 0
+    cache.clear()
+    _event(uuid.uuid4(), timezone.now())
+    qs = AnalyticsEvent.objects.filter(automated=False)
+
+    _build_derived_visits_cached(qs)
+    with CaptureQueriesContext(connection) as warm:
+        _build_derived_visits_cached(qs)
+
+    assert len(warm.captured_queries) >= 1  # no caching → still hits the DB

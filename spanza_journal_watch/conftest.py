@@ -1,4 +1,5 @@
 import pytest
+from django.core.cache import cache
 
 from spanza_journal_watch.users.models import User
 from spanza_journal_watch.users.tests.factories import UserFactory
@@ -7,6 +8,19 @@ from spanza_journal_watch.users.tests.factories import UserFactory
 @pytest.fixture(autouse=True)
 def media_storage(settings, tmpdir):
     settings.MEDIA_ROOT = tmpdir.strpath
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Isolate the (LocMem) cache between tests.
+
+    The test DB rolls back per test but the process-wide cache does not, so any
+    cached value keyed on a query (e.g. analytics derived visits) would leak a
+    previous test's data into the next. Clear before and after each test.
+    """
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

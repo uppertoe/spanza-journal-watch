@@ -10,11 +10,14 @@ Five tabs, each answering a specific question:
 """
 
 import datetime
+import hashlib
 import json
 from collections import Counter, defaultdict
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseBadRequest
@@ -320,6 +323,43 @@ def _build_derived_visits(events_qs):
         if not current_visit["utm_campaign"]:
             current_visit["utm_campaign"] = _utm_field_from_metadata(row, "utm_campaign")
 
+    return visits
+
+
+# Sessionising a 90-day window pulls ~17k rows into Python and spends ~1.7s
+# building visits (the SQL itself is <0.4s). The dashboard panels each rebuild
+# this from the same base queryset, so cache the result briefly and let every
+# panel for a given date-range/scope share it. Analytics tolerate minutes of
+# staleness; production uses Redis (a fresh copy per get, so no aliasing) and
+# fails open, while local dev uses DummyCache (this is a transparent no-op).
+_DERIVED_VISITS_CACHE_PREFIX = "analytics:derived_visits:"
+_CACHE_MISS = object()
+
+
+def _derived_visits_ttl():
+    return int(getattr(settings, "ANALYTICS_DERIVED_VISITS_CACHE_TTL", 600))
+
+
+def _build_derived_visits_cached(events_qs):
+    """Cached wrapper around :func:`_build_derived_visits`.
+
+    Keyed on the queryset's SQL, so identical scope + date-range across panels
+    (and repeat navigations) reuse one build. Falls back to an uncached build if
+    the query can't be rendered to a stable key.
+    """
+    ttl = _derived_visits_ttl()
+    if ttl <= 0:
+        return _build_derived_visits(events_qs)
+    try:
+        signature = str(events_qs.query)
+    except Exception:  # noqa: BLE001 — never let key derivation break the view
+        return _build_derived_visits(events_qs)
+    key = _DERIVED_VISITS_CACHE_PREFIX + hashlib.md5(signature.encode("utf-8")).hexdigest()  # noqa: S324
+    cached = cache.get(key, _CACHE_MISS)
+    if cached is not _CACHE_MISS:
+        return cached
+    visits = _build_derived_visits(events_qs)
+    cache.set(key, visits, ttl)
     return visits
 
 
@@ -769,7 +809,7 @@ def analytics_overview(request):
             }
         )
 
-    visits = _build_derived_visits(human_events)
+    visits = _build_derived_visits_cached(human_events)
 
     # Unique visitors and visits
     unique_visitors = len({v["visitor_id"] for v in visits if v["visitor_id"]})
@@ -1538,7 +1578,7 @@ def analytics_editorial(request):
 def analytics_traffic(request):
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
     human_events = _base_event_qs(request, start_ts, end_ts)
-    visits = _build_derived_visits(human_events)
+    visits = _build_derived_visits_cached(human_events)
 
     referrer_labels = {
         "newsletter": "Newsletter",
@@ -2103,7 +2143,7 @@ def analytics_journals(request):
 
     human_events = _base_event_qs(request, start_ts, end_ts)
     journal_events = human_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)
-    journal_visits = _build_derived_visits(journal_events)
+    journal_visits = _build_derived_visits_cached(journal_events)
 
     # ── Headline metrics ────────────────────────────────────────────
     total_visits = len(journal_visits)
@@ -2321,7 +2361,7 @@ def analytics_visitor(request, visitor_id):
     events_qs = AnalyticsEvent.objects.filter(
         visitor_id=visitor_id, timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False
     )
-    visits = sorted(_build_derived_visits(events_qs), key=lambda v: v["last_event"], reverse=True)
+    visits = sorted(_build_derived_visits_cached(events_qs), key=lambda v: v["last_event"], reverse=True)
 
     referrer_labels = {
         "newsletter": "Newsletter",
