@@ -103,3 +103,52 @@ def downgrade_no_js_burst_visitors_task(min_events=5, min_age_hours=0.5, dry_run
     ).exclude(referrer_category="newsletter")
 
     return _apply_downgrade(candidates, label="downgrade_no_js_burst_visitors", dry_run=dry_run)
+
+
+@celery_app.task
+def prune_automated_events_task(retention_days=90, batch_size=5000, dry_run=False):
+    """
+    Delete bot-classified analytics events older than ``retention_days``.
+
+    Crawler hits dominate raw event volume (~95% of recorded page visits), and
+    the downgrade sweepers flag them as ``automated=True``. Those rows are pure
+    noise once aggregated — the overview's "filtered as bot" totals live in
+    ``AutomatedRequestCount`` and are untouched here — so they can be pruned to
+    keep the ``analytics_analyticsevent`` table from growing without bound.
+
+    Only ``automated=True`` events are removed. Genuine human events (and
+    newsletter-referred visits, which the sweepers never downgrade) are kept
+    indefinitely, so human-engagement reporting is unaffected.
+
+    Deletes in batches to keep each transaction small and avoid holding a long
+    lock on a table that's written on every request. The ``(automated,
+    timestamp)`` index covers the filter.
+    """
+    cutoff = timezone.now() - timedelta(days=retention_days)
+    candidates = AnalyticsEvent.objects.filter(automated=True, timestamp__lt=cutoff)
+
+    if dry_run:
+        count = candidates.count()
+        logger.info(
+            "prune_automated_events dry run: would delete %d event(s) older than %s",
+            count,
+            cutoff.date(),
+        )
+        return {"would_delete": count, "deleted": 0, "dry_run": True}
+
+    total_deleted = 0
+    while True:
+        batch_ids = list(candidates.values_list("id", flat=True)[:batch_size])
+        if not batch_ids:
+            break
+        AnalyticsEvent.objects.filter(id__in=batch_ids).delete()
+        total_deleted += len(batch_ids)
+        if len(batch_ids) < batch_size:
+            break
+
+    logger.info(
+        "prune_automated_events: deleted %d event(s) older than %s",
+        total_deleted,
+        cutoff.date(),
+    )
+    return {"deleted": total_deleted, "dry_run": False}

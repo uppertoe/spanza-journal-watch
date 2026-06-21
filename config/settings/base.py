@@ -2,6 +2,7 @@
 Base settings to build other settings files upon.
 """
 
+import logging
 from pathlib import Path
 
 import environ
@@ -350,6 +351,26 @@ LOGGING = {
     },
     "root": {"level": "INFO", "handlers": ["console"]},
 }
+
+# django-request-logging
+# ------------------------------------------------------------------------------
+# Log 4xx responses at WARNING rather than the package default of ERROR. Routine
+# bot traffic — credential scans (/.env, /wp-login.php) and crawls of deleted
+# tag pages (/explore/<slug> for tags removed by Tag.delete_if_orphaned) — is
+# almost all 4xx. At ERROR these flooded the logs and, in production, were
+# forwarded to Sentry as events (Sentry's logging integration uses
+# event_level=ERROR), burning quota on non-actionable noise.
+REQUEST_LOGGING_HTTP_4XX_LOG_LEVEL = logging.WARNING
+# Mask Cookie/Set-Cookie when logging request headers. The package masks only
+# Authorization/Proxy-Authorization by default, so on every logged request the
+# full Cookie header — including the live sessionid and jwvid visitor ID — was
+# written to logs (and Sentry breadcrumbs) in cleartext.
+REQUEST_LOGGING_SENSITIVE_HEADERS = [
+    "Authorization",
+    "Proxy-Authorization",
+    "Cookie",
+    "Set-Cookie",
+]
 
 # Celery
 # ------------------------------------------------------------------------------

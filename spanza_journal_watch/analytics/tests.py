@@ -1490,6 +1490,58 @@ def test_downgrade_singleton_visitors_dry_run_makes_no_changes():
     assert result == {"would_downgrade": 1, "downgraded": 0, "dry_run": True}
 
 
+# ---- prune_automated_events_task ----
+
+
+def _make_event(*, automated, age_days):
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=automated,
+        visitor_id=uuid.uuid4(),
+    )
+    AnalyticsEvent.objects.filter(pk=event.pk).update(timestamp=timezone.now() - timedelta(days=age_days))
+    return event
+
+
+def test_prune_automated_events_deletes_old_automated_only():
+    from spanza_journal_watch.analytics.tasks import prune_automated_events_task
+
+    old_bot = _make_event(automated=True, age_days=120)
+    recent_bot = _make_event(automated=True, age_days=10)
+    old_human = _make_event(automated=False, age_days=120)
+
+    result = prune_automated_events_task(retention_days=90)
+
+    assert result == {"deleted": 1, "dry_run": False}
+    assert not AnalyticsEvent.objects.filter(pk=old_bot.pk).exists()
+    # Recent bots and human events of any age are retained.
+    assert AnalyticsEvent.objects.filter(pk=recent_bot.pk).exists()
+    assert AnalyticsEvent.objects.filter(pk=old_human.pk).exists()
+
+
+def test_prune_automated_events_batches_until_drained():
+    from spanza_journal_watch.analytics.tasks import prune_automated_events_task
+
+    for _ in range(5):
+        _make_event(automated=True, age_days=120)
+
+    result = prune_automated_events_task(retention_days=90, batch_size=2)
+
+    assert result == {"deleted": 5, "dry_run": False}
+    assert AnalyticsEvent.objects.filter(automated=True).count() == 0
+
+
+def test_prune_automated_events_dry_run_makes_no_changes():
+    from spanza_journal_watch.analytics.tasks import prune_automated_events_task
+
+    old_bot = _make_event(automated=True, age_days=120)
+
+    result = prune_automated_events_task(retention_days=90, dry_run=True)
+
+    assert result == {"would_delete": 1, "deleted": 0, "dry_run": True}
+    assert AnalyticsEvent.objects.filter(pk=old_bot.pk).exists()
+
+
 # ---- referrer_category default when request is None ----
 
 
