@@ -11,8 +11,10 @@ from django.utils import timezone
 from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.backend.analytics_views import (
     _build_derived_visits_cached,
+    _engaged_human_count,
     _split_new_returning,
 )
+from spanza_journal_watch.newsletter.models import Subscriber
 
 pytestmark = pytest.mark.django_db
 
@@ -144,6 +146,47 @@ def test_derived_visits_cache_keyed_by_queryset_scope(settings):
     # Different scope → different cache key → not cross-contaminated.
     assert len(humans) == 1
     assert len(everyone) == 2
+
+
+# ---- _engaged_human_count ----
+
+
+def _engaged_event(visitor_id, *, event_type=AnalyticsEvent.EventType.PAGE_VISIT, scroll_depth=None, subscriber=None):
+    return AnalyticsEvent.objects.create(
+        event_type=event_type,
+        automated=False,
+        visitor_id=visitor_id,
+        scroll_depth=scroll_depth,
+        subscriber=subscriber,
+    )
+
+
+def test_engaged_human_count_counts_only_engaged_visitors():
+    qs = AnalyticsEvent.objects.all()
+    scroller = uuid.uuid4()
+    bouncer = uuid.uuid4()
+    interactor = uuid.uuid4()
+    _engaged_event(scroller, scroll_depth=60)  # past the fold → engaged
+    _engaged_event(bouncer, scroll_depth=10)  # shallow page view → not engaged
+    _engaged_event(interactor, event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)  # interaction → engaged
+
+    assert _engaged_human_count(qs) == 2
+
+
+def test_engaged_human_count_includes_subscriber_and_excludes_bots():
+    qs = AnalyticsEvent.objects.filter(automated=False)
+    sub = Subscriber.objects.create(email="reader@example.com")
+    subscriber_visitor = uuid.uuid4()
+    bot_visitor = uuid.uuid4()
+    _engaged_event(subscriber_visitor, subscriber=sub)  # matched subscriber → engaged
+    AnalyticsEvent.objects.create(  # automated, deep scroll, but excluded by qs filter
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=True,
+        visitor_id=bot_visitor,
+        scroll_depth=95,
+    )
+
+    assert _engaged_human_count(qs) == 1
 
 
 def test_derived_visits_cache_disabled_with_zero_ttl(settings):

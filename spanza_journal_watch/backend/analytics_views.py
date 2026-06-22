@@ -111,6 +111,49 @@ _VISIT_PROGRESSION_EVENT_TYPES = frozenset(
     ]
 )
 
+# "Engaged human" KPI: a distinct visitor counts only once they emit a real
+# engagement signal in the period — scroll past the fold, fire an interaction
+# event, or match a subscriber. This is the trustworthy headline figure that
+# replaces raw "NOT automated" (which counts JS-executing bots that load a page
+# and leave). Mirrors the canonical query in the bot-classification spec.
+_ENGAGED_HUMAN_SCROLL_THRESHOLD = 50
+_ENGAGED_HUMAN_EVENT_TYPES = frozenset(
+    [
+        AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
+        AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE,
+        AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY,
+        AnalyticsEvent.EventType.REVIEW_SHARE_X,
+        AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
+        AnalyticsEvent.EventType.SEARCH,
+        AnalyticsEvent.EventType.SEARCH_RESULT_CLICK,
+        AnalyticsEvent.EventType.CPD_TRACKING_TOGGLE,
+        AnalyticsEvent.EventType.JOURNAL_SELECT,
+    ]
+)
+
+
+def _engaged_human_count(events_qs):
+    """Distinct visitors in ``events_qs`` who emitted an engagement signal.
+
+    ``events_qs`` is expected to already be human-filtered + period-scoped
+    (i.e. ``_base_event_qs``), so this is the spec's canonical "engaged humans"
+    query expressed as distinct engaged ``visitor_id``s.
+    """
+    return (
+        events_qs.filter(visitor_id__isnull=False)
+        .filter(
+            Q(scroll_depth__gte=_ENGAGED_HUMAN_SCROLL_THRESHOLD)
+            | Q(subscriber__isnull=False)
+            | Q(event_type__in=_ENGAGED_HUMAN_EVENT_TYPES)
+        )
+        .values("visitor_id")
+        .distinct()
+        .count()
+    )
+
 
 def _date_range_from_request(request, default_days=90):
     today = timezone.localdate()
@@ -434,13 +477,19 @@ def _confidence_summary(events_qs):
     """Return confidence metrics for a queryset of AnalyticsEvent."""
     total = events_qs.count()
     if not total:
-        return {"conf_total": 0, "conf_js_rate": "—", "conf_subscriber_rate": "—"}
+        return {
+            "conf_total": 0,
+            "conf_js_rate": "—",
+            "conf_subscriber_rate": "—",
+            "conf_engaged_humans": 0,
+        }
     js = events_qs.filter(js_verified=True).count()
     subs = events_qs.filter(human_confidence="known_subscriber_human").count()
     return {
         "conf_total": total,
         "conf_js_rate": _safe_percentage(js, total),
         "conf_subscriber_rate": _safe_percentage(subs, total),
+        "conf_engaged_humans": _engaged_human_count(events_qs),
     }
 
 
@@ -813,6 +862,7 @@ def analytics_overview(request):
 
     # Unique visitors and visits
     unique_visitors = len({v["visitor_id"] for v in visits if v["visitor_id"]})
+    engaged_humans = _engaged_human_count(human_events)
     unique_sessions = len(visits)
     # Distinct Django session_keys (only written when a request mutates the
     # session, e.g. a JS beacon fires). Used as the bot-signal denominator:
@@ -845,6 +895,9 @@ def analytics_overview(request):
     automated_count = automated_counter_qs.aggregate(total=Coalesce(Sum("count"), 0))["total"]
     automated_breakdown = list(
         automated_counter_qs.values("event_type").annotate(total=Sum("count")).order_by("-total")
+    )
+    automated_reason_breakdown = list(
+        automated_counter_qs.values("reason").annotate(total=Sum("count")).order_by("-total")
     )
     total_attempted_events = total_all_events + automated_count
     js_verified_count = all_agg["js_verified_count"]
@@ -1193,6 +1246,7 @@ def analytics_overview(request):
         "start_date": start_date,
         "end_date": end_date,
         "unique_visitors": unique_visitors,
+        "engaged_humans": engaged_humans,
         "unique_sessions": unique_sessions,
         "total_opens": total_opens,
         "total_engaged": total_engaged,
@@ -1215,6 +1269,7 @@ def analytics_overview(request):
         "total_attempted_events": total_attempted_events,
         "automated_share": _safe_percentage(automated_count, total_attempted_events),
         "automated_breakdown": automated_breakdown,
+        "automated_reason_breakdown": automated_reason_breakdown,
         "unique_session_keys": unique_session_keys,
         "visitor_session_ratio": (round(unique_visitors / unique_session_keys, 1) if unique_session_keys else None),
         "js_verified_count": js_verified_count,

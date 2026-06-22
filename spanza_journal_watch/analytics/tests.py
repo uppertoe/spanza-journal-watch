@@ -26,6 +26,7 @@ from spanza_journal_watch.analytics.utils import (
     REFERRER_SOCIAL,
     _categorize_from_header,
     categorize_referrer,
+    classify_automated_reason,
     classify_event_confidence,
     is_probable_automated_event,
     is_probable_automated_newsletter_event,
@@ -357,6 +358,50 @@ def test_generic_url_in_user_agent_is_automated(rf):
         HTTP_USER_AGENT="Mozilla/5.0 (compatible; UnknownBot/1.0; +https://unknownbot.example.com/about)",
     )
     assert is_probable_automated_event(request) is True
+
+
+def test_gatus_uptime_monitor_is_automated(rf):
+    # The audit found Gatus/1.0 leaking through as a "human".
+    request = rf.get("/", HTTP_USER_AGENT="Gatus/1.0")
+    assert is_probable_automated_event(request) is True
+
+
+def test_modern_automation_frameworks_are_automated(rf):
+    for ua in ("uptime-kuma/1.23", "Playwright/1.4", "puppeteer", "okhttp/4.9"):
+        request = rf.get("/", HTTP_USER_AGENT=ua)
+        assert is_probable_automated_event(request) is True, ua
+
+
+def test_generic_bot_token_is_automated(rf):
+    request = rf.get("/", HTTP_USER_AGENT="SomeNewThing/2.0 (an unlisted bot)")
+    assert is_probable_automated_event(request) is True
+
+
+def test_extra_ua_markers_from_settings(rf, settings):
+    settings.ANALYTICS_EXTRA_AUTOMATED_UA_MARKERS = ["acmescanner"]
+    request = rf.get("/", HTTP_USER_AGENT="AcmeScanner/9")
+    assert is_probable_automated_event(request) is True
+
+
+def test_classify_automated_reason_tokens(rf):
+    assert classify_automated_reason(rf.get("/", HTTP_USER_AGENT="")) == "empty_ua"
+    assert classify_automated_reason(rf.get("/", HTTP_USER_AGENT="Gatus/1.0")) == "ua_marker"
+    # Chrome stub without AppleWebKit → fabrication.
+    assert classify_automated_reason(rf.get("/", HTTP_USER_AGENT="Chrome/120.0.0.0")) == "chrome_fabrication"
+    ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0"
+    assert classify_automated_reason(rf.get("/", HTTP_USER_AGENT=ua), event_type="search") == "sec_fetch_strict"
+    # A real browser navigation is not automated.
+    request = rf.get("/", HTTP_USER_AGENT=ua, HTTP_SEC_FETCH_MODE="navigate", HTTP_SEC_FETCH_SITE="same-origin")
+    assert classify_automated_reason(request) is None
+
+
+def test_record_event_for_bot_skips_row_and_bumps_reason(rf):
+    request = rf.get("/", HTTP_USER_AGENT="Gatus/1.0")
+    result = AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT, request=request)
+    assert result is None
+    assert AnalyticsEvent.objects.count() == 0
+    counter = AutomatedRequestCount.objects.get(event_type=AnalyticsEvent.EventType.PAGE_VISIT, reason="ua_marker")
+    assert counter.count == 1
 
 
 def test_search_event_without_sec_fetch_headers_is_automated(rf):

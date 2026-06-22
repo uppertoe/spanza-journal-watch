@@ -66,6 +66,23 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "pingdom",
     "statuscake",
     "site24x7",
+    "gatus",
+    "uptime-kuma",
+    "betteruptime",
+    # Headless automation frameworks (JS-executing bots js_verified can't catch)
+    "playwright",
+    "puppeteer",
+    # Additional generic HTTP clients
+    "okhttp",
+    "aiohttp",
+    "bingpreview",
+    # Generic self-identifying crawler tokens. Substring match — classification
+    # only affects counting/persistence (never blocking), so the rare false
+    # positive (e.g. a "Cubot" phone) is an acceptable miscount.
+    "crawler",
+    "spider",
+    "slurp",
+    "bot",
     # Social preview bots (these fetch pages to generate link previews, not human reads)
     "facebookexternalhit",
     "twitterbot",
@@ -87,45 +104,60 @@ NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=60)
 _SEC_FETCH_STRICT_EVENT_TYPES = frozenset({"search"})
 
 
-def is_probable_automated_event(request, event_type=None):
+def _automated_ua_markers():
+    """Default UA markers plus any added via settings (no code deploy needed)."""
+    extra = getattr(settings, "ANALYTICS_EXTRA_AUTOMATED_UA_MARKERS", ())
+    return AUTOMATED_USER_AGENT_MARKERS + [m.lower() for m in extra]
+
+
+def classify_automated_reason(request, event_type=None):
+    """Return a coarse reason token if the request looks automated, else None.
+
+    The token is the deciding signal (for observability / AutomatedRequestCount),
+    not a per-marker value — kept low-cardinality on purpose.
+    """
     user_agent = (request.headers.get("user-agent") or "").lower()
     if not user_agent:
-        return True
-    if any(marker in user_agent for marker in AUTOMATED_USER_AGENT_MARKERS):
-        return True
+        return "empty_ua"
+    if any(marker in user_agent for marker in _automated_ua_markers()):
+        return "ua_marker"
     # Generic crawler convention: UA contains a URL identifying the bot
     # (e.g. "... +http://example.com/bot"). Real browsers never do this.
     if "+http://" in user_agent or "+https://" in user_agent:
-        return True
+        return "bot_url"
     # Research-bot self-identification ("+contact: ..." in UA body).
     if "+contact:" in user_agent:
-        return True
+        return "bot_contact"
     # Real Chrome UAs always carry AppleWebKit/ and Safari/ tokens. Bots often
     # fabricate a "Chrome/NNN.0.0.0" stub — catch the mismatch.
     if "chrome/" in user_agent and "applewebkit/" not in user_agent:
-        return True
+        return "chrome_fabrication"
 
     # Common prefetch/scanner headers
     if (request.headers.get("purpose") or "").lower() in {"prefetch", "preview"}:
-        return True
+        return "prefetch"
     if (request.headers.get("x-purpose") or "").lower() in {"preview"}:
-        return True
+        return "preview"
     if (request.headers.get("x-moz") or "").lower() == "prefetch":
-        return True
+        return "moz_prefetch"
 
     sec_fetch_mode = (request.headers.get("sec-fetch-mode") or "").lower()
     sec_fetch_site = (request.headers.get("sec-fetch-site") or "").lower()
     if sec_fetch_mode == "no-cors" and sec_fetch_site == "cross-site":
         # Often image preloading/proxy behavior
-        return True
+        return "image_proxy"
 
     # For events that only fire from interactive page loads (e.g. SEARCH), a
     # modern browser always sends sec-fetch-* headers. Their absence points to
     # a scripted client whose UA doesn't match our marker list.
     if event_type in _SEC_FETCH_STRICT_EVENT_TYPES and not sec_fetch_mode:
-        return True
+        return "sec_fetch_strict"
 
-    return False
+    return None
+
+
+def is_probable_automated_event(request, event_type=None):
+    return classify_automated_reason(request, event_type=event_type) is not None
 
 
 def is_probable_automated_newsletter_event(request, newsletter):

@@ -30,7 +30,7 @@ def _apply_downgrade(candidates, *, label, dry_run):
     )
 
     for bucket in bucket_counts:
-        AutomatedRequestCount.bump(bucket["event_type"], date=bucket["day"], by=bucket["n"])
+        AutomatedRequestCount.bump(bucket["event_type"], reason=label[:32], date=bucket["day"], by=bucket["n"])
 
     logger.info("%s: downgraded %d event(s) to suspected_automated", label, downgraded)
     return {"downgraded": downgraded, "dry_run": False}

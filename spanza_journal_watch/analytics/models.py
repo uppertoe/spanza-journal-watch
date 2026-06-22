@@ -11,9 +11,9 @@ from django.utils import timezone
 from spanza_journal_watch.analytics.utils import (
     REFERRER_DIRECT,
     categorize_referrer,
+    classify_automated_reason,
     classify_event_confidence,
     extract_referrer_domain,
-    is_probable_automated_event,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.utils.functions import get_domain_url
@@ -191,8 +191,9 @@ class AnalyticsEvent(models.Model):
         session_sequence = 0
         share_token = ""
         if request is not None:
-            if is_probable_automated_event(request, event_type=event_type):
-                AutomatedRequestCount.bump(event_type)
+            automated_reason = classify_automated_reason(request, event_type=event_type)
+            if automated_reason is not None:
+                AutomatedRequestCount.bump(event_type, reason=automated_reason)
                 return None
             user_agent = request.headers.get("user-agent", "")
             session_key = request.session.session_key or ""
@@ -251,23 +252,27 @@ class AutomatedRequestCount(models.Model):
 
     date = models.DateField()
     event_type = models.CharField(max_length=48, choices=AnalyticsEvent.EventType.choices)
+    # Coarse deciding signal (e.g. "ua_marker", "empty_ua", "downgrade:singleton").
+    # Low cardinality on purpose; "" for rows written before reason capture.
+    reason = models.CharField(max_length=32, default="", blank=True)
     count = models.PositiveIntegerField(default=0)
 
     class Meta:
-        unique_together = ("date", "event_type")
+        unique_together = ("date", "event_type", "reason")
         indexes = [models.Index(fields=["date"])]
         ordering = ("-date", "event_type")
 
     @classmethod
-    def bump(cls, event_type, *, date=None, by=1):
+    def bump(cls, event_type, *, reason="", date=None, by=1):
         target_date = date or timezone.localdate()
-        updated = cls.objects.filter(date=target_date, event_type=event_type).update(count=F("count") + by)
+        lookup = {"date": target_date, "event_type": event_type, "reason": reason}
+        updated = cls.objects.filter(**lookup).update(count=F("count") + by)
         if updated:
             return
         try:
-            cls.objects.create(date=target_date, event_type=event_type, count=by)
+            cls.objects.create(**lookup, count=by)
         except IntegrityError:
-            cls.objects.filter(date=target_date, event_type=event_type).update(count=F("count") + by)
+            cls.objects.filter(**lookup).update(count=F("count") + by)
 
     def __str__(self):
         return f"{self.date} {self.event_type}: {self.count}"
