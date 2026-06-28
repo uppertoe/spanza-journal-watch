@@ -161,14 +161,16 @@ def _engaged_event(visitor_id, *, event_type=AnalyticsEvent.EventType.PAGE_VISIT
     )
 
 
-def test_engaged_human_count_counts_only_engaged_visitors():
+def test_engaged_human_count_excludes_passive_scroll_and_bare_search():
     qs = AnalyticsEvent.objects.all()
     scroller = uuid.uuid4()
-    bouncer = uuid.uuid4()
-    interactor = uuid.uuid4()
-    _engaged_event(scroller, scroll_depth=60)  # past the fold → engaged
-    _engaged_event(bouncer, scroll_depth=10)  # shallow page view → not engaged
-    _engaged_event(interactor, event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)  # interaction → engaged
+    searcher = uuid.uuid4()
+    reader = uuid.uuid4()
+    clicker = uuid.uuid4()
+    _engaged_event(scroller, scroll_depth=95)  # deep scroll only → gamed, NOT engaged
+    _engaged_event(searcher, event_type=AnalyticsEvent.EventType.SEARCH)  # bare search → gamed, NOT engaged
+    _engaged_event(reader, event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)  # sustained read → engaged
+    _engaged_event(clicker, event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)  # deliberate click → engaged
 
     assert _engaged_human_count(qs) == 2
 

@@ -1587,6 +1587,93 @@ def test_prune_automated_events_dry_run_makes_no_changes():
     assert AnalyticsEvent.objects.filter(pk=old_bot.pk).exists()
 
 
+# ---- downgrade_ua_cohort_visitors_task ----
+
+_FLEET_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0.0.0 Safari/537.36"
+
+
+def _cohort_visitor(
+    ua, *, event_type=AnalyticsEvent.EventType.PAGE_VISIT, referrer_category="", subscriber=None, age_hours=24
+):
+    event = AnalyticsEvent.objects.create(
+        event_type=event_type,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        user_agent=ua,
+        referrer_category=referrer_category,
+        subscriber=subscriber,
+        js_verified=True,  # the fleet executes JS — that's why other sweepers miss it
+    )
+    _backdate(event, hours=age_hours)
+    return event
+
+
+def test_ua_cohort_downgrades_no_interaction_fleet():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    fleet = [_cohort_visitor(_FLEET_UA) for _ in range(3)]
+
+    result = downgrade_ua_cohort_visitors_task(min_cohort_size=3)
+
+    assert result["downgraded"] == 3
+    assert result["cohorts"] == 1
+    for e in fleet:
+        e.refresh_from_db()
+        assert e.automated is True
+        assert e.human_confidence == AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED
+
+
+def test_ua_cohort_protects_interacting_visitor_on_same_ua():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    [_cohort_visitor(_FLEET_UA) for _ in range(3)]
+    human = _cohort_visitor(_FLEET_UA, event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
+
+    downgrade_ua_cohort_visitors_task(min_cohort_size=3)
+
+    human.refresh_from_db()
+    assert human.automated is False  # deliberate action protects even on the bot UA
+
+
+def test_ua_cohort_below_threshold_not_swept():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    survivors = [_cohort_visitor(_FLEET_UA) for _ in range(2)]
+
+    result = downgrade_ua_cohort_visitors_task(min_cohort_size=3)
+
+    assert result == {"downgraded": 0, "cohorts": 0, "dry_run": False}
+    for e in survivors:
+        e.refresh_from_db()
+        assert e.automated is False
+
+
+def test_ua_cohort_protects_newsletter_visitors():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    [_cohort_visitor(_FLEET_UA) for _ in range(3)]
+    nl = _cohort_visitor(_FLEET_UA, referrer_category="newsletter")
+
+    downgrade_ua_cohort_visitors_task(min_cohort_size=3)
+
+    nl.refresh_from_db()
+    assert nl.automated is False
+
+
+def test_ua_cohort_dry_run_makes_no_changes():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    fleet = [_cohort_visitor(_FLEET_UA) for _ in range(3)]
+
+    result = downgrade_ua_cohort_visitors_task(min_cohort_size=3, dry_run=True)
+
+    assert result["would_downgrade"] == 3
+    assert result["downgraded"] == 0
+    for e in fleet:
+        e.refresh_from_db()
+        assert e.automated is False
+
+
 # ---- referrer_category default when request is None ----
 
 

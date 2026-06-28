@@ -6,7 +6,12 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from config.celery_app import app as celery_app
-from spanza_journal_watch.analytics.models import AnalyticsEvent, AutomatedRequestCount, HumanConfidence
+from spanza_journal_watch.analytics.models import (
+    DELIBERATE_INTERACTION_EVENT_TYPES,
+    AnalyticsEvent,
+    AutomatedRequestCount,
+    HumanConfidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +108,71 @@ def downgrade_no_js_burst_visitors_task(min_events=5, min_age_hours=0.5, dry_run
     ).exclude(referrer_category="newsletter")
 
     return _apply_downgrade(candidates, label="downgrade_no_js_burst_visitors", dry_run=dry_run)
+
+
+@celery_app.task
+def downgrade_ua_cohort_visitors_task(min_cohort_size=25, lookback_days=30, min_age_hours=0.5, dry_run=False):
+    """
+    Reclassify JS-executing bot fleets that share one user-agent as
+    ``suspected_automated``.
+
+    The singleton and no-JS-burst sweepers both miss the modern fleet seen in the
+    2026-06 audit: ~300+ "visitors" on a single identical Windows/Chrome UA that
+    run JS and scroll many pages, but never take a deliberate action and never
+    return. They evade the other sweepers precisely because they are JS-verified
+    and multi-event.
+
+    Signature exploited (all from existing data, no new signal):
+      - a single user-agent shared by >= ``min_cohort_size`` distinct visitors
+        within the lookback window,
+      - where those visitors fired ZERO deliberate interactions
+        (``DELIBERATE_INTERACTION_EVENT_TYPES``).
+
+    False positives are bounded two ways: the threshold is conservative (a real
+    UA shared by that many people on a niche site is implausible), and any
+    visitor who took a deliberate action — or matched a subscriber, or came via
+    the newsletter — is protected and never swept, even if they share the UA.
+    Only touches ``probable_human`` events, so it is idempotent.
+    """
+    now = timezone.now()
+    cutoff = now - timedelta(hours=min_age_hours)
+    window_start = now - timedelta(days=lookback_days)
+
+    base = (
+        AnalyticsEvent.objects.filter(
+            timestamp__gte=window_start,
+            timestamp__lt=cutoff,
+            human_confidence=HumanConfidence.PROBABLE_HUMAN,
+            visitor_id__isnull=False,
+        )
+        .exclude(referrer_category="newsletter")
+        .exclude(user_agent="")
+    )
+
+    # Visitors that are real humans (deliberate action or matched subscriber) are
+    # protected regardless of which UA they share.
+    protected = set(
+        base.filter(Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES) | Q(subscriber__isnull=False)).values_list(
+            "visitor_id", flat=True
+        )
+    )
+
+    # User-agents whose *non-protected* visitor count crosses the cohort size.
+    cohort_uas = list(
+        base.exclude(visitor_id__in=protected)
+        .values("user_agent")
+        .annotate(n=Count("visitor_id", distinct=True))
+        .filter(n__gte=min_cohort_size)
+        .values_list("user_agent", flat=True)
+    )
+    if not cohort_uas:
+        logger.info("downgrade_ua_cohort: no bot cohorts >= %d found", min_cohort_size)
+        return {"downgraded": 0, "cohorts": 0, "dry_run": dry_run}
+
+    candidates = base.filter(user_agent__in=cohort_uas).exclude(visitor_id__in=protected)
+    result = _apply_downgrade(candidates, label="downgrade_ua_cohort", dry_run=dry_run)
+    result["cohorts"] = len(cohort_uas)
+    return result
 
 
 @celery_app.task

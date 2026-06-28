@@ -242,6 +242,29 @@ class AnalyticsEvent(models.Model):
         return label
 
 
+# Deliberate, hard-to-fake actions that mark a visitor as a real human: a
+# sustained read, a click on a link/share, a search-result click, a journal
+# selection, a CPD toggle. Passive signals (scroll, bare search submissions) are
+# excluded because a 2026-06 audit showed JS-executing bots game them. Shared by
+# the dashboard's "engaged human" KPI and the UA-cohort bot sweeper so the two
+# never disagree on who counts as human.
+DELIBERATE_INTERACTION_EVENT_TYPES = frozenset(
+    [
+        AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
+        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
+        AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE,
+        AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY,
+        AnalyticsEvent.EventType.REVIEW_SHARE_X,
+        AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
+        AnalyticsEvent.EventType.SEARCH_RESULT_CLICK,
+        AnalyticsEvent.EventType.CPD_TRACKING_TOGGLE,
+        AnalyticsEvent.EventType.JOURNAL_SELECT,
+    ]
+)
+
+
 class AutomatedRequestCount(models.Model):
     """Daily aggregate of requests dropped by record_event's bot short-circuit.
 

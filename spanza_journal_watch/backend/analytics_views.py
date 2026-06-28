@@ -26,6 +26,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
+    DELIBERATE_INTERACTION_EVENT_TYPES,
     AnalyticsEvent,
     AutomatedRequestCount,
     NewsletterClick,
@@ -111,44 +112,22 @@ _VISIT_PROGRESSION_EVENT_TYPES = frozenset(
     ]
 )
 
-# "Engaged human" KPI: a distinct visitor counts only once they emit a real
-# engagement signal in the period — scroll past the fold, fire an interaction
-# event, or match a subscriber. This is the trustworthy headline figure that
-# replaces raw "NOT automated" (which counts JS-executing bots that load a page
-# and leave). Mirrors the canonical query in the bot-classification spec.
-_ENGAGED_HUMAN_SCROLL_THRESHOLD = 50
-_ENGAGED_HUMAN_EVENT_TYPES = frozenset(
-    [
-        AnalyticsEvent.EventType.REVIEW_ENGAGED,
-        AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
-        AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
-        AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
-        AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE,
-        AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY,
-        AnalyticsEvent.EventType.REVIEW_SHARE_X,
-        AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
-        AnalyticsEvent.EventType.SEARCH,
-        AnalyticsEvent.EventType.SEARCH_RESULT_CLICK,
-        AnalyticsEvent.EventType.CPD_TRACKING_TOGGLE,
-        AnalyticsEvent.EventType.JOURNAL_SELECT,
-    ]
-)
 
-
+# "Engaged human" KPI: a distinct visitor counts only once they take a
+# *deliberate* action (DELIBERATE_INTERACTION_EVENT_TYPES) or match a subscriber.
+# Passive scroll and bare `search` submissions are excluded — a 2026-06 prod
+# audit showed JS-executing bots game both. The same constant gates the
+# UA-cohort bot sweeper, so "engaged" and "not swept as a bot" always agree.
 def _engaged_human_count(events_qs):
-    """Distinct visitors in ``events_qs`` who emitted an engagement signal.
+    """Distinct visitors in ``events_qs`` who took a deliberate engagement action.
 
     ``events_qs`` is expected to already be human-filtered + period-scoped
-    (i.e. ``_base_event_qs``), so this is the spec's canonical "engaged humans"
-    query expressed as distinct engaged ``visitor_id``s.
+    (i.e. ``_base_event_qs``). Counts distinct ``visitor_id``s that either fired
+    a deliberate interaction or matched a subscriber.
     """
     return (
         events_qs.filter(visitor_id__isnull=False)
-        .filter(
-            Q(scroll_depth__gte=_ENGAGED_HUMAN_SCROLL_THRESHOLD)
-            | Q(subscriber__isnull=False)
-            | Q(event_type__in=_ENGAGED_HUMAN_EVENT_TYPES)
-        )
+        .filter(Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES))
         .values("visitor_id")
         .distinct()
         .count()
