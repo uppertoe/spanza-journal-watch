@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from config.celery_app import app as celery_app
 from spanza_journal_watch.analytics.models import (
-    HARD_INTERACTION_EVENT_TYPES,
+    DELIBERATE_INTERACTION_EVENT_TYPES,
     AnalyticsEvent,
     AutomatedRequestCount,
     HumanConfidence,
@@ -125,9 +125,9 @@ def downgrade_ua_cohort_visitors_task(min_cohort_size=25, lookback_days=30, min_
     Signature exploited (all from existing data, no new signal):
       - a single user-agent shared by >= ``min_cohort_size`` distinct visitors
         within the lookback window,
-      - where those visitors fired ZERO hard interactions — a click on a
-        specific element (``HARD_INTERACTION_EVENT_TYPES``); a 5s scroll-dwell
-        (REVIEW_ENGAGED) does NOT protect, since auto-scrollers trip it.
+      - where those visitors fired ZERO deliberate interactions — a click on a
+        specific element (``DELIBERATE_INTERACTION_EVENT_TYPES``); a 5s
+        scroll-dwell (REVIEW_ENGAGED) does NOT protect, as auto-scrollers trip it.
 
     False positives are bounded two ways: the threshold is conservative (a real
     UA shared by that many people on a niche site is implausible), and any
@@ -151,11 +151,10 @@ def downgrade_ua_cohort_visitors_task(min_cohort_size=25, lookback_days=30, min_
     )
 
     # Visitors that are real humans (a hard click or matched subscriber) are
-    # protected regardless of which UA they share. REVIEW_ENGAGED is excluded
-    # here on purpose — auto-scrollers trip it, so protecting on it would shield
-    # the fleet (see HARD_INTERACTION_EVENT_TYPES).
+    # protected regardless of which UA they share. The deliberate set excludes
+    # REVIEW_ENGAGED (gameable 5s dwell), so dwell-only bots are not shielded.
     protected = set(
-        base.filter(Q(event_type__in=HARD_INTERACTION_EVENT_TYPES) | Q(subscriber__isnull=False)).values_list(
+        base.filter(Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES) | Q(subscriber__isnull=False)).values_list(
             "visitor_id", flat=True
         )
     )

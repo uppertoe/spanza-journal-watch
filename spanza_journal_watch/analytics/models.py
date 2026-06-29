@@ -242,15 +242,17 @@ class AnalyticsEvent(models.Model):
         return label
 
 
-# Deliberate, hard-to-fake actions that mark a visitor as a real human: a
-# sustained read, a click on a link/share, a search-result click, a journal
-# selection, a CPD toggle. Passive signals (scroll, bare search submissions) are
-# excluded because a 2026-06 audit showed JS-executing bots game them. Shared by
-# the dashboard's "engaged human" KPI and the UA-cohort bot sweeper so the two
-# never disagree on who counts as human.
+# Hard-to-fake actions that mark a visitor as a real human: a click on a
+# specific element (full text, share, search result, journal select, CPD toggle).
+# This is the single definition shared by the "engaged human" KPI, the share-
+# attribution metric, and the UA-cohort bot sweeper's protected set.
+#
+# Excluded on purpose, because a 2026-06 prod audit showed JS-executing bots game
+# them: scroll depth, bare `search` submissions, and REVIEW_ENGAGED (a 5s
+# scroll-dwell — its "only" population was 100% non-returning bots). A click on a
+# specific element is the cheapest signal these fleets don't produce.
 DELIBERATE_INTERACTION_EVENT_TYPES = frozenset(
     [
-        AnalyticsEvent.EventType.REVIEW_ENGAGED,
         AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
         AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
         AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
@@ -262,16 +264,6 @@ DELIBERATE_INTERACTION_EVENT_TYPES = frozenset(
         AnalyticsEvent.EventType.CPD_TRACKING_TOGGLE,
         AnalyticsEvent.EventType.JOURNAL_SELECT,
     ]
-)
-
-# A stricter subset for the UA-cohort sweeper's "protected" set: a click on a
-# specific element, which an auto-scrolling bot can't fake. REVIEW_ENGAGED (5s
-# dwell) is deliberately NOT here — auto-scrollers trip it, and protecting on it
-# would shield the very fleets the sweeper targets. A genuine deep-reader is
-# still counted as engaged by the KPI; they only lose sweep-protection if they
-# also sit inside a high-volume bot UA cohort, which real readers don't.
-HARD_INTERACTION_EVENT_TYPES = DELIBERATE_INTERACTION_EVENT_TYPES - frozenset(
-    [AnalyticsEvent.EventType.REVIEW_ENGAGED]
 )
 
 
