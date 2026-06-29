@@ -1623,16 +1623,30 @@ def test_ua_cohort_downgrades_no_interaction_fleet():
         assert e.human_confidence == AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED
 
 
-def test_ua_cohort_protects_interacting_visitor_on_same_ua():
+def test_ua_cohort_protects_hard_click_visitor_on_same_ua():
     from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
 
     [_cohort_visitor(_FLEET_UA) for _ in range(3)]
-    human = _cohort_visitor(_FLEET_UA, event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
+    human = _cohort_visitor(_FLEET_UA, event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)
 
     downgrade_ua_cohort_visitors_task(min_cohort_size=3)
 
     human.refresh_from_db()
-    assert human.automated is False  # deliberate action protects even on the bot UA
+    assert human.automated is False  # a hard click protects even on the bot UA
+
+
+def test_ua_cohort_sweeps_review_engaged_only_visitor():
+    # REVIEW_ENGAGED (5s dwell) is gameable by auto-scrollers, so it does NOT
+    # protect — a dwell-only visitor inside a bot cohort is still swept.
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    [_cohort_visitor(_FLEET_UA) for _ in range(3)]
+    scroller = _cohort_visitor(_FLEET_UA, event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED)
+
+    downgrade_ua_cohort_visitors_task(min_cohort_size=3)
+
+    scroller.refresh_from_db()
+    assert scroller.automated is True
 
 
 def test_ua_cohort_below_threshold_not_swept():

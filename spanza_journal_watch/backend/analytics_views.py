@@ -772,6 +772,15 @@ def analytics_overview(request):
     prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
     prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
 
+    # The comparison is only meaningful if the previous period sits wholly within
+    # the analytics era; otherwise it baselines against near-zero data and every
+    # delta explodes (e.g. +5936%). Suppress the deltas in that case.
+    _rollout_date = _site_analytics_rollout_date()
+    comparison_reliable = _rollout_date is not None and prev_start >= _rollout_date
+
+    def _delta(current, previous):
+        return _pct_change(current, previous) if comparison_reliable else None
+
     prev_human = AnalyticsEvent.objects.filter(
         timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
     )
@@ -944,7 +953,17 @@ def analytics_overview(request):
         if count:
             top_share_method = {"label": label, "count": count}
             break
-    share_attributed_visits = len(_build_derived_visits(human_events.exclude(share_token="")))
+    # Visitors who arrived via a share link (carry a ref token) AND actually
+    # engaged. Excludes link-preview/unfurl fetchers, which land a single
+    # tokened page_visit with no interaction and would otherwise inflate this.
+    share_attributed_visits = (
+        human_events.exclude(share_token="")
+        .filter(visitor_id__isnull=False)
+        .filter(Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES))
+        .values("visitor_id")
+        .distinct()
+        .count()
+    )
 
     search_query_counter = Counter()
     zero_result_counter = Counter()
@@ -1253,14 +1272,15 @@ def analytics_overview(request):
         "visitor_session_ratio": (round(unique_visitors / unique_session_keys, 1) if unique_session_keys else None),
         "js_verified_count": js_verified_count,
         "confidence_breakdown": confidence_breakdown,
-        "delta_opens": _pct_change(total_opens, prev_opens),
-        "delta_engaged": _pct_change(total_engaged, prev_engaged),
-        "delta_dwell": _pct_change(avg_dwell_ms, prev_dwell_ms),
-        "delta_full_text": _pct_change(total_full_text, prev_full_text),
-        "delta_shares": _pct_change(total_shares, prev_shares),
-        "delta_searches": _pct_change(search_count, prev_searches),
-        "delta_scroll": _pct_change(avg_scroll_depth or 0, prev_scroll_depth or 0) if avg_scroll_depth else None,
+        "delta_opens": _delta(total_opens, prev_opens),
+        "delta_engaged": _delta(total_engaged, prev_engaged),
+        "delta_dwell": _delta(avg_dwell_ms, prev_dwell_ms),
+        "delta_full_text": _delta(total_full_text, prev_full_text),
+        "delta_shares": _delta(total_shares, prev_shares),
+        "delta_searches": _delta(search_count, prev_searches),
+        "delta_scroll": (_delta(avg_scroll_depth or 0, prev_scroll_depth or 0) if avg_scroll_depth else None),
         "comparison_label": f"vs {prev_start.strftime('%-d %b')} – {prev_end.strftime('%-d %b')}",
+        "comparison_reliable": comparison_reliable,
         "overview_editorial_items": overview_editorial_items,
         "overview_dev_items": overview_dev_items,
         "overview_confidence_items": overview_confidence_items,
@@ -1439,7 +1459,17 @@ def analytics_editorial(request):
     share_breakdown = [{"label": k, "count": v} for k, v in share_counts.items() if v]
 
     # Share-to-visit attribution — count downstream visits from share tokens
-    share_attributed_visits = len(_build_derived_visits(human_events.exclude(share_token="")))
+    # Visitors who arrived via a share link (carry a ref token) AND actually
+    # engaged. Excludes link-preview/unfurl fetchers, which land a single
+    # tokened page_visit with no interaction and would otherwise inflate this.
+    share_attributed_visits = (
+        human_events.exclude(share_token="")
+        .filter(visitor_id__isnull=False)
+        .filter(Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES))
+        .values("visitor_id")
+        .distinct()
+        .count()
+    )
 
     # Tag-based content type breakdown — shows what topics resonate
     tag_type_breakdown = sorted(
@@ -2282,6 +2312,13 @@ def analytics_journals(request):
         timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
     )
 
+    # Suppress deltas when the comparison period predates the analytics era.
+    _rollout_date = _site_analytics_rollout_date()
+    comparison_reliable = _rollout_date is not None and prev_start >= _rollout_date
+
+    def _delta(current, previous):
+        return _pct_change(current, previous) if comparison_reliable else None
+
     prev_visits = len(_build_derived_visits(prev_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)))
     prev_stars = states_in_range.filter(starred_at__gte=prev_start_ts, starred_at__lte=prev_end_ts).count()
     prev_searches = (
@@ -2317,31 +2354,31 @@ def analytics_journals(request):
         {
             "name": "Journal visits",
             "metric": total_visits,
-            "delta": _pct_change(total_visits, prev_visits),
+            "delta": _delta(total_visits, prev_visits),
             "secondary": f"{returning_rate} returning",
         },
         {
             "name": "Reading Lists",
             "metric": total_stars,
-            "delta": _pct_change(total_stars, prev_stars),
+            "delta": _delta(total_stars, prev_stars),
             "secondary": f"{total_reading_list_users} users",
         },
         {
             "name": "Search",
             "metric": total_searches,
-            "delta": _pct_change(total_searches, prev_searches),
+            "delta": _delta(total_searches, prev_searches),
             "secondary": f"{search_ctr} CTR",
         },
         {
             "name": "Sharing",
             "metric": total_shares,
-            "delta": _pct_change(total_shares, prev_shares),
+            "delta": _delta(total_shares, prev_shares),
             "secondary": "",
         },
         {
             "name": "CPD Reports",
             "metric": cpd_generated,
-            "delta": _pct_change(cpd_generated, prev_cpd),
+            "delta": _delta(cpd_generated, prev_cpd),
             "secondary": f"{cpd_users} user{'s' if cpd_users != 1 else ''}",
         },
     ]

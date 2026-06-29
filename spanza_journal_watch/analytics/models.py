@@ -264,6 +264,16 @@ DELIBERATE_INTERACTION_EVENT_TYPES = frozenset(
     ]
 )
 
+# A stricter subset for the UA-cohort sweeper's "protected" set: a click on a
+# specific element, which an auto-scrolling bot can't fake. REVIEW_ENGAGED (5s
+# dwell) is deliberately NOT here — auto-scrollers trip it, and protecting on it
+# would shield the very fleets the sweeper targets. A genuine deep-reader is
+# still counted as engaged by the KPI; they only lose sweep-protection if they
+# also sit inside a high-volume bot UA cohort, which real readers don't.
+HARD_INTERACTION_EVENT_TYPES = DELIBERATE_INTERACTION_EVENT_TYPES - frozenset(
+    [AnalyticsEvent.EventType.REVIEW_ENGAGED]
+)
+
 
 class AutomatedRequestCount(models.Model):
     """Daily aggregate of requests dropped by record_event's bot short-circuit.
