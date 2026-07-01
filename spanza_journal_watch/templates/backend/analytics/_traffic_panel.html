@@ -260,9 +260,9 @@
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span>Recent visits</span>
     <div class="btn-group btn-group-sm" role="group" aria-label="Visit filter">
-      <a href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}engaged_only=0#session-explorer"
+      <a href="?{% if request.GET.start %}start={{ request.GET.start }}&amp;{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&amp;{% endif %}engaged_only=0#session-explorer"
          class="btn btn-outline-secondary {% if not engaged_only %}active{% endif %}">All</a>
-      <a href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}engaged_only=1#session-explorer"
+      <a href="?{% if request.GET.start %}start={{ request.GET.start }}&amp;{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&amp;{% endif %}engaged_only=1#session-explorer"
          class="btn btn-outline-secondary {% if engaged_only %}active{% endif %}">Engaged only</a>
     </div>
   </div>
@@ -271,7 +271,7 @@
     <span class="d-block mt-1">
       <strong>Impression</strong>: review scrolled into view (≥25% visible).
       <strong>Sustained view</strong>: review visible ≥5 s.
-      <strong>Engaged</strong> visits have ≥1 sustained view, full-text click, or ≥30 s total duration.
+      <strong>Engaged</strong> visits contain a deliberate interaction (full-text click, share, search-result click, journal select) or a known subscriber — the same signal as the engaged-humans KPI. Dwell time alone doesn't count, since bots game it.
     </span>
   </div>
   <ul class="list-group list-group-flush" id="session-explorer">
@@ -319,9 +319,9 @@
     <span class="text-muted">Page {{ recent_session_page }} of {{ recent_session_total_pages }}</span>
     <div class="btn-group btn-group-sm">
       <a class="btn btn-outline-secondary {% if not recent_session_has_prev %}disabled{% endif %}"
-         href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}{% if engaged_only %}engaged_only=1&amp;{% endif %}page={{ recent_session_page|add:'-1' }}#session-explorer">Previous</a>
+         href="?{% if request.GET.start %}start={{ request.GET.start }}&amp;{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&amp;{% endif %}engaged_only={% if engaged_only %}1{% else %}0{% endif %}&amp;page={{ recent_session_page|add:'-1' }}#session-explorer">Previous</a>
       <a class="btn btn-outline-secondary {% if not recent_session_has_next %}disabled{% endif %}"
-         href="?{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&amp;{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}&amp;{% endif %}{% if engaged_only %}engaged_only=1&amp;{% endif %}page={{ recent_session_page|add:'1' }}#session-explorer">Next</a>
+         href="?{% if request.GET.start %}start={{ request.GET.start }}&amp;{% endif %}{% if request.GET.end %}end={{ request.GET.end }}&amp;{% endif %}engaged_only={% if engaged_only %}1{% else %}0{% endif %}&amp;page={{ recent_session_page|add:'1' }}#session-explorer">Next</a>
     </div>
   </div>
   {% endif %}

@@ -1,41 +1,44 @@
 {% extends "backend/analytics/_base.html" %}
 {% block analytics_content %}
 <div class="mb-3">
-  <a href="{% url 'backend:analytics_editorial' %}" class="small text-decoration-none">&larr; Back to Editorial</a>
+  <a href="{% url 'backend:analytics_issues' %}" class="small text-decoration-none">&larr; Back to Issues</a>
 </div>
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
   <div>
-    <h1 class="h4 mb-1">{{ review }}</h1>
-    <p class="text-muted small mb-0">Event timeline · last {{ lookback_days }} days</p>
+    <h1 class="h4 mb-1">{{ issue.name }}</h1>
+    <p class="text-muted small mb-0">
+      {{ issue.date|date:"j M Y"|default:"undated" }} · {{ review_count }} review{{ review_count|pluralize }} ·
+      {{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }}
+    </p>
   </div>
   <div>
-    <a href="{{ review.get_absolute_url }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">View review</a>
+    <a href="{{ issue.get_absolute_url }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">View issue</a>
   </div>
 </div>
 
 <div class="row g-2 mb-3">
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body py-2">
-      <div class="text-muted small" title="Review scrolled into view (≥25% visible)">Impressions</div>
-      <div class="h4 mb-0">{{ impressions }}</div>
+      <div class="text-muted small">Impressions</div>
+      <div class="h4 mb-0">{{ total_opens }}</div>
     </div></div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body py-2">
-      <div class="text-muted small" title="Review visible for ≥5 seconds">Sustained views</div>
-      <div class="h4 mb-0">{{ sustained_views }}</div>
+      <div class="text-muted small">Sustained views</div>
+      <div class="h4 mb-0">{{ total_engaged }} <span class="text-muted small">({{ engaged_rate }})</span></div>
     </div></div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body py-2">
       <div class="text-muted small">Full-text clicks</div>
-      <div class="h4 mb-0">{{ full_text_clicks }}</div>
+      <div class="h4 mb-0">{{ total_full_text }}</div>
     </div></div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card h-100"><div class="card-body py-2">
-      <div class="text-muted small">Avg dwell</div>
-      <div class="h4 mb-0">{{ avg_duration_s }}s</div>
+      <div class="text-muted small" title="Direct visits to the issue page">Issue page views</div>
+      <div class="h4 mb-0">{{ page_view_count }}</div>
     </div></div>
   </div>
 </div>
@@ -45,7 +48,7 @@
     <div class="card h-100">
       <div class="card-header">Opens over time <span class="text-muted small fw-normal">· last 26 weeks</span></div>
       <div class="card-body">
-        <canvas id="review-opens-chart" height="90"></canvas>
+        <canvas id="issue-opens-chart" height="90"></canvas>
       </div>
     </div>
   </div>
@@ -63,47 +66,40 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-muted mb-0 small">No opens recorded yet, so no referrer data.</p>
+        <p class="text-muted mb-0 small">No review opens recorded for this issue in the window.</p>
         {% endif %}
       </div>
     </div>
   </div>
 </div>
 
-{% if timeline %}
 <div class="card mb-3">
-  <div class="card-header">Events ({{ total_events }} in window)</div>
-  <table class="table table-sm small mb-0">
-    <thead><tr><th>Time</th><th>Event</th><th>Visitor</th><th>Referrer</th><th>Detail</th></tr></thead>
-    <tbody>
-      {% for event in timeline %}
-      <tr>
-        <td class="text-nowrap text-muted">{{ event.timestamp|date:"j M H:i:s" }}</td>
-        <td>{{ event.type }}</td>
-        <td>
-          {% if event.visitor_id %}
-          <a href="{% url 'backend:analytics_visitor' visitor_id=event.visitor_id %}" class="text-decoration-none"><code>{{ event.visitor_id_short }}</code></a>
-          {% else %}<span class="text-muted">—</span>{% endif %}
-        </td>
-        <td class="text-muted">{{ event.referrer_domain|default:event.referrer|default:"—" }}</td>
-        <td class="text-muted text-break">{{ event.detail }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% if total_pages > 1 %}
-  <div class="card-footer d-flex justify-content-between align-items-center small">
-    <span class="text-muted">Page {{ page }} of {{ total_pages }}</span>
-    <div class="btn-group btn-group-sm">
-      <a class="btn btn-outline-secondary {% if not has_prev %}disabled{% endif %}" href="?page={{ page|add:'-1' }}">Previous</a>
-      <a class="btn btn-outline-secondary {% if not has_next %}disabled{% endif %}" href="?page={{ page|add:'1' }}">Next</a>
-    </div>
+  <div class="card-header">Reviews in this issue</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Review</th><th>Opens</th><th>Engaged rate</th><th>Full text</th><th>Shares</th></tr></thead>
+      <tbody>
+        {% for item in review_rows %}
+        <tr>
+          <td>
+            <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+            <div class="text-muted" style="font-size:0.75rem">
+              {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+              · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+            </div>
+          </td>
+          <td>{{ item.opens }}</td>
+          <td>{{ item.engaged_rate }}</td>
+          <td>{{ item.full_text }}</td>
+          <td>{{ item.shares }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted small">No reviews attached to this issue.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
-  {% endif %}
 </div>
-{% else %}
-<p class="text-muted">No events recorded for this review in the last {{ lookback_days }} days.</p>
-{% endif %}
 
 <script>
 (function () {
@@ -116,7 +112,7 @@
     else { console.warn("Chart.js did not load within 5 seconds"); }
   }
   waitForChart(function () {
-    const ctx = document.getElementById("review-opens-chart");
+    const ctx = document.getElementById("issue-opens-chart");
     if (!ctx) return;
     new window.Chart(ctx, {
       type: "bar",

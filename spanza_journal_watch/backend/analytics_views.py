@@ -41,7 +41,7 @@ from spanza_journal_watch.backend.views import (
     _site_analytics_rollout_date,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.submissions.models import Review
+from spanza_journal_watch.submissions.models import Issue, Review
 
 
 def _pct_change(current, previous):
@@ -293,6 +293,7 @@ def _build_derived_visits(events_qs):
             "metadata",
             "session_key",
             "js_verified",
+            "human_confidence",
         )
     )
     # Group by visit_key then timestamp. A single visitor_id can span multiple
@@ -446,6 +447,131 @@ def _rank_rows(rows, sort_fields, limit=8):
     return sorted(rows, key=_sort_key, reverse=True)[:limit]
 
 
+# ── Recency / freshness helpers ────────────────────────────────────
+# Absolute-count leaderboards structurally favour older reviews: a review live
+# for 90 days has had 90 days to bank opens, one released 3 days ago has had 3.
+# These helpers let the dashboard surface just-released content on its own terms
+# (velocity, and opens-in-first-week vs the median for the cohort).
+
+_FIRST_WINDOW_DAYS = 7
+_BENCHMARK_LOOKBACK_DAYS = 180
+_BENCHMARK_MIN_COHORT = 5
+
+
+def _review_publish_date(review):
+    """Best-effort publication date: review's own date, else its earliest issue."""
+    if review.publish_date:
+        return review.publish_date
+    issue_dates = [i.date for i in review.issues.all() if i.date]
+    return min(issue_dates) if issue_dates else None
+
+
+def _first_window_opens(review, review_ct, today, days=_FIRST_WINDOW_DAYS):
+    """REVIEW_OPEN count within the review's own first ``days`` after publish.
+
+    Bounded per review and independent of the dashboard window — a brand-new
+    review's first week may sit outside the selected range. Callers pass a small
+    set (reviews published recently), so the per-review count stays cheap.
+    """
+    publish = _review_publish_date(review)
+    if publish is None:
+        return None
+    window_end = publish + datetime.timedelta(days=days)
+    # Only meaningful once the full first window has elapsed.
+    if window_end > today:
+        return None
+    start_ts = timezone.make_aware(datetime.datetime.combine(publish, datetime.time.min))
+    end_ts = timezone.make_aware(datetime.datetime.combine(window_end, datetime.time.max))
+    return AnalyticsEvent.objects.filter(
+        content_type=review_ct,
+        object_id=review.pk,
+        event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+        timestamp__gte=start_ts,
+        timestamp__lte=end_ts,
+        automated=False,
+    ).count()
+
+
+def _first_window_benchmark(review_ct, today):
+    """Median first-week REVIEW_OPEN count across recently-published reviews.
+
+    Cached briefly — it walks a bounded cohort (reviews published in the trailing
+    ~180 days whose first window has fully elapsed). Returns (median, cohort_size);
+    median is None until the cohort reaches _BENCHMARK_MIN_COHORT.
+    """
+    cache_key = f"analytics_first_week_benchmark:{today.isoformat()}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached["median"], cached["cohort"]
+
+    cohort_start = today - datetime.timedelta(days=_BENCHMARK_LOOKBACK_DAYS)
+    window_cutoff = today - datetime.timedelta(days=_FIRST_WINDOW_DAYS)
+    counts = []
+    reviews = (
+        Review.objects.filter(active=True, publish_date__gte=cohort_start, publish_date__lte=window_cutoff)
+        .prefetch_related("issues")
+        .only("id", "publish_date")
+    )
+    for review in reviews:
+        opens = _first_window_opens(review, review_ct, today)
+        if opens is not None:
+            counts.append(opens)
+
+    median = None
+    if len(counts) >= _BENCHMARK_MIN_COHORT:
+        counts.sort()
+        mid = len(counts) // 2
+        median = counts[mid] if len(counts) % 2 else (counts[mid - 1] + counts[mid]) / 2
+
+    result = {"median": median, "cohort": len(counts)}
+    cache.set(cache_key, result, 600)
+    return median, len(counts)
+
+
+_REFERRER_CATEGORY_LABELS = {
+    "newsletter": "Newsletter",
+    "search": "Search engines",
+    "social": "Social",
+    "internal": "Internal (on-site)",
+    "direct": "Direct / bookmark",
+    "other": "Other",
+}
+
+
+def _referrer_source_breakdown(events_qs):
+    """How readers arrived — grouped by referrer_category, ordered by count.
+
+    Returns a list of {label, category, count, pct}. ``pct`` is the share of the
+    total, so the template can render proportional bars without a second pass.
+    """
+    rows = list(events_qs.values("referrer_category").annotate(count=Count("id")).order_by("-count"))
+    total = sum(r["count"] for r in rows)
+    breakdown = []
+    for r in rows:
+        category = r["referrer_category"] or "other"
+        breakdown.append(
+            {
+                "label": _REFERRER_CATEGORY_LABELS.get(category, category.title() if category else "Other"),
+                "category": category,
+                "count": r["count"],
+                "pct": round(r["count"] / total * 100) if total else 0,
+            }
+        )
+    return breakdown
+
+
+def _benchmark_verdict(first_week_opens, median):
+    """Classify a review's first-week opens against the cohort median."""
+    if first_week_opens is None or median is None or median <= 0:
+        return None
+    ratio = first_week_opens / median
+    if ratio >= 1.25:
+        return "outperforming"
+    if ratio <= 0.75:
+        return "underperforming"
+    return "on_track"
+
+
 def _is_one_step_visit(visit):
     sections_seen = {section for section in (_derive_page_section(row) for row in visit["events"]) if section}
     progressed = any(row["event_type"] in _VISIT_PROGRESSION_EVENT_TYPES for row in visit["events"])
@@ -562,18 +688,20 @@ _FLOW_LABELS = {
 }
 
 
-_ENGAGED_VISIT_EVENT_TYPES = {
-    AnalyticsEvent.EventType.REVIEW_ENGAGED,
-    AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
-}
-_ENGAGED_VISIT_MIN_DURATION_S = 30
-
-
 def _visit_is_engaged(visit):
-    if any(row["event_type"] in _ENGAGED_VISIT_EVENT_TYPES for row in visit["events"]):
-        return True
-    duration = (visit["last_event"] - visit["first_event"]).total_seconds()
-    return duration >= _ENGAGED_VISIT_MIN_DURATION_S
+    """Whether a visit represents genuine human engagement.
+
+    Uses the same signal as the headline engaged-humans KPI: a deliberate
+    interaction (full-text click, share, search-result click, journal select…)
+    or a known subscriber. It deliberately ignores sustained-view dwell and raw
+    session duration — the June 2026 bot audit found JS-executing bots game both,
+    so counting them here would let the Audience explorer contradict the KPI.
+    """
+    return any(
+        row["event_type"] in DELIBERATE_INTERACTION_EVENT_TYPES
+        or row.get("human_confidence") == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
+        for row in visit["events"]
+    )
 
 
 def _resolve_content_titles(event_ids):
@@ -1398,12 +1526,15 @@ def analytics_editorial(request):
             tag_totals[label]["full_text"] += row["full_text_clicks"]
             tag_totals[label]["score"] += score
 
-    # Engagement velocity — score per week since publication
+    # Engagement velocity — score per week since publication. Uses the issue-date
+    # fallback so reviews without their own publish_date still get a velocity.
     today = timezone.localdate()
     for item in top_reviews:
         review = item["review"]
-        if review.publish_date:
-            days_since = max((today - review.publish_date).days, 1)
+        publish = _review_publish_date(review)
+        item["publish_date"] = publish
+        if publish:
+            days_since = max((today - publish).days, 1)
             weeks_since = max(days_since / 7, 0.5)
             item["velocity"] = round(item["engagement_score"] / weeks_since, 1)
             item["weeks_since"] = round(weeks_since, 1)
@@ -1415,6 +1546,33 @@ def analytics_editorial(request):
     top_reviews_by_depth = _rank_rows(top_reviews, ("engaged_views", "avg_dwell_seconds", "avg_scroll_depth"))
     top_reviews_by_full_text = _rank_rows(top_reviews, ("full_text_clicks", "full_text_ctr_value", "opens"))
     top_reviews_by_shares = _rank_rows(top_reviews, ("total_shares", "share_rate_value", "opens"))
+    top_reviews_by_velocity = _rank_rows(
+        [item for item in top_reviews if item["velocity"] is not None],
+        ("velocity", "opens"),
+    )
+
+    # ── New releases — reviews published within the window, judged on their own
+    # terms (velocity + first-week opens vs the cohort median) so freshly-released
+    # content surfaces instead of being buried under the accumulated archive.
+    benchmark_median, benchmark_cohort = _first_window_benchmark(review_ct, today)
+    new_releases = []
+    for item in top_reviews:
+        publish = item["publish_date"]
+        if not publish or not (start_date <= publish <= end_date):
+            continue
+        review = item["review"]
+        first_week_opens = _first_window_opens(review, review_ct, today)
+        verdict = _benchmark_verdict(first_week_opens, benchmark_median)
+        new_releases.append(
+            {
+                **item,
+                "first_week_opens": first_week_opens,
+                "benchmark_verdict": verdict,
+                "days_live": max((today - publish).days, 0),
+                "window_pending": first_week_opens is None,
+            }
+        )
+    new_releases.sort(key=lambda r: (r["publish_date"], r["velocity"] or 0), reverse=True)
     top_journals = sorted(
         ({"label": k, **v} for k, v in journal_totals.items()),
         key=lambda x: x["score"],
@@ -1601,6 +1759,11 @@ def analytics_editorial(request):
         "engaged_rate": _safe_percentage(total_engaged, total_opens),
         "full_text_ctr": _safe_percentage(total_full_text, total_opens),
         "share_rate": _safe_percentage(total_shares, total_opens),
+        "new_releases": new_releases,
+        "benchmark_median": benchmark_median,
+        "benchmark_cohort": benchmark_cohort,
+        "benchmark_ready": benchmark_median is not None,
+        "top_reviews_by_velocity": top_reviews_by_velocity,
         "top_reviews_by_reach": top_reviews_by_reach,
         "top_reviews_by_depth": top_reviews_by_depth,
         "top_reviews_by_full_text": top_reviews_by_full_text,
@@ -1831,8 +1994,9 @@ def analytics_traffic(request):
     # Top visit flows — most common 2-step transitions
     flow_counts = _compute_top_flows(visits)
 
-    # Recent visit explorer
-    engaged_only = request.GET.get("engaged_only") in ("1", "true", "yes")
+    # Recent visit explorer — defaults to engaged-only (the high-signal view);
+    # an explicit engaged_only=0 opts back into the full raw-traffic list.
+    engaged_only = request.GET.get("engaged_only") not in ("0", "false", "no")
     try:
         page = max(1, int(request.GET.get("page", "1")))
     except (TypeError, ValueError):
@@ -2542,6 +2706,12 @@ def analytics_review_timeline(request, review_pk):
             }
         )
 
+    # Views over time — weekly REVIEW_OPEN counts for this review.
+    open_events = events_qs.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)
+    weekly_opens = _weekly_buckets(open_events, weeks=26)
+    # How readers reached this review (referrer mix on its opens).
+    referrer_breakdown = _referrer_source_breakdown(open_events)
+
     context = {
         "review": review,
         "lookback_days": lookback_days,
@@ -2550,6 +2720,8 @@ def analytics_review_timeline(request, review_pk):
         "sustained_views": totals["sustained"] or 0,
         "full_text_clicks": totals["full_text"] or 0,
         "avg_duration_s": round((totals["avg_duration"] or 0) / 1000, 1),
+        "weekly_opens": weekly_opens,
+        "referrer_breakdown": referrer_breakdown,
         "timeline": timeline,
         "page": page,
         "total_pages": total_pages,
@@ -2558,6 +2730,326 @@ def analytics_review_timeline(request, review_pk):
         "active_tab": "content",
     }
     return render(request, "backend/analytics/review_timeline.html", context)
+
+
+_ISSUE_SHARE_EVENT_TYPES = [
+    AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
+    AnalyticsEvent.EventType.REVIEW_SHARE_EMAIL,
+    AnalyticsEvent.EventType.REVIEW_SHARE_NATIVE,
+    AnalyticsEvent.EventType.REVIEW_SHARE_BLUESKY,
+    AnalyticsEvent.EventType.REVIEW_SHARE_X,
+    AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
+]
+
+
+def _issue_page_visits_by_slug(human_events):
+    """Count PAGE_VISIT landings on /issues/<slug>, keyed by slug.
+
+    Issue detail is served at /issues/<slug> (no trailing slash), but tolerate a
+    trailing slash from clients that add one.
+    """
+    paths = human_events.filter(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        metadata__path__startswith="/issues/",
+    ).values_list("metadata__path", flat=True)
+    visits = Counter()
+    for path in paths:
+        slug = (path or "").split("/issues/", 1)[-1].strip("/")
+        # Skip nested paths (e.g. /issues/latest is not a real slug we track here).
+        if slug and "/" not in slug:
+            visits[slug] += 1
+    return visits
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_issues(request):
+    """Issue-level engagement leaderboard.
+
+    Reviews are M2M to issues, so a review shared across issues has its events
+    counted toward each issue it appears in; issue totals intentionally do not
+    sum to a site-wide total. Ordered newest-issue-first so recent issues surface
+    rather than being outranked by the accumulated archive.
+    """
+    start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
+    human_events = _base_event_qs(request, start_ts, end_ts)
+    review_ct = ContentType.objects.get_for_model(Review)
+    review_events = human_events.filter(content_type=review_ct)
+    E = AnalyticsEvent.EventType
+
+    review_stats = {
+        row["object_id"]: row
+        for row in review_events.values("object_id").annotate(
+            opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+            engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+            shares=Count("id", filter=Q(event_type__in=_ISSUE_SHARE_EVENT_TYPES)),
+        )
+    }
+
+    issues = list(Issue.objects.filter(active=True).order_by("-date", "-id"))
+    issue_ids = [i.id for i in issues]
+    issue_reviews = defaultdict(list)
+    for issue_id, review_id in Issue.reviews.through.objects.filter(issue_id__in=issue_ids).values_list(
+        "issue_id", "review_id"
+    ):
+        issue_reviews[issue_id].append(review_id)
+
+    visits_by_slug = _issue_page_visits_by_slug(human_events)
+
+    today = timezone.localdate()
+    issue_rows = []
+    for issue in issues:
+        rids = issue_reviews.get(issue.id, [])
+        opens = sum(review_stats.get(rid, {}).get("opens", 0) for rid in rids)
+        engaged = sum(review_stats.get(rid, {}).get("engaged", 0) for rid in rids)
+        full_text = sum(review_stats.get(rid, {}).get("full_text", 0) for rid in rids)
+        shares = sum(review_stats.get(rid, {}).get("shares", 0) for rid in rids)
+        page_views = visits_by_slug.get(issue.slug, 0)
+        weeks_since = None
+        if issue.date:
+            weeks_since = round(max((today - issue.date).days, 1) / 7, 1)
+        issue_rows.append(
+            {
+                "issue": issue,
+                "review_count": len(rids),
+                "opens": opens,
+                "engaged": engaged,
+                "engaged_rate": _safe_percentage(engaged, opens),
+                "full_text": full_text,
+                "shares": shares,
+                "page_views": page_views,
+                "weeks_since": weeks_since,
+                "low_sample": opens < _LOW_SAMPLE_THRESHOLD,
+            }
+        )
+
+    tracked_issue_count = len(issue_rows)
+    most_engaged_issues = _rank_rows(issue_rows, ("opens", "engaged", "shares"), limit=5)
+    any_engaged_issues = any(r["opens"] for r in most_engaged_issues)
+
+    context = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "issue_rows": issue_rows,
+        "most_engaged_issues": most_engaged_issues,
+        "any_engaged_issues": any_engaged_issues,
+        "tracked_issue_count": tracked_issue_count,
+        "active_tab": "issues",
+    }
+    context.update(_confidence_summary(human_events))
+    return _render_analytics(request, "backend/analytics/issues.html", context, "backend/analytics/_issues_panel.html")
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_issue_detail(request, issue_pk):
+    """Per-issue drill-down: funnel, reviews within the issue, views over time,
+    and how readers reached the issue."""
+    issue = Issue.objects.filter(pk=issue_pk).first()
+    if issue is None:
+        return redirect("backend:analytics_issues")
+
+    start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
+    human_events = _base_event_qs(request, start_ts, end_ts)
+    review_ct = ContentType.objects.get_for_model(Review)
+    E = AnalyticsEvent.EventType
+
+    review_ids = list(issue.reviews.values_list("id", flat=True))
+    issue_review_events = human_events.filter(content_type=review_ct, object_id__in=review_ids)
+
+    funnel = issue_review_events.aggregate(
+        total_opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+        total_engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+        total_full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+        total_shares=Count("id", filter=Q(event_type__in=_ISSUE_SHARE_EVENT_TYPES)),
+    )
+    total_opens = funnel["total_opens"]
+    total_engaged = funnel["total_engaged"]
+    total_full_text = funnel["total_full_text"]
+    total_shares = funnel["total_shares"]
+
+    per_review = {
+        row["object_id"]: row
+        for row in issue_review_events.values("object_id").annotate(
+            opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+            engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+            shares=Count("id", filter=Q(event_type__in=_ISSUE_SHARE_EVENT_TYPES)),
+        )
+    }
+    reviews_by_id = {
+        r.id: r
+        for r in issue.reviews.select_related("article__journal", "author").defer(
+            "body", "search_vector", "article__abstract", "article__metadata_json", "article__tags_string"
+        )
+    }
+    review_rows = []
+    for rid, review in reviews_by_id.items():
+        stats = per_review.get(rid, {})
+        opens = stats.get("opens", 0)
+        review_rows.append(
+            {
+                "review": review,
+                "opens": opens,
+                "engaged": stats.get("engaged", 0),
+                "engaged_rate": _safe_percentage(stats.get("engaged", 0), opens),
+                "full_text": stats.get("full_text", 0),
+                "shares": stats.get("shares", 0),
+                "low_sample": opens < _LOW_SAMPLE_THRESHOLD,
+            }
+        )
+    review_rows.sort(key=lambda r: (r["opens"], r["engaged"], r["shares"]), reverse=True)
+
+    open_events = issue_review_events.filter(event_type=E.REVIEW_OPEN)
+    weekly_opens = _weekly_buckets(open_events, weeks=26)
+    referrer_breakdown = _referrer_source_breakdown(open_events)
+
+    page_view_count = _issue_page_visits_by_slug(human_events).get(issue.slug, 0)
+
+    context = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "issue": issue,
+        "review_count": len(review_ids),
+        "page_view_count": page_view_count,
+        "total_opens": total_opens,
+        "total_engaged": total_engaged,
+        "total_full_text": total_full_text,
+        "total_shares": total_shares,
+        "engaged_rate": _safe_percentage(total_engaged, total_opens),
+        "full_text_ctr": _safe_percentage(total_full_text, total_opens),
+        "share_rate": _safe_percentage(total_shares, total_opens),
+        "review_rows": review_rows,
+        "weekly_opens": weekly_opens,
+        "referrer_breakdown": referrer_breakdown,
+        "active_tab": "issues",
+    }
+    return render(request, "backend/analytics/issue_detail.html", context)
+
+
+_CONTENT_SEARCH_LIMIT = 20
+
+
+@login_required
+@permission_required(VIEW_SITE_ANALYTICS, raise_exception=True)
+def analytics_content_search(request):
+    """HTMX fragment: find any review or issue by name and show its window stats.
+
+    Searches the full catalogue (not just the top-N leaderboards), so an admin can
+    jump straight to a specific piece of content. ``kind`` narrows to review/issue;
+    default searches both.
+    """
+    query = (request.GET.get("q") or "").strip()
+    kind = (request.GET.get("kind") or "").strip()
+    start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
+
+    if not query:
+        return render(
+            request,
+            "backend/analytics/_content_search_results.html",
+            {"q": query, "reviews": [], "issues": [], "empty_query": True},
+        )
+
+    human_events = _base_event_qs(request, start_ts, end_ts)
+    review_ct = ContentType.objects.get_for_model(Review)
+    review_events = human_events.filter(content_type=review_ct)
+    E = AnalyticsEvent.EventType
+
+    review_results = []
+    reviews_truncated = False
+    if kind != "issue":
+        matched = list(
+            Review.objects.filter(active=True)
+            .filter(
+                Q(article__title__icontains=query)
+                | Q(article__journal__name__icontains=query)
+                | Q(author__name__icontains=query)
+            )
+            .select_related("article__journal", "author")
+            .defer("body", "search_vector", "article__abstract", "article__metadata_json", "article__tags_string")
+            .order_by("-publish_date", "-id")[: _CONTENT_SEARCH_LIMIT + 1]
+        )
+        reviews_truncated = len(matched) > _CONTENT_SEARCH_LIMIT
+        matched = matched[:_CONTENT_SEARCH_LIMIT]
+        stats = {
+            row["object_id"]: row
+            for row in review_events.filter(object_id__in=[r.id for r in matched])
+            .values("object_id")
+            .annotate(
+                opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+                engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+                full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+                shares=Count("id", filter=Q(event_type__in=_ISSUE_SHARE_EVENT_TYPES)),
+            )
+        }
+        for review in matched:
+            s = stats.get(review.id, {})
+            opens = s.get("opens", 0)
+            review_results.append(
+                {
+                    "review": review,
+                    "opens": opens,
+                    "engaged": s.get("engaged", 0),
+                    "engaged_rate": _safe_percentage(s.get("engaged", 0), opens),
+                    "full_text": s.get("full_text", 0),
+                    "shares": s.get("shares", 0),
+                }
+            )
+
+    issue_results = []
+    issues_truncated = False
+    if kind != "review":
+        matched_issues = list(
+            Issue.objects.filter(active=True)
+            .filter(Q(name__icontains=query) | Q(slug__icontains=query))
+            .order_by("-date", "-id")[: _CONTENT_SEARCH_LIMIT + 1]
+        )
+        issues_truncated = len(matched_issues) > _CONTENT_SEARCH_LIMIT
+        matched_issues = matched_issues[:_CONTENT_SEARCH_LIMIT]
+        issue_ids = [i.id for i in matched_issues]
+        issue_reviews = defaultdict(list)
+        for issue_id, rid in Issue.reviews.through.objects.filter(issue_id__in=issue_ids).values_list(
+            "issue_id", "review_id"
+        ):
+            issue_reviews[issue_id].append(rid)
+        all_rids = {rid for rids in issue_reviews.values() for rid in rids}
+        review_stats = {
+            row["object_id"]: row
+            for row in review_events.filter(object_id__in=all_rids)
+            .values("object_id")
+            .annotate(
+                opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
+                engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
+            )
+        }
+        for issue in matched_issues:
+            rids = issue_reviews.get(issue.id, [])
+            opens = sum(review_stats.get(rid, {}).get("opens", 0) for rid in rids)
+            engaged = sum(review_stats.get(rid, {}).get("engaged", 0) for rid in rids)
+            issue_results.append(
+                {
+                    "issue": issue,
+                    "review_count": len(rids),
+                    "opens": opens,
+                    "engaged": engaged,
+                    "engaged_rate": _safe_percentage(engaged, opens),
+                }
+            )
+
+    return render(
+        request,
+        "backend/analytics/_content_search_results.html",
+        {
+            "q": query,
+            "reviews": review_results,
+            "issues": issue_results,
+            "reviews_truncated": reviews_truncated,
+            "issues_truncated": issues_truncated,
+            "limit": _CONTENT_SEARCH_LIMIT,
+            "empty_query": False,
+        },
+    )
 
 
 @login_required

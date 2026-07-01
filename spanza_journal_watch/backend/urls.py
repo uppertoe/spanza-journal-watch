@@ -272,6 +272,17 @@ urlpatterns = [
     path("analytics", views.analytics_redirect, name="site_analytics"),
     path("analytics/overview/", analytics_views.analytics_overview, name="analytics_overview"),
     path("analytics/editorial/", analytics_views.analytics_editorial, name="analytics_editorial"),
+    path("analytics/issues/", analytics_views.analytics_issues, name="analytics_issues"),
+    path(
+        "analytics/issue/<int:issue_pk>/",
+        analytics_views.analytics_issue_detail,
+        name="analytics_issue_detail",
+    ),
+    path(
+        "analytics/content/search/",
+        analytics_views.analytics_content_search,
+        name="analytics_content_search",
+    ),
     path("analytics/traffic/", analytics_views.analytics_traffic, name="analytics_traffic"),
     path("analytics/email/", analytics_views.analytics_email, name="analytics_email"),
     path("analytics/journals/", analytics_views.analytics_journals, name="analytics_journals"),

@@ -5,6 +5,26 @@
 {% render_bundle 'analytics_backend' 'js' attrs='defer' %}
 {% endblock javascript %}
 {% block content %}
+<style>
+  /* Analytics tables use .table-sm for density, but its 0.25rem cell padding
+     reads as cramped — especially the wider multi-column tables. Give every
+     analytics table roomier, consistent cell padding in one place. */
+  #analytics-content .table > thead > tr > th,
+  #analytics-content .table > tbody > tr > td {
+    padding: 0.5rem 0.75rem;
+    vertical-align: middle;
+  }
+  /* A touch more breathing room on the leading cell of each row. */
+  #analytics-content .table > thead > tr > th:first-child,
+  #analytics-content .table > tbody > tr > td:first-child {
+    padding-left: 1rem;
+  }
+  /* Keep the compact stat/list rows unaffected. */
+  #analytics-content .list-group-item {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+</style>
 <div class="row g-0 g-lg-4">
   <div class="col-lg-2">
     <div class="sticky-top pt-3 pb-4" style="top: 4rem;">
@@ -12,6 +32,7 @@
       <nav class="nav flex-column gap-1 mb-4">
         {% url 'backend:analytics_overview' as url_overview %}
         {% url 'backend:analytics_editorial' as url_editorial %}
+        {% url 'backend:analytics_issues' as url_issues %}
         {% url 'backend:analytics_traffic' as url_traffic %}
         {% url 'backend:analytics_journals' as url_journals %}
         {% with qs=request.GET.urlencode %}
@@ -23,6 +44,10 @@
            href="{{ url_editorial }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_editorial }}{% if qs %}?{{ qs }}{% endif %}"
            hx-target="#analytics-content" hx-push-url="true">Editorial</a>
+        <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'issues' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
+           href="{{ url_issues }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-get="{{ url_issues }}{% if qs %}?{{ qs }}{% endif %}"
+           hx-target="#analytics-content" hx-push-url="true">Issues</a>
         <a class="nav-link rounded px-2 py-1 small analytics-sidebar-link{% if active_tab == 'traffic' %} bg-primary-subtle text-primary fw-semibold{% endif %}"
            href="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"
            hx-get="{{ url_traffic }}{% if qs %}?{{ qs }}{% endif %}"

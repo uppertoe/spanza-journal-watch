@@ -1,0 +1,45 @@
+{% if empty_query %}
+{# cleared input — render nothing #}
+{% elif not reviews and not issues %}
+<div class="border rounded px-3 py-2 bg-body-tertiary">
+  <p class="text-muted small mb-0">No matches for "{{ q }}".</p>
+</div>
+{% else %}
+<div class="border rounded overflow-auto" style="max-height:22rem">
+  {% if issues %}
+  <div class="px-3 pt-2 pb-1 bg-body-tertiary border-bottom">
+    <span class="text-muted x-small text-uppercase fw-semibold">Issues</span>
+  </div>
+  <div class="list-group list-group-flush">
+    {% for item in issues %}
+    <a href="{% url 'backend:analytics_issue_detail' issue_pk=item.issue.pk %}"
+       class="list-group-item list-group-item-action px-3 py-2 d-flex justify-content-between align-items-center gap-3">
+      <span class="small text-truncate" title="{{ item.issue.name }}">{{ item.issue.name|truncatechars:60 }}
+        <span class="text-muted d-block d-sm-inline x-small">· {{ item.issue.date|date:"M Y"|default:"undated" }} · {{ item.review_count }} review{{ item.review_count|pluralize }}</span>
+      </span>
+      <span class="text-nowrap x-small text-muted">{{ item.opens }} opens · {{ item.engaged_rate }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if issues_truncated %}<p class="text-muted x-small mb-0 px-3 py-1 bg-body-tertiary border-top">Showing first {{ limit }} — refine to narrow.</p>{% endif %}
+  {% endif %}
+
+  {% if reviews %}
+  <div class="px-3 pt-2 pb-1 bg-body-tertiary border-bottom{% if issues %} border-top{% endif %}">
+    <span class="text-muted x-small text-uppercase fw-semibold">Reviews</span>
+  </div>
+  <div class="list-group list-group-flush">
+    {% for item in reviews %}
+    <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}"
+       class="list-group-item list-group-item-action px-3 py-2 d-flex justify-content-between align-items-center gap-3">
+      <span class="small text-truncate" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:60 }}
+        <span class="text-muted d-block d-sm-inline x-small">· {{ item.review.article.journal }}</span>
+      </span>
+      <span class="text-nowrap x-small text-muted">{{ item.opens }} opens · {{ item.engaged_rate }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if reviews_truncated %}<p class="text-muted x-small mb-0 px-3 py-1 bg-body-tertiary border-top">Showing first {{ limit }} — refine to narrow.</p>{% endif %}
+  {% endif %}
+</div>
+{% endif %}

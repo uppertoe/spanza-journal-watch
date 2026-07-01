@@ -1,0 +1,79 @@
+<div class="mb-2">
+  <h1 class="h3 mb-1">Issues</h1>
+  <p class="text-muted mb-0 small">{{ start_date|date:"j M Y" }} – {{ end_date|date:"j M Y" }} · {{ tracked_issue_count }} issue{{ tracked_issue_count|pluralize }} tracked</p>
+</div>
+{% include "backend/analytics/_confidence_badge.html" %}
+
+<div class="card bg-body-tertiary mb-4">
+  <div class="card-body py-2 small text-muted">
+    Reviews belong to one or more issues (many-to-many), so a review shared across issues counts toward each. Issue totals therefore don't sum to a site-wide total. Ordered newest-first so recent issues surface.
+  </div>
+</div>
+
+{# ── Find an issue ─────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-body">
+    <label class="form-label small text-muted mb-2">Find an issue</label>
+    <input type="search" class="form-control form-control-sm" name="q" placeholder="Type an issue name…"
+           autocomplete="off"
+           hx-get="{% url 'backend:analytics_content_search' %}?kind=issue"
+           hx-trigger="input changed delay:200ms, search"
+           hx-target="#issue-search-results"
+           hx-include="[name=start],[name=end]">
+    <div id="issue-search-results" class="mt-3"></div>
+  </div>
+</div>
+
+{# ── Most engaged (this window) ────────────────────────────────── #}
+{% if any_engaged_issues %}
+<h6 class="text-muted small fw-semibold mb-2">Most engaged this window</h6>
+<div class="row g-3 mb-4 row-cols-2 row-cols-lg-5">
+  {% for item in most_engaged_issues %}
+  {% if item.opens %}
+  <div class="col">
+    <div class="card h-100">
+      <div class="card-body py-2 px-3">
+        <div class="text-muted x-small text-truncate" title="{{ item.issue.name }}">{{ item.issue.name }}</div>
+        <div class="h5 mb-0 mt-1">{{ item.opens }}</div>
+        <div class="text-muted x-small">opens · {{ item.engaged_rate }} engaged</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Issue leaderboard (newest first) ──────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header">All issues</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Issue</th><th>Reviews</th><th>Opens</th><th>Engaged rate</th><th>Full text</th><th>Shares</th><th>Page views</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in issue_rows %}
+        <tr>
+          <td>
+            <a href="{% url 'backend:analytics_issue_detail' issue_pk=item.issue.pk %}" class="text-decoration-none small" title="{{ item.issue.name }}">{{ item.issue.name|truncatechars:48 }}</a>
+            <div class="text-muted" style="font-size:0.75rem">
+              {{ item.issue.date|date:"j M Y"|default:"undated" }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+            </div>
+          </td>
+          <td class="small">{{ item.review_count }}</td>
+          <td>{{ item.opens }}</td>
+          <td>{{ item.engaged_rate }}</td>
+          <td>{{ item.full_text }}</td>
+          <td>{{ item.shares }}</td>
+          <td>{{ item.page_views }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted small">No active issues.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -4,6 +4,20 @@
 </div>
 {% include "backend/analytics/_confidence_badge.html" %}
 
+{# ── Find a review or issue ────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-body">
+    <label class="form-label small text-muted mb-2">Find a review or issue</label>
+    <input type="search" class="form-control form-control-sm" name="q" placeholder="Type a title, journal, or author…"
+           autocomplete="off"
+           hx-get="{% url 'backend:analytics_content_search' %}"
+           hx-trigger="input changed delay:200ms, search"
+           hx-target="#content-search-results"
+           hx-include="[name=start],[name=end]">
+    <div id="content-search-results" class="mt-3"></div>
+  </div>
+</div>
+
 <div class="card mb-4">
   <div class="card-header">Engagement funnel</div>
   <div class="card-body">
@@ -30,6 +44,56 @@
     <p class="text-muted mb-0 small">No impressions in this date range.</p>
     {% endif %}
   </div>
+</div>
+
+{# ── New releases ──────────────────────────────────────────────── #}
+<div class="card mb-4 border-primary-subtle">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>New releases <span class="text-muted small fw-normal">· published in this window</span></span>
+    {% if benchmark_ready %}
+    <span class="badge text-bg-light text-dark" title="Median first-week opens across reviews published in the last 180 days ({{ benchmark_cohort }} reviews)">Typical first week: {{ benchmark_median }} opens</span>
+    {% else %}
+    <span class="badge text-bg-light text-dark" title="Need at least 5 reviews with a completed first week to set a baseline">Baseline still building</span>
+    {% endif %}
+  </div>
+  <div class="card-body small text-muted pb-2">
+    Judged on their own terms — velocity (engagement per week live) and first-week opens versus the cohort — so freshly-released reviews surface instead of being buried under the archive.
+  </div>
+  {% if new_releases %}
+  <div class="table-responsive border-top">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Review</th><th>Days live</th><th>Opens</th><th>First week</th><th>Velocity</th></tr></thead>
+      <tbody>
+        {% for item in new_releases %}
+        <tr>
+          <td>
+            <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+            <div class="text-muted" style="font-size:0.75rem">
+              {{ item.review.article.journal }}
+              · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+            </div>
+          </td>
+          <td class="small">{{ item.days_live }}</td>
+          <td>{{ item.opens }}</td>
+          <td>
+            {% if item.window_pending %}
+            <span class="text-muted small" title="First 7 days since publication have not fully elapsed">pending</span>
+            {% else %}
+            {{ item.first_week_opens }}
+            {% if item.benchmark_verdict == 'outperforming' %}<span class="badge text-bg-success ms-1">&uarr; ahead</span>
+            {% elif item.benchmark_verdict == 'underperforming' %}<span class="badge text-bg-warning text-dark ms-1">&darr; behind</span>
+            {% elif item.benchmark_verdict == 'on_track' %}<span class="badge text-bg-secondary ms-1">typical</span>{% endif %}
+            {% endif %}
+          </td>
+          <td>{% if item.velocity is not None %}{{ item.velocity }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body"><p class="text-muted mb-0 small">No reviews published in this date range. Widen the window or check back after the next issue.</p></div>
+  {% endif %}
 </div>
 
 {# ── Content gaps & search demand ──────────────────────────────── #}
@@ -196,14 +260,40 @@
       </div>
       <div class="card-header p-0 border-bottom-0">
         <ul class="nav nav-pills card-header-pills px-3 pt-2" role="tablist">
-          <li class="nav-item"><button class="nav-link active small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-reach" type="button" role="tab">Most opened</button></li>
+          <li class="nav-item"><button class="nav-link active small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-rising" type="button" role="tab" title="Engagement per week since publication — favours fresh reviews">Rising</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-reach" type="button" role="tab">Most opened</button></li>
           <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-depth" type="button" role="tab">Most read</button></li>
           <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-fulltext" type="button" role="tab">Most clicked through</button></li>
           <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-shares" type="button" role="tab">Most shared</button></li>
         </ul>
       </div>
       <div class="tab-content">
-        <div class="tab-pane fade show active" id="tab-review-reach" role="tabpanel">
+        <div class="tab-pane fade show active" id="tab-review-rising" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Review</th><th>Velocity</th><th>Weeks live</th><th>Opens</th></tr></thead>
+              <tbody>
+                {% for item in top_reviews_by_velocity %}
+                <tr>
+                  <td>
+                    <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
+                    <div class="text-muted" style="font-size:0.75rem">
+                      {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                    </div>
+                  </td>
+                  <td>{{ item.velocity }}</td>
+                  <td>{% if item.weeks_since is not None %}{{ item.weeks_since }}{% else %}&mdash;{% endif %}</td>
+                  <td>{{ item.opens }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted small">No data in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="tab-review-reach" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
               <thead><tr><th>Review</th><th>Opens</th><th>Engaged rate</th><th>Full text CTR</th></tr></thead>
