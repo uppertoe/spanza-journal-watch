@@ -588,9 +588,27 @@ class Issue(TimeStampedModel):
         return None
 
     def save(self, *args, **kwargs):
+        retired_slug = None
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.name))
+        elif self.pk:
+            # Re-slug when the name changes so the URL tracks the issue name,
+            # and remember the old slug so its links keep resolving.
+            previous = type(self).objects.filter(pk=self.pk).values_list("name", "slug").first()
+            if previous:
+                previous_name, previous_slug = previous
+                desired_base = slugify(self.name)
+                if previous_name != self.name and desired_base:
+                    desired_slug = get_unique_slug(self, desired_base, exclude_pk=self.pk)
+                    if desired_slug and desired_slug != self.slug:
+                        retired_slug = self.slug
+                        self.slug = desired_slug
         super().save(*args, **kwargs)
+
+        if retired_slug and retired_slug != self.slug:
+            # The new slug can never also be a stale redirect for another issue.
+            IssueSlugRedirect.objects.filter(old_slug=self.slug).delete()
+            IssueSlugRedirect.objects.update_or_create(old_slug=retired_slug, defaults={"issue": self})
 
         if self.image:
             celery_resize_image.delay(
@@ -606,6 +624,19 @@ class Issue(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class IssueSlugRedirect(TimeStampedModel):
+    """Maps a retired Issue slug to its current Issue so old links 301 forward."""
+
+    old_slug = models.SlugField(max_length=255, unique=True)
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="slug_redirects")
+
+    class Meta:
+        verbose_name = "Issue slug redirect"
+
+    def __str__(self):
+        return f"{self.old_slug} → {self.issue.slug}"
 
 
 class Comment(TimeStampedModel):

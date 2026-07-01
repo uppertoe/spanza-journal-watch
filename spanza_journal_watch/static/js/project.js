@@ -1191,6 +1191,63 @@ document.addEventListener('click', (event) => {
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
+/* ── Issue reviews: precise anchor scrolling ──────────────
+   Reviews carry `content-visibility: auto` with an estimated
+   `contain-intrinsic-size`, so a single native jump to a `#list-item-*`
+   anchor is computed against placeholder heights and lands short of the
+   target once the real reviews above it render in. Scroll, then re-correct
+   across frames until the target's position stops moving. */
+const isIssueReviewHash = (hash) =>
+  typeof hash === 'string' && hash.indexOf('#list-item-') === 0;
+
+const scrollToIssueReviewTarget = (target) => {
+  if (!target) return;
+  let lastTop = null;
+  let stableFrames = 0;
+  let frames = 0;
+  const step = () => {
+    target.scrollIntoView({ block: 'start', behavior: 'auto' });
+    const top = Math.round(target.getBoundingClientRect().top);
+    stableFrames = top === lastTop ? stableFrames + 1 : 0;
+    lastTop = top;
+    frames += 1;
+    if (stableFrames < 3 && frames < 90) {
+      window.requestAnimationFrame(step);
+    }
+  };
+  window.requestAnimationFrame(step);
+};
+
+const scrollToIssueReviewHash = () => {
+  if (!isIssueReviewHash(window.location.hash)) return;
+  scrollToIssueReviewTarget(
+    document.getElementById(window.location.hash.slice(1)),
+  );
+};
+
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('#list-reviews a[href^="#list-item-"]');
+  if (!link) return;
+  const href = link.getAttribute('href');
+  const target = document.getElementById(href.slice(1));
+  if (!target) return;
+  event.preventDefault();
+  if (window.location.hash !== href) {
+    window.history.pushState(null, '', href);
+  }
+  scrollToIssueReviewTarget(target);
+});
+
+window.addEventListener('hashchange', scrollToIssueReviewHash);
+
+if (isIssueReviewHash(window.location.hash)) {
+  if (document.readyState === 'complete') {
+    scrollToIssueReviewHash();
+  } else {
+    window.addEventListener('load', scrollToIssueReviewHash);
+  }
+}
+
 /* ── Journal shelf: visibility toggling + horizontal scroll ────── */
 (function () {
   var grid = document.getElementById('journal-shelf-grid');

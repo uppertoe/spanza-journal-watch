@@ -35,7 +35,7 @@ from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HitMixin, HtmxMixin, SidebarMixin
 
-from .models import Author, CuratedCollection, HealthService, Issue, Review, Tag
+from .models import Author, CuratedCollection, HealthService, Issue, IssueSlugRedirect, Review, Tag
 from .templatetags.tag_scores import compute_tag_scores
 
 # ---------------------------------------------------------------------------
@@ -428,7 +428,16 @@ class IssueDetailView(
     arrange_sidebar_top = True
 
     def get(self, request, *args, **kwargs):
-        self.object = self.get_object(queryset=Issue.objects.exclude(active=False))
+        try:
+            self.object = self.get_object(queryset=Issue.objects.exclude(active=False))
+        except Http404:
+            slug = self.kwargs.get(self.slug_url_kwarg, self.kwargs.get("slug"))
+            redirect_entry = (
+                IssueSlugRedirect.objects.filter(old_slug=slug, issue__active=True).select_related("issue").first()
+            )
+            if redirect_entry:
+                return redirect(redirect_entry.issue.get_absolute_url(), permanent=True)
+            raise
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):

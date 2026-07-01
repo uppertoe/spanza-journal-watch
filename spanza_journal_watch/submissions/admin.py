@@ -82,6 +82,14 @@ class IssueAdmin(admin.ModelAdmin):
         return ("slug",)
 
 
+@admin.register(models.IssueSlugRedirect)
+class IssueSlugRedirectAdmin(admin.ModelAdmin):
+    list_display = ("old_slug", "issue", "created")
+    search_fields = ("old_slug", "issue__name", "issue__slug")
+    autocomplete_fields = ["issue"]
+    readonly_fields = ("created", "modified")
+
+
 @admin.register(models.Comment)
 class CommentAdmin(admin.ModelAdmin):
     list_display = ("article", "author", "created")

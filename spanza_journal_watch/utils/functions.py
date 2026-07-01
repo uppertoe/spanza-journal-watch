@@ -34,7 +34,7 @@ def process_model_instance(app_label, model_name, instance_pk):
     return instance
 
 
-def get_unique_slug(instance, slug):
+def get_unique_slug(instance, slug, exclude_pk=None):
     model = instance.__class__
     max_length = model._meta.get_field("slug").max_length
 
@@ -47,7 +47,11 @@ def get_unique_slug(instance, slug):
     unique_slug = slug
     counter = 1
 
-    while model.objects.filter(slug=unique_slug).exists():
+    taken = model.objects.all()
+    if exclude_pk is not None:
+        taken = taken.exclude(pk=exclude_pk)
+
+    while taken.filter(slug=unique_slug).exists():
         # Leave space for counter
         truncated_slug = unique_slug[: max_length - 2]
         unique_slug = f"{truncated_slug}-{counter}"

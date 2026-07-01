@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from ..submissions.models import Journal
@@ -452,6 +453,31 @@ def populate_pubmed_batch_from_cache(batch, watched_journals):
             )
 
     if new_rows:
+        # Carry forward Planka push state from the issue's earlier batches so a
+        # regenerated batch still shows which articles were already pushed and
+        # doesn't create duplicate cards. planka_card_id lives on
+        # PubmedBatchArticle (cascade-deleted with its batch), so without this a
+        # fresh batch loses every prior push link for the same articles.
+        if batch.issue_id:
+            new_article_ids = [row.article_id for row in new_rows]
+            prior_push_state = {}
+            prior_rows = (
+                PubmedBatchArticle.objects.filter(issue_id=batch.issue_id, article_id__in=new_article_ids)
+                .exclude(batch=batch)
+                .exclude(planka_card_id="")
+                .order_by(F("planka_pushed_at").asc(nulls_first=True), "pk")
+                .values("article_id", "planka_card_id", "planka_card_url", "planka_pushed_at")
+            )
+            # Ascending by push time (nulls first) then pk, overwriting per article →
+            # the most recently pushed card wins even if pushed from an older batch.
+            for pr in prior_rows:
+                prior_push_state[pr["article_id"]] = pr
+            for row in new_rows:
+                state = prior_push_state.get(row.article_id)
+                if state:
+                    row.planka_card_id = state["planka_card_id"]
+                    row.planka_card_url = state["planka_card_url"]
+                    row.planka_pushed_at = state["planka_pushed_at"]
         PubmedBatchArticle.objects.bulk_create(new_rows)
 
     batch.result_count = batch.batch_articles.count()

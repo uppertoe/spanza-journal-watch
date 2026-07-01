@@ -6253,6 +6253,40 @@ def _sync_planka_card_into_issue(*, request, issue, binding, selected):
             PubmedBatchArticle.objects.select_related("article").filter(planka_card_id=card_id).order_by("-pk").first()
         )
 
+    if not linked_batch_row:
+        # No planka_card_id link found. The batch that originally pushed this card
+        # may have been deleted or regenerated — the link lives only on
+        # PubmedBatchArticle, which is cascade-deleted with its batch, so the card
+        # is orphaned from its cached article. Fall back to matching the card name
+        # against pulled article titles (the pushed card title is the article
+        # title verbatim). Prefer this issue's batch rows, then any batch row.
+        # Require a unique match so we never guess; a bare re-import article is
+        # never a batch row, so it can't collide here. Heal the link on success.
+        card_name = (selected.get("name") or "").strip()
+        if card_name:
+            title_matches = list(
+                PubmedBatchArticle.objects.select_related("article")
+                .filter(issue=issue, article__title__iexact=card_name)
+                .order_by("-pk")[:2]
+            )
+            if not title_matches:
+                title_matches = list(
+                    PubmedBatchArticle.objects.select_related("article")
+                    .filter(article__title__iexact=card_name)
+                    .order_by("-pk")[:2]
+                )
+            if len(title_matches) == 1:
+                linked_batch_row = title_matches[0]
+                if not linked_batch_row.planka_card_id:
+                    linked_batch_row.planka_card_id = card_id
+                    linked_batch_row.save(update_fields=["planka_card_id", "modified"])
+            elif len(title_matches) > 1:
+                messages.warning(
+                    request,
+                    f'Card "{card_name}" matched more than one pulled article by title; '
+                    "the reviewer article was not auto-linked. Set the journal manually.",
+                )
+
     schema = selected["schema"]
     source_article = linked_batch_row.article if linked_batch_row else None
     metadata_manual_review_required = source_article is None

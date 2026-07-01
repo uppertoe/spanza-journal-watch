@@ -146,6 +146,41 @@ class PubmedImportBatchAdmin(admin.ModelAdmin):
     readonly_fields = ("created",)
     date_hierarchy = "created"
 
+    @staticmethod
+    def _batch_would_orphan_cards(batch):
+        """True if deleting this batch removes the only copy of a pushed Planka card.
+
+        planka_card_id lives on PubmedBatchArticle, which is cascade-deleted with
+        its batch. A card is safe to lose here only if another batch still carries
+        it (e.g. a regenerated batch that inherited the push state).
+        """
+        pushed_card_ids = {
+            cid
+            for cid in batch.batch_articles.exclude(planka_card_id="").values_list("planka_card_id", flat=True)
+            if cid
+        }
+        if not pushed_card_ids:
+            return False
+        for card_id in pushed_card_ids:
+            has_sibling = (
+                models.PubmedBatchArticle.objects.filter(planka_card_id=card_id).exclude(batch=batch).exists()
+            )
+            if not has_sibling:
+                return True
+        return False
+
+    def get_deleted_objects(self, objs, request):
+        deletable, model_count, perms_needed, protected = super().get_deleted_objects(objs, request)
+        protected = list(protected)
+        for batch in objs:
+            if self._batch_would_orphan_cards(batch):
+                protected.append(
+                    f"Batch {batch.pk} holds Planka cards not carried by any other batch — "
+                    "deleting it would orphan those cards from their articles. Re-push those "
+                    "articles from another batch (or clear their card links) first."
+                )
+        return deletable, model_count, perms_needed, protected
+
 
 @admin.register(models.PubmedArticle)
 class PubmedArticleAdmin(admin.ModelAdmin):
