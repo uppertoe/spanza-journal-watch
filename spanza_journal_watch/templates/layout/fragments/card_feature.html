@@ -8,6 +8,7 @@
             <div>
             <strong class="d-inline-block mb-2 {{ feature_text_styles|random }}">Featured Article</strong>
             <h5 class="mb-1">{{ feature.article.get_title }}</h5>
+            {% if feature.article.get_subtitle %}<p class="card-subtitle mb-1">{{ feature.article.get_subtitle|capfirst }}</p>{% endif %}
             <div class="mb-1 text-body-secondary">By <a href="{{ feature.author.get_absolute_url }}" class="link-body-emphasis text-decoration-none">{{ feature.author }}</a></div>
             </div>
             <a

@@ -383,6 +383,14 @@ class Review(TimeStampedModel):
             cls.objects.filter(active=True, article__tags__text__icontains=query).values_list("id", flat=True)
         )
 
+        # Collect review IDs whose author name contains the query. Whole-string
+        # trigram similarity is diluted by extra words in multi-part names (e.g.
+        # "barney" vs "Barney Rathnayaka Mudiyanselage" scores below threshold),
+        # so a substring match guarantees name lookups resolve.
+        author_match_ids = set(
+            cls.objects.filter(active=True, author__name__icontains=query).values_list("id", flat=True)
+        )
+
         # Main query: trigram + full-text on the base review table (no tag join)
         results = (
             cls.objects.exclude(active=False)
@@ -399,6 +407,7 @@ class Review(TimeStampedModel):
                 | Q(author_similarity__gte=cls.AUTHOR_TRIGRAM_THRESHOLD)
                 | Q(journal_similarity__gte=cls.JOURNAL_TRIGRAM_THRESHOLD)
                 | Q(pk__in=tag_match_ids)
+                | Q(pk__in=author_match_ids)
             )
             .annotate(
                 headline=SearchHeadline(
