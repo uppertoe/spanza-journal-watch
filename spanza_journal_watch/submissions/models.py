@@ -343,8 +343,14 @@ class Review(TimeStampedModel):
         # Perform an initial save
         super().save(*args, **kwargs)
 
+        # Stamp the publish date the first time a review goes active. Use today's
+        # date (the moment it becomes live to readers) rather than self.created:
+        # reviews are often drafted days before the issue is published, so
+        # created-based dates over-count how long a review has really been live.
         if not self.publish_date and self.active:
-            Review.objects.filter(pk=self.pk).update(publish_date=self.created)
+            today = timezone.localdate()
+            Review.objects.filter(pk=self.pk).update(publish_date=today)
+            self.publish_date = today
 
         # Delegate resizing to Celery
         if self.feature_image:
