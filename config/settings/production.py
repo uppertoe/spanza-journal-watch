@@ -95,8 +95,13 @@ AWS_QUERYSTRING_AUTH = False
 # DO NOT change these unless you know what you're doing.
 _AWS_EXPIRY = 60 * 60 * 24 * 7
 # https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
+# `immutable` stops Safari/Firefox revalidating every image on page reload —
+# variants are regenerated under new names or overwritten wholesale, and the
+# 7-day cap bounds staleness for the overwrite case. (Browsers normally fetch
+# media via the Caddy /media/* proxy, which sets the same header; this covers
+# direct-S3 URLs embedded in already-sent newsletters.)
 AWS_S3_OBJECT_PARAMETERS = {
-    "CacheControl": f"max-age={_AWS_EXPIRY}, s-maxage={_AWS_EXPIRY}, must-revalidate",
+    "CacheControl": f"public, max-age={_AWS_EXPIRY}, immutable",
 }
 # https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html#settings
 AWS_S3_MAX_MEMORY_SIZE = env.int(
