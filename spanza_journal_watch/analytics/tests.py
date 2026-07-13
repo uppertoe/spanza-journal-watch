@@ -80,6 +80,13 @@ def _make_review():
     return review
 
 
+def _ts_days_ago(days, hour, minute=0):
+    """An aware timestamp `days` before today — keeps report-window tests from
+    going stale as the calendar advances past hardcoded dates."""
+    day = timezone.localdate() - timedelta(days=days)
+    return timezone.make_aware(datetime.datetime.combine(day, datetime.time(hour, minute)))
+
+
 def test_track_event_records_review_share_event(client):
     review = _make_review()
 
@@ -182,24 +189,50 @@ def test_classify_event_confidence_prioritises_automation_over_subscriber():
     )
 
 
-# ---- Visitor ID Middleware ----
+# ---- Visitor ID minting (beacon endpoint, never page responses) ----
 
 
-def test_visitor_id_cookie_set_on_first_visit(client):
+def _post_beacon(client, payload=None, **extra):
+    """POST a page-load beacon to /reader/action, as project.js does."""
+    data = {
+        "event_type": AnalyticsEvent.EventType.PAGE_VISIT,
+        "source": "page_load",
+        "metadata": {"path": "/"},
+        "page_url": "http://testserver/",
+        "referrer": "",
+    }
+    data.update(payload or {})
+    return client.post(reverse("reader_action"), data=data, content_type="application/json", **extra)
+
+
+def test_page_response_does_not_set_visitor_cookie(client):
+    """HTML responses must stay free of Set-Cookie so the CDN can cache them."""
     response = client.get("/")
-    assert "jwvid" in response.cookies
+    assert "jwvid" not in response.cookies
+
+
+def test_visitor_cookie_minted_by_beacon(client):
+    response = _post_beacon(client)
+    assert response.status_code == 200
     cookie = response.cookies["jwvid"]
     assert cookie["httponly"]
     assert cookie["samesite"].lower() == "lax"
 
 
-def test_visitor_id_cookie_not_reset_on_second_visit(client):
-    r1 = client.get("/")
+def test_visitor_cookie_not_reset_on_second_beacon(client):
+    r1 = _post_beacon(client)
     first_value = r1.cookies["jwvid"].value
-    r2 = client.get("/")
-    # On second visit the browser sends the cookie, so server should not set a new one
-    if "jwvid" in r2.cookies:
-        assert r2.cookies["jwvid"].value == first_value
+    r2 = _post_beacon(client)
+    assert "jwvid" not in r2.cookies
+    visitor_ids = {str(v) for v in AnalyticsEvent.objects.values_list("visitor_id", flat=True)}
+    assert visitor_ids == {first_value}
+
+
+def test_beacon_response_sets_csrf_cookie(client):
+    """First-time visitors get their CSRF cookie from the beacon response, since
+    cached HTML can no longer bake a valid token into the markup."""
+    response = _post_beacon(client)
+    assert "csrftoken" in response.cookies
 
 
 def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_home(client):
@@ -729,14 +762,12 @@ def test_analytics_traffic_splits_visits_on_inactivity_gap(client):
         session_key="shared-session",
         metadata={"page": "search"},
     )
-    AnalyticsEvent.objects.filter(pk=first.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 9, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=second.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 10, 5))
-    )
+    AnalyticsEvent.objects.filter(pk=first.pk).update(timestamp=_ts_days_ago(7, 9, 0))
+    AnalyticsEvent.objects.filter(pk=second.pk).update(timestamp=_ts_days_ago(7, 10, 5))
 
-    response = client.get(reverse("backend:analytics_traffic"))
+    # engaged_only=0: this test asserts visit-splitting, and the recent-visit
+    # explorer defaults to showing engaged visits only.
+    response = client.get(reverse("backend:analytics_traffic"), {"engaged_only": "0"})
 
     assert response.status_code == 200
     assert len(response.context["recent_sessions"]) == 2
@@ -751,7 +782,7 @@ def test_analytics_traffic_source_breakdown_uses_visit_starts_not_internal_follo
     client.force_login(user)
 
     visitor_id = uuid.uuid4()
-    t0 = timezone.make_aware(datetime.datetime(2026, 4, 11, 9, 0))
+    t0 = _ts_days_ago(6, 9, 0)
     search_start = AnalyticsEvent.objects.create(
         event_type=AnalyticsEvent.EventType.PAGE_VISIT,
         automated=False,
@@ -823,12 +854,8 @@ def test_analytics_traffic_campaign_breakdown_uses_first_touch_visits(client):
             "utm_campaign": "launch",
         },
     )
-    AnalyticsEvent.objects.filter(pk=started.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 9, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=follow_on.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 9, 3))
-    )
+    AnalyticsEvent.objects.filter(pk=started.pk).update(timestamp=_ts_days_ago(5, 9, 0))
+    AnalyticsEvent.objects.filter(pk=follow_on.pk).update(timestamp=_ts_days_ago(5, 9, 3))
 
     response = client.get(reverse("backend:analytics_traffic"))
 
@@ -876,18 +903,10 @@ def test_analytics_traffic_surfaces_landing_friction_and_search_dead_ends(client
         metadata={"query": "failed search", "result_count": 0},
     )
 
-    AnalyticsEvent.objects.filter(pk=stuck_visit.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 9, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=successful_landing.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 10, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=successful_engaged.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 10, 3))
-    )
-    AnalyticsEvent.objects.filter(pk=dead_end_search.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 16, 9, 2))
-    )
+    AnalyticsEvent.objects.filter(pk=stuck_visit.pk).update(timestamp=_ts_days_ago(4, 9, 0))
+    AnalyticsEvent.objects.filter(pk=successful_landing.pk).update(timestamp=_ts_days_ago(4, 10, 0))
+    AnalyticsEvent.objects.filter(pk=successful_engaged.pk).update(timestamp=_ts_days_ago(4, 10, 3))
+    AnalyticsEvent.objects.filter(pk=dead_end_search.pk).update(timestamp=_ts_days_ago(4, 9, 2))
 
     response = client.get(reverse("backend:analytics_traffic"))
 
@@ -929,15 +948,9 @@ def test_analytics_traffic_page_breakdown_uses_sections_touched_per_visit(client
         session_key="page-sections",
         metadata={"query": "airway"},
     )
-    AnalyticsEvent.objects.filter(pk=home.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 10, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=search.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 10, 3))
-    )
-    AnalyticsEvent.objects.filter(pk=search_click.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 12, 10, 4))
-    )
+    AnalyticsEvent.objects.filter(pk=home.pk).update(timestamp=_ts_days_ago(5, 10, 0))
+    AnalyticsEvent.objects.filter(pk=search.pk).update(timestamp=_ts_days_ago(5, 10, 3))
+    AnalyticsEvent.objects.filter(pk=search_click.pk).update(timestamp=_ts_days_ago(5, 10, 4))
 
     response = client.get(reverse("backend:analytics_traffic"))
 
@@ -970,12 +983,8 @@ def test_analytics_overview_uses_derived_visits_for_visit_count(client):
         session_key="sticky-session",
         metadata={"page": "search"},
     )
-    AnalyticsEvent.objects.filter(pk=first.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 9, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=second.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 10, 10, 5))
-    )
+    AnalyticsEvent.objects.filter(pk=first.pk).update(timestamp=_ts_days_ago(7, 9, 0))
+    AnalyticsEvent.objects.filter(pk=second.pk).update(timestamp=_ts_days_ago(7, 10, 5))
 
     response = client.get(reverse("backend:analytics_overview"))
 
@@ -1019,18 +1028,10 @@ def test_analytics_journals_uses_derived_visits_and_prior_history_for_returning_
         session_key="journal-new",
     )
 
-    AnalyticsEvent.objects.filter(pk=prior.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 1, 1, 10, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=first_current.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 13, 9, 0))
-    )
-    AnalyticsEvent.objects.filter(pk=same_visit_follow_on.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 13, 9, 5))
-    )
-    AnalyticsEvent.objects.filter(pk=second_visit.pk).update(
-        timestamp=timezone.make_aware(datetime.datetime(2026, 4, 13, 11, 0))
-    )
+    AnalyticsEvent.objects.filter(pk=prior.pk).update(timestamp=_ts_days_ago(120, 10, 0))
+    AnalyticsEvent.objects.filter(pk=first_current.pk).update(timestamp=_ts_days_ago(3, 9, 0))
+    AnalyticsEvent.objects.filter(pk=same_visit_follow_on.pk).update(timestamp=_ts_days_ago(3, 9, 5))
+    AnalyticsEvent.objects.filter(pk=second_visit.pk).update(timestamp=_ts_days_ago(3, 11, 0))
 
     response = client.get(reverse("backend:analytics_journals"))
 
@@ -1067,77 +1068,79 @@ def test_extract_referrer_domain_no_www():
     assert extract_referrer_domain(request) == "bsky.app"
 
 
-# ---- extract_utm_params ----
+# ---- UTM extraction from the beacon's page_url ----
 
 
-def test_extract_utm_params_returns_present_params():
-    from spanza_journal_watch.analytics.utils import extract_utm_params
+def test_extract_utm_params_from_url_returns_present_params():
+    from spanza_journal_watch.analytics.views import _extract_utm_params_from_url
 
-    request = RequestFactory().get("/?utm_source=newsletter&utm_medium=email&utm_campaign=jan2026")
-    params = extract_utm_params(request)
+    params = _extract_utm_params_from_url(
+        "http://testserver/?utm_source=newsletter&utm_medium=email&utm_campaign=jan2026"
+    )
     assert params == {"utm_source": "newsletter", "utm_medium": "email", "utm_campaign": "jan2026"}
 
 
-def test_extract_utm_params_ignores_empty():
-    from spanza_journal_watch.analytics.utils import extract_utm_params
+def test_extract_utm_params_from_url_ignores_empty():
+    from spanza_journal_watch.analytics.views import _extract_utm_params_from_url
 
-    request = RequestFactory().get("/?utm_source=&utm_medium=email")
-    params = extract_utm_params(request)
+    params = _extract_utm_params_from_url("http://testserver/?utm_source=&utm_medium=email")
     assert params == {"utm_medium": "email"}
     assert "utm_source" not in params
 
 
-def test_extract_utm_params_truncates_long_values():
-    from spanza_journal_watch.analytics.utils import extract_utm_params
+def test_extract_utm_params_from_url_truncates_long_values():
+    from spanza_journal_watch.analytics.views import _extract_utm_params_from_url
 
-    request = RequestFactory().get(f"/?utm_source={'a' * 200}")
-    params = extract_utm_params(request)
+    params = _extract_utm_params_from_url(f"http://testserver/?utm_source={'a' * 200}")
     assert len(params["utm_source"]) == 128
+
+
+def test_extract_utm_params_from_url_tolerates_garbage():
+    from spanza_journal_watch.analytics.views import _extract_utm_params_from_url
+
+    assert _extract_utm_params_from_url("") == {}
+    assert _extract_utm_params_from_url(None) == {}
+    assert _extract_utm_params_from_url("not a url at all") == {}
 
 
 # ---- UTM-based referrer categorisation ----
 
 
 def test_utm_newsletter_source_categorised():
-    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm_source
 
-    request = RequestFactory().get("/?utm_source=newsletter")
-    assert _categorize_from_utm(request) == REFERRER_NEWSLETTER
+    assert _categorize_from_utm_source("newsletter") == REFERRER_NEWSLETTER
 
 
 def test_utm_email_source_categorised_as_newsletter():
-    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm_source
 
-    request = RequestFactory().get("/?utm_source=email")
-    assert _categorize_from_utm(request) == REFERRER_NEWSLETTER
+    assert _categorize_from_utm_source("email") == REFERRER_NEWSLETTER
 
 
 def test_utm_twitter_source_categorised_as_social():
-    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm_source
 
-    request = RequestFactory().get("/?utm_source=twitter")
-    assert _categorize_from_utm(request) == REFERRER_SOCIAL
+    assert _categorize_from_utm_source("twitter") == REFERRER_SOCIAL
 
 
 def test_utm_google_source_categorised_as_search():
-    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm_source
 
-    request = RequestFactory().get("/?utm_source=google")
-    assert _categorize_from_utm(request) == REFERRER_SEARCH
+    assert _categorize_from_utm_source("google") == REFERRER_SEARCH
 
 
 def test_utm_unknown_source_categorised_as_other():
-    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm_source
 
-    request = RequestFactory().get("/?utm_source=partner_site")
-    assert _categorize_from_utm(request) == REFERRER_OTHER
+    assert _categorize_from_utm_source("partner_site") == REFERRER_OTHER
 
 
 def test_utm_empty_returns_none():
-    from spanza_journal_watch.analytics.utils import _categorize_from_utm
+    from spanza_journal_watch.analytics.utils import _categorize_from_utm_source
 
-    request = RequestFactory().get("/")
-    assert _categorize_from_utm(request) is None
+    assert _categorize_from_utm_source("") is None
+    assert _categorize_from_utm_source(None) is None
 
 
 # ---- Prefetch / sec-fetch header detection ----
@@ -1178,19 +1181,26 @@ def test_sec_fetch_navigate_same_origin_not_automated(rf):
     assert is_probable_automated_event(request) is False
 
 
-# ---- Landing page capture in VisitorIdMiddleware ----
+# ---- Landing page / share token arrive in the beacon payload ----
 
 
-def test_landing_page_captured_in_session(client):
-    client.get("/")
-    session = client.session
-    assert session.get("analytics_landing_page") == "/"
+def test_landing_page_recorded_from_beacon_payload(client):
+    _post_beacon(client, {"landing_page": "/reviews/some-review"})
+    event = AnalyticsEvent.objects.get()
+    assert event.landing_page == "/reviews/some-review"
 
 
-def test_share_token_captured_from_ref_param(client):
-    client.get("/newsletter/success/?ref=abc123")
-    session = client.session
-    assert session.get("analytics_share_token") == "abc123"
+def test_share_token_recorded_from_beacon_payload(client):
+    _post_beacon(client, {"share_token": "abc123"})
+    event = AnalyticsEvent.objects.get()
+    assert event.share_token == "abc123"
+
+
+def test_page_response_does_not_touch_session(client):
+    """Anonymous page loads must not create a session (Set-Cookie breaks CDN caching)."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "sessionid" not in response.cookies
 
 
 # ---- SafeSessionCookieMiddleware ----
@@ -1256,10 +1266,10 @@ def test_manifest_does_not_add_vary_cookie(client):
     assert "Cookie" not in vary
 
 
-def test_visitor_id_still_set_on_sub_resource_paths(client):
-    """VisitorIdMiddleware should still set the jwvid cookie on sub-resource paths."""
+def test_no_visitor_cookie_on_sub_resource_paths(client):
+    """Sub-resource responses must stay cookie-free so the CDN can cache them."""
     response = client.get("/manifest.json")
-    assert "jwvid" in response.cookies
+    assert "jwvid" not in response.cookies
 
 
 # ---- downgrade_singleton_visitors_task ----
@@ -1726,9 +1736,10 @@ def test_record_event_does_not_bump_counter_for_human_request(client):
     assert AutomatedRequestCount.objects.count() == 0
 
 
-def test_page_visit_middleware_drops_bot_requests(client):
-    client.get("/", HTTP_USER_AGENT="Googlebot/2.1")
-    assert not AnalyticsEvent.objects.filter(source="server").exists()
+def test_beacon_from_bot_ua_is_dropped(client):
+    """Headless bots that execute JS still get UA-classified at the beacon."""
+    _post_beacon(client, HTTP_USER_AGENT="Googlebot/2.1")
+    assert not AnalyticsEvent.objects.exists()
 
 
 # ---- Newsletter click redirectors emit AnalyticsEvent ----
@@ -1779,47 +1790,55 @@ def test_track_newsletter_link_records_analytics_event(client):
     assert event.metadata.get("newsletter_id") == newsletter.pk
 
 
-# ---- PageVisitAnalyticsMiddleware ----
+# ---- Page-load beacon (replaces the server-side PAGE_VISIT middleware) ----
 
 
-def test_page_visit_middleware_records_event_for_html_get(client):
-    client.get("/")
-    events = AnalyticsEvent.objects.filter(
+def test_page_load_beacon_records_page_visit(client):
+    _post_beacon(client)
+    event = AnalyticsEvent.objects.get(
         event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-        source="server",
+        source="page_load",
     )
-    assert events.count() == 1
+    assert event.metadata["path"] == "/"
+    assert event.js_verified is True
 
 
-def test_page_visit_middleware_captures_external_referer(client):
-    client.get("/", HTTP_REFERER="https://www.google.com/search?q=foo")
-    event = AnalyticsEvent.objects.filter(source="server").first()
-    assert event is not None
+def test_page_response_records_no_event(client):
+    """With CDN caching, cache hits never reach the origin — page views come
+    exclusively from the beacon, so HTML GETs must not write events."""
+    client.get("/")
+    assert not AnalyticsEvent.objects.exists()
+
+
+def test_page_load_beacon_uses_payload_referrer_not_request_header(client):
+    # The beacon request's own Referer is always same-origin; the payload
+    # carries the page's document.referrer, which holds the real source.
+    _post_beacon(
+        client,
+        {"referrer": "https://www.google.com/search?q=foo"},
+        HTTP_REFERER="http://testserver/reviews/some-review",
+    )
+    event = AnalyticsEvent.objects.get()
     assert event.referrer_category == REFERRER_SEARCH
+    assert event.referrer_domain == "google.com"
 
 
-def test_page_visit_middleware_skips_htmx_requests(client):
-    client.get("/", HTTP_HX_REQUEST="true")
-    assert not AnalyticsEvent.objects.filter(source="server").exists()
+def test_page_load_beacon_utm_source_categorises_referrer(client):
+    _post_beacon(client, {"page_url": "http://testserver/?utm_source=newsletter"})
+    event = AnalyticsEvent.objects.get()
+    assert event.referrer_category == REFERRER_NEWSLETTER
+    assert event.metadata["utm_source"] == "newsletter"
 
 
-def test_page_visit_middleware_skips_json_responses(client):
-    _make_review()
-    response = client.post(
-        reverse("reader_action"),
-        data={"event_type": AnalyticsEvent.EventType.PAGE_VISIT},
-        content_type="application/json",
-    )
+def test_page_load_beacon_skips_editorial_paths(client):
+    response = _post_beacon(client, {"metadata": {"path": "/editorial/dashboard/"}})
     assert response.status_code == 200
-    assert not AnalyticsEvent.objects.filter(source="server").exists()
+    assert not AnalyticsEvent.objects.exists()
 
 
-def test_page_visit_middleware_skips_redirects(client):
-    subscriber = Subscriber.objects.create(email="redirect@example.com", subscribed=True)
-    response = client.get(
-        reverse("analytics:track_email_click"),
-        {"email": subscriber.email, "next": "/"},
+def test_non_page_load_events_are_not_path_filtered(client):
+    _post_beacon(
+        client,
+        {"source": "scroll_depth", "scroll_depth": 30, "metadata": {"page": "home"}},
     )
-    assert response.status_code == 302
-    # The server-side source events should only come from newsletter_click, not server.
-    assert not AnalyticsEvent.objects.filter(source="server").exists()
+    assert AnalyticsEvent.objects.count() == 1

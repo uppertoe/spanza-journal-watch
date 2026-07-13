@@ -1,18 +1,20 @@
 import logging
 from json import JSONDecodeError, loads
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.core.exceptions import MultipleObjectsReturned
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
+from django.middleware.csrf import get_token
 from django.urls import resolve
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from spanza_journal_watch.analytics.middleware import ensure_visitor_id, set_visitor_cookie
 from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
 from spanza_journal_watch.analytics.utils import (
     classify_event_confidence,
-    extract_utm_params,
     is_probable_automated_event,
     is_probable_automated_newsletter_event,
     set_newsletter_referrer_in_session,
@@ -105,6 +107,10 @@ def track_newsletter_link(request, newsletter_token):
     newsletter = _get_newsletter(newsletter_token)
     subscriber = _get_subscriber(email)
 
+    # This redirect is the first request of a newsletter visit, and the HTML
+    # it lands on is CDN-cached (no Set-Cookie), so mint the visitor ID here.
+    visitor_id, visitor_cookie_created = ensure_visitor_id(request)
+
     if newsletter and subscriber:
         automated = is_probable_automated_newsletter_event(request, newsletter)
         tracker = NewsletterClick(
@@ -133,6 +139,8 @@ def track_newsletter_link(request, newsletter_token):
     response = _get_next_url(request, next)
     if subscriber:
         set_subscribed_cookie(response)
+    if visitor_cookie_created:
+        set_visitor_cookie(response, visitor_id)
     return response
 
 
@@ -159,6 +167,8 @@ def track_email_click(request):
     email = request.GET.get("email") or None
     next = request.GET.get("next") or "/"
 
+    visitor_id, visitor_cookie_created = ensure_visitor_id(request)
+
     subscriber = Subscriber.first_by_email(email)
     if subscriber:
         request.session["subscriber_id"] = subscriber.pk
@@ -178,7 +188,36 @@ def track_email_click(request):
     response = _get_next_url(request, next)
     if subscriber:
         set_subscribed_cookie(response)
+    if visitor_cookie_created:
+        set_visitor_cookie(response, visitor_id)
     return response
+
+
+# Staff/utility paths whose page loads should not be recorded — mirrors the
+# exclusions the old server-side PageVisitAnalyticsMiddleware applied.
+_PAGE_VISIT_EXCLUDED_PREFIXES = ("/editorial/", "/o/", "/__debug__/", "/tinymce/", "/markdownx/")
+
+
+def _is_excluded_page_path(path):
+    admin_url = (getattr(settings, "ADMIN_URL", "admin/") or "").strip("/")
+    admin_prefix = f"/{admin_url}/" if admin_url else None
+    if admin_prefix and path.startswith(admin_prefix):
+        return True
+    return any(path.startswith(prefix) for prefix in _PAGE_VISIT_EXCLUDED_PREFIXES)
+
+
+def _extract_utm_params_from_url(page_url):
+    """Return utm_source/medium/campaign parsed from the page URL's query string."""
+    try:
+        query = parse_qs(urlparse(page_url or "").query)
+    except ValueError:
+        return {}
+    params = {}
+    for key in ("utm_source", "utm_medium", "utm_campaign"):
+        value = (query.get(key) or [""])[0].strip()
+        if value:
+            params[key] = value[:128]
+    return params
 
 
 @csrf_exempt
@@ -204,22 +243,41 @@ def track_event(request):
 
     subscriber_id = request.session.get("subscriber_id")
 
+    # Page context travels in the payload: the beacon request itself is always
+    # same-origin, so its Referer/query string say nothing about the page.
     event_metadata = payload.get("metadata") or {}
-    utm_params = extract_utm_params(request)
+    page_url = (payload.get("page_url") or "")[:1024]
+    utm_params = _extract_utm_params_from_url(page_url)
     if utm_params:
         event_metadata.update(utm_params)
 
-    AnalyticsEvent.record_event(
-        event_type=event_type,
-        request=request,
-        content_object=review,
-        subscriber_id=subscriber_id,
-        source=payload.get("source") or "",
-        duration_ms=payload.get("duration_ms"),
-        scroll_depth=payload.get("scroll_depth"),
-        metadata=event_metadata,
-        js_verified=True,
-    )
+    source = payload.get("source") or ""
+    event_path = str(event_metadata.get("path") or urlparse(page_url).path or "")
+    skip_record = source == "page_load" and _is_excluded_page_path(event_path)
+
+    visitor_id, visitor_cookie_created = ensure_visitor_id(request)
+
+    if not skip_record:
+        AnalyticsEvent.record_event(
+            event_type=event_type,
+            request=request,
+            content_object=review,
+            subscriber_id=subscriber_id,
+            source=source,
+            duration_ms=payload.get("duration_ms"),
+            scroll_depth=payload.get("scroll_depth"),
+            metadata=event_metadata,
+            js_verified=True,
+            referrer=(payload.get("referrer") or "")[:1024],
+            utm_source=utm_params.get("utm_source", ""),
+            landing_page=payload.get("landing_page") or "",
+            share_token=payload.get("share_token") or "",
+        )
+
+    # First-time visitors arrive via CDN-cached HTML that never sets cookies,
+    # so the beacon response is where both the visitor ID and the CSRF cookie
+    # (needed for the subscribe form's X-CSRFToken header) get minted.
+    get_token(request)
     # Prevent the response from setting or deleting the session cookie.  This
     # endpoint is called via sendBeacon during visibilitychange / pagehide.  If
     # the response includes Set-Cookie it can overwrite the authenticated
@@ -233,4 +291,7 @@ def track_event(request):
     # regardless of which branch fired.
     request.session.modified = False
     request._no_session_cookie = True
-    return JsonResponse({"ok": True})
+    response = JsonResponse({"ok": True})
+    if visitor_cookie_created:
+        set_visitor_cookie(response, visitor_id)
+    return response

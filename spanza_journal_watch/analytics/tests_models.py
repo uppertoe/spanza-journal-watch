@@ -106,23 +106,41 @@ class TestAnalyticsEventRecordEvent:
         assert e1.session_sequence == 0
         assert e2.session_sequence == 0
 
-    def test_captures_landing_page_from_session(self):
-        request = _request_with_session()
-        request.session["analytics_landing_page"] = "/search/?q=test"
+    def test_captures_landing_page_from_kwarg(self):
         event = AnalyticsEvent.record_event(
             event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-            request=request,
+            request=_request_with_session(),
+            landing_page="/search/?q=test",
         )
         assert event.landing_page == "/search/?q=test"
 
-    def test_captures_share_token_from_session(self):
-        request = _request_with_session()
-        request.session["analytics_share_token"] = "abc123"
+    def test_captures_share_token_from_kwarg(self):
+        event = AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            request=_request_with_session(),
+            share_token="abc123",
+        )
+        assert event.share_token == "abc123"
+
+    def test_landing_page_and_share_token_truncated(self):
+        event = AnalyticsEvent.record_event(
+            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+            request=_request_with_session(),
+            landing_page="/x" * 400,
+            share_token="t" * 50,
+        )
+        assert len(event.landing_page) == 512
+        assert len(event.share_token) == 32
+
+    def test_referrer_kwarg_overrides_request_header(self):
+        request = _request_with_session(HTTP_REFERER="http://testserver/internal-page")
         event = AnalyticsEvent.record_event(
             event_type=AnalyticsEvent.EventType.PAGE_VISIT,
             request=request,
+            referrer="https://www.google.com/search?q=foo",
         )
-        assert event.share_token == "abc123"
+        assert event.referrer_category == "search"
+        assert event.referrer_domain == "google.com"
 
     def test_metadata_defaults_to_empty_dict(self):
         event = AnalyticsEvent.record_event(

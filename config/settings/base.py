@@ -178,7 +178,6 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "spanza_journal_watch.newsletter.middleware.SubscriberCookieMiddleware",
     "spanza_journal_watch.backend.middleware.HtmxMessagesMiddleware",
-    "spanza_journal_watch.analytics.middleware.PageVisitAnalyticsMiddleware",
 ]
 
 # STATIC
@@ -254,7 +253,10 @@ FIXTURE_DIRS = (str(APPS_DIR / "fixtures"),)
 # https://docs.djangoproject.com/en/dev/ref/settings/#session-cookie-httponly
 SESSION_COOKIE_HTTPONLY = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#csrf-cookie-httponly
-CSRF_COOKIE_HTTPONLY = True
+# False (the Django default) so htmx can read the token from the cookie at
+# request time — pages are CDN-cached, so a token baked into markup goes
+# stale. Per the Django docs, HttpOnly here adds no practical protection.
+CSRF_COOKIE_HTTPONLY = False
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = "DENY"
 # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff

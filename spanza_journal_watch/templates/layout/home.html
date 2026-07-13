@@ -19,7 +19,7 @@
 <div class="row home-feature-grid">
 {% for feature in card_features %}
 {% cycle 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' as feature_pattern silent %}
-{% include "layout/fragments/card_feature.html" with shared_review_modal="home-review-modal" pattern_variant=feature_pattern %}
+{% include "layout/fragments/card_feature.html" with shared_review_modal="home-review-modal" pattern_variant=feature_pattern lcp_candidate=forloop.first %}
 {% endfor %}
 </div>
 {% endif %}

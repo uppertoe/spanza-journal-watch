@@ -254,9 +254,9 @@ def _categorize_from_header(referer, own_domain=""):
 _UTM_SOCIAL_SOURCES = frozenset(["twitter", "x", "facebook", "linkedin", "bluesky", "instagram", "reddit", "mastodon"])
 
 
-def _categorize_from_utm(request):
-    """Return a referrer category if utm_source is present, else None."""
-    utm_source = (request.GET.get("utm_source") or "").strip().lower()
+def _categorize_from_utm_source(utm_source):
+    """Return a referrer category if utm_source is non-empty, else None."""
+    utm_source = (utm_source or "").strip().lower()
     if not utm_source:
         return None
     if "newsletter" in utm_source or "email" in utm_source:
@@ -268,15 +268,19 @@ def _categorize_from_utm(request):
     return REFERRER_OTHER
 
 
-def categorize_referrer(request):
+def categorize_referrer(request, referrer=None, utm_source=None):
     """
     Return the referrer category for the current request.
 
     Priority:
     1. Session override (set when a subscriber follows a newsletter link).
-    2. UTM parameters (utm_source in query string).
-    3. HTTP Referer header.
+    2. UTM parameters (explicit utm_source, else utm_source in query string).
+    3. Referrer URL (explicit, else HTTP Referer header).
     Session entries expire at local midnight on the day they were set.
+
+    The explicit referrer/utm_source arguments carry the *page* context from
+    the JS beacon payload — the beacon request itself is always same-origin,
+    so its own header and query string say nothing about the traffic source.
     """
     session_entry = (request.session.get(_REFERRER_SESSION_KEY) or {}) if hasattr(request, "session") else {}
     if session_entry:
@@ -287,18 +291,21 @@ def categorize_referrer(request):
         except (KeyError, ValueError):
             pass
 
-    utm_category = _categorize_from_utm(request)
+    utm_category = _categorize_from_utm_source(utm_source if utm_source is not None else request.GET.get("utm_source"))
     if utm_category is not None:
         return utm_category
 
-    referer = request.headers.get("referer") or request.headers.get("referrer") or ""
+    if referrer is None:
+        referrer = request.headers.get("referer") or request.headers.get("referrer") or ""
     own_domain = _get_own_domain()
-    return _categorize_from_header(referer, own_domain)
+    return _categorize_from_header(referrer, own_domain)
 
 
-def extract_referrer_domain(request):
-    """Return the bare domain from the HTTP Referer header, or empty string."""
-    referer = request.headers.get("referer") or request.headers.get("referrer") or ""
+def extract_referrer_domain(request, referrer=None):
+    """Return the bare domain from the referrer URL or HTTP Referer header."""
+    referer = (
+        referrer if referrer is not None else request.headers.get("referer") or request.headers.get("referrer") or ""
+    )
     if not referer:
         return ""
     try:
@@ -309,16 +316,6 @@ def extract_referrer_domain(request):
         return host[:255]
     except Exception:
         return ""
-
-
-def extract_utm_params(request):
-    """Return a dict of utm_source/medium/campaign from the query string."""
-    params = {}
-    for key in ("utm_source", "utm_medium", "utm_campaign"):
-        value = (request.GET.get(key) or "").strip()
-        if value:
-            params[key] = value[:128]
-    return params
 
 
 def set_newsletter_referrer_in_session(request):

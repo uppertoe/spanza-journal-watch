@@ -4,7 +4,8 @@
         hx-target="#drawer-subscribe-container"
         hx-swap="outerHTML"
         hx-indicator="#drawer-subscribe-spinner">
-    {% csrf_token %}
+    {# No {% csrf_token %}: a token baked into CDN-cached markup goes stale, and #}
+    {# Django prefers the form field over the X-CSRFToken header htmx sends. #}
     <input type="hidden" name="source" value="drawer">
     <div class="input-group input-group-sm">
       {{ form.email }}

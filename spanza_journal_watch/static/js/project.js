@@ -217,8 +217,49 @@ const getCookie = (name) => {
   return decodeURIComponent(cookieParts.pop().split(';').shift());
 };
 
+// Landing page and share-token (?ref=) attribution live in sessionStorage:
+// pages are CDN-cached and never touch the Django session, so the beacon
+// payload is the only channel that can carry this context to the server.
+const LANDING_PAGE_STORAGE_KEY = 'jwLandingPage';
+const SHARE_TOKEN_STORAGE_KEY = 'jwShareToken';
+
+const capturePageAttribution = () => {
+  try {
+    if (!sessionStorage.getItem(LANDING_PAGE_STORAGE_KEY)) {
+      sessionStorage.setItem(
+        LANDING_PAGE_STORAGE_KEY,
+        window.location.pathname,
+      );
+    }
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) {
+      sessionStorage.setItem(SHARE_TOKEN_STORAGE_KEY, ref.slice(0, 32));
+    }
+  } catch (_e) {
+    // sessionStorage unavailable (private mode edge cases) — attribution is best-effort
+  }
+};
+capturePageAttribution();
+
+const getPageContext = () => {
+  const context = {
+    page_url: window.location.href,
+    referrer: document.referrer || '',
+    landing_page: '',
+    share_token: '',
+  };
+  try {
+    context.landing_page =
+      sessionStorage.getItem(LANDING_PAGE_STORAGE_KEY) || '';
+    context.share_token = sessionStorage.getItem(SHARE_TOKEN_STORAGE_KEY) || '';
+  } catch (_e) {
+    // best-effort
+  }
+  return context;
+};
+
 const sendAnalyticsEvent = (payload, { beacon = false } = {}) => {
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify({ ...getPageContext(), ...payload });
 
   if (beacon && navigator.sendBeacon) {
     const blob = new Blob([body], { type: 'application/json' });
@@ -232,7 +273,6 @@ const sendAnalyticsEvent = (payload, { beacon = false } = {}) => {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken'),
       },
       body,
       keepalive: beacon,
@@ -240,6 +280,34 @@ const sendAnalyticsEvent = (payload, { beacon = false } = {}) => {
     .then((response) => response.ok)
     .catch(() => false);
 };
+
+// One page-view beacon per full page load. This replaces the server-side
+// PAGE_VISIT middleware: with CDN caching, cache hits never reach the origin,
+// so the origin only learns about the visit from this request. It also mints
+// the jwvid visitor cookie and a fresh CSRF cookie on its response.
+const sendPageLoadEvent = () => {
+  const pageMeta = document.querySelector('[data-analytics-page]');
+  const metadata = { path: window.location.pathname };
+  if (pageMeta && pageMeta.dataset.analyticsPage) {
+    metadata.page = pageMeta.dataset.analyticsPage;
+  }
+  sendAnalyticsEvent({
+    event_type: 'page_visit',
+    source: 'page_load',
+    metadata,
+  });
+};
+sendPageLoadEvent();
+
+// CSRF for htmx: read the cookie at request time rather than baking a token
+// into the markup, which would go stale once pages are CDN-cached. The cookie
+// is minted/refreshed by the page-load beacon response above.
+document.body.addEventListener('htmx:configRequest', (event) => {
+  const csrfToken = getCookie('csrftoken');
+  if (csrfToken) {
+    event.detail.headers['X-CSRFToken'] = csrfToken;
+  }
+});
 
 const getReviewAnalyticsContext = (element) => {
   const reviewRoot = element?.closest('[data-analytics-review-id]');

@@ -179,7 +179,17 @@ class AnalyticsEvent(models.Model):
         scroll_depth=None,
         metadata=None,
         js_verified=False,
+        referrer=None,
+        utm_source=None,
+        landing_page=None,
+        share_token=None,
     ):
+        """
+        The referrer/utm_source/landing_page/share_token kwargs carry page
+        context from the JS beacon payload; beacon requests are same-origin so
+        their own headers/query string can't supply these. When omitted (server-
+        rendered call sites like newsletter clicks), request headers are used.
+        """
         subscriber = _get_subscriber_for_analytics(subscriber_id, log_context="analytics event")
 
         user_agent = ""
@@ -187,9 +197,7 @@ class AnalyticsEvent(models.Model):
         visitor_id = None
         referrer_category = REFERRER_DIRECT
         referrer_domain = ""
-        landing_page = ""
         session_sequence = 0
-        share_token = ""
         if request is not None:
             automated_reason = classify_automated_reason(request, event_type=event_type)
             if automated_reason is not None:
@@ -198,10 +206,10 @@ class AnalyticsEvent(models.Model):
             user_agent = request.headers.get("user-agent", "")
             session_key = request.session.session_key or ""
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
-            referrer_category = categorize_referrer(request)
-            referrer_domain = extract_referrer_domain(request)
-            landing_page = request.session.get("analytics_landing_page", "")
-            share_token = request.session.get("analytics_share_token", "")
+            referrer_category = categorize_referrer(request, referrer=referrer, utm_source=utm_source)
+            referrer_domain = extract_referrer_domain(request, referrer=referrer)
+        landing_page = (landing_page or "")[:512]
+        share_token = (share_token or "")[:32]
         human_confidence = classify_event_confidence(automated=False, subscriber=subscriber)
 
         content_type = None
