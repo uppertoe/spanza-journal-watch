@@ -628,3 +628,104 @@ class TestArticleIntakeUserView:
         result_row2 = next(r for r in ctx2["result_rows"] if r.pk == row.pk)
         assert result_row2.is_new is False
         assert ctx2["new_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: batch regeneration carry-forward (Planka push state + staging state)
+# ---------------------------------------------------------------------------
+
+
+class TestBatchRegenerationCarryForward:
+    def _make_issue_batch(self, user, issue, watched=None):
+        today = datetime.date.today().replace(day=1)
+        batch = PubmedImportBatch.objects.create(from_month=today, to_month=today, created_by=user, issue=issue)
+        if watched is None:
+            watched = WatchedJournal.objects.create(name="WJ Carry", active=True)
+        batch.watched_journals.add(watched)
+        return batch, watched
+
+    def _make_cached_article(self, watched, pmid, publication_month):
+        article = PubmedArticle.objects.create(
+            pmid=pmid,
+            title=f"Article {pmid}",
+            publication_date=publication_month,
+            publication_month=publication_month,
+        )
+        WatchedJournalArticle.objects.create(
+            watched_journal=watched,
+            article=article,
+            publication_month=publication_month,
+        )
+        return article
+
+    def test_regenerated_batch_carries_push_state_and_staging(self):
+        from django.utils import timezone
+
+        from spanza_journal_watch.backend.pubmed_cache import populate_pubmed_batch_from_cache
+
+        _, user = _make_manager()
+        issue = Issue.objects.create(name="Carry Issue", body="")
+        old_batch, watched = self._make_issue_batch(user, issue)
+
+        staged_pushed = self._make_cached_article(watched, "10000001", old_batch.from_month)
+        staged_unpushed = self._make_cached_article(watched, "10000002", old_batch.from_month)
+        unstaged_pushed = self._make_cached_article(watched, "10000003", old_batch.from_month)
+
+        pushed_at = timezone.now()
+        PubmedBatchArticle.objects.create(
+            batch=old_batch,
+            article=staged_pushed,
+            issue=issue,
+            is_selected=True,
+            planka_card_id="card-1",
+            planka_card_url="https://planka.example/cards/card-1",
+            planka_pushed_at=pushed_at,
+        )
+        PubmedBatchArticle.objects.create(batch=old_batch, article=staged_unpushed, issue=issue, is_selected=True)
+        PubmedBatchArticle.objects.create(
+            batch=old_batch,
+            article=unstaged_pushed,
+            issue=issue,
+            is_selected=False,
+            planka_card_id="card-3",
+            planka_card_url="https://planka.example/cards/card-3",
+            planka_pushed_at=pushed_at,
+        )
+
+        new_batch, _ = self._make_issue_batch(user, issue, watched=watched)
+        populate_pubmed_batch_from_cache(new_batch, [watched])
+
+        row1 = PubmedBatchArticle.objects.get(batch=new_batch, article=staged_pushed)
+        assert row1.is_selected is True
+        assert row1.planka_card_id == "card-1"
+        assert row1.planka_pushed_at == pushed_at
+
+        row2 = PubmedBatchArticle.objects.get(batch=new_batch, article=staged_unpushed)
+        assert row2.is_selected is True
+        assert row2.planka_card_id == ""
+
+        row3 = PubmedBatchArticle.objects.get(batch=new_batch, article=unstaged_pushed)
+        assert row3.is_selected is False
+        assert row3.planka_card_id == "card-3"
+
+        new_batch.refresh_from_db()
+        assert new_batch.selected_count == 2
+
+    def test_latest_batch_selection_wins_across_regenerations(self):
+        from spanza_journal_watch.backend.pubmed_cache import populate_pubmed_batch_from_cache
+
+        _, user = _make_manager()
+        issue = Issue.objects.create(name="Carry Issue 2", body="")
+        first_batch, watched = self._make_issue_batch(user, issue)
+        article = self._make_cached_article(watched, "20000001", first_batch.from_month)
+
+        # Staged in the first batch, then unstaged in the second.
+        PubmedBatchArticle.objects.create(batch=first_batch, article=article, issue=issue, is_selected=True)
+        second_batch, _ = self._make_issue_batch(user, issue, watched=watched)
+        PubmedBatchArticle.objects.create(batch=second_batch, article=article, issue=issue, is_selected=False)
+
+        third_batch, _ = self._make_issue_batch(user, issue, watched=watched)
+        populate_pubmed_batch_from_cache(third_batch, [watched])
+
+        row = PubmedBatchArticle.objects.get(batch=third_batch, article=article)
+        assert row.is_selected is False

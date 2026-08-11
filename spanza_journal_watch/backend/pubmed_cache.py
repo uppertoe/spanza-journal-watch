@@ -472,12 +472,28 @@ def populate_pubmed_batch_from_cache(batch, watched_journals):
             # the most recently pushed card wins even if pushed from an older batch.
             for pr in prior_rows:
                 prior_push_state[pr["article_id"]] = pr
+
+            # Carry forward staging state too: the staging area should reflect
+            # the issue's current Planka board, not the lifetime of one batch.
+            # The latest batch's row per article is authoritative.
+            prior_selection = {}
+            selection_rows = (
+                PubmedBatchArticle.objects.filter(issue_id=batch.issue_id, article_id__in=new_article_ids)
+                .exclude(batch=batch)
+                .order_by("batch_id", "pk")
+                .values("article_id", "is_selected")
+            )
+            for pr in selection_rows:
+                prior_selection[pr["article_id"]] = pr["is_selected"]
+
             for row in new_rows:
                 state = prior_push_state.get(row.article_id)
                 if state:
                     row.planka_card_id = state["planka_card_id"]
                     row.planka_card_url = state["planka_card_url"]
                     row.planka_pushed_at = state["planka_pushed_at"]
+                if prior_selection.get(row.article_id):
+                    row.is_selected = True
         PubmedBatchArticle.objects.bulk_create(new_rows)
 
     batch.result_count = batch.batch_articles.count()
