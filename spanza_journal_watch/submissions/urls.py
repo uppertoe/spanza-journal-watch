@@ -5,7 +5,7 @@ from . import views
 
 app_name = "submissions"
 urlpatterns = [
-    path("reviews", RedirectView.as_view(url="search", permanent=False), name="review_list"),  # Redirect to search
+    path("reviews", RedirectView.as_view(url="/search", permanent=True), name="review_list"),  # Redirect to search
     path("reviews/<slug:slug>", views.ReviewDetailView.as_view(), name="review_detail"),
     path("journals", views.JournalListView.as_view(), name="journal_list"),
     path(

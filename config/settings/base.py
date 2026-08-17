@@ -169,6 +169,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "spanza_journal_watch.analytics.middleware.VisitorIdMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    "spanza_journal_watch.utils.middleware.RemoveSlashMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "request_logging.middleware.LoggingMiddleware",

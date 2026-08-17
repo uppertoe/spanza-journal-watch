@@ -207,6 +207,16 @@ def build_request_absolute_url(request, path):
     return request.build_absolute_uri(path)
 
 
+def build_paginated_canonical_url(request, path):
+    # Keep ?page=N (pages after the first are distinct content) but drop all
+    # other query params so tracking URLs don't declare themselves canonical
+    canonical = build_request_absolute_url(request, path)
+    page = request.GET.get("page", "") if request is not None else ""
+    if page.isdigit() and int(page) > 1:
+        canonical = f"{canonical}?page={int(page)}"
+    return canonical
+
+
 def attach_review_display_fields(reviews, *, issue=None, include_share_context=False, request=None):
     review_list = list(reviews)
     if not review_list:
@@ -301,6 +311,8 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
 
         article_title = self.object.article.get_title().strip()
         share_title = f"SPANZA Journal Watch - {article_title}"
+        seo_title = article_title.rstrip(".").strip()
+        context["page_title"] = f"{seo_title} | SPANZA Journal Watch"
         share_description = self.object.get_truncated_body().strip()
         share_email_summary = self.object.get_plain_body().strip()
         self.object.display_review_date = self.object.get_review_date()
@@ -347,7 +359,7 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
             {
                 "@context": "https://schema.org",
                 "@type": "Article",
-                "headline": share_title,
+                "headline": seo_title,
                 "description": share_description,
                 "url": canonical_url,
                 "image": og_image,
@@ -449,7 +461,7 @@ class IssueDetailView(
             f"{self.object.name}: curated Journal Watch reviews and commentary "
             "from the paediatric anaesthesia literature."
         )
-        context["canonical_url"] = self.request.build_absolute_uri()
+        context["canonical_url"] = build_paginated_canonical_url(self.request, self.object.get_absolute_url())
         issue_sd = {
             "@context": "https://schema.org",
             "@type": "PublicationIssue",
@@ -526,7 +538,7 @@ class IssueListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumb
         context["page_meta_description"] = (
             "Browse previous SPANZA Journal Watch issues and collections of paediatric anaesthesia literature reviews."
         )
-        context["canonical_url"] = self.request.build_absolute_uri()
+        context["canonical_url"] = build_paginated_canonical_url(self.request, reverse("submissions:issue_list"))
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
@@ -1082,7 +1094,7 @@ class AuthorDetailView(
         context["action_dock_aria_label"] = "Author page navigation"
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
         context["page_meta_description"] = f"Reviews contributed to SPANZA Journal Watch by {self.object}."
-        context["canonical_url"] = build_request_absolute_url(self.request, self.object.get_absolute_url())
+        context["canonical_url"] = build_paginated_canonical_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",

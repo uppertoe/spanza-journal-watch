@@ -33,7 +33,7 @@ class TestPublicRoutes:
             {
                 "name": "review_list",
                 "url": reverse("submissions:review_list"),
-                "status": 302,
+                "status": 301,
                 "redirect_contains": "search",
             },
             {
