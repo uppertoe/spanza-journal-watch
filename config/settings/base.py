@@ -117,6 +117,7 @@ LOCAL_APPS = [
     "spanza_journal_watch.analytics.apps.AnalyticsConfig",
     "spanza_journal_watch.backend.apps.BackendConfig",
     "spanza_journal_watch.cpd.apps.CpdConfig",
+    "spanza_journal_watch.events.apps.EventsConfig",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -228,6 +229,7 @@ TEMPLATES = [
                 "spanza_journal_watch.utils.context_processors.content_cache_version",
                 "spanza_journal_watch.backend.context_processors.selected_issue",
                 "spanza_journal_watch.backend.context_processors.frontend_banner",
+                "spanza_journal_watch.events.context_processors.events_nav",
                 "spanza_journal_watch.newsletter.context_processors.subscriber_state",
             ],
             "builtins": [

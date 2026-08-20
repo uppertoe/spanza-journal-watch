@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+{% block sidebar %}{% endblock sidebar %}
+{% block breadcrumbs %}{% endblock breadcrumbs %}
+
+{% block article-block %}
+<div class="live-flyer-wall">
+  <header class="live-flyer-wall__intro">
+    <p class="live-flyer__kicker">Journal Watch Edition 2026</p>
+    <h1 class="live-flyer-wall__title">PACS by SPANZA</h1>
+    <p class="live-flyer-wall__lede">{{ page_meta_description }}</p>
+  </header>
+
+  <div class="live-flyer-wall__cards">
+    {% for session in sessions %}
+    <a class="live-flyer-card{% if session.is_past %} live-flyer-card--past{% endif %}" href="{{ session.get_absolute_url }}">
+      <div class="live-flyer-card__date" aria-hidden="true">
+        <span class="live-flyer-card__dow">{{ session.start_datetime|date:"D" }}</span>
+        <span class="live-flyer-card__day">{{ session.start_datetime|date:"j" }}</span>
+        <span class="live-flyer-card__month">{{ session.start_datetime|date:"M Y" }}</span>
+      </div>
+      <div class="live-flyer-card__info">
+        {% with tz=session.start_datetime|date:"T" %}
+        <p class="live-flyer-card__when">
+          {{ session.start_datetime|date:"l j F Y" }}
+          &middot; {{ session.start_datetime|time:"g:i a" }}{% if session.end_datetime %} &ndash; {{ session.end_datetime|time:"g:i a" }}{% endif %} {{ tz }}{% if tz == "AEDT" %} (daylight saving){% endif %}
+          {% if session.is_past %}<span class="live-flyer-card__past-badge">This session has run</span>{% endif %}
+        </p>
+        {% endwith %}
+        <h2 class="live-flyer-card__title">{{ session.title }}</h2>
+        {% if session.speaker %}<p class="live-flyer-card__person"><span>{% if " · " in session.speaker %}Guests{% else %}Guest{% endif %}</span> {{ session.speaker }}</p>{% endif %}
+        {% if session.chair %}<p class="live-flyer-card__person"><span>Chair</span> {{ session.chair }}</p>{% endif %}
+        <span class="live-flyer-card__go">Session details &amp; pre-reading &rarr;</span>
+      </div>
+    </a>
+    {% empty %}
+    <p class="live-flyer-wall__empty">There are no sessions scheduled at the moment. Check back soon!</p>
+    {% endfor %}
+  </div>
+
+  {% if registration %}
+  <section class="live-flyer-wall__register">
+    <h2 class="live-flyer__reading-title">Registration</h2>
+    {% if registration.registration_note %}<p class="live-flyer-wall__register-note">{{ registration.registration_note }}</p>{% endif %}
+    <p class="live-flyer__cta-row-tight">
+      <a class="btn live-flyer__cta" href="{{ registration.registration_url }}" target="_blank" rel="noopener noreferrer">Register for PACS by SPANZA</a>
+    </p>
+    {% if registration.event_url %}<p class="live-flyer__cta-alt"><a href="{{ registration.event_url }}" target="_blank" rel="noopener noreferrer">Full event information on spanza.org.au</a>, including payment and cancellation terms.</p>{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock article-block %}

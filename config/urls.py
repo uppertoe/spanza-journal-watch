@@ -11,6 +11,7 @@ from markdownx import urls as markdownx
 
 from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import views as backend_views
+from spanza_journal_watch.events.models import LiveSessionSitemap
 from spanza_journal_watch.layout.feeds import LatestReviewsFeed
 from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
 from spanza_journal_watch.layout.views import HomepageView
@@ -21,6 +22,7 @@ sitemaps = {
     "issues": IssueSitemap,
     "tags": TagSitemap,
     "authors": AuthorSitemap,
+    "live": LiveSessionSitemap,
 }
 
 
@@ -56,6 +58,7 @@ urlpatterns = [
     # Your stuff: custom urls includes go here
     path("", include("spanza_journal_watch.submissions.urls")),
     path("", include("spanza_journal_watch.layout.urls")),
+    path("", include("spanza_journal_watch.events.urls")),
     path("newsletter/", include("spanza_journal_watch.newsletter.urls")),
     path("reader/action", analytics_views.track_event, name="reader_action"),
     path("analytics/", include("spanza_journal_watch.analytics.urls")),

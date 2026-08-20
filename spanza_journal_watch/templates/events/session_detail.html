@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+{% block sidebar %}{% endblock sidebar %}
+{% block breadcrumbs %}{% endblock breadcrumbs %}
+
+{% block article-block %}
+<article class="live-flyer">
+  <header class="live-flyer__masthead">
+    <div class="live-flyer__glow" aria-hidden="true"></div>
+    <p class="live-flyer__kicker">PACS by SPANZA</p>
+    <h1 class="live-flyer__title">{{ session.title }}</h1>
+    <ul class="live-flyer__chips list-unstyled">
+      <li class="live-flyer__chip">{{ session.start_datetime|date:"l j F Y" }}</li>
+      {% with tz=session.start_datetime|date:"T" %}
+      <li class="live-flyer__chip">{{ session.start_datetime|time:"g:i a" }}{% if session.end_datetime %} &ndash; {{ session.end_datetime|time:"g:i a" }}{% endif %} {{ tz }}{% if tz == "AEDT" %} <span class="live-flyer__chip-note">(daylight saving)</span>{% endif %}</li>
+      {% endwith %}
+      <li class="live-flyer__chip">Online</li>
+      {% if session.is_past %}<li class="live-flyer__chip live-flyer__chip--past">This session has run</li>{% endif %}
+    </ul>
+    {% if session.speaker or session.chair %}
+    <dl class="live-flyer__people">
+      {% if session.speaker %}
+      <div class="live-flyer__person">
+        <dt>{% if " · " in session.speaker %}Guests{% else %}Guest{% endif %}</dt>
+        <dd>{{ session.speaker }}</dd>
+      </div>
+      {% endif %}
+      {% if session.chair %}
+      <div class="live-flyer__person">
+        <dt>Chair</dt>
+        <dd>{{ session.chair }}</dd>
+      </div>
+      {% endif %}
+    </dl>
+    {% endif %}
+  </header>
+
+  <div class="live-flyer__perforation" aria-hidden="true"></div>
+
+  <div class="live-flyer__body">
+    <p class="live-flyer__backrow live-flyer__backrow--top">
+      <a class="btn live-flyer__back" href="{% url 'events:session_list' %}">&larr; All PACS sessions</a>
+    </p>
+    {% if session.description %}
+    <div class="live-flyer__blurb">
+      {{ session.get_markdown_description|safe }}
+    </div>
+    {% endif %}
+
+    {% if not session.is_past %}
+    {% if session.registration_url %}
+    <div class="live-flyer__cta-row">
+      <a class="btn live-flyer__cta" href="{{ session.registration_url }}" target="_blank" rel="noopener noreferrer">Register for PACS by SPANZA</a>
+      {% if session.registration_note %}<p class="live-flyer__cta-note">{{ session.registration_note }}</p>{% endif %}
+      {% if session.event_url %}<p class="live-flyer__cta-alt"><a href="{{ session.event_url }}" target="_blank" rel="noopener noreferrer">Full event information on spanza.org.au</a>, including payment and cancellation terms.</p>{% endif %}
+    </div>
+    {% elif session.event_url %}
+    <div class="live-flyer__cta-row">
+      <a class="btn live-flyer__cta" href="{{ session.event_url }}" target="_blank" rel="noopener noreferrer">Register on the SPANZA event page</a>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if readings %}
+    <section class="live-flyer__reading">
+      <h2 class="live-flyer__reading-title">Pre-reading</h2>
+      {% if session.pre_reading_note %}<p class="live-flyer__reading-note">{{ session.pre_reading_note }}</p>{% endif %}
+      <ul class="live-flyer__reading-list">
+        {% for reading in readings %}
+        <li class="live-flyer__reading-card">
+          <div class="live-flyer__reading-paper">
+            <span class="live-flyer__paper-title">{{ reading.get_title|capfirst }}</span>
+            {% if reading.get_source %}<span class="live-flyer__paper-source">{{ reading.get_source }}</span>{% endif %}
+            <span class="live-flyer__paper-links">
+              {% if reading.get_review_url %}<a class="btn live-flyer__pill" href="{{ reading.get_review_url }}">Read our review</a>{% endif %}
+              {% if reading.get_fulltext_url %}<a class="btn live-flyer__pill" href="{{ reading.get_fulltext_url }}" target="_blank" rel="noopener noreferrer"{% if reading.get_cpd_article_id %} data-cpd-article-id="{{ reading.get_cpd_article_id }}"{% endif %}>Full text</a>{% endif %}
+              {% if reading.get_pubmed_url %}<a class="btn live-flyer__pill" href="{{ reading.get_pubmed_url }}" target="_blank" rel="noopener noreferrer">PubMed</a>{% endif %}
+            </span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <p class="live-flyer__backrow live-flyer__backrow--end">
+      <a class="btn live-flyer__back" href="{% url 'events:session_list' %}">&larr; All PACS sessions</a>
+    </p>
+  </div>
+</article>
+{% endblock article-block %}

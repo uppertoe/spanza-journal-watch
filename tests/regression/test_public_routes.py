@@ -88,6 +88,13 @@ class TestPublicRoutes:
                 "template": "submissions/healthservice_list.html",
             },
             {
+                "name": "live_list",
+                "url": reverse("events:session_list"),
+                "status": 200,
+                "template": "events/session_list.html",
+                "contains": ["PACS by SPANZA"],
+            },
+            {
                 "name": "author_detail",
                 "url": reverse("submissions:author_detail", kwargs={"slug": author.slug}),
                 "status": 200,
@@ -204,6 +211,30 @@ class TestPublicRoutes:
             rf'href="{re.escape(expected_href)}"[^>]*aria-current="page"',
         )
         assert active_link_pattern.search(nav_html)
+
+    def test_events_nav_visible_only_with_upcoming_session(self, route_client, regression_baseline):
+        import datetime
+
+        from django.utils import timezone
+
+        from spanza_journal_watch.events.models import LiveSession
+
+        nav_pattern = re.compile(r'nav-link[^>]*href="/pacs"[^>]*>PACS</a>')
+
+        html = route_client.get(reverse("home")).content.decode("utf-8", errors="ignore")
+        assert not nav_pattern.search(html)
+
+        session = LiveSession.objects.create(
+            title="Upcoming test session",
+            start_datetime=timezone.now() + datetime.timedelta(days=7),
+            end_datetime=timezone.now() + datetime.timedelta(days=7, hours=1),
+        )
+        html = route_client.get(reverse("home")).content.decode("utf-8", errors="ignore")
+        assert nav_pattern.search(html)
+
+        session.delete()
+        html = route_client.get(reverse("home")).content.decode("utf-8", errors="ignore")
+        assert not nav_pattern.search(html)
 
     @pytest.mark.parametrize(
         "name,url_name,kwargs,query,headers",
