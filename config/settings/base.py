@@ -205,6 +205,9 @@ MEDIA_URL = "/media/"
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
+# Compile all templates at WSGI start-up (see utils.template_warmup). Off under
+# DEBUG so runserver reloads stay fast; override with DJANGO_TEMPLATE_WARMUP.
+TEMPLATE_WARMUP = env.bool("DJANGO_TEMPLATE_WARMUP", default=not DEBUG)
 # https://docs.djangoproject.com/en/dev/ref/settings/#templates
 TEMPLATES = [
     {

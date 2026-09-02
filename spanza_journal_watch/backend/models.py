@@ -985,6 +985,11 @@ class PubmedArticle(TimeStampedModel):
 
     @property
     def tags_curated(self):
+        # Lists of review cards prefetch ``article__tags``; filtering the
+        # prefetched rows in Python avoids one query per card (25 on a topic page).
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "tags" in prefetched:
+            return [tag for tag in prefetched["tags"] if tag.curated]
         return self.tags.filter(curated=True)
 
     # ── Tag management (ported from submissions.Article) ──

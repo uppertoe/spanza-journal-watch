@@ -34,6 +34,13 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 # file. This includes Django's development server, if the WSGI_APPLICATION
 # setting points here.
 application = get_wsgi_application()
+
+# Runs once per gunicorn worker (workers import this module after forking), so
+# each worker's cached template loader is warm before it takes traffic.
+from spanza_journal_watch.utils.template_warmup import warm_template_cache, warm_url_resolver  # noqa: E402
+
+warm_url_resolver()
+warm_template_cache()
 # Apply WSGI middleware here.
 # from helloworld.wsgi import HelloWorldApplication
 # application = HelloWorldApplication(application)

@@ -112,6 +112,7 @@ class Homepage(TimeStampedModel):
         card_features = (
             Review.objects.filter(issues__homepage=self, is_featured=True, active=True)
             .select_related("article", "author")
+            .prefetch_related("article__tags")
             .order_by("created")
         )
         return card_features
