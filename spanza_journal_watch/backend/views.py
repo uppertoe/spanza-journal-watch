@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import posixpath
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -13,6 +14,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.views import redirect_to_login
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.search import TrigramSimilarity
 from django.core.cache import cache
@@ -943,7 +945,9 @@ def _build_article_intake_queryset(batch, params):
     query = (params.get("q") or "").strip()
     watched_journal_id = (params.get("journal") or "").strip()
     selected = (params.get("filter_selected") or params.get("selected") or "").strip().lower()
-    paediatric_only = _param_enabled(params, "paediatric_only", default=False)
+    # Paediatric-only is on by default: the results form carries an explicit 0/1
+    # so a coordinator can still switch it off.
+    paediatric_only = _param_enabled(params, "paediatric_only", default=True)
     humans_only = _param_enabled(params, "humans_only", default=False)
     review_only = _param_enabled(params, "review_only", default=False)
     trial_only = _param_enabled(params, "trial_only", default=False)
@@ -3004,7 +3008,7 @@ def send_final_newsletter(request, pk):
     elif newsletter.is_sent and not newsletter.resend_enabled:
         messages.warning(
             request,
-            f"Newsletter {newsletter} has already been sent. " "Use 'Enable one resend' below to dispatch it again.",
+            f"Newsletter {newsletter} has already been sent. Use 'Enable one resend' below to dispatch it again.",
         )
     else:
         messages.error(request, f"Newsletter {newsletter} not sent: not ready")
@@ -6917,16 +6921,35 @@ def inbox_reply(request, thread_id):
 
 _DOCS_ROOT = Path(settings.BASE_DIR) / "docs" / "_build" / "html"
 
+# The user guide is public so prospective coordinators and invited reviewers can
+# read it before they have an account. Everything else in the built docs (the
+# operations runbooks, the search index, the page sources) stays behind an
+# editorial login.
+_PUBLIC_DOCS_PREFIXES = ("user-guide/", "_static/", "_images/")
+_PUBLIC_DOCS_FILES = frozenset({"index.html"})
 
-@login_required
+
+def _docs_path_is_public(path):
+    return path in _PUBLIC_DOCS_FILES or path.startswith(_PUBLIC_DOCS_PREFIXES)
+
+
 def serve_docs(request, path=""):
-    """Serve the built Sphinx documentation, protected by login."""
-    if not (
-        request.user.has_perm("submissions.chief_editor") or request.user.has_perm("submissions.regional_coordinator")
-    ):
-        raise PermissionDenied
-    if not path:
-        path = "index.html"
+    """Serve the built Sphinx documentation.
+
+    The user guide is open to everyone; the rest requires an editorial role.
+    """
+    # Normalise before the public check so "user-guide/../operations/x.html"
+    # cannot slip past it. django.views.static.serve does the same normalisation
+    # again before touching the filesystem.
+    path = posixpath.normpath(path or "index.html").lstrip("/")
+    if not _docs_path_is_public(path):
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        if not (
+            request.user.has_perm("submissions.chief_editor")
+            or request.user.has_perm("submissions.regional_coordinator")
+        ):
+            raise PermissionDenied
     return static_serve(request, path, document_root=str(_DOCS_ROOT))
 
 

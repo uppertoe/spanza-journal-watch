@@ -416,15 +416,20 @@ class TestArticleIntakePushToPlanka:
         }
         mock_client.get_list.return_value = {"id": "list-candidates", "boardId": "board-1"}
 
-        with patch(
-            "spanza_journal_watch.backend.views._build_planka_client",
-            return_value=mock_client,
-        ), patch("spanza_journal_watch.backend.views._ensure_planka_board_mappings"), patch(
-            "spanza_journal_watch.backend.views._get_board_label_map",
-            return_value={},
-        ), patch(
-            "spanza_journal_watch.backend.views._get_board_list_type_map",
-            return_value={"list-candidates": "candidates"},
+        with (
+            patch(
+                "spanza_journal_watch.backend.views._build_planka_client",
+                return_value=mock_client,
+            ),
+            patch("spanza_journal_watch.backend.views._ensure_planka_board_mappings"),
+            patch(
+                "spanza_journal_watch.backend.views._get_board_label_map",
+                return_value={},
+            ),
+            patch(
+                "spanza_journal_watch.backend.views._get_board_list_type_map",
+                return_value={"list-candidates": "candidates"},
+            ),
         ):
             url = reverse("backend:article_intake_push_to_planka", kwargs={"batch_id": batch.pk})
             resp = client.post(url)
@@ -443,15 +448,20 @@ class TestArticleIntakePushToPlanka:
 
         mock_client = MagicMock()
 
-        with patch(
-            "spanza_journal_watch.backend.views._build_planka_client",
-            return_value=mock_client,
-        ), patch("spanza_journal_watch.backend.views._ensure_planka_board_mappings"), patch(
-            "spanza_journal_watch.backend.views._get_board_label_map",
-            return_value={},
-        ), patch(
-            "spanza_journal_watch.backend.views._get_board_list_type_map",
-            return_value={},
+        with (
+            patch(
+                "spanza_journal_watch.backend.views._build_planka_client",
+                return_value=mock_client,
+            ),
+            patch("spanza_journal_watch.backend.views._ensure_planka_board_mappings"),
+            patch(
+                "spanza_journal_watch.backend.views._get_board_label_map",
+                return_value={},
+            ),
+            patch(
+                "spanza_journal_watch.backend.views._get_board_list_type_map",
+                return_value={},
+            ),
         ):
             url = reverse("backend:article_intake_push_to_planka", kwargs={"batch_id": batch.pk})
             resp = client.post(url)
@@ -616,7 +626,8 @@ class TestArticleIntakeUserView:
         article = PubmedArticle.objects.create(pmid="55556666", title="C")
         row = PubmedBatchArticle.objects.create(batch=batch, article=article, watched_journal=watched)
 
-        ctx = _article_intake_results_context(batch, {}, user=user)
+        # The row has no MeSH terms, so switch off the default paediatric filter.
+        ctx = _article_intake_results_context(batch, {"paediatric_only": "0"}, user=user)
         result_row = next(r for r in ctx["result_rows"] if r.pk == row.pk)
         assert result_row.is_new is True
         assert ctx["new_count"] == 1
@@ -624,7 +635,7 @@ class TestArticleIntakeUserView:
         # Acknowledge the row → no longer flagged new.
         view.seen_batch_article_ids = [row.pk]
         view.save(update_fields=["seen_batch_article_ids", "modified"])
-        ctx2 = _article_intake_results_context(batch, {}, user=user)
+        ctx2 = _article_intake_results_context(batch, {"paediatric_only": "0"}, user=user)
         result_row2 = next(r for r in ctx2["result_rows"] if r.pk == row.pk)
         assert result_row2.is_new is False
         assert ctx2["new_count"] == 0
@@ -729,3 +740,30 @@ class TestBatchRegenerationCarryForward:
 
         row = PubmedBatchArticle.objects.get(batch=third_batch, article=article)
         assert row.is_selected is False
+
+
+class TestArticleIntakeFilterDefaults:
+    def _results(self, client, batch, **params):
+        return client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}), params)
+
+    def test_paediatric_filter_is_on_by_default(self):
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+        resp = self._results(client, batch)
+        assert resp.status_code == 200
+        assert resp.context["filter_paediatric_only"] is True
+
+    def test_paediatric_filter_can_be_switched_off(self):
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+        resp = self._results(client, batch, paediatric_only="0")
+        assert resp.context["filter_paediatric_only"] is False
+
+    def test_unticking_the_box_sends_an_explicit_zero(self):
+        # The hidden 0 must sit before the checkbox so the ticked value wins.
+        client, user = _make_manager()
+        batch, _ = _make_batch_with_watched(user)
+        html = self._results(client, batch).content.decode()
+        hidden = html.index('type="hidden" name="paediatric_only" value="0"')
+        checkbox = html.index('name="paediatric_only" value="1" id="filter-paediatric"')
+        assert hidden < checkbox

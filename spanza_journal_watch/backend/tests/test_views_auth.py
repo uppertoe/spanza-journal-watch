@@ -344,29 +344,45 @@ class TestNewsletterAuthGuards:
 
 
 class TestDocsAuthGuards:
-    def test_docs_requires_login(self):
-        url = reverse("backend:docs")
-        _redirect_to_login(anon().get(url))
+    """The user guide is public; the operations docs need an editorial role."""
 
-    def test_docs_forbidden_without_editorial_role(self):
-        url = reverse("backend:docs")
-        _forbidden(user_without_perm().get(url))
-
-    def test_docs_allows_chief_editor(self, monkeypatch):
+    @pytest.fixture(autouse=True)
+    def _fake_static_serve(self, monkeypatch):
         monkeypatch.setattr(
             "spanza_journal_watch.backend.views.static_serve", lambda *args, **kwargs: HttpResponse("ok")
         )
-        client = user_with_perm(CHIEF_EDITOR)
-        response = client.get(reverse("backend:docs"))
-        assert response.status_code == 200
 
-    def test_docs_allows_regional_coordinator(self, monkeypatch):
-        monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.static_serve", lambda *args, **kwargs: HttpResponse("ok")
-        )
-        client = user_with_perm(REGIONAL_COORDINATOR)
-        response = client.get(reverse("backend:docs"))
-        assert response.status_code == 200
+    @staticmethod
+    def _docs(path):
+        return reverse("backend:docs_file", kwargs={"path": path})
+
+    def test_docs_index_is_public(self):
+        assert anon().get(reverse("backend:docs")).status_code == 200
+
+    @pytest.mark.parametrize(
+        "path",
+        ["user-guide/index.html", "user-guide/reviewer.html", "_static/demos.js", "_static/demos.css"],
+    )
+    def test_user_guide_and_assets_are_public(self, path):
+        assert anon().get(self._docs(path)).status_code == 200
+
+    @pytest.mark.parametrize(
+        "path", ["operations/index.html", "searchindex.js", "search.html", "_sources/index.rst.txt"]
+    )
+    def test_operations_docs_require_login(self, path):
+        _redirect_to_login(anon().get(self._docs(path)))
+
+    def test_operations_docs_forbidden_without_editorial_role(self):
+        _forbidden(user_without_perm().get(self._docs("operations/index.html")))
+
+    def test_traversal_out_of_public_prefix_is_not_public(self):
+        _redirect_to_login(anon().get(self._docs("user-guide/../operations/aws-setup.html")))
+
+    def test_operations_docs_allow_chief_editor(self):
+        assert user_with_perm(CHIEF_EDITOR).get(self._docs("operations/index.html")).status_code == 200
+
+    def test_operations_docs_allow_regional_coordinator(self):
+        assert user_with_perm(REGIONAL_COORDINATOR).get(self._docs("operations/index.html")).status_code == 200
 
 
 # ---------------------------------------------------------------------------

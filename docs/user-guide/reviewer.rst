@@ -3,149 +3,151 @@
 Reviewer Guide
 ==============
 
-As a reviewer, you write article summaries and commentaries directly in the
-Planka kanban board. You do not need access to the backend editorial interface —
-everything happens in Planka.
+The editorial platform sends you an invitation, creates your Planka access
+automatically, and provides a card for each article your regional coordinator
+has shortlisted. As a reviewer, you write your reviews directly on the Planka
+kanban board. You do not need access to the editorial pages. Everything
+happens in Planka.
 
 Accepting your invitation
---------------------------
+-------------------------
 
-You will receive an invitation email with the subject
-**"Invitation to be a reviewer for {issue name}"**. The email contains a button
-with a link to accept the invitation.
+.. container:: feature
 
-Click the button (or copy the URL below it into your browser).
+   .. container:: feature-text
 
-Signing in or creating an account
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      Your regional coordinator will send you an email inviting you to review
+      for a particular issue. To accept, sign in to Journal Watch, or create
+      an account if you do not have one, using the email address the
+      invitation was sent to. That is how the platform matches the invitation
+      to you.
 
-The invitation link takes you to the Journal Watch acceptance page:
+      1. Open the email titled **Invitation to be a reviewer for …** and click
+         **Accept invitation**.
+      2. Sign in, or create an account, with the email address the invitation
+         was sent to.
+      3. When you see **Access confirmed**, click **Open Planka**. On the
+         Planka page, choose **Sign in with Journal Watch**. You do not need a
+         separate password.
 
-- **If you already have a Journal Watch account** with the invited email address,
-  sign in normally. Your invitation is accepted automatically once you sign in.
-
-- **If you do not yet have an account**, click **Sign up** and create one using
-  exactly the email address the invitation was sent to. Then sign in.
+   .. raw:: html
+      :file: _demos/accept.html
 
 .. important::
    You must use the same email address the invitation was sent to. If you sign
    in with a different email, you will see a message asking you to use the
    correct account.
 
-Once signed in with the correct account, the page confirms your access and
-shows links to the Planka board.
-
 You will also receive a welcome email with a direct link to the Planka board.
-Your Planka account is created automatically — you do not need to register
+Your Planka account is created automatically, so there is nothing to register
 separately in Planka.
 
-
-Logging in to Planka
---------------------
-
-After accepting, go to Planka at the URL in your welcome email. Click
-**Sign in with Journal Watch**.
-
-You will be taken through the Journal Watch login page and then redirected
-automatically to Planka. You do not need a separate Planka password.
+You can also reach Planka from the account button at the top of the main
+Journal Watch site: open it and choose **Editor**, or go to
+`/editorial/go </editorial/go>`_. Reviewers are sent straight to the board.
 
 .. tip::
-   Bookmark the Planka URL after signing in. On subsequent visits, click
+   Bookmark the Planka URL after signing in. On later visits, click
    **Sign in with Journal Watch** to return directly to your board.
 
 
-Navigating the board
---------------------
+Finding your way around the board
+---------------------------------
 
 Your Planka project has two boards:
 
-- **Reviews** — the main board where article cards live and you write your
+- **Reviews**, the main board where article cards live and you write your
   reviews
-- **Instructions** — a read-only board with guidance cards for reviewers,
+- **Instructions**, a read-only board with guidance cards for reviewers,
   editors, and administrators
 
 The Reviews board is organised into three lists:
 
-- **Candidates** — articles that have been staged for review
-- **Under review** — articles you are actively working on
-- **Publish ready** — articles whose review is complete and ready for the
+- **Candidates**: articles your coordinator has shortlisted for review
+- **Under review**: articles someone is working on
+- **Publish ready**: articles whose review is complete and ready for the
   editors
-
-
-Writing your review
--------------------
-
-Picking up an article
-~~~~~~~~~~~~~~~~~~~~~
-
-Browse the *Candidates* list and open a card that interests you. The card
-description contains the article title, journal, publication date, abstract,
-and a link to the full article.
-
-When you are ready to review that article:
-
-1. **Add yourself as a member** of the card (use the Members section inside
-   the card) so editors can see who is covering which article.
-2. Move the card to *Under review* to indicate you are working on it. You can
-   drag the card or change the list from the card menu.
 
 You can filter articles by journal using the **Labels** button, or use the
 **search cards** function to find a specific article.
 
-Adding an unlisted article
-~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If the article you want to review is not in the *Candidates* list, you can
-create your own card. On your new card:
+Choosing an article
+-------------------
 
-- Add yourself as a member
-- Include the article title or URL so editors can identify it
-- Place the card in *Under review* while drafting
-- Move it to *Publish ready* when finished
+.. container:: feature flip
 
-Completing the review
-~~~~~~~~~~~~~~~~~~~~~
+   .. container:: feature-text
 
-Open the card and write your review in the **description** field. The card
-description is split into two sections by a marker line:
+      Look through *Candidates* and choose an article you would like to
+      review. The card holds the article title, journal, abstract, and a link
+      to the full article. If you would rather review an article that is not
+      listed, you are welcome to add your own card.
 
-.. code-block:: text
+      1. Open a card in *Candidates* to read the abstract and follow the link
+         to the full article.
+      2. Add yourself as a member of the card, using the Members section
+         inside it, so the editors can see who is covering what.
+      3. Drag the card into *Under review*.
+      4. To review an article that is not listed, click **Add card** at the
+         bottom of *Under review*, give it the article's title or a link, and
+         add yourself as a member.
 
-   < --- Please write your review below this line --- >
+   .. raw:: html
+      :file: _demos/pick.html
 
-**Above the marker** is the article context (title, abstract, instructions).
-Leave this section intact unless a correction is needed.
 
-**Below the marker** is where you write your review. A suggested structure is
-provided as a starting point:
+Finishing your review
+---------------------
 
-- **Review summary** — a brief overview of the study
-- **Key findings** — the main results
-- **Strengths** — what the study does well
-- **Limitations** — caveats or weaknesses
-- **Bottom line** — why this matters for paediatric anaesthesia practice
+.. container:: feature
 
-Feel free to adapt this structure to suit the article. Use the formatting
-toolbar to add headings, bullet points, and bold text.
+   .. container:: feature-text
 
-When your review is complete, move the card to *Publish ready*. This signals
-to the editors that your review is ready to be imported into the newsletter.
+      You write your review straight into the card's description. The top part
+      of the description holds the article details and a marker line.
+      Everything below the line is yours. A suggested structure is there to get
+      you started, but any format you are comfortable with is fine.
+
+      When you are done, moving the card to *Publish ready* tells the editors
+      it is ready to go into the issue.
+
+      1. Open your card and click into the description.
+      2. Write your review below the line that reads *Please write your review
+         below this line*. Leave the article details above it as they are.
+      3. When you are finished, drag the card into *Publish ready*.
+      4. You can still edit the card afterwards. If the editors have
+         questions, they will leave a comment on the card.
+
+   .. raw:: html
+      :file: _demos/ready.html
+
+The suggested structure below the marker line is:
+
+- **Review summary**: a brief overview of the study
+- **Key findings**: the main results
+- **Strengths**: what the study does well
+- **Limitations**: caveats or weaknesses
+- **Bottom line**: why this matters for paediatric anaesthesia practice
+
+Feel free to adapt this to suit the article. Use the formatting toolbar to add
+headings, bullet points, and bold text.
 
 Attaching files
 ~~~~~~~~~~~~~~~
 
-If you prefer to write your review in another application (e.g. a Word
-document), you can upload the file to the card as an attachment. Note that
-formatting from attached files will not transfer automatically — your editor
-will reconstruct it as accurately as possible.
+If you prefer to write your review in another application, such as a Word
+document, you can upload the file to the card as an attachment. Formatting
+from attached files will not transfer automatically, so your editor will
+reconstruct it as accurately as possible.
 
 Editing after submission
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can continue editing a card after moving it to *Publish ready*. If the
 editors need changes, they may add a comment to the card asking you to revise
-it. Simply update the description and add a comment letting them know it is
-ready again.
+it. Update the description and add a comment letting them know it is ready
+again.
 
 .. note::
    Please do not edit other reviewers' cards directly. Use the **Comments**

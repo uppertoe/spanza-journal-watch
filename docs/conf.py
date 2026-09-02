@@ -13,3 +13,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "furo"
 html_favicon = "../spanza_journal_watch/static/images/favicon_package/favicon-32x32.png"
+
+html_static_path = ["_static"]
+html_css_files = ["demos.css"]
+html_js_files = ["demos.js"]

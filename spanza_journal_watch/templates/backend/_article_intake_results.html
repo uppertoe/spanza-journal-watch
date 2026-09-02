@@ -70,6 +70,8 @@
       <div class="col-12">
         <div class="d-flex flex-wrap gap-3 small">
           <div class="form-check">
+            {# Sent when the box is unticked; the checkbox value wins when it is ticked. #}
+            <input type="hidden" name="paediatric_only" value="0">
             <input class="form-check-input intake-filter-checkbox" type="checkbox" name="paediatric_only" value="1" id="filter-paediatric" {% if filter_paediatric_only %}checked{% endif %}>
             <label class="form-check-label" for="filter-paediatric">Paediatric (MeSH)</label>
           </div>

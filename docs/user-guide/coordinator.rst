@@ -4,119 +4,195 @@ Regional Coordinator Guide
 ==========================
 
 Regional coordinators are assigned to specific issues by the chief editor.
-Your role is to help manage article intake and invite reviewers for the issues
-assigned to you. You have access to the backend editorial interface for those
+Your role is to shortlist the articles and invite the reviewers for the
+issues assigned to you. You have access to the editorial pages for those
 issues only.
+
+What the editorial platform does
+--------------------------------
+
+.. container:: feature
+
+   .. container:: feature-text
+
+      The editorial platform takes care of the mechanical parts of assembling
+      an issue, so that your time goes on judgement rather than on searching.
+
+      Each issue covers a window of a month or two. For that window, the
+      platform retrieves every article published in the watched journals
+      directly from PubMed, with MeSH terms attached, and applies a paediatric
+      filter before you see the list. Your task is to look over what remains
+      and shortlist the articles that merit a review.
+
+      The shortlist is sent to a shared Planka board, where reviewers claim
+      articles, write their reviews and mark them complete. You can see who is
+      covering what, and how each review is progressing, without a round of
+      emails.
+
+      1. The platform retrieves every article the watched journals published
+         in the window, directly from PubMed.
+      2. The paediatric MeSH filter removes what is not relevant before you
+         look.
+      3. You shortlist the articles that merit a review and send them to the
+         Planka board.
+      4. Reviewers claim, write and complete their reviews on the board, in
+         view of the coordinators and editors.
+
+   .. raw:: html
+      :file: _demos/overview.html
+
 
 Logging in
 ----------
 
-Go to ``/backend/`` and sign in with your account. You will see a landing page
-where you can choose **Go to backend** or **Go to Planka**.
+.. container:: feature flip
 
-If you go to the backend, you land on the **coordinator dashboard**, which
-shows a card for each issue you have been assigned to. If you have not yet
-been assigned to an issue, the dashboard will be empty — contact the chief
-editor to be assigned.
+   .. container:: feature-text
 
-On each issue card you will see:
+      Go to `/editorial/go </editorial/go>`_ on the Journal Watch site and
+      sign in with your account. You will be asked where you would like to go:
+      the **editorial backend**, where article intake and reviewer invitations
+      are managed, or **Planka**, the reviewers' board.
 
-- The issue name and date
-- The current status (Live or Draft)
-- **Articles** — jump to Article Intake for this issue
-- **Reviewers** — jump to the Contributors list for this issue
+      The same page is available from the account button at the top of the
+      main site once you are signed in: open it and choose **Editor**. The
+      button appears as soon as your invitation has been accepted.
 
-At the top of the page, an **issue context bar** shows the currently selected
-issue and two workflow tabs available to you: **Articles** and **Reviewers**.
-The remaining tabs (Pull Reviews, Edit Reviews, Publish, Newsletter) are
-managed by the chief editor.
+      Choose the editorial backend and you land on your **dashboard**, which
+      shows a card for each issue you have been assigned to. If the dashboard
+      is empty, you have not been assigned to an issue yet. Contact the chief
+      editor.
+
+      Each issue card has two shortcuts: **Articles** opens Article Intake for
+      that issue, and **Reviewers** opens its reviewer list. Once you are in an
+      issue, the **context bar** at the top of every page shows which issue you
+      are working in, with tabs for the two steps that are yours. The
+      remaining tabs (Pull Reviews, Edit Reviews, Publish, Newsletter) are
+      managed by the chief editor.
+
+   .. raw:: html
+      :file: _demos/go.html
 
 
 Article intake
 --------------
 
-Click **Articles** on an issue card (or the Articles tab in the context bar)
-to open Article Intake for that issue.
+Click **Articles** on an issue card, or the Articles tab in the context bar,
+to open Article Intake for that issue. The page walks through three steps:
+loading the articles, choosing the ones worth reviewing, and sending that
+shortlist across to the reviewers' board.
 
-Article Intake has three stages:
-
-Stage 1 — Fetch from PubMed
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Select the date range and choose the journals to search. Click **Fetch from
-PubMed**. The fetch runs in the background and results appear once it completes.
-
-Stage 2 — Stage candidates
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The results table shows all articles returned from PubMed. Use the filters
-(text search, journal, specialty toggles) to narrow the list to the articles
-that are relevant to your region or specialty.
-
-Tick the **Staged** checkbox on each article you want to send to the Planka
-board. Use **Bulk select / unselect** to stage or unstage everything matching
-the current filters at once.
-
-Stage 3 — Push to Planka
+Step 1: Load the articles
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Click **Push staged articles to Planka candidates**. Each staged article
-becomes a card in the *Candidates* list on the Planka board, ready for
-reviewers to pick up.
+Choose the months the issue covers, tick the journals you would like to
+search, and click **Start intake**. Journal Watch keeps its own copy of the
+PubMed feed for the watched journals, so the list is usually ready within a
+few seconds. Later on, **Check for new articles** picks up anything the
+journals have published since.
+
+Step 2: Choose articles to review
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. container:: feature
+
+   .. container:: feature-text
+
+      The list holds everything the watched journals published during the
+      issue's window, retrieved from PubMed. The **Paediatric (MeSH)** filter
+      is on by default, so articles without a paediatric MeSH term are hidden
+      until you switch it off. The other filters and the journal tabs narrow
+      the list further.
+
+      Marking an article as **staged** puts it on your shortlist. It does not
+      change the public website, and it is not yet visible to reviewers.
+
+      1. Look through the filtered list. Use the journal tabs and the
+         specialty filters to narrow it as you see fit.
+      2. Click the toggle on each article you would like to shortlist. It
+         turns green and reads *Staged*.
+      3. If you would like everything currently showing, use **Stage all
+         (filtered)**. **Unstage all (filtered)** takes them off again.
+
+   .. raw:: html
+      :file: _demos/stage.html
+
+Step 3: Send the shortlist to the review board
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. container:: feature flip
+
+   .. container:: feature-text
+
+      Reviewers work on a shared **Planka board**, a simple kanban board with
+      three lists. Pushing sends your staged articles to that board, where
+      each one becomes a card in the *Candidates* list for reviewers to
+      choose from.
+
+      This does not affect the public website. The issue is only published
+      when the editors release it.
+
+      1. Once you are happy with the shortlist, scroll down to Step 3 and
+         click **Push staged articles to Planka candidates**.
+      2. Wait for the confirmation. The *pushed* count at the top of the
+         results updates.
+      3. You can stage more articles and push again whenever you like.
+         Anything already on the board is left alone.
+
+   .. raw:: html
+      :file: _demos/push.html
 
 Use **Reconcile Planka status** at any time to check which articles are still
-in the Candidates list and which have been moved or removed.
+in the Candidates column and which have been moved or removed by reviewers.
 
 
-Managing contributors
----------------------
+Inviting your reviewers
+-----------------------
 
-Click **Reviewers** on an issue card (or the Reviewers tab) to open the
-Contributors list for that issue.
+Click **Reviewers** on an issue card, or the Reviewers tab, to open the
+reviewer list for that issue.
 
-Adding a reviewer
-~~~~~~~~~~~~~~~~~
+.. container:: feature
 
-Enter the reviewer's **name** and **email address**, then click **Add
-reviewer**. Both fields are required. The reviewer is added with status
-*Pending*.
+   .. container:: feature-text
 
-Sending invitations
-~~~~~~~~~~~~~~~~~~~
+      Reviewers are invited by email. You add each person to the issue first,
+      then send the invitations together. When a reviewer accepts, the
+      platform creates their Planka access and adds them to the board, so
+      there is nothing to set up on the board itself.
 
-Once you have added the reviewers you want, click **Send invites**. Each
-pending reviewer receives an email with an invitation link valid for 180 days.
-When they accept, their status changes to *Active* and they are added to the
-Planka board automatically.
+      1. Enter the reviewer's name and email address and click **Add**. They
+         appear in the table as *Pending*.
+      2. Repeat for everyone you would like to invite.
+      3. Click **Send initial invites**. Each pending reviewer receives an
+         email with a link that stays valid for 180 days.
+      4. Keep an eye on the Status column. *Invited* means the email has gone
+         out, and *Active* means they have accepted and can see the board.
+      5. To send a reminder, tick the reviewer's row and click **Resend to
+         selected**.
 
-Monitoring progress
-~~~~~~~~~~~~~~~~~~~
+   .. raw:: html
+      :file: _demos/invite.html
 
-The contributors table shows each reviewer's status:
-
-- **Pending** — added but not yet invited
-- **Invited** — invitation sent, not yet accepted
-- **Active** — accepted and has Planka board access
-- **Revoked** — access removed
-
-Use **Resend invite** to send a new link to a reviewer who has not responded.
-Use **Revoke** to remove a reviewer from the issue.
+The Status column can also show *Expired*, when an invitation link has run
+out, and *Revoked*, when a reviewer has been removed from the issue. Use
+**Revoke** on a reviewer's row to remove them.
 
 
 Working in Planka
 -----------------
 
 Once you are assigned to an issue, you are added to its Planka board. Log in to
-Planka using your Journal Watch account — click **Sign in with Journal Watch**
+Planka using your Journal Watch account: click **Sign in with Journal Watch**
 on the Planka login page. No separate Planka login is needed.
 
 In Planka you can:
 
 - View all article cards on the Reviews board
-- Move cards between lists (e.g. from *Candidates* to *Under review*)
+- Move cards between lists, for example from *Candidates* to *Under review*
 - Comment on cards to give feedback to reviewers
 - Check reviewer progress by seeing which cards are in each list
 
-Your role on the Reviews board is board editor — you can see and interact
+Your role on the Reviews board is board editor, so you can see and interact
 with all cards. The Instructions board contains read-only guidance cards.
 Planka board settings are managed by the chief editor.
