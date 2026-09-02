@@ -1,9 +1,8 @@
 {% extends 'base.html' %}
-{% block meta_description %}{{ share_description }}{% endblock meta_description %}
 {% block head_meta %}
 <meta property="og:type" content="article">
 <meta property="og:title" content="{{ page_title }}">
-<meta property="og:description" content="{{ share_description }}">
+<meta property="og:description" content="{{ page_meta_description }}">
 <meta property="og:url" content="{{ canonical_url }}">
 <meta property="og:site_name" content="Journal Watch">
 <meta property="og:image" content="{% if share_image_url %}{{ share_image_url }}{% else %}{{ default_og_image }}{% endif %}">
@@ -11,7 +10,7 @@
 {% if review.author %}<meta property="article:author" content="{{ review.author }}">{% endif %}
 <meta name="twitter:card" content="{% if share_image_url %}summary_large_image{% else %}summary{% endif %}">
 <meta name="twitter:title" content="{{ page_title }}">
-<meta name="twitter:description" content="{{ share_description }}">
+<meta name="twitter:description" content="{{ page_meta_description }}">
 <meta name="twitter:image" content="{% if share_image_url %}{{ share_image_url }}{% else %}{{ default_og_image }}{% endif %}">
 {% endblock head_meta %}
 {% block main-feature %}

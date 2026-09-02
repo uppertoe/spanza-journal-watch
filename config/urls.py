@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.http import HttpResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.views import defaults as default_views
 from django.views.decorators.cache import cache_control, cache_page
 from django.views.generic.base import TemplateView
@@ -14,7 +14,7 @@ from spanza_journal_watch.backend import views as backend_views
 from spanza_journal_watch.events.models import LiveSessionSitemap
 from spanza_journal_watch.layout.feeds import LatestReviewsFeed
 from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
-from spanza_journal_watch.layout.views import HomepageView
+from spanza_journal_watch.layout.views import HomepageView, indexnow_key
 from spanza_journal_watch.users.views import invite_aware_login_view, invite_aware_signup_view
 
 sitemaps = {
@@ -47,6 +47,8 @@ urlpatterns = [
         ),
     ),
     path("feed/", cache_page(3600)(LatestReviewsFeed()), name="review_feed"),
+    # IndexNow ownership key: /<key>.txt (404 unless it matches settings.INDEXNOW_KEY)
+    re_path(r"^(?P<key>[A-Za-z0-9-]{8,128})\.txt$", indexnow_key, name="indexnow_key"),
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
     # User management

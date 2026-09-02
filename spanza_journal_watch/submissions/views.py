@@ -207,6 +207,25 @@ def build_request_absolute_url(request, path):
     return request.build_absolute_uri(path)
 
 
+# Longest article title we place in <title>; longer ones are cut at a word boundary.
+SEO_TITLE_MAX_LENGTH = 150
+# Search engines flag descriptions shorter than this as too thin to be useful.
+META_DESCRIPTION_MIN_LENGTH = 120
+
+
+def build_review_meta_description(summary, article):
+    """Return a meta description for a review, padding thin summaries with context."""
+    summary = " ".join((summary or "").split())  # meta content must be a single line
+    if len(summary) >= META_DESCRIPTION_MIN_LENGTH:
+        return summary
+    journal_name = article.source_journal_name or (str(article.journal) if article.journal else "")
+    if journal_name:
+        suffix = f"A SPANZA Journal Watch review of research published in {journal_name}."
+    else:
+        suffix = "A SPANZA Journal Watch review of recent paediatric anaesthesia research."
+    return f"{summary} {suffix}".strip()
+
+
 def build_paginated_canonical_url(request, path):
     # Keep ?page=N (pages after the first are distinct content) but drop all
     # other query params so tracking URLs don't declare themselves canonical
@@ -311,9 +330,10 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
 
         article_title = self.object.article.get_title().strip()
         share_title = f"SPANZA Journal Watch - {article_title}"
-        seo_title = article_title.rstrip(".").strip()
+        seo_title = shorten_text(article_title.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
         context["page_title"] = f"{seo_title} | SPANZA Journal Watch"
         share_description = self.object.get_truncated_body().strip()
+        context["page_meta_description"] = build_review_meta_description(share_description, self.object.article)
         share_email_summary = self.object.get_plain_body().strip()
         self.object.display_review_date = self.object.get_review_date()
         review_date = self.object.display_review_date
@@ -458,8 +478,8 @@ class IssueDetailView(
         context["article_cols"] = self.article_cols
         context["page_title"] = f"{self.object.name} | SPANZA Journal Watch"
         context["page_meta_description"] = (
-            f"{self.object.name}: curated Journal Watch reviews and commentary "
-            "from the paediatric anaesthesia literature."
+            f"{self.object.name}: curated SPANZA Journal Watch reviews and expert commentary "
+            "on recent paediatric anaesthesia research, selected by SPANZA members."
         )
         context["canonical_url"] = build_paginated_canonical_url(self.request, self.object.get_absolute_url())
         issue_sd = {
@@ -536,7 +556,8 @@ class IssueListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumb
         context["action_dock_aria_label"] = "Issue list quick navigation"
         context["page_title"] = "Issues | SPANZA Journal Watch"
         context["page_meta_description"] = (
-            "Browse previous SPANZA Journal Watch issues and collections of paediatric anaesthesia literature reviews."
+            "Browse every SPANZA Journal Watch issue: curated collections of paediatric anaesthesia "
+            "literature reviews with expert commentary, published regularly by SPANZA members."
         )
         context["canonical_url"] = build_paginated_canonical_url(self.request, reverse("submissions:issue_list"))
         context["structured_data"] = json.dumps(
@@ -613,7 +634,10 @@ class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMi
         query_params.pop("page", None)
         context["filter_querystring"] = query_params.urlencode()
         context["page_title"] = "Explore topics | SPANZA Journal Watch"
-        context["page_meta_description"] = "Browse topics and themes used across SPANZA Journal Watch reviews."
+        context["page_meta_description"] = (
+            "Explore SPANZA Journal Watch reviews by topic: browse the themes and subject areas "
+            "covered across our paediatric anaesthesia literature reviews."
+        )
         context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:tag_list"))
         context["structured_data"] = json.dumps(
             {
@@ -772,7 +796,20 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
 
         context["article_cols"] = self.article_cols
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
-        context["page_meta_description"] = f"Browse Journal Watch reviews tagged {self.object}."
+        tag_reviews = []
+        for article in self.object.articles.all():
+            latest_review = next(iter(article.reviews.all()), None)
+            if latest_review is not None:
+                tag_reviews.append(latest_review)
+        attach_review_display_fields(tag_reviews)
+        context["tag_reviews"] = tag_reviews
+
+        review_count = len(tag_reviews)
+        count_label = f"{review_count} SPANZA Journal Watch review{'s' if review_count != 1 else ''}"
+        context["page_meta_description"] = (
+            f"{count_label} on {self.object}: summaries and expert commentary on "
+            "paediatric anaesthesia research, selected from the literature by SPANZA members."
+        )
         context["canonical_url"] = build_request_absolute_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
             {
@@ -783,14 +820,6 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
                 "description": context["page_meta_description"],
             }
         )
-
-        tag_reviews = []
-        for article in self.object.articles.all():
-            latest_review = next(iter(article.reviews.all()), None)
-            if latest_review is not None:
-                tag_reviews.append(latest_review)
-        attach_review_display_fields(tag_reviews)
-        context["tag_reviews"] = tag_reviews
 
         return context
 
@@ -837,8 +866,9 @@ class CuratedCollectionDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcr
         context["tag_reviews"] = reviews
         context["article_cols"] = self.article_cols
         context["page_title"] = f"{collection.title} | SPANZA Journal Watch"
-        context["page_meta_description"] = (
-            collection.description or f"A curated collection of reviews: {collection.title}."
+        context["page_meta_description"] = collection.description or (
+            f"{collection.title}: a curated collection of SPANZA Journal Watch reviews and "
+            "expert commentary on paediatric anaesthesia research."
         )
         context["canonical_url"] = build_request_absolute_url(self.request, collection.get_absolute_url())
 
@@ -1093,7 +1123,10 @@ class AuthorDetailView(
         context["show_default_action_dock"] = False
         context["action_dock_aria_label"] = "Author page navigation"
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
-        context["page_meta_description"] = f"Reviews contributed to SPANZA Journal Watch by {self.object}."
+        context["page_meta_description"] = (
+            f"Paediatric anaesthesia literature reviews by {self.object} for SPANZA Journal Watch: "
+            "summaries and expert commentary on recent research of interest to clinicians."
+        )
         context["canonical_url"] = build_paginated_canonical_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
             {
@@ -1514,7 +1547,8 @@ class JournalListView(AnonymousCacheMixin, TemplateView):
         context.update(_journal_browser_context(self.request))
         context["page_title"] = "Journals | Journal Watch"
         context["page_meta_description"] = (
-            "Browse cached PubMed articles from watched journals by month, with filters and community recommendations."
+            "Browse recent paediatric anaesthesia articles from the journals SPANZA Journal Watch follows, "
+            "month by month, with filters and community recommendations for further reading."
         )
         context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:journal_list"))
         context["structured_data"] = json.dumps(

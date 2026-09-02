@@ -211,6 +211,18 @@ python manage.py generate_regression_baseline [--fixture-output path] [--snapsho
 
 ---
 
+## SEO
+
+### `indexnow_submit`
+
+Submits URLs to [IndexNow](https://www.indexnow.org/) so Bing, Yandex and other participating engines re-crawl them promptly. Requires `INDEXNOW_KEY` (the key is served at `/<key>.txt`). Publishing an issue from the backend already queues a submission for the issue, its reviews and their authors; this command covers everything else.
+
+```bash
+python manage.py indexnow_submit                # every URL in the sitemap
+python manage.py indexnow_submit /reviews/foo   # specific paths or absolute URLs
+python manage.py indexnow_submit --dry-run      # list what would be sent
+```
+
 ## Common Workflows
 
 ### After deploying tag changes

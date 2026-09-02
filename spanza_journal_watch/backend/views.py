@@ -45,6 +45,7 @@ from spanza_journal_watch.submissions.models import (
     Review,
     Tag,
 )
+from spanza_journal_watch.submissions.tasks import queue_indexnow_submission
 from spanza_journal_watch.utils.cache import bump_content_cache_version
 
 from .forms import (
@@ -5702,7 +5703,7 @@ def publish_issue_bundle(request, issue_id):
         issue.active = True
         issue.save(update_fields=["active", "modified"])
 
-        reviews = issue.reviews.select_related("article").all()
+        reviews = list(issue.reviews.select_related("article", "author").all())
         for review in reviews:
             if not review.article.active:
                 review.article.active = True
@@ -5712,6 +5713,14 @@ def publish_issue_bundle(request, issue_id):
                 review.save()
 
         transaction.on_commit(bump_content_cache_version)
+
+        # Ask Bing & co. to re-crawl everything this publish changed.
+        indexnow_paths = ["/", reverse("submissions:issue_list"), issue.get_absolute_url()]
+        indexnow_paths += [review.get_absolute_url() for review in reviews]
+        indexnow_paths += [
+            review.author.get_absolute_url() for review in reviews if review.author and not review.author.anonymous
+        ]
+        transaction.on_commit(lambda: queue_indexnow_submission(indexnow_paths))
 
     messages.success(request, "Issue, reviews, and articles are now live.")
     return redirect(f"{reverse('backend:issue_publish')}?issue={issue.pk}")

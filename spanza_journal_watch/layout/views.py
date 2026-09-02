@@ -1,7 +1,7 @@
 import json
 
 from django.conf import settings
-from django.http import FileResponse, HttpRequest, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse
 from django.templatetags.static import static
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
@@ -65,8 +65,8 @@ class HomepageView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListView):
         context["show_default_action_dock"] = False
         context["action_dock_aria_label"] = "Homepage quick navigation"
         context["page_meta_description"] = (
-            "Review highlights from the paediatric anaesthesia literature"
-            " curated by the SPANZA Journal Watch community."
+            "Expert reviews of the latest paediatric anaesthesia research, curated by the SPANZA "
+            "Journal Watch community: concise summaries and clinical commentary for anaesthetists."
         )
         context["canonical_url"] = self.request.build_absolute_uri(self.request.path)
         context["structured_data"] = json.dumps(
@@ -163,3 +163,12 @@ def manifest_view(request: HttpRequest) -> JsonResponse:
         ],
     }
     return JsonResponse(manifest, content_type="application/manifest+json")
+
+
+@require_GET
+@cache_control(max_age=86400, public=True)
+def indexnow_key(request, key):
+    """Serve the IndexNow ownership key at /<key>.txt (see utils.indexnow)."""
+    if not settings.INDEXNOW_KEY or key != settings.INDEXNOW_KEY:
+        raise Http404
+    return HttpResponse(settings.INDEXNOW_KEY, content_type="text/plain")

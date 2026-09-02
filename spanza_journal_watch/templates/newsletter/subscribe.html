@@ -3,7 +3,7 @@
 <form class="input-group input-group-sm" id="subscribe-form">
 {# No {% csrf_token %}: a token baked into CDN-cached markup goes stale, and #}
 {# Django prefers the form field over the X-CSRFToken header htmx sends. #}
-<img id="subscribe-spinner" class="htmx-indicator px-2" src="{% static "images/spinners/pulse-rings-multiple.svg" %}"/>
+<img id="subscribe-spinner" class="htmx-indicator px-2" src="{% static "images/spinners/pulse-rings-multiple.svg" %}" alt=""/>
 {{ form.email }}
 <button class="btn btn-outline-warning btn-sm" type="submit" hx-post="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML" hx-indicator="#subscribe-spinner">Subscribe</button>
 </form>

@@ -454,6 +454,12 @@ OAUTH2_PROVIDER = {
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
 
+# IndexNow (Bing, Yandex, ...) instant URL submission
+# ------------------------------------------------------------------------------
+# Leave INDEXNOW_KEY blank to disable. The key is served at /<key>.txt to prove ownership.
+INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
+INDEXNOW_ENDPOINT = env("INDEXNOW_ENDPOINT", default="https://api.indexnow.org/indexnow")
+
 
 # django-webpack-loader
 # ------------------------------------------------------------------------------

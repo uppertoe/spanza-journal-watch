@@ -1,4 +1,4 @@
-{% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}{% load webpack_fonts %}<!DOCTYPE html>
+{% load static i18n %}{% load render_bundle from webpack_loader %}{% load view_breadcrumbs %}{% load webpack_fonts %}{% load seo_tags %}<!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
   <head><script>
@@ -21,6 +21,7 @@
     {% block canonical_link %}{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}{% endblock canonical_link %}
     {% block robots_meta %}{% if meta_robots %}<meta name="robots" content="{{ meta_robots }}">{% endif %}{% endblock robots_meta %}
     {% block structured_data %}{% if structured_data %}<script type="application/ld+json">{{ structured_data|safe }}</script>{% endif %}{% endblock structured_data %}
+    {% breadcrumb_structured_data %}
     {% block head_meta %}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ page_title|default:"Journal Watch" }}">
