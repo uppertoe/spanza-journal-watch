@@ -7,7 +7,7 @@
   {% if selected_issue and planka_binding %}data-planka-refresh-url="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}"{% endif %}
 >
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span>Planka integration</span>
+    <span>Cards on the board</span>
     {% if planka_binding %}
       <span class="text-muted small">{{ planka_binding.project_name }}</span>
     {% endif %}
@@ -20,8 +20,8 @@
     {% endif %}
 
     {% if not planka_credential %}
-      <div class="alert alert-light border">
-        No DB-backed Planka API key found yet. Use the credential form above on this page first.
+      <div class="alert alert-warning">
+        No Planka connection configured. Set one up in Settings.
       </div>
     {% endif %}
 
@@ -39,124 +39,10 @@
         <div class="text-muted small mt-2">This usually takes about 20 seconds and continues in the background.</div>
       </div>
     {% elif not planka_binding %}
-      <p class="text-muted">
-        Link this issue to a new Planka project. This creates:
-        <strong>Reviews</strong> board (Articles, Candidates, Under review, Publish ready)
-        and <strong>Instructions</strong> board (Reviewers, Editors, Administrators) prefilled from local markdown templates.
-      </p>
-      <form
-        method="post"
-        enctype="multipart/form-data"
-        hx-encoding="multipart/form-data"
-        hx-post="{% url "backend:planka_setup_issue_project" selected_issue.pk %}"
-        hx-target="#planka-sync-panel"
-        hx-swap="outerHTML"
-      >
-        {% csrf_token %}
-        <div class="row g-3">
-          <div class="col-md-6">
-            {{ planka_setup_form.project_name|as_crispy_field }}
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="id_background_asset">Background image (optional)</label>
-            <select class="form-select" name="background_asset" id="id_background_asset">
-              <option value="">No background image</option>
-              {% for asset in planka_background_assets %}
-                <option value="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}" {% if planka_setup_form.background_asset.value|stringformat:"s" == asset.pk|stringformat:"s" %}selected{% endif %}>
-                  {{ asset.name }}
-                </option>
-              {% endfor %}
-            </select>
-            <div class="form-text">Choose from uploaded assets or upload a new image below.</div>
-          </div>
-          <div class="col-12">
-            {{ planka_setup_form.background_upload|as_crispy_field }}
-          </div>
-          <div class="col-12">
-            <div id="planka-bg-preview-wrap" class="d-none">
-              <div class="small text-muted mb-1">Background preview</div>
-              <img id="planka-bg-preview" src="" alt="Selected background preview" class="img-fluid rounded border" style="max-height: 220px; object-fit: cover;" />
-            </div>
-          </div>
-          {% if planka_background_assets %}
-            <div class="col-12">
-              <div class="small text-muted mb-1">Available uploaded backgrounds</div>
-              <div class="d-flex flex-wrap gap-2">
-                {% for asset in planka_background_assets %}
-                  <button
-                    type="button"
-                    class="btn btn-light border p-1 js-bg-pick"
-                    data-asset-id="{{ asset.pk }}"
-                    data-preview-url="{{ asset.image.url }}"
-                    title="{{ asset.name }}"
-                  >
-                    <img src="{{ asset.image.url }}" alt="{{ asset.name }}" style="width: 84px; height: 56px; object-fit: cover;" class="rounded" />
-                  </button>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-          <div class="col-md-4 ms-md-auto">
-            <button type="submit" class="btn btn-primary w-100">Create + link project</button>
-          </div>
-        </div>
-      </form>
-      <script>
-        (() => {
-          const select = document.getElementById("id_background_asset");
-          const upload = document.getElementById("id_background_upload");
-          const preview = document.getElementById("planka-bg-preview");
-          const previewWrap = document.getElementById("planka-bg-preview-wrap");
-          if (!select || !upload || !preview || !previewWrap) return;
-
-          const showPreview = (url) => {
-            if (!url) {
-              preview.src = "";
-              previewWrap.classList.add("d-none");
-              return;
-            }
-            preview.src = url;
-            previewWrap.classList.remove("d-none");
-          };
-
-          const updateFromSelect = () => {
-            const opt = select.options[select.selectedIndex];
-            const url = opt ? opt.getAttribute("data-preview-url") : "";
-            if (url) {
-              upload.value = "";
-            }
-            showPreview(url || "");
-          };
-
-          select.addEventListener("change", updateFromSelect);
-
-          upload.addEventListener("change", () => {
-            const file = upload.files && upload.files[0];
-            if (!file) {
-              updateFromSelect();
-              return;
-            }
-            select.value = "";
-            const reader = new FileReader();
-            reader.onload = (event) => showPreview(event.target?.result || "");
-            reader.readAsDataURL(file);
-          });
-
-          document.querySelectorAll(".js-bg-pick").forEach((button) => {
-            button.addEventListener("click", () => {
-              const id = button.getAttribute("data-asset-id");
-              const url = button.getAttribute("data-preview-url") || "";
-              if (id) {
-                select.value = id;
-                upload.value = "";
-              }
-              showPreview(url);
-            });
-          });
-
-          updateFromSelect();
-        })();
-      </script>
+      <div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-0">
+        <span>This issue has no Planka board yet.</span>
+        <a class="btn btn-sm btn-primary" href="{% url "backend:issue_builder" %}?issue={{ selected_issue.pk }}#planka-panel">Create it on the Setup tab</a>
+      </div>
     {% else %}
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
@@ -169,7 +55,7 @@
                 hx-target="#planka-sync-panel"
                 hx-swap="outerHTML"
               >
-                Publish bucket
+                Publish ready
                 <span class="badge text-bg-secondary ms-1">{{ planka_scope_counts.publish|default:0 }}</span>
               </a>
             </li>
@@ -188,10 +74,10 @@
           </ul>
           {% if planka_publish_summary %}
             <div class="text-muted small mt-1">
-              Cards shown: {{ planka_publish_summary.total }} total ·
+              {{ planka_publish_summary.total }} card{{ planka_publish_summary.total|pluralize }} ·
               {{ planka_publish_summary.valid }} ready ·
-              {{ planka_publish_summary.missing }} missing required fields ·
-              {{ planka_publish_summary.already_imported }} imported/protected
+              {{ planka_publish_summary.missing }} missing fields ·
+              {{ planka_publish_summary.already_imported }} already imported
             </div>
           {% endif %}
         </div>
@@ -208,7 +94,7 @@
 
       {% if planka_board_missing %}
         <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
-          <span>Linked Reviews board is missing in Planka. Recreate and remap the board for this issue.</span>
+          <span>The Reviews board has been deleted in Planka. Recreate it to continue.</span>
           <form
             method="post"
             action="{% url "backend:planka_recreate_issue_board" selected_issue.pk %}"
@@ -242,7 +128,7 @@
                   <th>Card</th>
                   <th>List</th>
                   <th>Article URL</th>
-                  <th>Sync readiness</th>
+                  <th>Ready to import</th>
                   <th></th>
                 </tr>
               </thead>
@@ -271,15 +157,15 @@
                     </td>
                     <td>
                       {% if card.has_associated_review %}
-                        <span class="badge text-bg-secondary">Review exists (protected)</span>
+                        <span class="badge text-bg-secondary">Already imported</span>
                         {% if card.associated_review_id %}
                           <div class="small text-muted">Review ID: {{ card.associated_review_id }}</div>
                         {% endif %}
                       {% endif %}
                       {% if card.is_valid %}
-                        <span class="badge text-bg-success">Valid</span>
+                        <span class="badge text-bg-success">Ready</span>
                       {% else %}
-                        <span class="badge text-bg-danger">Missing required fields</span>
+                        <span class="badge text-bg-danger">Missing fields</span>
                         <div class="small text-danger mt-1">{{ card.missing_required|join:", " }}</div>
                       {% endif %}
                     </td>
@@ -293,7 +179,7 @@
                           data-bs-toggle="modal"
                           data-bs-target="#planka-card-description-modal"
                         >
-                          View card body
+                          View card
                         </button>
                         <button
                           type="button"
@@ -308,9 +194,9 @@
                           History
                         </button>
                         {% if card.has_associated_review %}
-                          <span class="badge text-bg-secondary">Protected</span>
+                          <span class="badge text-bg-secondary">Imported</span>
                         {% else %}
-                          <span class="small text-muted">Select row to import</span>
+                          <span class="small text-muted">Tick to import</span>
                         {% endif %}
                       </div>
                     </td>
@@ -321,8 +207,8 @@
           </div>
 
           <div class="d-flex flex-wrap gap-2 justify-content-end">
-            <button type="submit" name="selection_mode" value="selected" class="btn btn-primary">Create reviews from selected</button>
-            <button type="submit" name="selection_mode" value="publish_bucket" class="btn btn-outline-primary">Create reviews from Publish bucket</button>
+            <button type="submit" name="selection_mode" value="selected" class="btn btn-primary">Import selected</button>
+            <button type="submit" name="selection_mode" value="publish_bucket" class="btn btn-outline-primary">Import all Publish ready</button>
           </div>
         </form>
 
@@ -354,7 +240,7 @@
           </div>
         </div>
       {% else %}
-        <div class="alert alert-light border mb-0">No cards loaded yet. Click <strong>Refresh cards</strong>.</div>
+        <div class="alert alert-light border mb-0">No cards in this list. Click <strong>Refresh cards</strong> to check the board again.</div>
       {% endif %}
     {% endif %}
   </div>

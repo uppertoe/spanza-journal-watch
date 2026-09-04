@@ -7,17 +7,17 @@
   </div>
   <div class="card-body">
     <p class="text-muted small mb-3">
-      Add reviewers one at a time, then send invites. Invite links are valid for {{ issue_invite_ttl_days }} days.
+      Add each reviewer, then send the invites. Links stay valid for {{ issue_invite_ttl_days }} days.
     </p>
 
     {% if not planka_binding %}
       {% if not is_coordinator_only %}
       <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
-        <span>No Planka board is linked to this issue. Set one up before inviting contributors.</span>
+        <span>Create the Planka board on the Setup tab before inviting reviewers.</span>
         <a
           class="btn btn-sm btn-warning ms-auto"
-          href="{{ request.path }}#planka-panel"
-        >Set up Planka</a>
+          href="{% url "backend:issue_builder" %}?issue={{ selected_issue.pk }}#planka-panel"
+        >Go to Setup</a>
       </div>
       {% endif %}
     {% else %}

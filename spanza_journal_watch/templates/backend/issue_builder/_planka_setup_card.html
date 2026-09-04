@@ -1,23 +1,11 @@
 {% load crispy_forms_tags %}
 
 {% if planka_binding %}
-<div class="card mb-0">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span>Planka board</span>
-    <span class="badge text-bg-success">Connected</span>
-  </div>
-  <div class="card-body">
-    <p class="mb-1">Board linked: <strong>{{ planka_binding.project_name }}</strong></p>
-    <p class="text-muted small mb-0">
-      To import completed reviews from Planka, use the
-      <a href="{% url "backend:issue_planka_import" %}?issue={{ selected_issue.pk }}">Pull Reviews</a> tab.
-    </p>
-  </div>
-</div>
+{% include "backend/issue_builder/_planka_project_context_card.html" %}
 {% else %}
   {% if not planka_credential %}
     <div class="alert alert-warning">
-      No Planka API key configured. Contact your administrator to set one up before this board can be initialised.
+      No Planka connection configured. Set one up in Settings before creating the board.
     </div>
   {% else %}
     {% if planka_setup_job and planka_setup_job.is_in_progress %}
@@ -26,15 +14,13 @@
     <div id="planka-sync-panel" class="card mb-0"
       data-planka-disconnected="{% if planka_disconnected %}true{% else %}false{% endif %}"
     >
-      <div class="card-header">Initialise Planka board</div>
+      <div class="card-header">Planka board</div>
       <div class="card-body">
         {% if planka_panel_status %}
           <div class="alert alert-{{ planka_panel_status_level|default:'info' }} py-2">{{ planka_panel_status }}</div>
         {% endif %}
         <p class="text-muted mb-3">
-          Link this issue to a new Planka project. This creates a
-          <strong>Reviews</strong> board (Articles, Candidates, Under review, Publish ready)
-          and an <strong>Instructions</strong> board prefilled from local templates.
+          Creates a Planka project named after this issue, with a <strong>Reviews</strong> board and an <strong>Instructions</strong> board for reviewers.
         </p>
         <form
           id="planka-setup-form"
@@ -51,40 +37,42 @@
           {% csrf_token %}
           <input type="hidden" name="from_setup_page" value="1">
           <div class="row g-3">
-            <div class="col-md-6">
-              {{ planka_setup_form.project_name|as_crispy_field }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="id_background_asset">Background image (optional)</label>
-              <select class="form-select" name="background_asset" id="id_background_asset">
-                <option value="">No background image</option>
-                {% for asset in planka_background_assets %}
-                  <option value="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}"
-                    {% if planka_setup_form.background_asset.value|stringformat:"s" == asset.pk|stringformat:"s" %}selected{% endif %}>
-                    {{ asset.name }}
-                  </option>
-                {% endfor %}
-              </select>
-              <div class="form-text">Choose from uploaded assets or upload a new image below.</div>
-            </div>
             <div class="col-12">
-              {{ planka_setup_form.background_upload|as_crispy_field }}
-            </div>
-            {% if planka_background_assets %}
-              <div class="col-12">
-                <div class="small text-muted mb-1">Available uploaded backgrounds</div>
-                <div class="d-flex flex-wrap gap-2">
-                  {% for asset in planka_background_assets %}
-                    <button type="button" class="btn btn-light border p-1 js-bg-pick"
-                      data-asset-id="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}" title="{{ asset.name }}">
-                      <img src="{{ asset.image.url }}" alt="{{ asset.name }}" style="width: 84px; height: 56px; object-fit: cover;" class="rounded">
-                    </button>
-                  {% endfor %}
+              <details>
+                <summary class="text-muted small">Board background (optional)</summary>
+                <div class="row g-3 mt-0">
+                  <div class="col-md-6">
+                    <label class="form-label" for="id_background_asset">Uploaded image</label>
+                    <select class="form-select" name="background_asset" id="id_background_asset">
+                      <option value="">No background image</option>
+                      {% for asset in planka_background_assets %}
+                        <option value="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}"
+                          {% if planka_setup_form.background_asset.value|stringformat:"s" == asset.pk|stringformat:"s" %}selected{% endif %}>
+                          {{ asset.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    {{ planka_setup_form.background_upload|as_crispy_field }}
+                  </div>
+                  {% if planka_background_assets %}
+                    <div class="col-12">
+                      <div class="d-flex flex-wrap gap-2">
+                        {% for asset in planka_background_assets %}
+                          <button type="button" class="btn btn-light border p-1 js-bg-pick"
+                            data-asset-id="{{ asset.pk }}" data-preview-url="{{ asset.image.url }}" title="{{ asset.name }}">
+                            <img src="{{ asset.image.url }}" alt="{{ asset.name }}" style="width: 84px; height: 56px; object-fit: cover;" class="rounded">
+                          </button>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  {% endif %}
                 </div>
-              </div>
-            {% endif %}
+              </details>
+            </div>
             <div class="col-md-4 ms-md-auto">
-              <button type="submit" class="btn btn-primary w-100">Create + link project</button>
+              <button type="submit" class="btn btn-primary w-100">Create Planka board</button>
             </div>
             <div class="col-12">
               {# Shown by hx-indicator while the request is in flight: upload progress, then hand-off to the worker. #}

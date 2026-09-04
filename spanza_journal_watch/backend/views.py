@@ -4178,6 +4178,10 @@ def _issue_builder_base_context(
     if issue:
         binding = PlankaIssueBinding.objects.filter(issue=issue).first()
         context["planka_binding"] = binding
+        planka_base = (
+            getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", "") or ""
+        ).rstrip("/")
+        context["planka_board_url"] = f"{planka_base}/boards/{binding.board_id}" if binding and planka_base else ""
         context["planka_setup_job"] = PlankaProjectSetupJob.objects.filter(issue=issue).first()
         context["planka_setup_form"] = PlankaProjectSetupForm(initial={"project_name": issue.name})
         if binding and binding.background_asset_id:
@@ -4241,6 +4245,18 @@ def _get_issue_review_readiness(issue):
         is_ready = all(i["ok"] for i in indicators if i["required"])
         result.append({"review": review, "indicators": indicators, "is_ready": is_ready})
     return result
+
+
+def _publish_summary(issue, readiness):
+    """Counts and blockers shown at the top of the Publish tab."""
+    if not issue:
+        return None
+    return {
+        "total": len(readiness),
+        "ready": sum(1 for item in readiness if item["is_ready"]),
+        "live": sum(1 for item in readiness if item["review"].active),
+        "errors": _validate_issue_publish(issue),
+    }
 
 
 def _validate_issue_publish(issue):
@@ -4312,6 +4328,7 @@ def issue_publish(request):
     context = _issue_builder_base_context(issue=issue)
     context["current_homepage"] = current_homepage
     context["review_readiness"] = _get_issue_review_readiness(issue)
+    context["publish_summary"] = _publish_summary(issue, context["review_readiness"])
     return render(request, "backend/issue_builder/issue_publish.html", context)
 
 
@@ -4367,6 +4384,7 @@ def toggle_review_active(request, review_id):
     context = _issue_builder_base_context(issue=issue)
     context["current_homepage"] = current_homepage
     context["review_readiness"] = _get_issue_review_readiness(issue)
+    context["publish_summary"] = _publish_summary(issue, context["review_readiness"])
     return render(request, "backend/issue_builder/_publish_reviews_panel.html", context)
 
 
@@ -5919,11 +5937,12 @@ def planka_setup_issue_project(request, issue_id):
         return render_card(
             request,
             issue,
-            panel_status="Project name is required.",
+            panel_status="Check the background image and try again.",
             panel_status_level="danger",
         )
 
-    project_name = form.cleaned_data["project_name"]
+    # The project takes the issue's name unless the form (older clients, tests) supplies one.
+    project_name = form.cleaned_data.get("project_name") or issue.name
     try:
         background_asset = _resolve_background_asset(form, request.user)
     except ValueError as error:
@@ -6121,7 +6140,7 @@ def planka_update_project_name(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     form = PlankaProjectNameForm(request.POST)
-    redirect_url = f"{reverse('backend:issue_planka_import')}?issue={issue.pk}"
+    redirect_url = f"{reverse('backend:issue_builder')}?issue={issue.pk}#planka-panel"
 
     if not form.is_valid():
         if request.headers.get("HX-Request") == "true":
@@ -6174,7 +6193,7 @@ def planka_make_project_shared(request, issue_id):
 
     issue = get_object_or_404(Issue, pk=issue_id)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
-    redirect_url = f"{reverse('backend:issue_planka_import')}?issue={issue.pk}"
+    redirect_url = f"{reverse('backend:issue_builder')}?issue={issue.pk}#planka-panel"
 
     try:
         client = _build_planka_client()
@@ -6212,7 +6231,7 @@ def planka_update_project_background(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     form = PlankaProjectBackgroundForm(request.POST, request.FILES)
-    redirect_url = f"{reverse('backend:issue_planka_import')}?issue={issue.pk}"
+    redirect_url = f"{reverse('backend:issue_builder')}?issue={issue.pk}#planka-panel"
 
     if not form.is_valid():
         if request.headers.get("HX-Request") == "true":

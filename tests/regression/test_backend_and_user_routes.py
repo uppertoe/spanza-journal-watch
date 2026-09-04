@@ -500,7 +500,7 @@ class TestIssueBuilderPlankaIntegration:
 
         assert response.status_code == 200
         body = response.content.decode("utf-8", errors="ignore")
-        assert "Planka Sync" in body
+        assert "Pull Reviews" in body
         assert "Select an issue to use Planka sync." not in body
 
     def test_planka_import_page_preloads_publish_cards(self, route_client, regression_baseline, monkeypatch):

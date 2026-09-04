@@ -5,7 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Publish</h1>
 </div>
-<p class="text-muted">Review readiness, publish individual reviews, and set the homepage.</p>
+<p class="text-muted">Make the reviews live, then set this issue as the homepage.</p>
 
 {% if selected_issue %}
 
@@ -50,10 +50,15 @@
     {% if current_homepage and current_homepage.issue == selected_issue %}
       <p class="text-success mb-0">&#10003; This issue is the current homepage.</p>
     {% else %}
+      {% if publish_summary and publish_summary.live == 0 %}
+        <div class="alert alert-warning py-2 small">No reviews are live yet. Publish them first, or the homepage will show an empty issue.</div>
+      {% else %}
+        <p class="text-muted small">{{ publish_summary.live }} of {{ publish_summary.total }} review{{ publish_summary.total|pluralize }} will be visible. Draft reviews stay hidden.</p>
+      {% endif %}
       <form method="post" action="{% url "backend:issue_set_homepage" %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-primary"
-          onclick="return confirm('Set {{ selected_issue.name }} as the homepage?')">
+          onclick="return confirm('Show {{ selected_issue.name|escapejs }} on the homepage, with {{ publish_summary.live|default:0 }} live review{{ publish_summary.live|default:0|pluralize }}?')">
           Set {{ selected_issue.name }} as homepage
         </button>
       </form>

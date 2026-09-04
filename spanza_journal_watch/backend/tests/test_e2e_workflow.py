@@ -198,8 +198,8 @@ class TestStage1IssueAndReview:
         response = client.get(reverse("backend:issue_builder") + "?issue=new")
         assert response.status_code == 200
         content = response.content.decode()
-        assert "Create issue draft" in content
-        assert "Edit issue draft" not in content
+        assert "New issue</div>" in content
+        assert "Create issue</button>" in content
 
     def test_add_review_creates_article_author_and_links_to_issue(self):
         issue = Issue.objects.create(name="March 2024", active=False, body="Body.")

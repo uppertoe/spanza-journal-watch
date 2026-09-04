@@ -595,7 +595,7 @@ class IssueContributorInviteForm(forms.Form):
 
 
 class PlankaProjectSetupForm(forms.Form):
-    project_name = forms.CharField(max_length=128)
+    project_name = forms.CharField(max_length=128, required=False)
     background_asset = forms.ModelChoiceField(
         queryset=PlankaBoardBackgroundAsset.objects.none(),
         required=False,
@@ -612,7 +612,7 @@ class PlankaProjectSetupForm(forms.Form):
         self.fields["background_asset"].queryset = PlankaBoardBackgroundAsset.objects.order_by("name")
 
     def clean_project_name(self):
-        return self.cleaned_data["project_name"].strip()
+        return (self.cleaned_data.get("project_name") or "").strip()
 
     def clean(self):
         cleaned_data = super().clean()

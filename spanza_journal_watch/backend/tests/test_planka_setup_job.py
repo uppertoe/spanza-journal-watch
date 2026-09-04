@@ -85,6 +85,17 @@ class TestSetupRequest:
         assert 'hx-trigger="every 1s"' in body
         assert not PlankaIssueBinding.objects.filter(issue=issue).exists()
 
+    def test_post_without_name_uses_issue_name(self, client):
+        _chief_editor_client(client)
+        PlankaIntegrationCredential.objects.create(api_key="test-api-key")
+        issue = Issue.objects.create(name="October 2026", body="body")
+
+        with patch("spanza_journal_watch.backend.views.provision_planka_project_task.delay"):
+            response = client.post(_setup_url(issue), data={"from_setup_page": "1"}, HTTP_HX_REQUEST="true")
+
+        assert response.status_code == 200
+        assert PlankaProjectSetupJob.objects.get(issue=issue).project_name == "October 2026"
+
     def test_second_post_while_running_does_not_requeue(self, client):
         _chief_editor_client(client)
         issue = Issue.objects.create(name="Busy Issue", body="body")
@@ -109,7 +120,7 @@ class TestSetupRequest:
 
         body = response.content.decode()
         assert 'hx-trigger="every 1s"' in body
-        assert "Create + link project" not in body
+        assert "Create Planka board" not in body
 
     def test_form_carries_timeout_and_indicator(self, client):
         _chief_editor_client(client)
@@ -159,7 +170,7 @@ class TestStatusPolling:
         body = client.get(_status_url(issue)).content.decode()
 
         assert "Planka said no" in body
-        assert "Create + link project" in body
+        assert "Create Planka board" in body
         assert "every 1s" not in body
 
     def test_stale_running_job_is_reported_not_polled_forever(self, client):

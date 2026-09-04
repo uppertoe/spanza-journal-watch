@@ -1,5 +1,13 @@
-<div class="card mb-3" id="planka-project-context-card">
-  <div class="card-header">Planka board context</div>
+<div class="card mb-0" id="planka-project-context-card">
+  <div class="card-header d-flex justify-content-between align-items-center gap-2">
+    <span>Planka board</span>
+    <span class="d-flex align-items-center gap-2">
+      <span class="badge text-bg-success">Connected</span>
+      {% if planka_board_url %}
+        <a class="btn btn-sm btn-outline-primary" href="{{ planka_board_url }}" target="_blank" rel="noopener noreferrer">Open board</a>
+      {% endif %}
+    </span>
+  </div>
   <div class="card-body">
     {% if planka_context_status %}
       <div class="alert alert-{{ planka_context_status_level|default:'info' }} py-2">
@@ -25,7 +33,10 @@
     {% endif %}
 
     <div class="d-flex justify-content-between align-items-start gap-3">
-      <h4 class="mb-1">{{ planka_binding.project_name }}</h4>
+      <div>
+        <div class="fw-semibold">{{ planka_binding.project_name }}</div>
+        <div class="text-muted small">Coordinators and reviewers join the board automatically when they accept their invitations.</div>
+      </div>
       <button
         class="btn btn-sm btn-outline-secondary"
         type="button"
@@ -34,7 +45,7 @@
         aria-expanded="false"
         aria-controls="planka-project-name-controls"
       >
-        Edit project name
+        Rename
       </button>
     </div>
 

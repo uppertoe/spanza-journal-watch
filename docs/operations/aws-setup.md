@@ -1,400 +1,225 @@
 # AWS setup — S3, SES, and SNS
 
-This document covers the complete AWS configuration for a production deployment:
-the S3 bucket layout and IAM policies, SES domain setup and SMTP credentials,
-and SNS-based bounce/complaint tracking for the Django webhook.
+Everything Journal Watch needs from AWS: three S3 buckets, three
+least-privilege IAM users, an SES sending identity with tracking events, and
+the SNS topics that feed Django's Anymail webhooks.
+
+`deploy/bootstrap/aws_setup.py` is the source of truth for how these
+resources are named and wired. **Read it before running any `aws` CLI
+command that mutates SES, SNS or IAM** — ad-hoc changes to the event
+destination have broken the webhook before. If a change does not fit the
+script's pattern, change the script.
 
 ---
 
-## Automated setup
+## Running the script
 
-Most of the infrastructure can be provisioned in a single command:
+Run from this repo on your local machine with **admin** AWS credentials (not
+the service keys that go into `.env`). It needs boto3; use a venv rather than
+the system Python.
 
 ```bash
-# Requires admin AWS credentials (not the service credentials in .env)
+python3 -m venv /tmp/jw-ops-venv && source /tmp/jw-ops-venv/bin/activate
+pip install boto3
+
 python deploy/bootstrap/aws_setup.py \
-  --bucket your-bucket-name \
-  --domain yourdomain.com \
-  --webhook-secret "$(grep WEBHOOK_SECRET .env | cut -d= -f2)"
+  --profile <admin-profile> \
+  --bucket <app-bucket> \
+  --domain journalwatch.org.au \
+  --webhook-secret "$(grep '^WEBHOOK_SECRET=' /path/to/apps/journal-watch/.env | cut -d= -f2-)" \
+  --enable-inbound
 ```
 
-Run the isolated AWS provisioning tests with:
+The script is idempotent: existing resources are skipped or have their
+policy re-applied; access keys are only created for users that have none.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--bucket` | required | App bucket (Django media and inbound email) |
+| `--planka-bucket` | `<bucket>-planka` | Dedicated Planka bucket |
+| `--backup-bucket` | `<bucket>-backups` | Dedicated Restic bucket |
+| `--domain` | required | App domain, used in the SNS webhook URLs |
+| `--ses-domain` | `--domain` | Domain for the SES identity; set to the production domain when reusing an already-verified identity (staging) |
+| `--region` | `ap-southeast-2` | AWS region |
+| `--profile` | default chain | Named profile from `~/.aws/config` |
+| `--webhook-secret` | empty | `WEBHOOK_SECRET` from the app env, used only to print the ready-to-run `aws sns subscribe` commands |
+| `--suffix` | empty | Appended to IAM user names, the SNS topics and the SES configuration set (`staging` → `jw-django-staging`, `TrackingConfigSet-staging`) |
+| `--enable-inbound` | off | Also create the SES inbound receipt rule set and inbound SNS topic |
+| `--backup-noncurrent-expiration-days` | `0` (off) | Lifecycle rule expiring noncurrent versions under `backups/` in the app bucket |
+
+Unit tests for the script (they mock boto3 and need no credentials):
 
 ```bash
-python3 -m pytest -q -o addopts='' deploy/bootstrap/tests/test_aws_setup.py
+docker compose -f local.yml run --rm django pytest -q -o addopts='' deploy/bootstrap/tests/test_aws_setup.py
 ```
 
-The script is **idempotent** — safe to run multiple times.
+### What the script creates
 
-### What the script does automatically
+| Resource | Details |
+|----------|---------|
+| App bucket | versioning on; SSE-S3; public ACLs blocked but bucket policies allowed; bucket policy granting public `s3:GetObject` on `media/*`; lifecycle rule aborting incomplete multipart uploads after 7 days |
+| Planka bucket | versioning on; SSE-S3; no public read |
+| Backup bucket | versioning **off**; SSE-S3; no public read |
+| IAM `jw-django[-suffix]` | `media/*` read/write/delete, `email/*` read, `ListBucket` limited to those prefixes, `ses:SendEmail`/`ses:SendRawEmail`, `sns:ConfirmSubscription` |
+| IAM `jw-planka[-suffix]` | full object access and `ListBucket` on the Planka bucket only |
+| IAM `jw-backup[-suffix]` | full object access, `ListBucket` and `GetBucketLocation` on the backup bucket only |
+| Access keys | one pair per newly created user, printed once |
+| SES identity | `--ses-domain`, Easy DKIM with 2048-bit keys; DKIM CNAMEs printed (skipped when reusing an existing identity) |
+| SES configuration set | `TrackingConfigSet[-suffix]` — matches `ANYMAIL_CONFIGURATION_SET_NAME` in the app env |
+| SNS topic | `journalwatch-ses-events[-suffix]` |
+| SES event destination | `TrackingToSNS[-suffix]` on the configuration set, sending `BOUNCE`, `COMPLAINT`, `DELIVERY_DELAY`, `REJECT`, `RENDERING_FAILURE` and `SUBSCRIPTION` to the topic |
+| Inbound (with `--enable-inbound`) | SNS topic `journalwatch-ses-inbound[-suffix]`; receipt rule set `journalwatch-inbound[-suffix]` made active; catch-all rule `ReceiveToS3SNS[-suffix]` writing to the app bucket under `email/` and notifying the inbound topic; bucket policy statement allowing `ses.amazonaws.com` to put objects under `email/*` |
 
-| Resource | Action |
-|----------|--------|
-| S3 bucket | Creates with versioning, block-all-public-access, SSE-S3, lifecycle rules |
-| IAM user `jw-django` | Creates with scoped `media/*` + `email/*` + SES send policy |
-| IAM user `jw-planka` | Creates with scoped `attachments/*`-only policy |
-| IAM user `jw-backup` | Creates with scoped `backups/*`-only policy |
-| IAM access keys | Generates one key per new user, printed once for `.env` |
-| SES email identity | Creates domain identity and returns DKIM DNS records |
-| SES configuration set | Creates `TrackingConfigSet` |
-| SNS topic | Creates `journalwatch-ses-events` |
-| SES → SNS routing | Wires Bounce + Complaint events to the SNS topic |
+### What still needs a human
 
-### What still requires manual steps
+| Step | Why |
+|------|-----|
+| Add the printed DNS records (`_amazonses` TXT, three DKIM CNAMEs, MX if inbound) | your DNS provider |
+| Request SES production access | AWS reviews manually, roughly 24 h |
+| Run the printed `aws sns subscribe` command(s) | Django must be publicly reachable to confirm |
+| Create SES SMTP credentials | only the SES console can mint them; used by the VPS backup alerts |
 
-| Step | Why it can't be automated |
-|------|--------------------------|
-| Add DNS records (TXT + CNAME × 3) | Must be added via your DNS provider |
-| SES production access request | AWS reviews manually; ~24h turnaround |
-| SNS webhook subscription | Requires Django to be publicly reachable |
-| SES SMTP credentials | Must be created via AWS console (for backup email notifications) |
-
-The script prints exact instructions and commands for each of these.
+The script prints exact instructions for each.
 
 ---
 
-## S3 bucket layout
+## Bucket layout
 
-A single bucket is shared by four consumers, each with a distinct prefix:
+```text
+<app-bucket>/
+├── media/          Django uploads (IAM jw-django; public read via bucket policy;
+│                   proxied same-origin by Caddy at /media/*)
+└── email/          inbound SES mail (written by SES, read by jw-django)
 
-```
-your-bucket/
-├── attachments/    ← Planka card attachments (IAM: jw-planka)
-├── email/          ← Inbound SES emails, written by SES rule action (IAM: jw-django)
-├── media/          ← Django media files — images, CSVs (IAM: jw-django)
-│   ├── backend/
-│   ├── issues/
-│   └── uploads/
-└── backups/        ← Restic-encrypted database backups (IAM: jw-backup)
+<planka-bucket>/    Planka attachments and backgrounds (IAM jw-planka)
+
+<backup-bucket>/    Restic repositories, one per service (IAM jw-backup)
 ```
 
-Static files are **not** stored in S3 — they are served by Whitenoise directly
-from the Django container.
+Static files are not in S3 — `collectstatic` writes them to the
+`jw_staticfiles` volume and Caddy serves them.
+
+The `media/*` public-read policy is what lets Caddy's `/media/*` proxy fetch
+objects without signing requests; `AWS_QUERYSTRING_AUTH` is off in
+`config/settings/production.py` for the same reason.
 
 ---
 
-## Step 1 — Create the S3 bucket
+## Where the credentials go
 
-In the AWS console (or CLI), create one bucket named however you like
-(e.g. `journalwatch-prod`).
+| User | Destination |
+|------|-------------|
+| `jw-django` | `apps/journal-watch/.env` on the host → `DJANGO_AWS_ACCESS_KEY_ID`, `DJANGO_AWS_SECRET_ACCESS_KEY`, `DJANGO_AWS_STORAGE_BUCKET_NAME`, `DJANGO_AWS_S3_REGION_NAME`, `DJANGO_AWS_DEFAULT_REGION` |
+| `jw-planka` | `apps/journal-watch/.env` → `PLANKA_S3_BUCKET`, `PLANKA_S3_ACCESS_KEY_ID`, `PLANKA_S3_SECRET_ACCESS_KEY`, `PLANKA_S3_REGION` |
+| `jw-backup` | server repo `backup/config.env` → `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`; the bucket goes into each `backup/services/*.env` as `RESTIC_REPOSITORY=s3:s3.amazonaws.com/<backup-bucket>/<service>`; deployed to `/etc/restic/` by `ansible/backup.yml` |
 
-### Required bucket settings
+The script's output labels the backup box `/etc/restic/env`; that is the
+pre-scaffold path. The current scaffold reads `/etc/restic/config.env` and
+`/etc/restic/services/<service>.env`, both written by Ansible from the server
+repo — edit them there, not on the host.
 
-| Setting | Value |
-|---------|-------|
-| Block all public access | **On** (all four checkboxes) |
-| Versioning | **Enabled** — protects media files from accidental overwrite |
-| Default encryption | SSE-S3 (AES-256) or SSE-KMS |
-| Object ownership | Bucket owner enforced (disables ACLs) |
-
-> **Note on ACLs**: `MediaRootS3Boto3Storage` does not set an ACL
-> (`default_acl` is unset), so no ACL is applied to uploaded objects and
-> bucket owner enforced mode works correctly.
-
-### Recommended lifecycle rules
-
-These rules keep the bucket tidy and control backup retention costs:
-
-1. **Expire incomplete multipart uploads** — expire after 7 days (applies to all
-   prefixes). Prevents orphaned in-progress uploads accumulating.
-
-2. **Expire old backup versions** — apply to prefix `backups/`, expire
-   non-current versions after 90 days.
+After editing the app env on the host, recreate the services
+(`docker compose up -d journal-watch jw_celeryworker jw_planka`), never
+`restart`.
 
 ---
 
-## Step 2 — Create IAM users
+## SES
 
-Create **three** IAM users with no console access (programmatic access only).
-Name them however you like; the names below are suggestions.
+### Sending
 
-### 2a. `jw-django` — app media + SES sending
+The app sends through the SES API (`anymail.backends.amazon_ses.EmailBackend`)
+with the `jw-django` keys, in `ap-southeast-2`, tagging every message with
+the `TrackingConfigSet` configuration set. Nothing in the app uses SMTP.
 
-This user is referenced by `DJANGO_AWS_ACCESS_KEY_ID` / `DJANGO_AWS_SECRET_ACCESS_KEY`.
+New AWS accounts are sandboxed (verified recipients only) until production
+access is granted from **SES → Account dashboard → Request production
+access**.
 
-**Inline policy — `jw-django-policy`:**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "S3MediaReadWrite",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/media/*"
-    },
-    {
-      "Sid": "S3InboundEmailRead",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject"
-      ],
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/email/*"
-    },
-    {
-      "Sid": "S3ListBucket",
-      "Effect": "Allow",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME",
-      "Condition": {
-        "StringLike": {
-          "s3:prefix": ["media/*", "email/*"]
-        }
-      }
-    },
-    {
-      "Sid": "SESSend",
-      "Effect": "Allow",
-      "Action": [
-        "ses:SendEmail",
-        "ses:SendRawEmail"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
+### SMTP credentials (backup alerts only)
+
+The VPS backup role sends failure/success mail via msmtp. Create credentials
+at **SES → SMTP settings → Create SMTP credentials** (the password is shown
+once) and put them in the server repo's `backup/config.env`:
+
+```text
+ALERT_EMAIL=you@example.com
+SMTP_HOST=email-smtp.ap-southeast-2.amazonaws.com
+SMTP_PORT=587
+SMTP_TLS=on
+SMTP_USER=<SMTP username>
+SMTP_PASSWORD=<SMTP password>
+SMTP_FROM=backup@journalwatch.org.au
 ```
 
-### 2b. `jw-planka` — Planka bucket only
+Then `ansible-playbook -i ansible/hosts ansible/backup.yml` from the server
+repo.
 
-This user is referenced by `PLANKA_S3_ACCESS_KEY_ID` / `PLANKA_S3_SECRET_ACCESS_KEY`.
-It should use a dedicated bucket referenced by `PLANKA_S3_BUCKET`.
+### DMARC and BIMI
 
-**Inline policy — `jw-planka-policy`:**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "S3PlankaBucketObjects",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": "arn:aws:s3:::YOUR-PLANKA-BUCKET/*"
-    },
-    {
-      "Sid": "S3ListBucket",
-      "Effect": "Allow",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::YOUR-PLANKA-BUCKET"
-    }
-  ]
-}
-```
-
-### 2c. `jw-backup` — Restic backups only
-
-This user's credentials belong to the server repo / VPS backup layer, not to
-any Journal Watch Docker service.
-
-**Inline policy — `jw-backup-policy`:**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "S3BackupReadWrite",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/backups/*"
-    },
-    {
-      "Sid": "S3ListBucket",
-      "Effect": "Allow",
-      "Action": [
-        "s3:ListBucket",
-        "s3:GetBucketLocation"
-      ],
-      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME",
-      "Condition": {
-        "StringLike": {
-          "s3:prefix": "backups/*"
-        }
-      }
-    }
-  ]
-}
-```
-
-Generate access keys for each user and record them in the appropriate place:
-
-| User | Where credentials go |
-|------|---------------------|
-| `jw-django` | `.env` → `DJANGO_AWS_ACCESS_KEY_ID` / `DJANGO_AWS_SECRET_ACCESS_KEY` |
-| `jw-planka` | `.env` → `PLANKA_S3_ACCESS_KEY_ID` / `PLANKA_S3_SECRET_ACCESS_KEY` |
-| `jw-backup` | `/etc/restic/env` → `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` |
+Once the identity is verified and DKIM is passing, add the DMARC and BIMI
+records described under "Email authentication DNS" in
+[production-deploy.md](production-deploy.md).
+`python manage.py check_email_auth` inside the app container reports SPF,
+DKIM and DMARC status.
 
 ---
 
-## Step 3 — Amazon SES
+## SNS webhooks
 
-### 3a. Verify your sending domain
+Anymail receives SES events over HTTPS subscriptions. Both endpoints are
+protected by HTTP basic auth using `WEBHOOK_SECRET` from the app env, which
+must therefore be in `username:password` form. The secret is embedded in
+the subscription URL as the userinfo part — not as a query parameter.
 
-1. Go to **SES → Verified identities → Create identity**.
-2. Choose **Domain**, enter `yourdomain.com`.
-3. Enable **Easy DKIM** — SES generates three CNAME records.
-4. Add the CNAME records to your DNS.
-5. Also add the provided TXT record for domain verification.
-6. Wait for "Verification status: Verified" (usually a few minutes).
+Tracking events (bounces, complaints, delivery delays, rejects, rendering
+failures, subscription changes):
 
-### 3b. Request production access (exit the sandbox)
-
-New SES accounts are in the **sandbox** — they can only send to verified
-addresses. You must request production access:
-
-1. Go to **SES → Account dashboard → Request production access**.
-2. Fill in the form; typical approval time is 24 hours.
-
-### 3c. Create SMTP credentials
-
-The backup notification emails (sent by msmtp from the VPS) use SMTP, not
-the SES API. Create dedicated SMTP credentials:
-
-1. Go to **SES → SMTP settings → Create SMTP credentials**.
-2. Give the IAM user a name (e.g. `ses-smtp-user`).
-3. Download the credentials file — **this is the only time the SMTP password
-   is shown**.
-4. Add to `/etc/restic/env`:
-   ```
-   SMTP_USER=<SMTP username from download>
-   SMTP_PASSWORD=<SMTP password from download>
-   SMTP_HOST=email-smtp.ap-southeast-2.amazonaws.com
-   SMTP_PORT=587
-   SMTP_TLS=on
-   ```
-
-> The Django app sends email via the SES **API** (boto3 / anymail), using the
-> `jw-django` IAM credentials above — not SMTP. SMTP credentials are only
-> needed for backup notifications from the VPS.
-
-### 3d. Create a configuration set
-
-The configuration set is named `TrackingConfigSet` in `settings/production.py`.
-
-1. Go to **SES → Configuration sets → Create set**.
-2. Name it exactly **`TrackingConfigSet`**.
-3. Leave all other settings as defaults for now — you will add an SNS
-   destination in the next step.
-
-### 3e. Add DMARC and BIMI DNS records
-
-Once SES domain verification and DKIM are passing, complete the mailbox-branding
-setup by adding DMARC and BIMI records in DNS.
-
-- DMARC is required by Gmail for bulk senders.
-- BIMI enables supported inboxes to show the Journal Watch logo next to your mail.
-
-The full record values, asset path, and verification checklist are documented in
-[production-deploy.md](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/docs/operations/production-deploy.md)
-under:
-
-- `Step 3b — Email authentication DNS records`
-- `BIMI (brand logo in inbox)`
-
----
-
-## Step 4 — SNS for bounce and complaint tracking
-
-Django's anymail integration receives bounce and complaint events via an SNS
-HTTP subscription, which Django then records for subscriber management.
-
-### 4a. Create an SNS topic
-
-1. Go to **SNS → Topics → Create topic**.
-2. Type: **Standard**.
-3. Name: `journalwatch-ses-events` (or similar).
-4. Leave encryption, access policy, etc. as defaults.
-5. Copy the **Topic ARN** — you need it in the next step.
-
-### 4b. Add SNS as an SES configuration set destination
-
-1. Go to **SES → Configuration sets → TrackingConfigSet → Event destinations**.
-2. Click **Add destination**.
-3. Event types: select **Bounce** and **Complaint** (and optionally Delivery).
-4. Destination type: **Amazon SNS**.
-5. Select the topic you just created.
-6. Save.
-
-### 4c. Subscribe Django to the SNS topic
-
-Django's anymail SNS webhook listens at `/anymail/amazon_ses/tracking/`.
-
-1. Go to **SNS → Topics → journalwatch-ses-events → Create subscription**.
-2. Protocol: **HTTPS**.
-3. Endpoint: `https://yourdomain.com/anymail/amazon_ses/tracking/`
-4. Click **Create subscription** — SNS immediately sends a `SubscriptionConfirmation`
-   request to the URL.
-5. Django automatically confirms the subscription (anymail handles this).
-   Check the subscription status — it should change to **Confirmed** within
-   a few seconds once your app is running.
-
-### 4d. Set the webhook secret
-
-The `WEBHOOK_SECRET` in `.env` is used by anymail to verify that SNS
-notifications are authentic. SNS signs each message with its own certificate —
-anymail validates the signature automatically. The `WEBHOOK_SECRET` provides
-an additional layer: SNS is configured to include it as a query parameter
-in the callback URL.
-
-Update the subscription endpoint to include the secret:
-
-```
-https://yourdomain.com/anymail/amazon_ses/tracking/?secret=YOUR-WEBHOOK-SECRET
+```bash
+aws sns subscribe \
+  --region ap-southeast-2 \
+  --topic-arn arn:aws:sns:ap-southeast-2:<account-id>:journalwatch-ses-events \
+  --protocol https \
+  --notification-endpoint 'https://<WEBHOOK_SECRET>@journalwatch.org.au/anymail/amazon_ses/tracking/'
 ```
 
-Where `YOUR-WEBHOOK-SECRET` is the value of `WEBHOOK_SECRET` from your `.env`.
+Inbound mail (only when `--enable-inbound` was used):
 
-To update the subscription endpoint:
-1. Delete the existing subscription.
-2. Create a new one with the URL above.
-3. Wait for Django to confirm it again.
+```bash
+aws sns subscribe \
+  --region ap-southeast-2 \
+  --topic-arn arn:aws:sns:ap-southeast-2:<account-id>:journalwatch-ses-inbound \
+  --protocol https \
+  --notification-endpoint 'https://<WEBHOOK_SECRET>@journalwatch.org.au/anymail/amazon_ses/inbound/'
+```
 
-### 4e. Configure inbound email (optional)
+Django confirms the subscription automatically (the `jw-django` policy
+includes `sns:ConfirmSubscription`); the SNS console should show
+**Confirmed** within seconds. To rotate `WEBHOOK_SECRET`, change it in the
+app env, recreate `journal-watch`, delete the subscription and create it
+again with the new URL.
 
-If you want to receive inbound email (e.g. for bounce handling via email):
-
-1. Go to **SES → Email receiving → Create rule set** (if not already created).
-2. Create a rule:
-   - Recipient condition: `inbound@yourdomain.com` (or `*@yourdomain.com`)
-   - Actions:
-     1. **S3**: store in `YOUR-BUCKET-NAME`, prefix `email/`
-     2. **SNS**: notify `journalwatch-ses-events` topic
-3. Create an SNS subscription to `https://yourdomain.com/anymail/amazon_ses/inbound/`
-   with the webhook secret as above.
-4. Add an MX record to DNS:
-   ```
-   yourdomain.com  MX  10  inbound-smtp.ap-southeast-2.amazonaws.com
-   ```
+Inbound mail also needs an MX record: `journalwatch.org.au MX 10
+inbound-smtp.ap-southeast-2.amazonaws.com`. The receipt rule is a catch-all
+for the domain so auto-replies and mail to any address are captured; Django
+reads the stored message from `email/` in the app bucket
+(`DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX=email`).
 
 ---
 
 ## Verification checklist
 
-After completing setup, verify each component:
-
-- [ ] S3 bucket: "Block all public access" enabled, versioning on
-- [ ] IAM users: three separate users created with scoped policies
-- [ ] `.env`: all three credential pairs populated (django, planka, restic)
-- [ ] SES domain: "Verification status: Verified" in console
-- [ ] SES: production access granted (out of sandbox)
-- [ ] Configuration set `TrackingConfigSet` exists
-- [ ] SNS topic has SES as event source for Bounce + Complaint
-- [ ] SNS subscription to Django tracking webhook: "Confirmed"
-- [ ] Send a test email from Django: `make shell` then
-  ```python
-  from django.core.mail import send_mail
-  send_mail("Test", "Hello", None, ["you@example.com"])
+- [ ] App bucket: versioning on, public ACLs blocked, bucket policy grants read on `media/*` only
+- [ ] Planka and backup buckets exist with no public access
+- [ ] Three IAM users with the scoped inline policies (`aws iam get-user-policy --user-name jw-django --policy-name jw-django-policy`)
+- [ ] `apps/journal-watch/.env` has the django and planka key pairs; `backup/config.env` has the backup pair
+- [ ] SES identity verified; DKIM status "Successful"
+- [ ] SES production access granted
+- [ ] `TrackingConfigSet` has event destination `TrackingToSNS` → `journalwatch-ses-events`
+- [ ] Tracking (and inbound, if enabled) subscriptions show **Confirmed**
+- [ ] Send a test email from the app container:
+  ```bash
+  docker compose exec -T journal-watch python manage.py shell -c 'from django.core.mail import send_mail; send_mail("Test", "Hello", None, ["you@example.com"])'
   ```
-- [ ] Trigger a test bounce (send to `bounce@simulator.amazonses.com`) and
-  confirm Django receives the SNS notification (check logs)
+- [ ] Send to `bounce@simulator.amazonses.com` and confirm the bounce appears in the app logs / subscriber status
+- [ ] An image URL under `https://journalwatch.org.au/media/` returns 200

@@ -3,380 +3,139 @@
 Chief Editor Guide
 ==================
 
-The chief editor has full access to all editorial functions. This guide walks
-through the complete workflow for a single newsletter issue — from creating the
-issue through to publication.
-
-Dashboard
----------
-
-After logging in you land on the dashboard at ``/backend/``. It shows a live
-snapshot of the system:
-
-- **Homepage issue** — the issue currently shown on the public site
-- **Current issue** — the issue you are actively building (status and review count)
-- **Latest newsletter** — whether the most recent newsletter has been sent
-- **Last CSV upload** — subscriber list status
-- **Planka health** — whether the OIDC and API key connections are working
-
-From the dashboard you can jump directly to any section of the backend. The
-sidebar and top navigation are available on every page.
-
-After logging in you can also choose to go directly to the Planka board via the
-**Go to backend / Go to Planka** landing page (``/backend/go/``).
+The chief editor takes an issue from creation to the newsletter. The tabs
+across the top of every issue page are the steps, in order: Setup, Articles,
+Reviewers, Pull Reviews, Edit Reviews, Publish, Newsletter. Coordinators see
+only Articles and Reviewers. This page is a reminder of which buttons to
+press.
 
 
-Settings: first-time setup
----------------------------
+First-time setup
+----------------
 
-Before using the system for the first time, visit **Settings** (``/backend/settings/``)
-and confirm the following.
+Open **Settings** once, before the first issue.
 
-PubMed API key
-~~~~~~~~~~~~~~
-
-An NCBI API key raises the PubMed rate limit and is required for production use.
-Obtain one free at `https://www.ncbi.nlm.nih.gov/account/` then paste it into the
-**PubMed API key** field and click **Save key**. The page shows the last
-validation time and any error from PubMed.
-
-Planka integration
-~~~~~~~~~~~~~~~~~~
-
-The Planka integration requires two setup steps, shown in sequence on the Settings page:
-
-1. **Register OIDC application** — click **Run setup_planka_oidc**. This creates
-   the OAuth2 client that lets Planka use Django as its identity provider. Only
-   needs to be run once.
-
-2. **Generate API key** — click **Run setup_planka_api_key**. This writes an API
-   token directly to the Planka database. The Settings page shows the masked key
-   and last validation time. If the key ever stops working (e.g. after a Planka
-   database restore), click the button again to regenerate it.
-
-The **Planka connection status** card below these buttons shows whether the API
-connection is currently healthy and which account it is using.
-
-Watched journals
-~~~~~~~~~~~~~~~~
-
-Article intake draws on a list of journals you maintain. Click **Manage
-journals** in Settings (or use the Watched Journals link in the sidebar) to
-see the list.
-
-To add a journal, type part of its name in the **Journal name** box and click
-**Search journals**. The results come from the NLM catalogue; choose the
-entry that matches, and the form fills in the journal's name, its MedlineTA
-abbreviation and its ISSNs. Click **Add watched journal**. The MedlineTA
-abbreviation is the identifier PubMed uses for the journal, so articles are
-matched reliably even where the journal's name has changed over time.
-
-Newly added journals are active immediately. Use **Deactivate** on a row to
-stop a journal from being offered at intake without deleting the articles
-already collected for it. **Edit** opens the journal's details; deleting a
-journal from that page also removes its cached article links.
-
-The PubMed feed
-~~~~~~~~~~~~~~~
+1. **PubMed API key**: paste an NCBI key and click **Save key**. Optional,
+   but it raises the PubMed rate limit.
+2. **Planka integration**: click **Run setup_planka_oidc**, then **Run
+   setup_planka_api_key**. The connection card below turns green. Rerun the
+   API key step if Planka is ever restored from backup.
+3. **Watched journals**: click **Manage journals**, search by name, choose
+   the NLM catalogue entry, and click **Add watched journal**. Repeat for
+   each journal. **Deactivate** hides a journal from intake without deleting
+   its articles.
 
 The platform keeps its own copy of the PubMed feed for the watched journals,
-so that coordinators see a list within seconds rather than waiting on a live
-search. A scheduled task refreshes this copy **every six hours**, covering
-the current month and the two months either side of it. Any article whose
-publication date falls in that window is added or updated on each run; an
-article belongs to the month of the publication date PubMed records for it,
-usually the online-first date.
-
-On a fresh installation the copy is empty. The first scheduled run fills it
-for the five-month window, and a coordinator's **Start intake** also asks
-PubMed directly for the issue's own months and journals, so the ordinary
-workflow does not depend on the scheduled task having run. For months
-outside the five-month window, or when a journal has just been added and you
-would like its back catalogue at once, run the backfill command from the
-server (see :doc:`/operations/management-commands`):
+refreshed every six hours for the current month and the two either side. A
+newly added journal is picked up on the next refresh. For older months, run
+the backfill command on the server (see
+:doc:`/operations/management-commands`):
 
 .. code-block:: bash
 
    python manage.py backfill_pubmed_journal_cache --from-month 2026-01 --to-month 2026-06
 
-A journal that has just been added is picked up by the next scheduled
-refresh, and by the next **Start intake** or **Check for new articles** on
-any issue that includes it.
-
-**Fetch monitoring** in Settings shows the scheduled runs of the last seven
-days, when the next one is due, and any errors, along with the state of the
-MeSH term refresh that keeps the paediatric filter accurate.
-
-
-Issue workflow overview
------------------------
-
-Each newsletter issue moves through seven steps, shown as tabs in the issue
-context bar at the top of all issue builder pages:
-
-1. **Setup** — create the issue, configure Planka, and assign coordinators
-2. **Articles** — fetch articles from PubMed, stage candidates, and push to Planka
-3. **Reviewers** — invite contributors and monitor their status
-4. **Pull Reviews** — import completed reviews from the Planka board
-5. **Edit Reviews** — edit and polish the review content
-6. **Publish** — make reviews live and set the homepage
-7. **Newsletter** — compose and send the newsletter email
-
-Coordinators see only the Articles and Reviewers tabs. The remaining tabs are
-chief-editor only.
-
-You can navigate between tabs at any time and come back to earlier steps. An
-**Issues** sidebar lets you switch between issues or create a new one.
+**Fetch monitoring** in Settings shows the last week of refreshes and when
+the next one is due.
 
 
 Step 1: Setup
 -------------
 
-Go to **Setup** (``/backend/issues/builder/``).
+Click **New issue** on the dashboard, or **Issues** in the top bar.
 
-Fill in:
+1. Enter the **Name**, and optionally the date, an introduction and a header
+   image. Click **Create issue**.
+2. Under **Planka board**, click **Create Planka board**. It takes about
+   twenty seconds and continues if you leave the page. **Open board**,
+   **Rename** and **Change background image** appear on the card once it is
+   done.
+3. Under **Coordinators**, add each coordinator's name and email, then click
+   **Send initial invites**.
 
-- **Name** — the issue title as it will appear on the site (required)
-- **Date** — publication date (optional)
-- **Body** — introductory text displayed above the reviews (Markdown supported)
-- **Image** — optional header image (JPG or PNG)
-
-Click **Save issue draft**. The issue is created in draft state and will not be
-visible on the public site until you publish it.
-
-Once saved, two additional panels appear on the page:
-
-**Planka setup** — create the Planka kanban board for this issue. Click
-**Initialise Planka board** (or **Create Planka project**). This automatically:
-
-- Creates a Planka project named after the issue
-- Sets up a **Reviews** board with three lists: *Candidates*, *Under review*,
-  and *Publish ready*
-- Creates a separate **Instructions** board with guidance cards for reviewers,
-  editors, and administrators
-- Registers a webhook so that card changes in Planka sync back to the backend
-
-After the board is created, the page shows a link to the board and allows you to
-set a custom background image. You can recreate the board (e.g. if it was
-accidentally deleted) without losing review data — the backend retains imported
-review content independently of Planka.
-
-**Issue coordinators** — assign regional coordinators to this issue. Enter a
-coordinator's name and email address. Once assigned, they can access the
-Articles and Reviewers tabs for this issue from their dashboard.
-
-.. note::
-   You can return to the Setup tab at any time to update the issue name, body,
-   image, or coordinator list before publishing.
+Coordinators see the issue on their dashboard once they accept. Come back to
+this tab at any time to change the name, introduction or image.
 
 
 Step 2: Articles
 ----------------
 
-Go to the **Articles** tab (``/backend/articles/intake/``). If an issue is not
-already selected, choose one from the Issues sidebar.
+The coordinator normally does this step. The
+:ref:`coordinator guide <coordinator>` has the details; in short:
 
-Stage 1 — Load
-~~~~~~~~~~~~~~
+1. Set the months, tick the journals, click **Start intake**.
+2. Click **Check for new articles** on the **Keep the list up to date** card
+   at the end of each month in the window, and a fortnight after it closes.
+3. Toggle articles to **Staged**, then click **Push staged articles to
+   Planka candidates**.
 
-Select the month range and tick the journals you want to search. Use the
-filter box to find journals by name. Click **Start intake**. The list loads
-immediately from the platform's copy of the PubMed feed, and a background
-check then asks PubMed for anything newer; a progress line shows each journal
-as it completes. The month range and journal list default to whatever the
-issue used last time.
-
-Stage 2 — Stage candidates
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The results table shows every article returned from PubMed. Use the filters
-to narrow the list:
-
-- **Text search** — filter by title, DOI, or PMID
-- **Journal** — filter to a single journal
-- **Selection status** — show only staged or unstaged articles
-- **Specialty filters** — paediatric content, humans only, pain, ICU, cardiac,
-  neonatal, review papers, trial papers
-
-For each article you want to send to the Planka board, click the toggle in
-the **Staged** column. You can also:
-
-- Click **Stage all (filtered)** or **Unstage all (filtered)** to stage or
-  unstage the entire filtered set at once
-- Click the article title to expand the abstract
-- Use the **Find article** panel (bottom right) to search for a specific article
-  by title, DOI, or PMID and add it directly to the batch
-
-Stage 3 — Push to Planka
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Once you have staged the articles you want, click **Push staged articles to
-Planka candidates**. Each staged article becomes a card in the *Candidates* list
-on the Planka board. Cards that were already pushed are skipped.
-
-Click **Reconcile Planka status** at any time to check which staged articles
-are still in the Candidates list, which have been moved to another list, and
-which have been deleted from Planka.
-
-The **Keep the list up to date** card between Step 1 and Step 2 shows where
-the issue's window sits relative to today and turns amber when a check is
-overdue. Click **Check for new articles** on it to run the PubMed check again
-for the issue's months and journals. Existing selections and pushed cards are left as
-they are; additions are marked with a blue dot and can be isolated with the
-**New only** filter. A list can be checked once every fifteen minutes. Issues
-whose window is still open should be checked at the end of each month and
-again a fortnight after the window closes; see
-:ref:`Keep the list up to date <coordinator-recheck>` in the coordinator
-guide.
+**Reconcile Planka status** shows which pushed cards reviewers have moved or
+removed.
 
 
 Step 3: Reviewers
 -----------------
 
-Go to the **Reviewers** tab (``/backend/issues/reviewers/``).
-
-Adding reviewers
-~~~~~~~~~~~~~~~~
-
-Enter a reviewer's **name** and **email address**, then click **Add reviewer**.
-Both fields are required. The reviewer is added with status *Pending*.
-
-Sending invitations
-~~~~~~~~~~~~~~~~~~~~
-
-Once you have added the reviewers you want, click **Send invites**. Each
-pending reviewer receives an email with a personalised invitation link valid
-for 180 days. The link takes them to a page where they sign in (or create an
-account) with their invited email address. Once signed in with the correct
-email, their invitation is accepted automatically.
-
-Once a reviewer accepts, their status changes to *Active* and they are
-automatically added as a member of the Planka board.
-
-Monitoring status
-~~~~~~~~~~~~~~~~~
-
-The contributors table shows each reviewer's current status:
-
-- **Pending** — added but invitation not yet sent
-- **Invited** — invitation email sent, not yet accepted
-- **Active** — accepted and has board access
-- **Revoked** — access removed
-
-Use **Resend invite** to send a new link to a reviewer who has not accepted.
-Use **Revoke** to remove a reviewer from the issue. Use **Sync to Planka** if a
-reviewer's board membership appears out of sync (e.g. after a Planka database
-restore).
+1. Enter each reviewer's name and email and click **Add**.
+2. Click **Send initial invites**. Links stay valid for 180 days.
+3. *Invited* means the email has gone out. *Active* means they have accepted
+   and are on the board.
+4. Tick a row and click **Resend to selected** to remind someone. **Revoke**
+   removes them. **Sync Planka** appears if their board membership failed.
 
 
 Step 4: Pull Reviews
 --------------------
 
-When reviewers complete their cards and move them to the *Publish ready* list on
-the Planka board, you import them into the backend.
+Reviewers move finished cards to *Publish ready* on the board.
 
-Go to the **Pull Reviews** tab.
+1. Click **Refresh cards** if the list looks stale.
+2. Tick the cards to bring in and click **Import selected**, or click
+   **Import all Publish ready**.
 
-The **Import cards** panel shows all cards in the Planka board. Use the scope
-selector to show only the *Publish ready* list (recommended) or all cards.
-
-Click **Import** next to each card you want to bring in. The backend extracts
-the review content from the card description (below the marker line) and creates
-a Review record linked to the issue. Cards that have already been imported are
-shown as blocked — click the review link to edit the existing review instead.
-
-Click **Import all publish-ready cards** to import the entire Publish ready list
-in one action.
-
-.. note::
-   Importing a card does not remove it from Planka. Reviewers can continue
-   editing a card after it has been imported — use the **card revisions** panel
-   (visible once a card is imported) to see the edit history and restore an
-   earlier version if needed.
+Each import creates a review from the text below the card's marker line.
+Cards already imported are marked and skipped. **History** shows a card's
+earlier versions if a reviewer has edited it since.
 
 
 Step 5: Edit Reviews
----------------------
+--------------------
 
-Go to the **Edit Reviews** tab (``/backend/issues/reviews/``).
+1. Click **Edit** on a review to change its article, author, text, featured
+   flag or featured image. Click **Save**.
+2. Click **Add review** for a review written outside Planka.
+3. **Remove** detaches a review from the issue without deleting it.
 
-The reviews table lists all reviews currently attached to this issue. For each
-review you can see whether it is **Featured**, whether it is **Live** (published),
-and whether it has a **featured image**.
-
-Editing a review
-~~~~~~~~~~~~~~~~~
-
-Click **Edit** on any row to open the review form:
-
-- **Article** — the linked PubMed article (searchable)
-- **Author** — the reviewer's author profile (searchable; autocompletes from
-  existing profiles)
-- **Body** — the review text (Markdown)
-- **Featured** — tick to mark this review as a featured article in the issue
-- **Featured image** — optional image displayed alongside the featured review
-
-Adding a review manually
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Click **Add review** to create a review that was not imported from Planka. You
-can search for an existing article or create one inline.
-
-Removing a review
-~~~~~~~~~~~~~~~~~
-
-Click **Remove** on any row to detach the review from this issue. The review
-record is not deleted — it can be re-attached later if needed.
+At most two reviews can be featured.
 
 
 Step 6: Publish
 ---------------
 
-Go to the **Publish** tab (``/backend/issues/publish/``).
+1. Check the readiness badges. Fix anything red on the Edit Reviews tab.
+2. Click **Publish all**, or **Publish** on individual rows.
+3. Click **Set … as homepage** to put the issue on the public site.
 
-Making individual reviews live
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The publish table lists every review in the issue with its current live/draft
-status. Click the toggle button on any row to make that review live or return
-it to draft. Reviews in draft state are not visible on the public site even
-after the issue is set as homepage.
-
-Setting the homepage
-~~~~~~~~~~~~~~~~~~~~
-
-The homepage section shows which issue is currently live on the public site.
-Click **Set {issue name} as homepage** to make this issue the active homepage.
-A confirmation dialog appears before the change takes effect. Setting the
-homepage does not automatically publish individual reviews — toggle them live
-first.
+Draft reviews stay hidden even after the issue is the homepage.
 
 
 Step 7: Newsletter
 ------------------
 
-Go to the **Newsletter** tab to compose and send the newsletter email for this
-issue.
+1. Click **Save newsletter**. It renders from the live reviews.
+2. Click **Send test email** and check it in a mail client.
+3. Click **Send newsletter**. A newsletter can only be sent after a test, and
+   only once unless you click **Enable one resend**.
 
-The newsletter workflow:
-
-1. **Draft** — compose the newsletter (it renders from the current live reviews)
-2. **Test send** — send a test copy to a nominated address
-3. **Final send** — dispatch to all active subscribers
-
-The newsletter is rendered to HTML email using MJML and delivered via Amazon SES.
-After sending, the Newsletters list shows delivery statistics.
+Open and click statistics appear on the same tab once the send is complete.
 
 
-Subscriber management
-----------------------
+Subscribers
+-----------
 
-Go to **Subscribers** (accessible from the dashboard) to manage the mailing list.
+Open **Subscribers** from the dashboard.
 
-**Upload CSV** — upload a CSV file with an ``email`` column (other columns are
-ignored). The system validates each address, skips duplicates, and shows a
-summary of what was imported. Existing subscribers are not duplicated.
-
-**Mailing list** — view and manage individual subscribers. Subscribers join via
-double opt-in through the public sign-up form or are added via CSV. You can
-manually unsubscribe any address from this list.
+- **Upload CSV**: a file with an ``email`` column. Duplicates are skipped and
+  a summary is shown.
+- **Mailing list**: view or unsubscribe individual addresses. Public sign-ups
+  arrive here after double opt-in.

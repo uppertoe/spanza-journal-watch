@@ -5,22 +5,18 @@
 <div id="planka-sync-page">
 <div id="planka-sync-content">
 <div class="d-flex justify-content-between align-items-center mb-2">
-  <h1 class="mb-0">Planka Sync</h1>
+  <h1 class="mb-0">Pull Reviews</h1>
 </div>
-<p class="text-muted">Link an issue to Planka and sync cards from the Publish ready list.</p>
+<p class="text-muted">Import the reviews that reviewers have moved to <em>Publish ready</em> on the board.</p>
 
 <div class="row g-4 align-items-start">
   <div class="col-12" id="planka-main-column">
     {% if selected_issue %}
-      {% if planka_binding %}
-        {% include "backend/issue_builder/_planka_project_context_card.html" %}
-      {% endif %}
-
       <div id="planka-panel">
         {% include "backend/issue_builder/_planka_panel.html" %}
       </div>
     {% else %}
-      <div class="alert alert-info mb-0">Select an issue to use Planka sync.</div>
+      <div class="alert alert-info mb-0">Select an issue to pull its reviews.</div>
     {% endif %}
   </div>
 </div>

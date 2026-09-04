@@ -1,17 +1,17 @@
 <div id="issue-coordinators-panel" class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span>Add coordinators to issue</span>
+    <span>Coordinators</span>
     <span class="badge text-bg-secondary">{{ issue_coordinators|length }} total</span>
   </div>
   <div class="card-body">
     <p class="text-muted small mb-3">
-      Add regional coordinators one at a time, then send invites. Invite links are valid for {{ issue_invite_ttl_days }} days.
+      Add each coordinator, then send the invites. Links stay valid for {{ issue_invite_ttl_days }} days.
     </p>
 
     {% if not planka_binding %}
       <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
-        <span>No Planka board is linked to this issue. Set one up before inviting coordinators.</span>
-        <a class="btn btn-sm btn-warning ms-auto" href="{{ request.path }}#planka-panel">Set up Planka</a>
+        <span>Create the Planka board above before inviting coordinators.</span>
+        <a class="btn btn-sm btn-warning ms-auto" href="#planka-panel">Go to board setup</a>
       </div>
     {% else %}
 

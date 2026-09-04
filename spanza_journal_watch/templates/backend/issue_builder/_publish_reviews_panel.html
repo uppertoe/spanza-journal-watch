@@ -1,8 +1,13 @@
 <div id="publish-reviews-panel">
 {% if selected_issue %}
   <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span>Reviews</span>
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span>
+        Reviews
+        {% if publish_summary %}
+          <span class="text-muted small ms-2">{{ publish_summary.ready }} of {{ publish_summary.total }} ready · {{ publish_summary.live }} live</span>
+        {% endif %}
+      </span>
       <div class="d-flex gap-2 align-items-center">
         {% if selected_issue.active %}
           <span class="badge text-bg-success">Issue live</span>
@@ -11,13 +16,21 @@
         {% endif %}
         <form method="post" action="{% url "backend:publish_issue_bundle" selected_issue.pk %}">
           {% csrf_token %}
-          <button type="submit" class="btn btn-success btn-sm"
-            onclick="return confirm('Publish this issue and all reviews?')">
+          <button type="submit" class="btn btn-success btn-sm" {% if publish_summary.errors %}disabled title="Fix the items listed below first"{% endif %}
+            onclick="return confirm('Make this issue and all {{ publish_summary.total|default:0 }} review{{ publish_summary.total|default:0|pluralize }} visible on the public site?')">
             Publish all
           </button>
         </form>
       </div>
     </div>
+    {% if publish_summary.errors %}
+      <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 small">
+        <div class="fw-semibold">Publish all is unavailable until these are fixed on the Edit Reviews tab:</div>
+        <ul class="mb-0 ps-3">
+          {% for error in publish_summary.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
     <div class="card-body p-0">
       {% if review_readiness %}
         <div class="table-responsive">
