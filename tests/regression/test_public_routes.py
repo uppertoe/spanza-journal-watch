@@ -258,7 +258,9 @@ class TestPublicRoutes:
         normalize_html(expected_path.read_text(encoding="utf-8"))
 
         page_markers = {
-            "newsletter_subscribe_htmx": ['id="subscribe-container"', 'name="email"', "csrfmiddlewaretoken"],
+            # No csrfmiddlewaretoken: the token comes from the cookie at request time
+            # so the fragment can be CDN-cached (see the template comment).
+            "newsletter_subscribe_htmx": ['id="subscribe-container"', 'name="email"'],
             "issue_list": ["abstract-header__title", "Issues", 'id="article-block"'],
             "tag_list": ["abstract-header__title", "Tags", 'id="article-block"'],
             "search": ["abstract-header__title", "Search", 'id="search-results"'],

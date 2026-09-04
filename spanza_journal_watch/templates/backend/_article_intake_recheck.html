@@ -1,0 +1,32 @@
+{# Body of the "Keep the list up to date" card. Swapped in again (oob) whenever a PubMed check finishes. #}
+<div id="intake-recheck-body">
+  <p class="mb-2">
+    {% if recheck.phase == "open" %}
+      This issue's window runs to <strong>{{ recheck.window_end|date:"j F Y" }}</strong>, so the list is not yet complete.
+      Journals publish throughout the window and PubMed indexes each article some days after it appears online.
+      Check again at the end of {{ recheck.next_check|date:"F" }}, and once more about a fortnight after the window closes
+      (around {{ recheck.settle_date|date:"j F" }}).
+    {% elif recheck.phase == "closing" %}
+      The window closed on <strong>{{ recheck.window_end|date:"j F Y" }}</strong>. Articles published late in
+      {{ recheck.window_end|date:"F" }} may still be arriving in PubMed. Check again around
+      <strong>{{ recheck.settle_date|date:"j F" }}</strong>, before you settle the shortlist.
+    {% else %}
+      The window closed on <strong>{{ recheck.window_end|date:"j F Y" }}</strong>, and PubMed should now hold everything
+      published in it. A final check before you push the shortlist is still worthwhile.
+    {% endif %}
+    Articles already staged or pushed to Planka are not affected.
+  </p>
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <form method="post" action="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-post="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
+      {% csrf_token %}
+      <button type="submit" class="btn {% if recheck.due %}btn-warning{% else %}btn-primary{% endif %}" title="Check PubMed for any new articles published in this date range">Check for new articles</button>
+    </form>
+    <span class="small {% if recheck.due %}fw-semibold{% else %}text-muted{% endif %}">
+      {% if recheck.last_checked_at %}
+        Last checked {{ recheck.last_checked_at|timesince }} ago
+      {% else %}
+        Not yet checked
+      {% endif %}
+    </span>
+  </div>
+</div>

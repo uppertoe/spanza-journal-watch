@@ -10,5 +10,6 @@
     <div id="article-intake-results" hx-swap-oob="true">
       {% include "backend/_article_intake_results.html" %}
     </div>
+    {% if recheck %}<div id="intake-recheck-body" hx-swap-oob="outerHTML">{% include "backend/_article_intake_recheck.html" %}</div>{% endif %}
   {% endif %}
 {% endif %}

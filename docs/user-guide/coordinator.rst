@@ -85,16 +85,47 @@ shortlist across to the reviewers' board.
 Step 1: Load the articles
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Choose the months the issue covers, tick the journals you would like to
-search, and click **Start intake**. Journal Watch keeps its own copy of the
-PubMed feed for the watched journals, so the list is usually ready within a
-few seconds. Later on, **Check for new articles** picks up anything the
-journals have published since.
+.. container:: feature
+
+   .. container:: feature-text
+
+      Choose the months the issue covers, tick the journals you would like to
+      search, and click **Start intake**. The month range and the journal
+      list open with whatever was used last time for this issue, so on a
+      return visit there is usually nothing to change.
+
+      The platform keeps its own copy of the PubMed feed for the watched
+      journals, refreshed every six hours for the months around the current
+      date. Start intake loads the list from that copy straight away, then
+      asks PubMed directly, in the background, for anything published in the
+      window that the copy does not yet hold. A progress line shows each
+      journal as it is checked, and the additions are merged into the list
+      when the check finishes. You can begin looking through the list while
+      it runs.
+
+      1. Set **From month** and **To month** to the first and last months of
+         the issue's window. A range may cover up to twelve months.
+      2. Tick the journals to search, or use **Select all**.
+      3. Click **Start intake**. The list appears within a few seconds, and
+         the PubMed check follows over the next minute or two.
+
+   .. raw:: html
+      :file: _demos/load.html
+
+An article belongs to the month of the publication date that PubMed records
+for it, which is usually the date it first appeared online rather than the
+date of the print issue. An article that appears in the October print issue
+but was published online in August is therefore an August article.
+
+If you would like to change the months or the journals, run **Start intake**
+again with the new settings. Your shortlist is carried across: articles
+already staged stay staged, and articles already on the Planka board are
+recognised and are not pushed a second time.
 
 Step 2: Choose articles to review
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. container:: feature
+.. container:: feature flip
 
    .. container:: feature-text
 
@@ -120,7 +151,7 @@ Step 2: Choose articles to review
 Step 3: Send the shortlist to the review board
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. container:: feature flip
+.. container:: feature
 
    .. container:: feature-text
 
@@ -144,6 +175,54 @@ Step 3: Send the shortlist to the review board
 
 Use **Reconcile Planka status** at any time to check which articles are still
 in the Candidates column and which have been moved or removed by reviewers.
+
+
+.. _coordinator-recheck:
+
+Checking again as the window fills
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. container:: feature flip
+
+   .. container:: feature-text
+
+      The list you load on the first day is not the final list. Journals
+      publish throughout the window, and PubMed indexes each article some
+      days after it appears online. An issue covering September and October,
+      set up in the first week of September, holds only a fraction of what
+      the two months will eventually contain.
+
+      The platform's own copy of the feed is refreshed every six hours, but
+      your issue's list is only brought up to date when you ask. A
+      highlighted card, **Keep the list up to date**, sits between Step 1
+      and Step 2. It shows how far the issue's window has run, when to check
+      next, and when the list was last checked, and it turns amber when a
+      check is overdue. Its **Check for new articles** button runs the PubMed
+      check again for the issue's months and journals. Articles you have
+      already staged, and articles already on the Planka board, are left
+      exactly as they were.
+
+      1. Return at the **end of each month** in the window and click
+         **Check for new articles** on the card. An amber card means more
+         than a week has passed since the last check.
+      2. Check once more a **fortnight or so after the window closes**, when
+         the last of the final month's articles have been indexed, before
+         you settle the shortlist.
+      3. Additions since your last visit are marked with a **blue dot** and
+         counted at the top of the list. Use the **New only** filter to see
+         just those, and **Mark all seen** once you have looked through them.
+
+   .. raw:: html
+      :file: _demos/recheck.html
+
+The check runs in the background and reports either *Found N new article(s)
+since last check* or *No new articles found*. Each list can be checked once
+every fifteen minutes; if you click again sooner, the page tells you how long
+to wait, and no request is sent to PubMed.
+
+The blue markers are kept per person. What is new to you is not necessarily
+new to a colleague working on the same issue, and marking articles as seen
+affects only your own view.
 
 
 Inviting your reviewers

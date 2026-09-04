@@ -358,8 +358,119 @@
     }, 14000);
   }
 
+  /* ---------------- coordinator: Step 1, load the articles ---------------- */
+  // Only animate the line in when it first appears or changes tone; a progress
+  // update that re-ran the entrance animation would flicker.
+  function statusLine(el, cls, html, spin) {
+    var was = el.hidden, before = el.className;
+    el.hidden = false; el.className = "dm-status" + (cls ? " " + cls : "");
+    el.innerHTML = (spin ? '<span class="dm-spin"></span>' : "") + "<span>" + html + "</span>";
+    if (was || before !== el.className) pop(el);
+  }
+  function initLoad(d) {
+    var from = d.q("[data-from]"), to = d.q("[data-to]"), untick = d.q("[data-untick]"), start = d.q("[data-start]");
+    var status = d.q("[data-status]"), results = d.q("[data-results]"), count = d.q("[data-count]");
+    var JOURNALS = ["Paediatric Anaesthesia", "Anesthesiology", "Anaesthesia", "British Journal of Anaesthesia", "Anaesthesia and Intensive Care"];
+    function reset() {
+      to.textContent = "September 2026"; from.classList.remove("lit"); to.classList.remove("lit");
+      untick.classList.remove("on"); status.hidden = true; results.hidden = true;
+      count.textContent = "112 shown · 0 staged · 0 pushed"; d.hideCursor();
+    }
+    if (reduced) {
+      reset(); to.textContent = "October 2026"; untick.classList.add("on"); results.hidden = false;
+      statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed";
+      d.sayNow("Choose the months and journals, then Start intake. The list loads from the platform's own copy of the feed, and PubMed is checked in the background.");
+      return null;
+    }
+    return makeRunner(function () {
+      var s = [
+        [100, function () { reset(); d.say("Choose the months the issue covers. This issue covers <b>September and October</b>, so the range runs from September to October."); }],
+        [1600, function () { d.moveTo(to); }],
+        [2300, function () { d.click(); to.classList.add("lit"); }],
+        [2700, function () { to.textContent = "October 2026"; }],
+        [3400, function () { to.classList.remove("lit"); }],
+        [4400, function () { d.say("Tick the journals to search. The list opens with the journals used last time, so usually there is nothing to change."); d.moveTo(untick); }],
+        [5500, function () { d.click(); untick.classList.add("on"); }],
+        [6600, function () { d.moveTo(start); }],
+        [7300, function () { d.click(); d.press(start); }],
+        [7600, function () { d.hideCursor(); results.hidden = false; pop(results); statusLine(status, "ok", "Loaded 112 cached article(s). Checking PubMed for newer articles in the background."); d.say("The platform keeps its own copy of the PubMed feed for the watched journals, so the list is ready within seconds."); }]
+      ];
+      JOURNALS.forEach(function (name, i) {
+        s.push([10200 + i * 700, function () {
+          if (i === 0) d.say("In the background, PubMed is asked for anything published in the window that the copy does not yet hold. This takes a minute or two.");
+          statusLine(status, "", "Checking PubMed (" + (i + 1) + "/" + JOURNALS.length + ") · finished " + name, true);
+        }]);
+      });
+      s.push([14400, function () { statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed"; flash(results); d.say("Anything PubMed has indexed since the copy was last refreshed is added to the list. You can begin shortlisting while the check runs."); }]);
+      return s;
+    }, 18400);
+  }
+
+  /* ---------------- coordinator: checking again as the window fills ---------------- */
+  function initRecheck(d) {
+    var today = d.q("[data-today]"), rows = d.qa(".dm-row"), check = d.q("[data-check]"), last = d.q("[data-last]");
+    var count = d.q("[data-count]"), badge = d.q("[data-new]"), nonew = d.q("[data-nonew]"), seen = d.q("[data-seen]"), status = d.q("[data-status]");
+    var callout = d.q("[data-callout]"), phase = d.q("[data-phase]"), note = d.q("[data-note]");
+    var NOTE_OPEN = "This issue's window runs to 31 October, so the list is not yet complete. Check again at the end of September, and once more about a fortnight after the window closes.";
+    var NOTE_CLOSING = "The window closed on 31 October. Articles published late in October may still be arriving in PubMed. Check again around 14 November, before you settle the shortlist.";
+    function setPhase(open, due) {
+      setBadge(phase, open ? "info" : "warn", open ? "Window open until 31 Oct" : "Window closed · final articles still arriving");
+      note.textContent = open ? NOTE_OPEN : NOTE_CLOSING;
+      callout.classList.toggle("due", due); check.classList.toggle("warn", due);
+    }
+    // Timeline: Aug | Sep | Oct | Nov, each month a quarter of the track.
+    var POS = { earlySep: 27, lateSep: 47, midNov: 87 };
+    function place(pct) { today.style.left = pct + "%"; }
+    function shown() { return rows.filter(function (r) { return !r.classList.contains("gone"); }).length; }
+    function setNew(n) {
+      if (n > 0) { badge.hidden = false; badge.textContent = n + " new"; nonew.hidden = true; seen.classList.remove("dim"); }
+      else { badge.hidden = true; nonew.hidden = false; seen.classList.add("dim"); }
+    }
+    function reveal(wave) {
+      var delay = 0, n = 0;
+      rows.forEach(function (r) {
+        if (r.getAttribute("data-wave") !== String(wave)) return;
+        n += 1;
+        setTimeout(function () { r.classList.remove("gone"); r.querySelector(".dm-dot").classList.add("on"); count.textContent = (36 + shown()) + " shown"; }, delay);
+        delay += 350;
+      });
+      return n;
+    }
+    function clearDots() { rows.forEach(function (r) { r.querySelector(".dm-dot").classList.remove("on"); }); setNew(0); }
+    function reset() {
+      place(POS.earlySep); rows.forEach(function (r) { if (r.hasAttribute("data-wave")) r.classList.add("gone"); });
+      clearDots(); count.textContent = "38 shown"; last.textContent = "Last checked 3 weeks ago"; status.hidden = true; setPhase(true, true); d.hideCursor();
+    }
+    if (reduced) {
+      reset(); place(POS.midNov); rows.forEach(function (r) { r.classList.remove("gone"); });
+      rows.filter(function (r) { return r.getAttribute("data-wave") === "2"; }).forEach(function (r) { r.querySelector(".dm-dot").classList.add("on"); });
+      setNew(1); count.textContent = "41 shown"; last.textContent = "Last checked just now"; setPhase(false, false);
+      d.sayNow("Return at the end of each month in the window, and once more a fortnight after it closes, and use Check for new articles. Additions are marked with a blue dot.");
+      return null;
+    }
+    return makeRunner(function () {
+      return [
+        [100, function () { reset(); d.say("An issue covering <b>September and October</b>, set up in the first week of September, holds only what PubMed has indexed so far. The <b>Keep the list up to date</b> card says how far the window has run."); }],
+        [4600, function () { d.say("Journals publish throughout the window, and PubMed indexes each article some days after it appears online. Return at the <b>end of each month</b>. The card turns amber when a check is overdue."); place(POS.lateSep); }],
+        [7800, function () { d.moveTo(check); }],
+        [8500, function () { d.click(); d.press(check); }],
+        [8800, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
+        [10600, function () { statusLine(status, "ok", "Found 2 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(1); setNew(2); setPhase(true, false); }],
+        [11200, function () { d.say("Additions are marked with a <b>blue dot</b> and counted at the top. Articles already staged or pushed are not disturbed."); }],
+        [15200, function () { d.say("Check once more a <b>fortnight or so after the window closes</b>, when the last of October's articles have been indexed."); place(POS.midNov); status.hidden = true; last.textContent = "Last checked 4 weeks ago"; setPhase(false, true); }],
+        [18600, function () { d.moveTo(check); }],
+        [19300, function () { d.click(); d.press(check); }],
+        [19600, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
+        [21400, function () { statusLine(status, "ok", "Found 1 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(2); setNew(3); setPhase(false, false); }],
+        [23400, function () { d.say("Once you have looked through the additions, <b>Mark all seen</b> clears the markers."); d.moveTo(seen); }],
+        [24600, function () { d.click(); clearDots(); }],
+        [25400, function () { d.hideCursor(); }]
+      ];
+    }, 28000);
+  }
+
   /* ---------------- boot ---------------- */
-  var inits = { overview: initOverview, go: initGo, stage: initStage, push: initPush, invite: initInvite, accept: initAccept, pick: initPick, ready: initReady };
+  var inits = { overview: initOverview, go: initGo, load: initLoad, stage: initStage, push: initPush, recheck: initRecheck, invite: initInvite, accept: initAccept, pick: initPick, ready: initReady };
   // Run a demo only while it is on screen. Leaving is debounced so a quick
   // scroll past, or a screenshot that briefly resizes the viewport, does not
   // restart the timeline from the beginning.

@@ -26,6 +26,7 @@
   <div class="fw-semibold mb-1">Workflow</div>
   <ol class="mb-0 small">
     <li><strong>Build intake batch</strong>: choose month range + watched journals, then load cached articles.</li>
+    <li><strong>Keep the list up to date</strong>: check PubMed again at the end of each month in the window, and a fortnight after it closes.</li>
     <li><strong>Stage articles</strong>: filter list and mark rows as staged.</li>
     <li><strong>Push to Planka</strong>: send staged rows to Candidates.</li>
   </ol>
@@ -108,6 +109,26 @@
 </div>
 
 {% if batch %}
+  <div id="intake-recheck-card" class="card mb-3 {% if recheck.due %}border-warning{% else %}border-primary{% endif %}">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 {% if recheck.due %}bg-warning-subtle{% else %}bg-primary-subtle{% endif %}">
+      <span class="fw-semibold">Keep the list up to date</span>
+      <span>
+        {% if recheck.due %}<span class="badge text-bg-warning">Check due</span>{% endif %}
+        {% if recheck.phase == "open" %}
+          <span class="badge text-bg-primary">Window open until {{ recheck.window_end|date:"j M Y" }}</span>
+        {% elif recheck.phase == "closing" %}
+          <span class="badge text-bg-warning">Window closed · final articles still arriving</span>
+        {% else %}
+          <span class="badge text-bg-secondary">Window closed {{ recheck.window_end|date:"j M Y" }}</span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="card-body">
+      {% include "backend/_article_intake_recheck.html" %}
+      <div id="article-intake-task-status" {% if show_stage2_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
+    </div>
+  </div>
+
   <div class="card mb-3">
     <div class="card-header">Step 2 · Stage and review articles</div>
     <div class="card-body">
@@ -117,21 +138,6 @@
       <div class="text-muted small mb-3">
         Loaded {{ batch.result_count }} articles · Selected {{ batch.selected_count }} in staging
       </div>
-      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <form method="post" action="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-post="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-primary" title="Check PubMed for any new articles published in this date range">Check for new articles</button>
-        </form>
-        <span class="text-muted small">
-          {% if last_pubmed_fetched_at %}
-            Last checked {{ last_pubmed_fetched_at|timesince }} ago
-          {% else %}
-            Not yet checked
-          {% endif %}
-        </span>
-      </div>
-
-      <div id="article-intake-task-status" {% if show_stage2_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
 
       <div class="card mb-3 border-0 bg-body-secondary">
         <div class="card-body py-3">

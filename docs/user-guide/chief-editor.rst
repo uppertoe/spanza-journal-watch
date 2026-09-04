@@ -60,10 +60,52 @@ connection is currently healthy and which account it is using.
 Watched journals
 ~~~~~~~~~~~~~~~~
 
-Article intake pulls from PubMed based on a list of journals you maintain.
-Click **Manage watched journals** in Settings (or use the Watched Journals link
-in the sidebar) to add or deactivate journals. Each journal entry holds a name
-and ISSN numbers. Newly added journals are active by default.
+Article intake draws on a list of journals you maintain. Click **Manage
+journals** in Settings (or use the Watched Journals link in the sidebar) to
+see the list.
+
+To add a journal, type part of its name in the **Journal name** box and click
+**Search journals**. The results come from the NLM catalogue; choose the
+entry that matches, and the form fills in the journal's name, its MedlineTA
+abbreviation and its ISSNs. Click **Add watched journal**. The MedlineTA
+abbreviation is the identifier PubMed uses for the journal, so articles are
+matched reliably even where the journal's name has changed over time.
+
+Newly added journals are active immediately. Use **Deactivate** on a row to
+stop a journal from being offered at intake without deleting the articles
+already collected for it. **Edit** opens the journal's details; deleting a
+journal from that page also removes its cached article links.
+
+The PubMed feed
+~~~~~~~~~~~~~~~
+
+The platform keeps its own copy of the PubMed feed for the watched journals,
+so that coordinators see a list within seconds rather than waiting on a live
+search. A scheduled task refreshes this copy **every six hours**, covering
+the current month and the two months either side of it. Any article whose
+publication date falls in that window is added or updated on each run; an
+article belongs to the month of the publication date PubMed records for it,
+usually the online-first date.
+
+On a fresh installation the copy is empty. The first scheduled run fills it
+for the five-month window, and a coordinator's **Start intake** also asks
+PubMed directly for the issue's own months and journals, so the ordinary
+workflow does not depend on the scheduled task having run. For months
+outside the five-month window, or when a journal has just been added and you
+would like its back catalogue at once, run the backfill command from the
+server (see :doc:`/operations/management-commands`):
+
+.. code-block:: bash
+
+   python manage.py backfill_pubmed_journal_cache --from-month 2026-01 --to-month 2026-06
+
+A journal that has just been added is picked up by the next scheduled
+refresh, and by the next **Start intake** or **Check for new articles** on
+any issue that includes it.
+
+**Fetch monitoring** in Settings shows the scheduled runs of the last seven
+days, when the next one is due, and any errors, along with the state of the
+MeSH term refresh that keeps the paediatric filter accurate.
 
 
 Issue workflow overview
@@ -134,13 +176,15 @@ Step 2: Articles
 Go to the **Articles** tab (``/backend/articles/intake/``). If an issue is not
 already selected, choose one from the Issues sidebar.
 
-Stage 1 — Fetch
-~~~~~~~~~~~~~~~
+Stage 1 — Load
+~~~~~~~~~~~~~~
 
-Select the date range and tick the journals you want to search. Use the filter
-box to find journals by name. Click **Fetch from PubMed**. The search runs in
-the background; a status indicator shows progress. Results appear below once the
-fetch completes.
+Select the month range and tick the journals you want to search. Use the
+filter box to find journals by name. Click **Start intake**. The list loads
+immediately from the platform's copy of the PubMed feed, and a background
+check then asks PubMed for anything newer; a progress line shows each journal
+as it completes. The month range and journal list default to whatever the
+issue used last time.
 
 Stage 2 — Stage candidates
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -154,11 +198,11 @@ to narrow the list:
 - **Specialty filters** — paediatric content, humans only, pain, ICU, cardiac,
   neonatal, review papers, trial papers
 
-For each article you want to send to the Planka board, tick the checkbox in
+For each article you want to send to the Planka board, click the toggle in
 the **Staged** column. You can also:
 
-- Click **Bulk select / unselect** to stage or unstage the entire filtered set
-  at once
+- Click **Stage all (filtered)** or **Unstage all (filtered)** to stage or
+  unstage the entire filtered set at once
 - Click the article title to expand the abstract
 - Use the **Find article** panel (bottom right) to search for a specific article
   by title, DOI, or PMID and add it directly to the batch
@@ -174,9 +218,16 @@ Click **Reconcile Planka status** at any time to check which staged articles
 are still in the Candidates list, which have been moved to another list, and
 which have been deleted from Planka.
 
-You can re-run the PubMed fetch (click **Refresh current batch**) to pick up
-articles published after the initial search, without losing your existing
-selections.
+The **Keep the list up to date** card between Step 1 and Step 2 shows where
+the issue's window sits relative to today and turns amber when a check is
+overdue. Click **Check for new articles** on it to run the PubMed check again
+for the issue's months and journals. Existing selections and pushed cards are left as
+they are; additions are marked with a blue dot and can be isolated with the
+**New only** filter. A list can be checked once every fifteen minutes. Issues
+whose window is still open should be checked at the end of each month and
+again a fortnight after the window closes; see
+:ref:`Checking again as the window fills <coordinator-recheck>` in the
+coordinator guide.
 
 
 Step 3: Reviewers

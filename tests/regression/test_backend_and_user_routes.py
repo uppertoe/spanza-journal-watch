@@ -1416,7 +1416,7 @@ class TestArticleIntakeWorkflow:
         assert row_one.is_selected is True
         assert row_two.is_selected is True
 
-    def test_article_intake_paediatric_filter_is_opt_in(self, route_client, regression_baseline):
+    def test_article_intake_paediatric_filter_is_on_by_default(self, route_client, regression_baseline):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
@@ -1450,21 +1450,23 @@ class TestArticleIntakeWorkflow:
         PubmedBatchArticle.objects.create(batch=batch, article=peds, watched_journal=watched, issue=issue)
         PubmedBatchArticle.objects.create(batch=batch, article=adult, watched_journal=watched, issue=issue)
 
+        # No filter params: the paediatric MeSH filter is applied by default.
         response = route_client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
 
         assert response.status_code == 200
         body = response.content.decode("utf-8", errors="ignore")
         assert "Paediatric airway paper" in body
-        assert "Adult perioperative paper" in body
+        assert "Adult perioperative paper" not in body
 
-        filtered_response = route_client.get(
+        # An explicit 0 (what the unticked checkbox sends) shows everything.
+        unfiltered_response = route_client.get(
             reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}),
-            data={"paediatric_only": "1"},
+            data={"paediatric_only": "0"},
         )
-        assert filtered_response.status_code == 200
-        filtered_body = filtered_response.content.decode("utf-8", errors="ignore")
-        assert "Paediatric airway paper" in filtered_body
-        assert "Adult perioperative paper" not in filtered_body
+        assert unfiltered_response.status_code == 200
+        unfiltered_body = unfiltered_response.content.decode("utf-8", errors="ignore")
+        assert "Paediatric airway paper" in unfiltered_body
+        assert "Adult perioperative paper" in unfiltered_body
 
     def test_article_intake_paediatric_filter_matches_text_without_mesh(self, route_client, regression_baseline):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()

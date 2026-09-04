@@ -10,4 +10,5 @@
 		{{ batch.task_note }}
 	</div>
 {% endif %}
+{% if recheck %}<div id="intake-recheck-body" hx-swap-oob="outerHTML">{% include "backend/_article_intake_recheck.html" %}</div>{% endif %}
 {% include "backend/_article_intake_results.html" %}

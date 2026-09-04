@@ -767,3 +767,79 @@ class TestArticleIntakeFilterDefaults:
         hidden = html.index('type="hidden" name="paediatric_only" value="0"')
         checkbox = html.index('name="paediatric_only" value="1" id="filter-paediatric"')
         assert hidden < checkbox
+
+
+# ---------------------------------------------------------------------------
+# Re-check card: where the batch's window sits relative to today
+# ---------------------------------------------------------------------------
+
+
+class TestIntakeRecheckState:
+    @staticmethod
+    def _batch(**overrides):
+        from unittest.mock import Mock
+
+        batch = Mock()
+        batch.to_month = datetime.date(2026, 10, 1)
+        batch.last_pubmed_fetched_at = None
+        for key, value in overrides.items():
+            setattr(batch, key, value)
+        return batch
+
+    @staticmethod
+    def _state(batch, today):
+        from django.utils import timezone
+
+        from spanza_journal_watch.backend.views import _intake_recheck_state
+
+        now = timezone.make_aware(datetime.datetime.combine(today, datetime.time(9, 0)))
+        return _intake_recheck_state(batch, today=today, now=now)
+
+    def test_window_end_and_settle_date_follow_to_month(self):
+        state = self._state(self._batch(), datetime.date(2026, 9, 4))
+        assert state["window_end"] == datetime.date(2026, 10, 31)
+        assert state["settle_date"] == datetime.date(2026, 11, 14)
+
+    def test_open_window_suggests_end_of_current_month(self):
+        state = self._state(self._batch(), datetime.date(2026, 9, 4))
+        assert state["phase"] == "open"
+        assert state["next_check"] == datetime.date(2026, 9, 30)
+
+    def test_open_window_final_month_suggests_window_end(self):
+        state = self._state(self._batch(), datetime.date(2026, 10, 12))
+        assert state["phase"] == "open"
+        assert state["next_check"] == datetime.date(2026, 10, 31)
+
+    def test_closing_phase_until_settle_date(self):
+        state = self._state(self._batch(), datetime.date(2026, 11, 5))
+        assert state["phase"] == "closing"
+        assert state["next_check"] == datetime.date(2026, 11, 14)
+
+    def test_settled_after_a_fortnight(self):
+        state = self._state(self._batch(), datetime.date(2026, 11, 20))
+        assert state["phase"] == "settled"
+        assert state["next_check"] is None
+
+    def test_never_checked_is_due(self):
+        assert self._state(self._batch(), datetime.date(2026, 9, 4))["due"] is True
+
+    def test_recent_check_is_not_due(self):
+        from django.utils import timezone
+
+        last = timezone.make_aware(datetime.datetime(2026, 9, 2, 9, 0))
+        state = self._state(self._batch(last_pubmed_fetched_at=last), datetime.date(2026, 9, 4))
+        assert state["due"] is False
+
+    def test_stale_check_in_open_window_is_due(self):
+        from django.utils import timezone
+
+        last = timezone.make_aware(datetime.datetime(2026, 8, 20, 9, 0))
+        state = self._state(self._batch(last_pubmed_fetched_at=last), datetime.date(2026, 9, 4))
+        assert state["due"] is True
+
+    def test_stale_check_after_settling_is_not_due(self):
+        from django.utils import timezone
+
+        last = timezone.make_aware(datetime.datetime(2026, 11, 15, 9, 0))
+        state = self._state(self._batch(last_pubmed_fetched_at=last), datetime.date(2026, 12, 20))
+        assert state["due"] is False

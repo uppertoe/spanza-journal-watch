@@ -225,3 +225,51 @@ body[data-theme="dark"] .dm { --dm-ok: #5fcf8b; --dm-info: #7ab8ff; --dm-warn: #
 .dm-issuehead { display: flex; justify-content: space-between; align-items: center; }
 .dm-stepcard { border: 1px solid var(--color-background-border); border-radius: 6px; padding: 6px 8px; margin-top: 6px; font-size: 10.5px; font-weight: 600; background: var(--color-background-secondary); }
 .dm[data-demo="go"] .dm-frame { min-height: 262px; }
+
+/* ---- load: Step 1 form, then the background PubMed check ---- */
+.dm-fieldrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 10px 4px; }
+.dm-fldlabel { font-size: 10px; font-weight: 600; color: var(--color-foreground-muted); margin-bottom: 3px; }
+.dm-select { border: 1px solid var(--color-background-border); border-radius: 6px; padding: 4px 7px; font-size: 10.5px; position: relative; padding-right: 18px; transition: border-color .2s, box-shadow .2s; white-space: nowrap; overflow: hidden; }
+.dm-select::after { content: ""; position: absolute; right: 7px; top: 9px; width: 5px; height: 5px; border: solid var(--color-foreground-muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.dm-select.lit { border-color: var(--dm-accent); box-shadow: 0 0 0 2px rgba(47, 90, 128, .18); }
+.dm-checks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; padding: 0 10px 8px; font-size: 10.5px; }
+.dm-checks .dm-cell { display: flex; min-width: 0; }
+.dm-checks .dm-tick { flex: none; }
+.dm-checks .dm-jname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-status { display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 6px 10px; border-radius: 6px; font-size: 10.5px; background: var(--dm-info-bg); color: var(--dm-info); border: 1px solid transparent; }
+.dm-status.ok { background: var(--dm-ok-bg); color: var(--dm-ok); }
+.dm [hidden] { display: none !important; }
+.dm-spin { width: 11px; height: 11px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: dm-spin .8s linear infinite; flex: none; }
+@keyframes dm-spin { to { transform: rotate(360deg); } }
+.dm-results { margin-top: 10px; }
+.dm[data-demo="load"] .dm-frame { min-height: 340px; }
+
+/* ---- recheck: the window filling over time ---- */
+.dm-tl { margin-bottom: 12px; }
+.dm-tl-months { display: flex; gap: 4px; }
+.dm-tl-month { flex: 1 1 0; text-align: center; font-size: 10.5px; padding: 3px 0; border-radius: 6px; border: 1px solid var(--color-background-border); color: var(--color-foreground-muted); }
+.dm-tl-month.on { background: var(--dm-info-bg); border-color: var(--dm-info); color: var(--dm-info); font-weight: 700; }
+.dm-tl-track { position: relative; height: 22px; margin-top: 4px; }
+.dm-tl-track::before { content: ""; position: absolute; left: 0; right: 0; top: 3px; height: 2px; background: var(--color-background-border); }
+.dm-tl-today { position: absolute; top: 0; left: 0; transform: translateX(-50%); transition: left 1.2s cubic-bezier(.4, 0, .2, 1); text-align: center; }
+.dm-tl-today::before { content: ""; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--dm-accent); margin: 0 auto; }
+.dm-tl-today span { display: block; font-size: 9px; font-weight: 600; color: var(--dm-accent); margin-top: 2px; white-space: nowrap; }
+.dm[data-demo="recheck"] .dm-row { grid-template-columns: 10px minmax(0, 1fr) auto; }
+.dm-dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; transition: background .3s; }
+.dm-dot.on { background: var(--dm-info); }
+.dm-link { color: var(--dm-accent); text-decoration: underline; }
+.dm-link.dim { opacity: .45; text-decoration: none; }
+.dm[data-demo="recheck"] .dm-status { margin: 0 10px 10px; }
+.dm[data-demo="recheck"] .dm-frame { min-height: 470px; }
+.dm[data-demo="recheck"] .dm-panelhead { flex-wrap: wrap; }
+.dm[data-demo="recheck"] .dm-count { white-space: normal; }
+.dm[data-demo="recheck"] .dm-title { -webkit-line-clamp: 1; }
+
+/* highlighted "Keep the list up to date" card, as on the intake page */
+.dm-callout { border-color: var(--dm-info); margin-bottom: 10px; transition: border-color .3s; }
+.dm-callout .dm-panelhead { background: var(--dm-info-bg); transition: background .3s; }
+.dm-callout.due { border-color: var(--dm-warn); }
+.dm-callout.due .dm-panelhead { background: var(--dm-warn-bg); }
+.dm-callout .dm-btn.warn { background: var(--dm-warn); }
+.dm-note { padding: 8px 10px 0; font-size: 10.5px; color: var(--color-foreground-secondary); line-height: 1.4; }
+.dm[data-demo="recheck"] .dm-callout .dm-actions { border-top: 0; }

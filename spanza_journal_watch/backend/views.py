@@ -934,6 +934,52 @@ def _pubmed_fetch_gate_remaining(batch):
     return PUBMED_FETCH_FRESHNESS - elapsed
 
 
+INTAKE_RECHECK_SETTLE_DAYS = 14
+INTAKE_RECHECK_DUE_DAYS = 7
+
+
+def _intake_recheck_state(batch, *, today=None, now=None):
+    """Describe where the batch's window sits relative to today, for the re-check card.
+
+    PubMed indexes an article some days after it appears online, so a list loaded
+    while the window is still open is incomplete. Phases:
+      open     - today is inside the window; check again at the end of each month
+      closing  - the window closed less than INTAKE_RECHECK_SETTLE_DAYS ago; late
+                 articles from the final month are still arriving
+      settled  - the window closed long enough ago that PubMed should hold everything
+    `due` is set when the list has never been checked, or the last check is older
+    than INTAKE_RECHECK_DUE_DAYS while the window is not yet settled.
+    """
+    now = now or timezone.now()
+    today = today or timezone.localdate(now)
+    window_end = _shift_month(batch.to_month, 1) - datetime.timedelta(days=1)
+    settle_date = window_end + datetime.timedelta(days=INTAKE_RECHECK_SETTLE_DAYS)
+    last = batch.last_pubmed_fetched_at
+    days_since_check = (now - last).days if last else None
+
+    if today <= window_end:
+        phase = "open"
+        month_end = _shift_month(today.replace(day=1), 1) - datetime.timedelta(days=1)
+        next_check = min(month_end, window_end)
+    elif today <= settle_date:
+        phase = "closing"
+        next_check = settle_date
+    else:
+        phase = "settled"
+        next_check = None
+
+    due = last is None or (phase != "settled" and days_since_check >= INTAKE_RECHECK_DUE_DAYS)
+    return {
+        "phase": phase,
+        "window_end": window_end,
+        "settle_date": settle_date,
+        "next_check": next_check,
+        "last_checked_at": last,
+        "days_since_check": days_since_check,
+        "due": due,
+    }
+
+
 def _import_pubmed_batch(batch, watched_journals):
     populate_pubmed_batch_from_cache(batch, watched_journals)
 
@@ -1165,6 +1211,7 @@ def _article_intake_results_context(batch, params, user=None):
         "filter_new_only": new_only,
         "user_view": user_view,
         "last_pubmed_fetched_at": batch.last_pubmed_fetched_at,
+        "recheck": _intake_recheck_state(batch),
         "fetch_gate_remaining_seconds": (
             int(_pubmed_fetch_gate_remaining(batch).total_seconds())
             if _pubmed_fetch_gate_remaining(batch) is not None
