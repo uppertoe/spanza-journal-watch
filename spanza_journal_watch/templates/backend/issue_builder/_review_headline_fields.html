@@ -1,0 +1,25 @@
+{% load crispy_forms_tags %}
+{# Swapped in whole by the "Suggest with Claude" button, so both fields refresh together. #}
+<div id="review-headline-fields" class="row g-3">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-end gap-2 mb-1">
+      <label class="form-label fw-semibold mb-0" for="id_headline">Editorial headline and bottom line</label>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              hx-post="{{ suggest_headline_url }}"
+              hx-include="#issue-review-form textarea[name='body'], #issue-review-form [name='article_name'], #issue-review-form [name='existing_article'], #issue-review-form [name='article_mode']"
+              hx-target="#review-headline-fields" hx-swap="outerHTML"
+              hx-indicator="#headline-suggest-spinner"
+              hx-disabled-elt="this">
+        Suggest with Claude
+      </button>
+    </div>
+    {% if headline_suggest_error %}
+      <div class="alert alert-warning py-2 small mb-2">{{ headline_suggest_error }}</div>
+    {% elif headline_suggested %}
+      <div class="alert alert-info py-2 small mb-2">Drafted from the review text. Edit freely before saving.</div>
+    {% endif %}
+    <span id="headline-suggest-spinner" class="htmx-indicator small text-muted">Reading the review and drafting…</span>
+  </div>
+  <div class="col-12">{{ review_form.headline|as_crispy_field }}</div>
+  <div class="col-12">{{ review_form.bottom_line|as_crispy_field }}</div>
+</div>

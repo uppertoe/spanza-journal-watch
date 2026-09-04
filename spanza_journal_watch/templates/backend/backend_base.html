@@ -222,6 +222,9 @@
 
               {% if perms.submissions.chief_editor %}
               <li class="nav-item">
+                <a class="nav-link{% if current == 'headline_queue' %} active{% endif %}" href="{% url "backend:headline_queue" %}">Headlines</a>
+              </li>
+              <li class="nav-item">
                 <a class="nav-link{% if current in 'backend_settings watched_journals watched_journal_edit fetch_monitoring affiliations_list affiliation_edit authors_list author_edit author_merge tag_management mesh_mapping_management unmapped_mesh_report collection_management' %} active{% endif %}" href="{% url "backend:backend_settings" %}">Settings</a>
               </li>
               {% endif %}

@@ -143,7 +143,7 @@ def peek_csv(file, user_header=None):
         column_count = len(fieldnames)
         fieldnames = []
         for i in range(column_count):
-            fieldnames.append(f"Column {i+1}")
+            fieldnames.append(f"Column {i + 1}")
     else:
         fieldnames = None  # Allow DictReader to use the first row as fieldnames
 
@@ -469,6 +469,21 @@ class IssueBuilderReviewForm(forms.Form):
         label="Affiliations",
     )
     body = forms.CharField(widget=forms.Textarea(attrs={"rows": 20, "style": "resize:vertical;"}), required=True)
+    headline = forms.CharField(
+        required=False,
+        max_length=140,
+        label="Editorial headline",
+        help_text=(
+            "What the review found, in one line. Used as the page title and heading; "
+            "the paper's title becomes the subtitle."
+        ),
+    )
+    bottom_line = forms.CharField(
+        required=False,
+        label="Bottom line",
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Two to four sentences for practice. Shown as a callout and used as the search description.",
+    )
     is_featured = forms.BooleanField(required=False)
     feature_image = forms.ImageField(required=False)
 
@@ -483,6 +498,8 @@ class IssueBuilderReviewForm(forms.Form):
             self.fields["author_mode"].initial = self.AUTHOR_MODE_EXISTING
             self.fields["author"].initial = review.author
             self.fields["body"].initial = review.body
+            self.fields["headline"].initial = review.editorial_headline
+            self.fields["bottom_line"].initial = review.bottom_line
             self.fields["is_featured"].initial = review.is_featured
             if review.article:
                 self.fields["article_curated_tags"].initial = review.article.tags.filter(curated=True)
@@ -577,6 +594,8 @@ class IssueBuilderReviewForm(forms.Form):
         review.author = author
         review.body = self.cleaned_data["body"]
         review.is_featured = self.cleaned_data.get("is_featured", False)
+        review.editorial_headline = (self.cleaned_data.get("headline") or "").strip()
+        review.bottom_line = (self.cleaned_data.get("bottom_line") or "").strip()
         if self.cleaned_data.get("feature_image"):
             review.feature_image = self.cleaned_data["feature_image"]
         review.save()

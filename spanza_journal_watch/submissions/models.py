@@ -281,6 +281,17 @@ class Review(TimeStampedModel):
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True, related_name="reviews")
     body = MarkdownxField()
+    # Editorial framing for search and sharing. The headline is the reviewer's
+    # angle (the question or the finding), which is what people search for; the
+    # paper's own title stays as the subtitle. The bottom line is a short plain
+    # text takeaway used for descriptions and a callout on the page.
+    editorial_headline = models.CharField(max_length=140, blank=True)
+    bottom_line = models.TextField(blank=True)
+    # Machine drafts wait here until the chief editor reads and approves them;
+    # nothing in these fields is ever rendered publicly.
+    draft_headline = models.CharField(max_length=140, blank=True)
+    draft_bottom_line = models.TextField(blank=True)
+    draft_generated_at = models.DateTimeField(blank=True, null=True)
     publish_date = models.DateField(blank=True, null=True)
     active = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
@@ -317,6 +328,18 @@ class Review(TimeStampedModel):
 
     def get_truncated_body(self):
         return shorten_text(self.get_plain_body(exclude_headings=True), self.TRUNCATED_BODY_LENGTH)
+
+    @property
+    def headline_status(self):
+        if (self.editorial_headline or "").strip():
+            return "done"
+        if (self.draft_headline or "").strip():
+            return "draft"
+        return "missing"
+
+    def get_display_headline(self):
+        """The editorial headline if one has been written, otherwise the paper's title."""
+        return (self.editorial_headline or "").strip() or self.article.get_title().strip()
 
     def get_longer_truncated_plain_body(self):
         return shorten_text(self.get_plain_body(), 500)

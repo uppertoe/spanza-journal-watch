@@ -445,6 +445,11 @@ ACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSignupForm"}
 # https://django-allauth.readthedocs.io/en/latest/forms.html
 SOCIALACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSocialSignupForm"}
 
+# Editorial headline drafting (Anthropic)
+# ------------------------------------------------------------------------------
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+REVIEW_HEADLINE_MODEL = env("REVIEW_HEADLINE_MODEL", default="claude-opus-5")
+
 # django-oauth-toolkit — Django acts as the OIDC provider for Planka
 # ------------------------------------------------------------------------------
 import base64  # noqa: E402

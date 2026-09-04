@@ -31,3 +31,4 @@ django-markdownx
 bleach
 openpyxl
 fpdf2
+anthropic  # editorial headline drafting

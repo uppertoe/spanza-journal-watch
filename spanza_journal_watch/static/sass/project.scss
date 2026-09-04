@@ -3556,6 +3556,19 @@ body.jw-modal-open {
   transition: transform 0.2s;
 }
 
+/* ── Bottom line callout on review pages ───────────────── */
+.jw-bottom-line {
+  border-left: 4px solid var(--bs-primary);
+  background: rgba(var(--bs-primary-rgb), 0.06);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.85rem 1rem;
+
+  .text-uppercase {
+    letter-spacing: 0.08em;
+    color: var(--bs-primary);
+  }
+}
+
 /* ── Dot indicator (reading list / nav) ─────────────────── */
 .jw-dot-indicator {
   position: absolute;

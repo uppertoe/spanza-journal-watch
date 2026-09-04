@@ -94,6 +94,10 @@ urlpatterns = [
         views.article_intake_toggle_recommendation_hidden,
         name="article_intake_toggle_recommendation_hidden",
     ),
+    path("headlines", views.headline_queue, name="headline_queue"),
+    path("headlines/draft-all", views.headline_draft_all, name="headline_draft_all"),
+    path("headlines/<int:review_id>/draft", views.headline_draft, name="headline_draft"),
+    path("headlines/<int:review_id>/save", views.headline_save, name="headline_save"),
     path("settings", views.backend_settings, name="backend_settings"),
     path("settings/fetch-monitoring", views.fetch_monitoring, name="fetch_monitoring"),
     path("settings/refresh-mesh", views.trigger_mesh_refresh, name="trigger_mesh_refresh"),
@@ -206,6 +210,11 @@ urlpatterns = [
         name="issue_sync_contributor_planka",
     ),
     path("issues/builder/<int:issue_id>/publish", views.publish_issue_bundle, name="publish_issue_bundle"),
+    path(
+        "issues/builder/<int:issue_id>/reviews/suggest-headline",
+        views.suggest_review_headline,
+        name="suggest_review_headline",
+    ),
     path(
         "issues/builder/<int:issue_id>/planka/setup",
         views.planka_setup_issue_project,

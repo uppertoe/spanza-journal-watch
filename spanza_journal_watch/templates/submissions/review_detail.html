@@ -14,7 +14,7 @@
 <meta name="twitter:image" content="{% if share_image_url %}{{ share_image_url }}{% else %}{{ default_og_image }}{% endif %}">
 {% endblock head_meta %}
 {% block main-feature %}
-    {% include "fragments/main_feature.html" with title=review.article.get_title body="A contributor review of a paper from the paediatric anaesthesia literature." header_theme="review" header_pattern="arc" header_kicker="Editorial review" %}
+    {% include "fragments/main_feature.html" with title=display_headline body="A contributor review of a paper from the paediatric anaesthesia literature." header_theme="review" header_pattern="arc" header_kicker="Editorial review" %}
 {% endblock main-feature %}
 
 {% block article-block %}
@@ -23,6 +23,12 @@
 {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
 <p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal|default:review.article.source_journal_name }}</a>
 <p class="card-subtitle text-muted mb-1">Submitted {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+{% if review.bottom_line %}
+<aside class="jw-bottom-line my-3" aria-label="Bottom line">
+  <p class="text-uppercase small fw-semibold mb-1">Bottom line</p>
+  <p class="mb-0">{{ review.bottom_line }}</p>
+</aside>
+{% endif %}
 <div class="mb-3">
     {% include 'fragments/share_actions.html' with show_social_links=True %}
 </div>

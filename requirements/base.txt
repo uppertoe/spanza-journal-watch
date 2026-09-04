@@ -6,6 +6,14 @@
 #
 amqp==5.3.1
     # via kombu
+annotated-types==0.8.0
+    # via pydantic
+anthropic==1.3.0
+    # via -r requirements/base.in
+anyio==4.14.2
+    # via
+    #   anthropic
+    #   httpx2
 argon2-cffi==25.1.0
     # via -r requirements/base.in
 argon2-cffi-bindings==25.1.0
@@ -99,6 +107,8 @@ django-view-breadcrumbs==2.5.1
     # via -r requirements/base.in
 django-webpack-loader==3.2.3
     # via -r requirements/base.in
+docstring-parser==0.18.0
+    # via anthropic
 et-xmlfile==2.0.0
     # via openpyxl
 flower==2.0.1
@@ -107,12 +117,23 @@ fonttools==4.62.1
     # via fpdf2
 fpdf2==2.8.7
     # via -r requirements/base.in
+h11==0.16.0
+    # via httpcore2
 hiredis==3.3.1
     # via -r requirements/base.in
+httpcore2==2.3.0
+    # via httpx2
+httpx2==2.3.0
+    # via anthropic
 humanize==4.15.0
     # via flower
 idna==3.11
-    # via requests
+    # via
+    #   anyio
+    #   httpx2
+    #   requests
+jiter==0.16.0
+    # via anthropic
 jwcrypto==1.5.7
     # via django-oauth-toolkit
 kombu==5.6.2
@@ -136,6 +157,10 @@ prompt-toolkit==3.0.52
     # via click-repl
 pycparser==3.0
     # via cffi
+pydantic==2.13.5
+    # via anthropic
+pydantic-core==2.46.5
+    # via pydantic
 pyjwt==2.12.1
     # via -r requirements/base.in
 python-crontab==3.3.0
@@ -154,14 +179,27 @@ requests==2.33.1
     # via django-oauth-toolkit
 six==1.17.0
     # via python-dateutil
+sniffio==1.3.1
+    # via anthropic
 sqlparse==0.5.5
     # via django
 text-unidecode==1.3
     # via python-slugify
 tornado==6.5.5
     # via flower
+truststore==0.10.4
+    # via
+    #   httpcore2
+    #   httpx2
 typing-extensions==4.15.0
-    # via jwcrypto
+    # via
+    #   anthropic
+    #   jwcrypto
+    #   pydantic
+    #   pydantic-core
+    #   typing-inspection
+typing-inspection==0.4.4
+    # via pydantic
 tzdata==2026.1
     # via
     #   django-celery-beat

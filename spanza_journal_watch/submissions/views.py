@@ -331,11 +331,17 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
         canonical_url = build_request_absolute_url(self.request, self.object.get_absolute_url())
 
         article_title = self.object.article.get_title().strip()
-        share_title = f"SPANZA Journal Watch - {article_title}"
-        seo_title = shorten_text(article_title.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
+        headline = self.object.get_display_headline()
+        share_title = f"SPANZA Journal Watch - {headline}"
+        seo_title = shorten_text(headline.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
         context["page_title"] = f"{seo_title} | SPANZA Journal Watch"
-        share_description = self.object.get_truncated_body().strip()
-        context["page_meta_description"] = build_review_meta_description(share_description, self.object.article)
+        context["display_headline"] = headline
+        context["has_editorial_headline"] = bool((self.object.editorial_headline or "").strip())
+        bottom_line = (self.object.bottom_line or "").strip()
+        share_description = bottom_line or self.object.get_truncated_body().strip()
+        context["page_meta_description"] = build_review_meta_description(
+            shorten_text(share_description, 300), self.object.article
+        )
         share_email_summary = self.object.get_plain_body().strip()
         self.object.display_review_date = self.object.get_review_date()
         review_date = self.object.display_review_date
@@ -381,7 +387,8 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
             {
                 "@context": "https://schema.org",
                 "@type": "Article",
-                "headline": seo_title,
+                "headline": shorten_text(headline, 110),
+                "alternativeHeadline": shorten_text(article_title, 150),
                 "description": share_description,
                 "url": canonical_url,
                 "image": og_image,

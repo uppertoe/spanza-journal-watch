@@ -1,0 +1,52 @@
+{% extends "backend/backend_base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="mb-0">Headlines</h1>
+  <form method="post" action="{% url 'backend:headline_draft_all' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-primary" {% if not anthropic_configured or not counts.missing %}disabled{% endif %}
+            title="{% if not anthropic_configured %}ANTHROPIC_API_KEY is not configured{% else %}Draft a headline and bottom line for every review that has neither{% endif %}">
+      Draft all missing ({{ counts.missing }})
+    </button>
+  </form>
+</div>
+<p class="text-muted">
+  An editorial headline says what a review found, in one line, and replaces the paper's title as the page title and heading.
+  Drafts are suggestions only: nothing appears on the site until you save it here.
+</p>
+
+<ul class="nav nav-pills mb-3">
+  {% for key, label, count in status_tabs %}
+    <li class="nav-item">
+      <a class="nav-link{% if status == key %} active{% endif %}" href="?status={{ key }}">{{ label }} <span class="badge text-bg-light text-dark border ms-1">{{ count }}</span></a>
+    </li>
+  {% endfor %}
+</ul>
+
+<div id="headline-rows" class="d-flex flex-column gap-3">
+  {% for row in rows %}
+    {% include "backend/_headline_row.html" with review=row.review take_home=row.take_home headline_value=row.headline_value bottom_line_value=row.bottom_line_value anthropic_configured=row.anthropic_configured %}
+  {% empty %}
+    <div class="alert alert-light border">Nothing in this list.</div>
+  {% endfor %}
+</div>
+<style>
+  .headline-review-scroll { max-height: 32rem; }
+  .headline-review-scroll :is(h1, h2, h3, h4, h5, h6) { font-size: 1rem; font-weight: 600; margin-top: 1rem; }
+</style>
+<script>
+  // When a row's review text is opened, the fields give up the width beside it; closing hands it back.
+  // Delegated at the document so it survives HTMX swapping rows in and out.
+  (() => {
+    const layout = (panel, open) => {
+      const fields = panel.closest(".headline-row-layout")?.querySelector(".headline-fields");
+      if (fields) { fields.classList.toggle("col-lg-5", open); fields.classList.toggle("col-12", !open); }
+      const button = document.querySelector(`[data-bs-target="#${panel.id}"]`);
+      if (button) button.textContent = open ? "Hide review text" : "Show review text";
+    };
+    document.addEventListener("show.bs.collapse", (e) => e.target.classList.contains("headline-review-text") && layout(e.target, true));
+    document.addEventListener("hidden.bs.collapse", (e) => e.target.classList.contains("headline-review-text") && layout(e.target, false));
+  })();
+</script>
+{% endblock content %}
