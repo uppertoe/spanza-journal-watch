@@ -6,7 +6,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
 
-from spanza_journal_watch.submissions.models import Author, Issue, Review, Tag
+from spanza_journal_watch.submissions.models import Author, CuratedCollection, Issue, Review, Tag
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
 from spanza_journal_watch.utils.functions import HTMLShortener, get_unique_slug
@@ -139,10 +139,12 @@ class PageHeader(PageModel):
         cache_key = f"layout:page_header:v{cache_version}:type:{page_type}"
         return cache.get_or_set(
             cache_key,
-            lambda: cls.objects.select_related("feature_article")
-            .filter(page_type=page_type, active=True)
-            .order_by("-modified")
-            .first(),
+            lambda: (
+                cls.objects.select_related("feature_article")
+                .filter(page_type=page_type, active=True)
+                .order_by("-modified")
+                .first()
+            ),
             timeout=60 * 30,
         )
 
@@ -177,13 +179,28 @@ class IssueSitemap(Sitemap):
 
 
 class TagSitemap(Sitemap):
+    """Curated topics with at least one live review: the same set /explore lists.
+
+    Uncurated or empty topics used to be submitted too, which handed search
+    engines pages the site itself does not link to and that have nothing on
+    them.
+    """
+
     changefreq = "weekly"
     priority = 0.7
 
     def items(self):
         return (
-            Tag.objects.filter(active=True)
-            .annotate(latest_review=models.Max("articles__reviews__modified"))
+            Tag.objects.filter(active=True, curated=True)
+            .annotate(
+                review_count=models.Count(
+                    "articles__reviews", filter=models.Q(articles__reviews__active=True), distinct=True
+                ),
+                latest_review=models.Max(
+                    "articles__reviews__modified", filter=models.Q(articles__reviews__active=True)
+                ),
+            )
+            .filter(review_count__gt=0)
             .order_by("text")
         )
 
@@ -192,11 +209,50 @@ class TagSitemap(Sitemap):
 
 
 class AuthorSitemap(Sitemap):
+    """Named contributors with at least one live review, matching the /about listing."""
+
     changefreq = "monthly"
     priority = 0.4
 
     def items(self):
-        return Author.objects.filter(anonymous=False).order_by("name")
+        return (
+            Author.objects.filter(anonymous=False)
+            .annotate(review_count=models.Count("reviews", filter=models.Q(reviews__active=True), distinct=True))
+            .filter(review_count__gt=0)
+            .order_by("name")
+        )
 
     def lastmod(self, obj):
         return obj.modified
+
+
+class CollectionSitemap(Sitemap):
+    changefreq = "monthly"
+    priority = 0.6
+
+    def items(self):
+        return CuratedCollection.objects.filter(active=True).order_by("title")
+
+
+class StaticPagesSitemap(Sitemap):
+    """The index pages, which were previously reachable only by following links."""
+
+    changefreq = "weekly"
+
+    _pages = (
+        ("home", 1.0),
+        ("submissions:issue_list", 0.8),
+        ("submissions:tag_list", 0.8),
+        ("submissions:journal_list", 0.5),
+        ("submissions:about", 0.5),
+        ("events:session_list", 0.5),
+    )
+
+    def items(self):
+        return [name for name, _priority in self._pages]
+
+    def location(self, item):
+        return reverse(item)
+
+    def priority(self, item):
+        return dict(self._pages)[item]

@@ -8,7 +8,7 @@ from django.views.decorators.http import require_GET
 from django.views.generic import DetailView, ListView
 
 from spanza_journal_watch.submissions.models import Review
-from spanza_journal_watch.submissions.views import attach_review_display_fields
+from spanza_journal_watch.submissions.views import attach_review_display_fields, build_paginated_canonical_url
 from spanza_journal_watch.utils.functions import get_domain_url
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HtmxMixin, SidebarMixin
 
@@ -68,7 +68,8 @@ class HomepageView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListView):
             "Expert reviews of the latest paediatric anaesthesia research, curated by the SPANZA "
             "Journal Watch community: concise summaries and clinical commentary for anaesthetists."
         )
-        context["canonical_url"] = self.request.build_absolute_uri(self.request.path)
+        # Keep ?page=N for later pages so they do not all claim to be the front page.
+        context["canonical_url"] = build_paginated_canonical_url(self.request, self.request.path)
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",

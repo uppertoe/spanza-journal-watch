@@ -70,10 +70,19 @@ class TestIssueSitemap:
 # ---------------------------------------------------------------------------
 
 
+def _live_review(pmid, title):
+    article = PubmedArticle.objects.create(pmid=pmid, title=title)
+    return article, Review.objects.create(article=article, body="Body " * 40, active=True)
+
+
 class TestTagSitemap:
     def test_inactive_tags_excluded(self):
-        active = Tag.objects.create(text="Sitemap Active Tag Unique", active=True)
-        inactive = Tag.objects.create(text="Sitemap Inactive Tag Unique", active=False)
+        # The sitemap mirrors /explore: curated topics that have at least one live review.
+        article, _ = _live_review("880001", "Tagged paper")
+        active = Tag.objects.create(text="Sitemap Active Tag Unique", active=True, curated=True)
+        inactive = Tag.objects.create(text="Sitemap Inactive Tag Unique", active=False, curated=True)
+        active.articles.add(article)
+        inactive.articles.add(article)
 
         items = list(TagSitemap().items())
         item_pks = [t.pk for t in items]
@@ -82,7 +91,9 @@ class TestTagSitemap:
         assert inactive.pk not in item_pks
 
     def test_all_items_have_absolute_url(self):
-        Tag.objects.create(text="Sitemap URL Tag Unique", active=True)
+        article, _ = _live_review("880002", "Tagged paper two")
+        tag = Tag.objects.create(text="Sitemap URL Tag Unique", active=True, curated=True)
+        tag.articles.add(article)
 
         items = list(TagSitemap().items())
 
@@ -97,8 +108,12 @@ class TestTagSitemap:
 
 class TestAuthorSitemap:
     def test_anonymous_authors_excluded(self):
+        # The sitemap mirrors /about: named contributors with at least one live review.
         named = Author.objects.create(name="Sitemap Real Author", anonymous=False)
         anon = Author.objects.create(name="Sitemap Anonymous", anonymous=True)
+        for pmid, author in (("880003", named), ("880004", anon)):
+            article = PubmedArticle.objects.create(pmid=pmid, title=f"Paper {pmid}")
+            Review.objects.create(article=article, body="Body " * 40, active=True, author=author)
 
         items = list(AuthorSitemap().items())
         item_pks = [a.pk for a in items]
@@ -106,8 +121,14 @@ class TestAuthorSitemap:
         assert named.pk in item_pks
         assert anon.pk not in item_pks
 
+    def test_authors_without_live_reviews_excluded(self):
+        idle = Author.objects.create(name="Sitemap Idle Author", anonymous=False)
+        assert idle.pk not in [a.pk for a in AuthorSitemap().items()]
+
     def test_all_items_have_absolute_url(self):
-        Author.objects.create(name="Sitemap URL Author", anonymous=False)
+        author = Author.objects.create(name="Sitemap URL Author", anonymous=False)
+        article = PubmedArticle.objects.create(pmid="880005", title="Paper 880005")
+        Review.objects.create(article=article, body="Body " * 40, active=True, author=author)
 
         items = list(AuthorSitemap().items())
 

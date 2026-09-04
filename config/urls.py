@@ -13,14 +13,23 @@ from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import views as backend_views
 from spanza_journal_watch.events.models import LiveSessionSitemap
 from spanza_journal_watch.layout.feeds import LatestReviewsFeed
-from spanza_journal_watch.layout.models import AuthorSitemap, IssueSitemap, ReviewSitemap, TagSitemap
+from spanza_journal_watch.layout.models import (
+    AuthorSitemap,
+    CollectionSitemap,
+    IssueSitemap,
+    ReviewSitemap,
+    StaticPagesSitemap,
+    TagSitemap,
+)
 from spanza_journal_watch.layout.views import HomepageView, indexnow_key
 from spanza_journal_watch.users.views import invite_aware_login_view, invite_aware_signup_view
 
 sitemaps = {
+    "pages": StaticPagesSitemap,
     "reviews": ReviewSitemap,
     "issues": IssueSitemap,
     "tags": TagSitemap,
+    "collections": CollectionSitemap,
     "authors": AuthorSitemap,
     "live": LiveSessionSitemap,
 }

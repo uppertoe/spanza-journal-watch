@@ -35,6 +35,7 @@ from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.functions import get_domain_url, shorten_text
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HitMixin, HtmxMixin, SidebarMixin
+from spanza_journal_watch.utils.seo import noindex_response
 
 from .models import Author, CuratedCollection, HealthService, Issue, IssueSlugRedirect, Review, Tag
 from .templatetags.tag_scores import compute_tag_scores
@@ -1208,6 +1209,23 @@ class HealthServiceListView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMix
         context["query"] = (self.request.GET.get("q") or "").strip()
         context["sort"] = (self.request.GET.get("sort") or "contributors").strip()
         context["service_count"] = context["health_services"].count()
+        context["page_title"] = "Contributors | SPANZA Journal Watch"
+        context["page_meta_description"] = (
+            "The paediatric anaesthetists who review the literature for SPANZA Journal Watch, "
+            "and the hospitals and departments they work in across Australia and New Zealand."
+        )
+        context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:about"))
+        if context["query"] or context["sort"] != "contributors":
+            context["meta_robots"] = "noindex,follow"
+        context["structured_data"] = json.dumps(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": "Contributors",
+                "url": context["canonical_url"],
+                "description": context["page_meta_description"],
+            }
+        )
         return context
 
 
@@ -1559,6 +1577,10 @@ class JournalListView(AnonymousCacheMixin, TemplateView):
             "month by month, with filters and community recommendations for further reading."
         )
         context["canonical_url"] = build_request_absolute_url(self.request, reverse("submissions:journal_list"))
+        # Every journal, month and filter combination is reachable by link and
+        # shares this one canonical; keep crawlers from indexing the permutations.
+        if any(key in self.request.GET for key in ("journal", "month", "paediatric", "has_abstract", "page")):
+            context["meta_robots"] = "noindex,follow"
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
@@ -1659,6 +1681,7 @@ def journal_article_mark_fulltext(request, article_id):
     return JsonResponse({"ok": True})
 
 
+@noindex_response
 def journal_fulltext_ids(request):
     """Return article IDs the current user/session has clicked full text on."""
     if request.user.is_authenticated:
@@ -1756,6 +1779,7 @@ def _toggle_visitor_recommendation(request, article):
     request.session["recommended_article_ids"] = recommended
 
 
+@noindex_response
 def journal_search(request):
     """Live search across all journals, rendered in the search drawer."""
     query = (request.GET.get("q") or "").strip()
@@ -1803,6 +1827,7 @@ def journal_search(request):
     return render(request, "submissions/fragments/journal_search_results.html", context)
 
 
+@noindex_response
 def journal_reading_list(request):
     """Full-width reading list with active/archived tabs, search, and journal filter."""
     from itertools import groupby

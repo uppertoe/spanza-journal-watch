@@ -5066,6 +5066,16 @@ def new_review_form(request, issue_id):
     )
 
 
+def _queue_indexnow_for_review(review):
+    """Ask search engines to re-crawl a live review after it is edited in place."""
+    if not review or not review.active:
+        return
+    paths = [review.get_absolute_url()]
+    if review.author and not review.author.anonymous:
+        paths.append(review.author.get_absolute_url())
+    transaction.on_commit(lambda: queue_indexnow_submission(paths))
+
+
 @login_required
 @permission_required("submissions.chief_editor", raise_exception=True)
 def add_issue_review(request, issue_id):
@@ -5269,6 +5279,8 @@ def update_issue_review(request, issue_id, review_id):
 
     if form.is_valid():
         form.save()
+        review.refresh_from_db()
+        _queue_indexnow_for_review(review)
         messages.success(request, "Review updated.")
         return _render_issue_panel(request, issue)
 

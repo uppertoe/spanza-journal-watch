@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
+# Signed-in areas and account plumbing
+Disallow: /editorial/
+Disallow: /accounts/
+Disallow: /o/
+Disallow: /users/
+Disallow: /cpd/
+Disallow: /newsletter/
+# Journal browser permutations (journal x month x filters) and its HTMX fragments;
+# the browser itself at /journals stays crawlable.
+Disallow: /journals?
+Disallow: /journals/
+Disallow: /offline.html
 
 Sitemap: {{ request.scheme }}://{{ request.get_host }}/sitemap.xml
