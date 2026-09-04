@@ -550,14 +550,21 @@ def dashboard(request):
     # ── Issue workflow progress ───────────────────────────────────
     workflow_steps = []
     if current_issue:
+        has_board = PlankaIssueBinding.objects.filter(issue=current_issue).exists()
         has_articles = PubmedBatchArticle.objects.filter(batch__issue=current_issue, is_selected=True).exists()
-        has_reviewers = IssueContributor.objects.filter(issue=current_issue).exists()
+        # Coordinators are contributors too; only reviewers count for this step.
+        has_reviewers = (
+            IssueContributor.objects.filter(issue=current_issue, role=IssueContributor.Role.REVIEWER)
+            .exclude(status=IssueContributor.Status.REVOKED)
+            .exists()
+        )
         has_reviews = current_issue.reviews.filter(active=True).exists()
         is_published = current_issue.active
         issue_newsletter = Newsletter.objects.filter(issue=current_issue).first()
         newsletter_sent = issue_newsletter.is_sent if issue_newsletter else False
 
         workflow_steps = [
+            ("Setup", has_board),
             ("Articles", has_articles),
             ("Reviewers", has_reviewers),
             ("Reviews", has_reviews),
