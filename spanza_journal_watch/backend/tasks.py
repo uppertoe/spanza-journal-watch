@@ -725,3 +725,69 @@ def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
     )
     batch.save(update_fields=["task_state", "task_note", "modified"])
     return {"status": "error" if failed else "success", "created": created, "failed": failed}
+
+
+@celery_app.task(bind=True)
+def provision_planka_project_task(self, job_id):
+    """Create the Planka project for an issue, recording progress on the job row.
+
+    Every exit path sets a terminal state: a job left "running" would make the
+    setup card poll forever, which is the failure this task exists to avoid.
+    """
+    from .models import PlankaIssueBinding, PlankaProjectSetupJob
+    from .planka import PlankaAPIError
+    from .views import _build_planka_client, _provision_planka_project, _register_planka_webhook
+
+    job = PlankaProjectSetupJob.objects.select_related("issue", "background_asset").get(pk=job_id)
+    job.state = PlankaProjectSetupJob.STATE_RUNNING
+    job.task_id = self.request.id or job.task_id
+    job.note = "Creating the Planka project, boards and lists."
+    job.save(update_fields=["state", "task_id", "note", "modified"])
+
+    issue = job.issue
+    if PlankaIssueBinding.objects.filter(issue=issue).exists():
+        job.state = PlankaProjectSetupJob.STATE_SUCCESS
+        job.note = "This issue is already linked to a Planka project."
+        job.save(update_fields=["state", "note", "modified"])
+        return
+
+    try:
+        client = _build_planka_client()
+        result = _provision_planka_project(client, job.project_name, background_asset=job.background_asset)
+    except (KeyError, PlankaAPIError) as error:
+        job.state = PlankaProjectSetupJob.STATE_ERROR
+        job.note = f"Unable to set up Planka project: {error}"
+        job.save(update_fields=["state", "note", "modified"])
+        return
+    except Exception:
+        logger.exception("Planka project setup failed for issue %s", issue.pk)
+        job.state = PlankaProjectSetupJob.STATE_ERROR
+        job.note = "Unable to set up Planka project: an unexpected error occurred. Check the server logs."
+        job.save(update_fields=["state", "note", "modified"])
+        return
+
+    project = result["project"]
+    board = result["board"]
+    instructions_board = result["instructions_board"]
+    binding = PlankaIssueBinding.objects.create(
+        issue=issue,
+        project_id=project["id"],
+        project_name=job.project_name,
+        board_id=board["id"],
+        board_name=board.get("name") or "Reviews",
+        instructions_board_id=instructions_board["id"],
+        instructions_board_name=instructions_board.get("name") or "Instructions",
+        lists=result["list_mapping"],
+        instructions_lists=result["instruction_list_mapping"],
+        custom_fields={},
+        custom_field_group_id=None,
+        background_asset=job.background_asset,
+    )
+    try:
+        _register_planka_webhook(client, binding)
+    except Exception:
+        logger.exception("Planka webhook registration failed for issue %s", issue.pk)
+
+    job.state = PlankaProjectSetupJob.STATE_SUCCESS
+    job.note = "Planka project linked to this issue."
+    job.save(update_fields=["state", "note", "modified"])

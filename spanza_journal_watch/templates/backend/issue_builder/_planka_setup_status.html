@@ -1,0 +1,24 @@
+{# Polls the setup job until the Planka project is linked. Replaces itself via outerHTML so the swap in a connected card or an error card is seamless. #}
+<div
+  id="planka-sync-panel"
+  class="card mb-0"
+  hx-get="{% url "backend:planka_setup_issue_project_status" selected_issue.pk %}?variant={{ variant|default:'setup' }}"
+  hx-trigger="every 1s"
+  hx-target="this"
+  hx-swap="outerHTML"
+>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>{% if variant == "panel" %}Planka integration{% else %}Initialise Planka board{% endif %}</span>
+    <span class="badge text-bg-info">Setting up</span>
+  </div>
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-2">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      <span>{{ job.note|default:"Creating the Planka project." }}</span>
+    </div>
+    <p class="text-muted small mb-0 mt-2">
+      This usually takes about 20 seconds. You can leave this page: the project is created in the background,
+      and this card will show it as connected when you return.
+    </p>
+  </div>
+</div>

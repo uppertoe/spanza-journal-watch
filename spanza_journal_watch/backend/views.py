@@ -83,6 +83,7 @@ from .models import (
     PlankaCardRevision,
     PlankaIntegrationCredential,
     PlankaIssueBinding,
+    PlankaProjectSetupJob,
     PubmedArticle,
     PubmedArticleUserState,
     PubmedBatchArticle,
@@ -115,6 +116,7 @@ from .pubmed_cache import (
 from .tasks import (
     check_batch_for_new_articles_task,
     process_subscriber_csv,
+    provision_planka_project_task,
     run_pubmed_batch_push_task,
 )
 
@@ -4125,9 +4127,11 @@ def _issue_builder_base_context(
         "all_health_services": list(HealthService.objects.order_by("name").values_list("name", flat=True)),
     }
 
+    context["planka_setup_job"] = None
     if issue:
         binding = PlankaIssueBinding.objects.filter(issue=issue).first()
         context["planka_binding"] = binding
+        context["planka_setup_job"] = PlankaProjectSetupJob.objects.filter(issue=issue).first()
         context["planka_setup_form"] = PlankaProjectSetupForm(initial={"project_name": issue.name})
         if binding and binding.background_asset_id:
             context["planka_background_form"].fields["background_asset"].initial = binding.background_asset_id
@@ -5805,24 +5809,67 @@ def _provision_planka_project(client, project_name, background_asset=None):
     }
 
 
+def _render_planka_setup_card(request, issue, panel_status=None, panel_status_level="info"):
+    context = _issue_builder_base_context(
+        issue=issue,
+        planka_panel_status=panel_status,
+        planka_panel_status_level=panel_status_level,
+    )
+    return render(request, "backend/issue_builder/_planka_setup_card.html", context)
+
+
+def _render_planka_setup_status(request, issue, job, variant):
+    return render(
+        request,
+        "backend/issue_builder/_planka_setup_status.html",
+        {"selected_issue": issue, "job": job, "variant": variant},
+    )
+
+
+def _planka_setup_variant(request):
+    """Which container submitted the setup form: the Setup tab card or the Pull Reviews panel."""
+    if request.method == "POST":
+        return "setup" if request.POST.get("from_setup_page") else "panel"
+    return "setup" if (request.GET.get("variant") or "setup") == "setup" else "panel"
+
+
+def _planka_setup_renderer(variant):
+    return _render_planka_setup_card if variant == "setup" else _render_planka_panel
+
+
 @login_required
 @permission_required("submissions.chief_editor", raise_exception=True)
 def planka_setup_issue_project(request, issue_id):
+    """Queue creation of the issue's Planka project and return a polling card.
+
+    Provisioning used to run inside this request. A 3 MB background upload
+    plus 15 seconds of Planka calls, with a header-only redirect as the sole
+    result, was dropped somewhere between the origin and the browser and the
+    page spun forever. Now the request only stores the inputs and enqueues the
+    work; the card polls the job until the binding exists.
+    """
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
 
     issue = get_object_or_404(Issue, pk=issue_id)
+    variant = _planka_setup_variant(request)
+    render_card = _planka_setup_renderer(variant)
+
     if hasattr(issue, "planka_binding"):
-        return _render_planka_panel(
+        return render_card(
             request,
             issue,
             panel_status="This issue is already linked to a Planka project.",
             panel_status_level="info",
         )
 
+    existing_job = PlankaProjectSetupJob.objects.filter(issue=issue).first()
+    if existing_job and existing_job.is_in_progress:
+        return _render_planka_setup_status(request, issue, existing_job, variant)
+
     form = PlankaProjectSetupForm(request.POST, request.FILES)
     if not form.is_valid():
-        return _render_planka_panel(
+        return render_card(
             request,
             issue,
             panel_status="Project name is required.",
@@ -5833,57 +5880,65 @@ def planka_setup_issue_project(request, issue_id):
     try:
         background_asset = _resolve_background_asset(form, request.user)
     except ValueError as error:
-        return _render_planka_panel(
+        return render_card(
             request,
             issue,
             panel_status=str(error),
             panel_status_level="danger",
         )
-    try:
-        client = _build_planka_client()
-        result = _provision_planka_project(client, project_name, background_asset=background_asset)
-    except (KeyError, PlankaAPIError) as error:
-        return _render_planka_panel(
+
+    job, _created = PlankaProjectSetupJob.objects.update_or_create(
+        issue=issue,
+        defaults={
+            "project_name": project_name,
+            "background_asset": background_asset,
+            "requested_by": request.user,
+            "state": PlankaProjectSetupJob.STATE_PENDING,
+            "note": "Queued. Waiting for the background worker to pick this up.",
+            "task_id": "",
+        },
+    )
+    provision_planka_project_task.delay(job.pk)
+    return _render_planka_setup_status(request, issue, job, variant)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def planka_setup_issue_project_status(request, issue_id):
+    """Polled by the setup card until the job reaches a terminal state."""
+    issue = get_object_or_404(Issue, pk=issue_id)
+    variant = _planka_setup_variant(request)
+    render_card = _planka_setup_renderer(variant)
+
+    if hasattr(issue, "planka_binding"):
+        return render_card(
             request,
             issue,
-            panel_status=f"Unable to set up Planka project: {error}",
-            panel_status_level="danger",
+            panel_status="Planka project linked to this issue.",
+            panel_status_level="success",
         )
 
-    project = result["project"]
-    board = result["board"]
-    instructions_board = result["instructions_board"]
-    list_mapping = result["list_mapping"]
-    instruction_list_mapping = result["instruction_list_mapping"]
-
-    new_binding = PlankaIssueBinding.objects.create(
-        issue=issue,
-        project_id=project["id"],
-        project_name=project_name,
-        board_id=board["id"],
-        board_name=board.get("name") or "Reviews",
-        instructions_board_id=instructions_board["id"],
-        instructions_board_name=instructions_board.get("name") or "Instructions",
-        lists=list_mapping,
-        instructions_lists=instruction_list_mapping,
-        custom_fields={},
-        custom_field_group_id=None,
-        background_asset=background_asset,
-    )
-    _register_planka_webhook(client, new_binding)
-
-    if request.POST.get("from_setup_page"):
-        from django.http import HttpResponse as _HttpResponse
-
-        response = _HttpResponse()
-        response["HX-Redirect"] = f"{reverse('backend:issue_builder')}?issue={issue.pk}"
-        return response
-
-    return _render_planka_panel(
+    job = PlankaProjectSetupJob.objects.filter(issue=issue).first()
+    if job is None:
+        return render_card(request, issue)
+    if job.is_in_progress:
+        return _render_planka_setup_status(request, issue, job, variant)
+    if job.state == PlankaProjectSetupJob.STATE_ERROR:
+        return render_card(request, issue, panel_status=job.note, panel_status_level="danger")
+    if job.is_stale:
+        return render_card(
+            request,
+            issue,
+            panel_status=(
+                "The Planka setup did not finish. Check Planka for a partly created project before trying again."
+            ),
+            panel_status_level="warning",
+        )
+    return render_card(
         request,
         issue,
-        panel_status="Planka project linked to this issue.",
-        panel_status_level="success",
+        panel_status="The setup finished but no Planka project is linked. Try again.",
+        panel_status_level="warning",
     )
 
 

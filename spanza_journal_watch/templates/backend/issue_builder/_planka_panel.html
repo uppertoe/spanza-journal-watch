@@ -25,7 +25,20 @@
       </div>
     {% endif %}
 
-    {% if not planka_binding %}
+    {% if not planka_binding and planka_setup_job and planka_setup_job.is_in_progress %}
+      <div
+        hx-get="{% url "backend:planka_setup_issue_project_status" selected_issue.pk %}?variant=panel"
+        hx-trigger="every 1s"
+        hx-target="#planka-sync-panel"
+        hx-swap="outerHTML"
+        hx-request='{"timeout": 120000}'
+        hx-disabled-elt="find button[type=submit]"
+      >
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        {{ planka_setup_job.note|default:"Creating the Planka project." }}
+        <div class="text-muted small mt-2">This usually takes about 20 seconds and continues in the background.</div>
+      </div>
+    {% elif not planka_binding %}
       <p class="text-muted">
         Link this issue to a new Planka project. This creates:
         <strong>Reviews</strong> board (Articles, Candidates, Under review, Publish ready)

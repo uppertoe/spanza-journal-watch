@@ -212,6 +212,11 @@ urlpatterns = [
         name="planka_setup_issue_project",
     ),
     path(
+        "issues/builder/<int:issue_id>/planka/setup/status",
+        views.planka_setup_issue_project_status,
+        name="planka_setup_issue_project_status",
+    ),
+    path(
         "issues/builder/<int:issue_id>/planka/recreate-board",
         views.planka_recreate_issue_board,
         name="planka_recreate_issue_board",

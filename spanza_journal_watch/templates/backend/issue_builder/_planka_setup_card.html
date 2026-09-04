@@ -20,6 +20,9 @@
       No Planka API key configured. Contact your administrator to set one up before this board can be initialised.
     </div>
   {% else %}
+    {% if planka_setup_job and planka_setup_job.is_in_progress %}
+      {% include "backend/issue_builder/_planka_setup_status.html" with job=planka_setup_job variant="setup" %}
+    {% else %}
     <div id="planka-sync-panel" class="card mb-0"
       data-planka-disconnected="{% if planka_disconnected %}true{% else %}false{% endif %}"
     >
@@ -34,12 +37,16 @@
           and an <strong>Instructions</strong> board prefilled from local templates.
         </p>
         <form
+          id="planka-setup-form"
           method="post"
           enctype="multipart/form-data"
           hx-encoding="multipart/form-data"
           hx-post="{% url "backend:planka_setup_issue_project" selected_issue.pk %}"
           hx-target="#planka-sync-panel"
           hx-swap="outerHTML"
+          hx-request='{"timeout": 120000}'
+          hx-disabled-elt="find button[type=submit]"
+          hx-indicator="#planka-setup-progress"
         >
           {% csrf_token %}
           <input type="hidden" name="from_setup_page" value="1">
@@ -79,12 +86,47 @@
             <div class="col-md-4 ms-md-auto">
               <button type="submit" class="btn btn-primary w-100">Create + link project</button>
             </div>
+            <div class="col-12">
+              {# Shown by hx-indicator while the request is in flight: upload progress, then hand-off to the worker. #}
+              <div id="planka-setup-progress" class="htmx-indicator">
+                <div class="d-flex align-items-center gap-2 small mb-1">
+                  <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                  <span data-setup-progress-label>Sending the request.</span>
+                </div>
+                <progress class="w-100" max="100" value="0" data-setup-progress-bar hidden></progress>
+              </div>
+              <div id="planka-setup-error" class="alert alert-warning py-2 mb-0" hidden>
+                The connection was interrupted before the server replied. The setup may still be running:
+                reload this page to check whether the project has been created before trying again.
+              </div>
+            </div>
           </div>
         </form>
       </div>
     </div>
+    {% endif %}
     <script>
       (() => {
+        const form = document.getElementById("planka-setup-form");
+        if (form) {
+          // Upload progress and connection failures, from htmx's own events.
+          const label = form.querySelector("[data-setup-progress-label]");
+          const bar = form.querySelector("[data-setup-progress-bar]");
+          const error = document.getElementById("planka-setup-error");
+          form.addEventListener("htmx:xhr:progress", (event) => {
+            const d = event.detail || {};
+            if (!d.lengthComputable || !bar) return;
+            const pct = Math.round((d.loaded / d.total) * 100);
+            bar.hidden = false;
+            bar.value = pct;
+            label.textContent = pct < 100 ? `Uploading background image: ${pct}%` : "Upload complete. Starting the Planka setup.";
+          });
+          const showError = () => { if (error) error.hidden = false; };
+          form.addEventListener("htmx:timeout", showError);
+          form.addEventListener("htmx:sendError", showError);
+          form.addEventListener("htmx:responseError", showError);
+        }
+
         const select = document.getElementById("id_background_asset");
         const upload = document.getElementById("id_background_upload");
         if (!select || !upload) return;

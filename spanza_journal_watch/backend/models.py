@@ -1,4 +1,5 @@
 import base64
+import datetime
 import hashlib
 import secrets
 import uuid
@@ -301,6 +302,70 @@ class PlankaBoardBackgroundAsset(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class PlankaProjectSetupJob(TimeStampedModel):
+    """
+    Tracks the background creation of an issue's Planka project.
+
+    Provisioning is 10-20 seconds of Planka API calls (project, two boards,
+    lists, instruction cards, background image, webhook). It runs in Celery and
+    the setup card polls this record, so the outcome lives in the database
+    rather than in a single long-lived browser request that can be dropped
+    somewhere between the origin and the browser.
+    """
+
+    STATE_PENDING = "pending"
+    STATE_RUNNING = "running"
+    STATE_SUCCESS = "success"
+    STATE_ERROR = "error"
+    STATE_CHOICES = (
+        (STATE_PENDING, "Pending"),
+        (STATE_RUNNING, "Running"),
+        (STATE_SUCCESS, "Success"),
+        (STATE_ERROR, "Error"),
+    )
+    # A job still "running" after this long is treated as lost (worker died).
+    STALE_AFTER = datetime.timedelta(minutes=5)
+
+    issue = models.OneToOneField("submissions.Issue", on_delete=models.CASCADE, related_name="planka_setup_job")
+    project_name = models.CharField(max_length=255)
+    background_asset = models.ForeignKey(
+        "backend.PlankaBoardBackgroundAsset",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="setup_jobs",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="+",
+    )
+    state = models.CharField(max_length=16, choices=STATE_CHOICES, default=STATE_PENDING)
+    note = models.TextField(blank=True)
+    task_id = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Planka Project Setup Job"
+        verbose_name_plural = "Planka Project Setup Jobs"
+
+    def __str__(self):
+        return f"Planka setup for {self.issue_id}: {self.state}"
+
+    @property
+    def is_active(self):
+        return self.state in {self.STATE_PENDING, self.STATE_RUNNING}
+
+    @property
+    def is_stale(self):
+        return self.is_active and timezone.now() - self.modified > self.STALE_AFTER
+
+    @property
+    def is_in_progress(self):
+        return self.is_active and not self.is_stale
 
 
 class PlankaCardImport(TimeStampedModel):

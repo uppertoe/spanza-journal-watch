@@ -597,6 +597,13 @@ class TestIssueBuilderPlankaIntegration:
                 return {"id": project_id}
 
         monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient())
+        # Provisioning runs in Celery; run the task inline so the binding exists after the POST.
+        from spanza_journal_watch.backend.tasks import provision_planka_project_task
+
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.provision_planka_project_task.delay",
+            lambda job_id: provision_planka_project_task.apply(args=(job_id,)),
+        )
 
         response = route_client.post(
             reverse("backend:planka_setup_issue_project", kwargs={"issue_id": issue.pk}),
