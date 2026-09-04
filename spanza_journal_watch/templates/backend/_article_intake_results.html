@@ -294,9 +294,12 @@
                 </td>
                 <td>
                   {% if row.recommendation_count %}
-                    <span class="badge text-bg-warning">{{ row.recommendation_count }}</span>
-                  {% else %}
+                    <span class="badge text-bg-warning" title="Recommended by signed-in members">{{ row.recommendation_count }}</span>
+                  {% elif not row.visitor_recommendation_count %}
                     <span class="text-muted small">0</span>
+                  {% endif %}
+                  {% if row.visitor_recommendation_count %}
+                    <span class="badge text-bg-light text-dark border" title="Recommended by visitors who were not signed in">{{ row.visitor_recommendation_count }} visitor{{ row.visitor_recommendation_count|pluralize }}</span>
                   {% endif %}
                 </td>
                 <td>

@@ -47,7 +47,7 @@
               {% endif %}
 
               <div class="d-flex flex-wrap gap-3 align-items-center">
-                {% include "submissions/fragments/journal_article_actions.html" with article=row.article user_state=row.user_state session_starred=row.session_starred recommendation_count=row.recommendation_count review=row.review next_url=request.get_full_path %}
+                {% include "submissions/fragments/journal_article_actions.html" with article=row.article user_state=row.user_state session_starred=row.session_starred session_recommended=row.session_recommended recommendation_count=row.recommendation_count review=row.review next_url=request.get_full_path %}
                 {% if row.article.article_url %}
                   <a class="btn btn-sm btn-outline-primary jw-action-btn--fulltext" href="{{ row.article.article_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ row.article.pk }}">
                     <span class="jw-action-btn__sizer" aria-hidden="true"><svg class="bi me-1" width="0.85em" height="0.85em"><use href="#icon-check"></use></svg>Full text</span>

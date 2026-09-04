@@ -1230,6 +1230,15 @@ document.body.addEventListener('showLoginPrompt', (event) => {
   /* Desktop toast */
   const toastEl = document.getElementById('login-prompt-toast');
   if (toastEl) {
+    const textEl = toastEl.querySelector('[data-prompt-text]');
+    if (event.detail?.text && textEl) {
+      const signIn = textEl.querySelector('a');
+      textEl.textContent = event.detail.text + ' ';
+      if (signIn) {
+        signIn.textContent = event.detail.link || 'Sign in';
+        textEl.appendChild(signIn);
+      }
+    }
     const countEl = toastEl.querySelector('[data-star-count]');
     if (countEl) countEl.textContent = count;
     const toast = window.bootstrap.Toast.getOrCreateInstance(toastEl, {

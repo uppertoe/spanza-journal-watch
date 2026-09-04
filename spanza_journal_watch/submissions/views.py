@@ -25,6 +25,7 @@ from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.backend.models import (
     PubmedArticle,
     PubmedArticleUserState,
+    PubmedArticleVisitorRecommendation,  # noqa: I001
     WatchedJournal,
     WatchedJournalArticle,
     can_recommend_pubmed_articles,
@@ -1318,6 +1319,7 @@ def _journal_browser_context(request):
                 filter=Q(article__user_states__recommended_at__isnull=False),
                 distinct=True,
             ),
+            visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
             star_count=Count(
                 "article__user_states",
                 filter=Q(article__user_states__starred_at__isnull=False),
@@ -1338,9 +1340,11 @@ def _journal_browser_context(request):
         }
 
     session_starred_ids = set()
+    session_recommended_ids = set()
     session_fulltext_ids = set()
     if not request.user.is_authenticated:
         session_starred_ids = set(request.session.get("starred_article_ids", []))
+        session_recommended_ids = set(request.session.get("recommended_article_ids", []))
         session_fulltext_ids = set(request.session.get("fulltext_clicked_ids", []))
 
     # Build PubmedArticle.pk → Review lookup for articles that have been reviewed
@@ -1367,6 +1371,7 @@ def _journal_browser_context(request):
         total_unfiltered += 1
         link.user_state = user_state_map.get(link.article_id)
         link.session_starred = link.article_id in session_starred_ids
+        link.session_recommended = link.article_id in session_recommended_ids
         link.publication_types = article_metadata_list(link.article, "publication_types")
         link.mesh_terms = article_metadata_list(link.article, "mesh_terms")
         link.keywords = article_metadata_list(link.article, "keywords")
@@ -1522,16 +1527,19 @@ def _attach_related_reviews_to_issue_page(reviews):
 def _journal_article_actions_context(request, article):
     user_state = None
     session_starred = False
+    session_recommended = False
     if request.user.is_authenticated:
         user_state = PubmedArticleUserState.objects.filter(user=request.user, article=article).first()
     else:
         session_starred = article.pk in request.session.get("starred_article_ids", [])
+        session_recommended = article.pk in request.session.get("recommended_article_ids", [])
     star_count = PubmedArticleUserState.objects.filter(article=article, starred_at__isnull=False).count()
     review = Review.objects.filter(active=True, article=article).select_related("author").first()
     return {
         "article": article,
         "user_state": user_state,
         "session_starred": session_starred,
+        "session_recommended": session_recommended,
         "star_count": star_count,
         "review": review,
         "can_recommend": can_recommend_pubmed_articles(request.user),
@@ -1683,25 +1691,69 @@ def journal_shelf_show_all(request):
     return JsonResponse({"ok": True})
 
 
-@login_required
 @require_POST
 def journal_article_toggle_recommend(request, article_id):
-    article = get_object_or_404(PubmedArticle, pk=article_id)
-    if not can_recommend_pubmed_articles(request.user):
-        messages.error(request, "You do not have permission to recommend articles yet.")
-        return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+    """Recommend an article for review, signed in or not.
 
-    state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
-    state.recommended_at = None if state.recommended_at else timezone.now()
-    state.save(update_fields=["recommended_at", "modified"])
+    Members are recorded on their PubmedArticleUserState. Visitors are recorded
+    per browser session in PubmedArticleVisitorRecommendation and counted
+    separately for coordinators; requests that look automated are ignored so
+    crawlers cannot pad the tally. Visitor recommendations are attributed to
+    the account if the person later signs in.
+    """
+    article = get_object_or_404(PubmedArticle, pk=article_id)
+
+    if request.user.is_authenticated:
+        if not can_recommend_pubmed_articles(request.user):
+            messages.error(request, "You do not have permission to recommend articles yet.")
+            return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+        state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
+        state.recommended_at = None if state.recommended_at else timezone.now()
+        state.save(update_fields=["recommended_at", "modified"])
+    else:
+        _toggle_visitor_recommendation(request, article)
 
     if request.headers.get("HX-Request") == "true":
-        return render(
+        response = render(
             request,
             "submissions/fragments/journal_article_actions.html",
             _journal_article_actions_context(request, article),
         )
+        if not request.user.is_authenticated and article.pk in request.session.get("recommended_article_ids", []):
+            response["HX-Trigger"] = json.dumps(
+                {
+                    "showLoginPrompt": {
+                        "text": "Thanks, your recommendation has been counted.",
+                        "link": "Sign in to keep it with your account",
+                    }
+                }
+            )
+        return response
     return redirect(request.POST.get("next") or reverse("submissions:journal_list"))
+
+
+def _toggle_visitor_recommendation(request, article):
+    """Record or withdraw a signed-out recommendation for this session."""
+    from spanza_journal_watch.analytics.middleware import VISITOR_COOKIE_NAME
+    from spanza_journal_watch.analytics.utils import is_probable_automated_event
+
+    if is_probable_automated_event(request, event_type="recommend"):
+        return
+    if not request.session.session_key:
+        request.session.create()
+    session_key = request.session.session_key
+    recommended = request.session.get("recommended_article_ids", [])
+    if article.pk in recommended:
+        recommended.remove(article.pk)
+        PubmedArticleVisitorRecommendation.objects.filter(article=article, session_key=session_key).delete()
+    else:
+        recommended.append(article.pk)
+        PubmedArticleVisitorRecommendation.objects.get_or_create(
+            article=article,
+            session_key=session_key,
+            defaults={"visitor_id": (request.COOKIES.get(VISITOR_COOKIE_NAME) or "")[:64]},
+        )
+    request.session["recommended_article_ids"] = recommended
 
 
 def journal_search(request):
@@ -1719,7 +1771,8 @@ def journal_search(request):
                     "article__user_states",
                     filter=Q(article__user_states__recommended_at__isnull=False),
                     distinct=True,
-                )
+                ),
+                visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
             )
             .filter(
                 Q(article__title__icontains=query)

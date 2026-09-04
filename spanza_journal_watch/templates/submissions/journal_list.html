@@ -201,24 +201,7 @@
   </div>
 {% endblock desktop_action_dock %}
 
-{# Login prompt toast — positioned independently so it never displaces the nav #}
-{% if not request.user.is_authenticated %}
-{% block login_prompt_toast %}
-  <div class="jw-login-toast-wrapper d-none d-md-block">
-    <div id="login-prompt-toast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="d-flex">
-        <div class="toast-body">
-          <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
-          You have <strong data-star-count>0</strong> starred article(s).
-          <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}" class="text-white text-decoration-underline">Sign up</a> or
-          <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}" class="text-white text-decoration-underline">log in</a> to save them permanently.
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-      </div>
-    </div>
-  </div>
-{% endblock login_prompt_toast %}
-{% endif %}
+
 
 {% load static %}
 {% block modal %}

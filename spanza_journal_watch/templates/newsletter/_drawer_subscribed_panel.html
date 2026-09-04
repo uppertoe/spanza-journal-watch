@@ -11,6 +11,13 @@
       <p class="small mb-0">Manage your subscription via the link in any of our emails.</p>
     {% endif %}
   </div>
+  {% if not request.user.is_authenticated %}
+    <p class="small text-muted mb-3">
+      That address is all you need for an account too:
+      <a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">sign in</a> and we email you a code.
+      Save articles to a reading list and recommend what we review next.
+    </p>
+  {% endif %}
 
   {% if can_unsubscribe_from_drawer %}
     <form hx-post="{% url 'newsletter:drawer_unsubscribe' %}"

@@ -50,6 +50,8 @@ You are receiving this email because you are a SPANZA member,
 or you subscribed at: {{ domain }}
 using the email {{ subscriber.email }}
 
+Sign in at {{ domain }}/accounts/login/ with this email address to save articles to a reading list and recommend what we review next. We email you a code, so there is no password.
+
 You are welcome to contact us with suggestions or comments by replying to this email.
 
 You can unsubscribe at any time by visiting the following address:

@@ -71,9 +71,14 @@ class UserSignupForm(SignupForm):
             request.session["subscriber_id"] = subscriber.pk
 
         # Migrate session-based starred articles and full-text clicks to this new user
-        from spanza_journal_watch.users.utils import migrate_session_fulltext_to_user, migrate_session_stars_to_user
+        from spanza_journal_watch.users.utils import (
+            migrate_session_fulltext_to_user,
+            migrate_session_recommendations_to_user,
+            migrate_session_stars_to_user,
+        )
 
         migrate_session_stars_to_user(request.session, user)
+        migrate_session_recommendations_to_user(request.session, user)
         migrate_session_fulltext_to_user(request.session, user)
 
         return user

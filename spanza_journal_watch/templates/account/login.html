@@ -8,6 +8,8 @@
 
 {% if invite_email %}
 <p class="text-muted small mb-3">Signing in to accept your invitation.</p>
+{% elif next_hint %}
+<p class="small mb-3 alert alert-light border py-2">{{ next_hint }}</p>
 {% else %}
 <p class="text-muted small mb-3">Enter your email address and we will send you a code. No password, and no separate sign-up: a new address gets an account straight away.</p>
 {% endif %}

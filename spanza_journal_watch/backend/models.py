@@ -854,6 +854,30 @@ class PubmedArticleUserState(TimeStampedModel):
         return f"{self.user_id}:{self.article_id}"
 
 
+class PubmedArticleVisitorRecommendation(TimeStampedModel):
+    """A "recommend for review" from someone who is not signed in.
+
+    Kept separate from PubmedArticleUserState so coordinators can weigh member
+    and visitor recommendations differently. One row per article per browser
+    session; rows are folded into the user's state if they later sign in.
+    """
+
+    article = models.ForeignKey(
+        "backend.PubmedArticle", on_delete=models.CASCADE, related_name="visitor_recommendations"
+    )
+    session_key = models.CharField(max_length=64)
+    visitor_id = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["article", "session_key"], name="uniq_pubmed_article_visitor_rec"),
+        ]
+        indexes = [models.Index(fields=["session_key"], name="backend_pavr_session_idx")]
+
+    def __str__(self):
+        return f"visitor:{self.article_id}"
+
+
 class BackendPreference(TimeStampedModel):
     DEFAULT_INBOX_FROM_NAME = "Journal Watch Admin"
     DEFAULT_INBOX_FROM_ADDRESS = "admin@journalwatch.org.au"

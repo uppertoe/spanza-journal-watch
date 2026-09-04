@@ -423,7 +423,23 @@
       </div>
     </div>
 
-    {% block login_prompt_toast %}{% endblock login_prompt_toast %}
+    {% block login_prompt_toast %}
+      {% if not request.user.is_authenticated %}
+        {# Shown after starring or recommending while signed out; JS fills the text. #}
+        <div class="jw-login-toast-wrapper d-none d-md-block">
+          <div id="login-prompt-toast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+              <div class="toast-body">
+                <svg class="bi me-1" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+                <span data-prompt-text>You have <strong data-star-count>0</strong> starred article(s).
+                  <a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}" class="text-white text-decoration-underline">Sign in</a> to keep them on every device.</span>
+              </div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endblock login_prompt_toast %}
 
     <footer class="py-5 text-center text-body-secondary bg-body-tertiary">
       <a

@@ -70,12 +70,23 @@ def _invite_email_from_request(request):
     return request.session.get("pending_invite_email", "") or request.GET.get("invite_email", "")
 
 
+def _next_hint(next_url):
+    """A sentence explaining why a page sent someone here, for the sign-in form."""
+    if next_url.startswith("/cpd/"):
+        return (
+            "Your CPD report is built from the articles you open while signed in, "
+            "so it needs an account. Sign in, or enter your email to create one."
+        )
+    return ""
+
+
 class InviteAwareLoginView(AllauthLoginView):
     """Allauth LoginView that pre-fills and locks the email when coming from an invite."""
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["invite_email"] = _invite_email_from_request(self.request)
+        ctx["next_hint"] = _next_hint(self.request.GET.get("next") or "")
         return ctx
 
     def get_form_kwargs(self):

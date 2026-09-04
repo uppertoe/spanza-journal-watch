@@ -5,6 +5,7 @@ import re
 import pytest
 from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
 
 from spanza_journal_watch.users.context_processors import user_initials, user_masthead_label, user_short_name
 from spanza_journal_watch.users.tests.factories import UserFactory
@@ -55,42 +56,135 @@ class TestMasthead:
         assert ">Signed in<" in body
 
 
-class TestAnonymousRecommendPrompt:
-    def _render(self, user, article, **extra):
-        from django.contrib.auth.models import AnonymousUser
-        from django.contrib.sessions.backends.db import SessionStore
-        from django.template.loader import render_to_string
-        from django.test import RequestFactory
+class TestVisitorRecommendations:
+    """Recommending works without an account; visitors are counted separately and folded in on sign-in."""
 
-        request = RequestFactory().get("/journals/")
-        request.user = user or AnonymousUser()
-        request.session = SessionStore()
-        context = {"article": article, "next_url": "/journals/", "review": None, "can_recommend": True, **extra}
-        return render_to_string("submissions/fragments/journal_article_actions.html", context, request=request)
-
-    def test_anonymous_visitor_is_offered_sign_in_to_recommend(self):
+    def _article(self, pmid="90001", title="An article"):
         from spanza_journal_watch.backend.models import PubmedArticle
 
-        article = PubmedArticle.objects.create(pmid="90001", title="An article")
-        body = self._render(None, article)
-        assert "Sign in to recommend" in body
-        assert reverse("account_login") + "?next=/journals/" in body
+        return PubmedArticle.objects.create(pmid=pmid, title=title)
 
-    def test_reviewed_article_shows_reviewed_pill_instead(self):
-        from spanza_journal_watch.backend.models import PubmedArticle
+    def _toggle(self, client, article, **headers):
+        return client.post(
+            reverse("submissions:journal_article_toggle_recommend", kwargs={"article_id": article.pk}),
+            {"next": "/journals/"},
+            HTTP_HX_REQUEST="true",
+            **headers,
+        )
 
-        article = PubmedArticle.objects.create(pmid="90002", title="Reviewed article")
-        body = self._render(None, article, review=object())
-        assert "Reviewed" in body
-        assert "Sign in to recommend" not in body
+    def test_visitor_can_recommend_and_withdraw(self, client):
+        from spanza_journal_watch.backend.models import PubmedArticleVisitorRecommendation
 
-    def test_signed_in_member_gets_the_real_button(self):
-        from spanza_journal_watch.backend.models import PubmedArticle
+        article = self._article()
+        response = self._toggle(client, article)
+        assert response.status_code == 200
+        assert ">Recommended<" in response.content.decode()
+        assert "recommendation has been counted" in response["HX-Trigger"]
+        assert PubmedArticleVisitorRecommendation.objects.filter(article=article).count() == 1
+        assert client.session["recommended_article_ids"] == [article.pk]
 
-        article = PubmedArticle.objects.create(pmid="90003", title="Another article")
-        body = self._render(UserFactory(), article)
-        assert "Recommend for review" in body
-        assert "Sign in to recommend" not in body
+        response = self._toggle(client, article)
+        assert ">Recommend for review<" in response.content.decode()
+        assert "HX-Trigger" not in response
+        assert not PubmedArticleVisitorRecommendation.objects.filter(article=article).exists()
+
+    def test_one_recommendation_per_session(self, client):
+        from django.test import Client
+
+        from spanza_journal_watch.backend.models import PubmedArticleVisitorRecommendation
+
+        article = self._article()
+        self._toggle(client, article)
+        assert PubmedArticleVisitorRecommendation.objects.filter(article=article).count() == 1
+        # A different browser (new session) counts once more. Real browsers always send a UA;
+        # an empty one is treated as automated and ignored.
+        Client(HTTP_USER_AGENT="Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Safari/605.1.15").post(
+            reverse("submissions:journal_article_toggle_recommend", kwargs={"article_id": article.pk}),
+            {"next": "/journals/"},
+        )
+        assert PubmedArticleVisitorRecommendation.objects.filter(article=article).count() == 2
+
+    def test_bots_are_not_counted(self, client):
+        from spanza_journal_watch.backend.models import PubmedArticleVisitorRecommendation
+
+        article = self._article()
+        response = self._toggle(client, article, HTTP_USER_AGENT="Mozilla/5.0 (compatible; SemrushBot/7~bl)")
+        assert response.status_code == 200
+        assert not PubmedArticleVisitorRecommendation.objects.filter(article=article).exists()
+        assert ">Recommend for review<" in response.content.decode()
+
+    def test_counts_are_split_for_coordinators(self, client):
+        from django.contrib.auth.models import Permission
+        from django.test import Client
+
+        from spanza_journal_watch.backend.models import (
+            PubmedArticleUserState,
+            PubmedBatchArticle,
+            PubmedImportBatch,
+            WatchedJournal,
+        )
+        from spanza_journal_watch.submissions.models import Issue
+
+        article = self._article()
+        self._toggle(client, article)  # one visitor
+        PubmedArticleUserState.objects.create(user=UserFactory(), article=article, recommended_at=timezone.now())
+
+        editor = UserFactory()
+        editor.user_permissions.add(
+            Permission.objects.get(codename="manage_issue_builder"),
+            Permission.objects.get(codename="chief_editor"),
+        )
+        staff = Client()
+        staff.force_login(editor)
+        issue = Issue.objects.create(name="Counts issue", body="body")
+        journal = WatchedJournal.objects.create(name="Journal", active=True)
+        today = timezone.localdate().replace(day=1)
+        batch = PubmedImportBatch.objects.create(issue=issue, created_by=editor, from_month=today, to_month=today)
+        batch.watched_journals.add(journal)
+        PubmedBatchArticle.objects.create(batch=batch, article=article, watched_journal=journal, issue=issue)
+
+        response = staff.get(
+            reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}), {"paediatric_only": "0"}
+        )
+        row = next(r for r in response.context["result_rows"] if r.article_id == article.pk)
+        assert row.recommendation_count == 1
+        assert row.visitor_recommendation_count == 1
+        assert "1 visitor" in response.content.decode()
+
+    def test_visitor_recommendation_is_attributed_on_sign_in(self, client):
+        from allauth.account.models import EmailAddress
+
+        from spanza_journal_watch.backend.models import PubmedArticleUserState, PubmedArticleVisitorRecommendation
+
+        article = self._article()
+        self._toggle(client, article)
+        user = UserFactory(email="visitor.turned.member@example.org")
+        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+
+        mail.outbox.clear()
+        client.post(reverse("users:start"), {"email": user.email})
+        code = _extract_code(mail.outbox[0].body)
+        client.post(reverse("account_confirm_login_code"), {"code": code})
+
+        state = PubmedArticleUserState.objects.get(user=user, article=article)
+        assert state.recommended_at is not None
+        assert not PubmedArticleVisitorRecommendation.objects.filter(article=article).exists()
+        assert "recommended_article_ids" not in client.session
+
+
+class TestNudges:
+    def test_toast_is_available_on_every_page_for_visitors(self, client):
+        body = client.get("/").content.decode()
+        assert 'id="login-prompt-toast"' in body
+        assert "data-prompt-text" in body
+
+    def test_toast_absent_when_signed_in(self, client):
+        client.force_login(UserFactory())
+        assert 'id="login-prompt-toast"' not in client.get("/").content.decode()
+
+    def test_login_page_explains_cpd(self, client):
+        body = client.get(reverse("account_login") + "?next=/cpd/report/").content.decode()
+        assert "CPD report" in body
 
 
 class TestSignInByCode:

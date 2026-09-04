@@ -42,11 +42,15 @@
         <span><svg class="bi me-1" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-check"></use></svg>Reviewed</span>
       </span>
     {% else %}
-      {# Recommending needs an account so it can be attributed; show the control so visitors learn it exists. #}
-      <a href="{% url 'account_login' %}?next={{ next_url|urlencode }}" class="btn btn-sm btn-outline-success jw-action-btn--recommend" title="Sign in to recommend this article for review">
-        <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
-        <span>Sign in to recommend</span>
-      </a>
+      {# Visitors can recommend too; it is recorded against this browser session and counted separately for coordinators. #}
+      <form method="post" action="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <button type="submit" class="btn btn-sm {% if session_recommended %}btn-success{% else %}btn-outline-success{% endif %} jw-action-btn--recommend">
+          <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
+          <span>{% if session_recommended %}Recommended{% else %}Recommend for review{% endif %}</span>
+        </button>
+      </form>
     {% endif %}
   {% endif %}
 </div>

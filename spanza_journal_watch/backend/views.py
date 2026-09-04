@@ -991,7 +991,8 @@ def _build_article_intake_queryset(batch, params):
                 "article__user_states",
                 filter=Q(article__user_states__recommended_at__isnull=False),
                 distinct=True,
-            )
+            ),
+            visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
         )
         .order_by("-article__publication_date", "article__title")
     )
@@ -1159,7 +1160,8 @@ def _article_intake_results_context(batch, params, user=None):
                 "article__user_states",
                 filter=Q(article__user_states__recommended_at__isnull=False),
                 distinct=True,
-            )
+            ),
+            visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
         )
         .filter(is_selected=True)
         .order_by("-modified")[:200]
@@ -2611,7 +2613,7 @@ def article_intake_recommended(request):
 
     qs = (
         PubmedArticle.objects.filter(
-            user_states__recommended_at__isnull=False,
+            Q(user_states__recommended_at__isnull=False) | Q(visitor_recommendations__isnull=False),
             recommendation_hidden=show_hidden,
         )
         .annotate(
@@ -2620,6 +2622,7 @@ def article_intake_recommended(request):
                 filter=Q(user_states__recommended_at__isnull=False),
                 distinct=True,
             ),
+            visitor_recommendation_count=Count("visitor_recommendations", distinct=True),
         )
         .distinct()
     )
@@ -2634,7 +2637,9 @@ def article_intake_recommended(request):
         except (ValueError, TypeError):
             pass
 
-    recommended_articles = list(qs.order_by("-recommendation_count", "-publication_date", "title")[:100])
+    recommended_articles = list(
+        qs.order_by("-recommendation_count", "-visitor_recommendation_count", "-publication_date", "title")[:100]
+    )
 
     # Attach staged/review indicators
     article_ids = [a.pk for a in recommended_articles]

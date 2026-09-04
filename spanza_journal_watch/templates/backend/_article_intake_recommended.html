@@ -55,7 +55,10 @@
               </td>
               <td>{{ article.source_journal_name|default:"-" }}</td>
               <td>{% if article.publication_date %}{{ article.publication_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
-              <td><span class="badge text-bg-warning">{{ article.recommendation_count }}</span></td>
+              <td>
+                {% if article.recommendation_count %}<span class="badge text-bg-warning" title="Signed-in members">{{ article.recommendation_count }}</span>{% endif %}
+                {% if article.visitor_recommendation_count %}<span class="badge text-bg-light text-dark border" title="Visitors who were not signed in">{{ article.visitor_recommendation_count }} visitor{{ article.visitor_recommendation_count|pluralize }}</span>{% endif %}
+              </td>
               <td>
                 {% if article.has_review %}
                   <span class="badge text-bg-info">Has review</span>

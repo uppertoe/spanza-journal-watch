@@ -28,6 +28,40 @@ def migrate_session_stars_to_user(session, user):
     return len(new_states)
 
 
+def migrate_session_recommendations_to_user(session, user):
+    """Attribute recommendations made while signed out to the user who just signed in.
+
+    The visitor rows for this session are removed so an article is not counted
+    twice, once as a visitor and once as a member.
+    """
+    recommended_ids = session.pop("recommended_article_ids", [])
+    session_key = getattr(session, "session_key", None)
+
+    from spanza_journal_watch.backend.models import (
+        PubmedArticle,
+        PubmedArticleUserState,
+        PubmedArticleVisitorRecommendation,
+    )
+
+    if session_key:
+        visitor_rows = PubmedArticleVisitorRecommendation.objects.filter(session_key=session_key)
+        recommended_ids = list(set(recommended_ids) | set(visitor_rows.values_list("article_id", flat=True)))
+        visitor_rows.delete()
+    if not recommended_ids:
+        return 0
+
+    valid_ids = set(PubmedArticle.objects.filter(pk__in=recommended_ids).values_list("pk", flat=True))
+    now = timezone.now()
+    migrated = 0
+    for article_id in valid_ids:
+        state, _ = PubmedArticleUserState.objects.get_or_create(user=user, article_id=article_id)
+        if not state.recommended_at:
+            state.recommended_at = now
+            state.save(update_fields=["recommended_at", "modified"])
+            migrated += 1
+    return migrated
+
+
 def migrate_session_fulltext_to_user(session, user):
     """Move session-based full-text click records to PubmedArticleUserState.
 
