@@ -19,23 +19,27 @@
 
     <mj-section background-color="#ffffff" border-radius="12px" padding="36px 32px">
       <mj-column>
+        {% if code %}
+        <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
+          Welcome to Journal Watch
+        </mj-text>
+        <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="8px">
+          {% if user.name %}Hello {{ user.name }}. {% endif %}Enter this code on the page you have open to confirm your email address and finish creating your account.
+        </mj-text>
+        <mj-text align="center" padding="8px 25px 24px">
+          <div style="display:inline-block; border:2px solid #cfd8e3; border-radius:12px; background:#f6f8fb; padding:16px 26px; font-size:34px; line-height:1; font-weight:700; color:#1e4468; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; white-space:nowrap;">{% for digit in code %}<span style="display:inline-block; padding:0 6px;">{{ digit }}</span>{% endfor %}</div>
+        </mj-text>
+        <mj-text font-size="13px" color="#8a96a2" line-height="1.6">
+          Your account has no password. Whenever you sign in, we email a fresh code to this address.
+          If you did not create an account, you can ignore this email and nothing will change.
+        </mj-text>
+        {% else %}
         <mj-text font-size="22px" font-weight="700" color="#1e4468" padding-bottom="12px">
           Verify your email
         </mj-text>
         <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="24px">
           {% user_display user as user_display %}You're receiving this email because {{ user_display }} registered an account on SPANZA Journal Watch. Please confirm your email address to activate your account.
         </mj-text>
-        {% if code %}
-        <mj-text font-size="15px" color="#444444" padding-bottom="8px">
-          Your verification code is:
-        </mj-text>
-        <mj-text font-size="28px" font-weight="700" color="#1e4468" letter-spacing="0.1em" padding-bottom="24px">
-          {{ code }}
-        </mj-text>
-        <mj-text font-size="13px" color="#8a96a2">
-          Enter this code in your open browser window.
-        </mj-text>
-        {% else %}
         <mj-button href="{{ activate_url }}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
           Confirm email address
         </mj-button>

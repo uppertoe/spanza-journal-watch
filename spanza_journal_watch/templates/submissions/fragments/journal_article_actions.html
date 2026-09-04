@@ -41,6 +41,12 @@
         <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
         <span><svg class="bi me-1" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-check"></use></svg>Reviewed</span>
       </span>
+    {% else %}
+      {# Recommending needs an account so it can be attributed; show the control so visitors learn it exists. #}
+      <a href="{% url 'account_login' %}?next={{ next_url|urlencode }}" class="btn btn-sm btn-outline-success jw-action-btn--recommend" title="Sign in to recommend this article for review">
+        <span class="jw-action-btn__sizer" aria-hidden="true">Recommend for review</span>
+        <span>Sign in to recommend</span>
+      </a>
     {% endif %}
   {% endif %}
 </div>

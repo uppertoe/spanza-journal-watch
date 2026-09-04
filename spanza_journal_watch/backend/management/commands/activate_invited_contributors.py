@@ -119,7 +119,6 @@ class Command(BaseCommand):
 
             # Grant permissions.
             perms_to_grant = [
-                ("submissions", "can_recommend"),
                 ("submissions", "invited_contributor"),
             ]
             if contributor.role == IssueContributor.Role.COORDINATOR:

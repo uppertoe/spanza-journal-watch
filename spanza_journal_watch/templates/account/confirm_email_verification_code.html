@@ -1,0 +1,9 @@
+{% extends "account/base.html" %}
+{% load i18n %}
+
+{% block head_title %}Confirm your email{% endblock %}
+
+{% block inner %}
+  {% url 'account_email_verification_sent' as action_url %}
+  {% include "account/_confirm_code_form.html" with title="Confirm your email address" recipient=email action_url=action_url change_title="Use a different email address" %}
+{% endblock %}

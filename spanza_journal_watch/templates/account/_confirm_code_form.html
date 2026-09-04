@@ -1,0 +1,97 @@
+{% load crispy_forms_tags %}
+{# Shared by the sign-in code and email verification code pages. Expects: title, recipient, action_url, verify_form, can_resend, cancel_url, redirect_field, can_change, change_form, change_title. #}
+<h5 class="mb-1">{{ title }}</h5>
+<p class="text-muted small mb-3">
+  We have emailed a six-digit code to <strong>{{ recipient }}</strong>. Enter it below.
+  If it has not arrived within a minute, check your junk folder.
+</p>
+
+<form method="post" action="{{ action_url }}" id="code-form" autocomplete="off">
+  {% csrf_token %}
+  {% for field in verify_form %}
+    <div class="mb-3">
+      <label class="visually-hidden" for="{{ field.id_for_label }}">Code</label>
+      <input type="text" name="{{ field.html_name }}" id="{{ field.id_for_label }}"
+             class="form-control jw-code-input{% if field.errors %} is-invalid{% endif %}"
+             inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
+             placeholder="••••••" aria-describedby="code-help" autofocus required>
+      {% for error in field.errors %}<div class="invalid-feedback text-center">{{ error }}</div>{% endfor %}
+      <div id="code-help" class="form-text text-center">Six digits. The page submits by itself once they are all in.</div>
+    </div>
+  {% endfor %}
+  {% for error in verify_form.non_field_errors %}<div class="alert alert-danger py-2 small">{{ error }}</div>{% endfor %}
+  {{ redirect_field }}
+  <div class="d-grid">
+    <button class="btn btn-primary" type="submit">Continue</button>
+  </div>
+</form>
+
+<div class="d-flex justify-content-center gap-3 mt-3">
+  {% if can_resend %}
+    <button class="btn btn-link btn-sm text-decoration-none" type="submit" form="resend">Send a new code</button>
+  {% endif %}
+  {% if cancel_url %}
+    <a class="btn btn-link btn-sm text-decoration-none text-muted" href="{{ cancel_url }}">Cancel</a>
+  {% else %}
+    <button class="btn btn-link btn-sm text-decoration-none text-muted" type="submit" form="logout-from-stage">Cancel</button>
+  {% endif %}
+</div>
+
+<form id="resend" method="post" action="{{ action_url }}">
+  <input type="hidden" name="action" value="resend">
+  {{ redirect_field }}
+  {% csrf_token %}
+</form>
+{% if not cancel_url %}
+<form id="logout-from-stage" method="post" action="{% url 'account_logout' %}">
+  <input type="hidden" name="next" value="{% url 'account_login' %}">
+  {% csrf_token %}
+</form>
+{% endif %}
+
+{% if can_change %}
+<details class="mt-4"{% if change_form.errors %} open{% endif %}>
+  <summary class="small text-muted">{{ change_title }}</summary>
+  <form method="post" action="{{ action_url }}" class="mt-2">
+    {% csrf_token %}
+    {{ change_form|crispy }}
+    {{ redirect_field }}
+    <div class="d-grid mt-2">
+      <button class="btn btn-outline-primary btn-sm" name="action" value="change" type="submit">Change</button>
+    </div>
+  </form>
+</details>
+{% endif %}
+
+<style>
+  .jw-code-input {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.5em;
+    text-align: center;
+    text-indent: 0.5em; /* balances the trailing letter-spacing so the digits sit centred */
+    padding: 0.6rem 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .jw-code-input::placeholder { letter-spacing: 0.5em; color: var(--bs-secondary-color); opacity: 0.5; }
+</style>
+<script>
+  (() => {
+    const form = document.getElementById("code-form");
+    const input = form && form.querySelector(".jw-code-input");
+    if (!input) return;
+    let submitted = false;
+    const tidy = () => {
+      // Keep digits only, whether typed, pasted with spaces, or autofilled from Mail/Messages.
+      const digits = input.value.replace(/\D/g, "").slice(0, 6);
+      if (digits !== input.value) input.value = digits;
+      if (digits.length === 6 && !submitted) {
+        submitted = true;
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      }
+    };
+    input.addEventListener("input", tidy);
+    input.addEventListener("paste", () => setTimeout(tidy, 0));
+    input.focus();
+  })();
+</script>

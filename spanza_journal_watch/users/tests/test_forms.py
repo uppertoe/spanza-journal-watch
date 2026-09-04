@@ -39,9 +39,10 @@ class TestUserAdminCreationForm:
 
 
 class TestUserSignupForm:
-    def test_signup_form_includes_name_field(self):
+    def test_signup_form_asks_only_for_email_and_newsletter(self):
+        # No name and no password: members are known by email and sign in with a code.
         form = UserSignupForm()
-        assert "name" in form.fields
+        assert list(form.fields) == ["email", "subscribe_to_newsletter"]
 
 
 class TestUserPreferencesForm:

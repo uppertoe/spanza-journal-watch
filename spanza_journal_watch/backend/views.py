@@ -653,12 +653,6 @@ def subscriber_list(request):
             users = users.filter(Q(subscriber__isnull=True) | Q(subscriber__subscribed=False))
         if role_filter == "staff":
             users = users.filter(is_staff=True)
-        elif role_filter == "can_recommend":
-            from django.contrib.auth.models import Permission
-
-            perm = Permission.objects.filter(content_type__app_label="submissions", codename="can_recommend").first()
-            if perm:
-                users = users.filter(user_permissions=perm)
         elif role_filter == "locked":
             users = users.filter(is_active=False)
 
@@ -666,7 +660,6 @@ def subscriber_list(request):
         # Pre-compute permission flags from prefetched permissions
         for u in user_list:
             perms = {p.codename for p in u.user_permissions.all()}
-            u.has_perm_can_recommend = "can_recommend" in perms
             u.has_perm_chief_editor = "chief_editor" in perms
 
         context = {
@@ -685,25 +678,6 @@ def subscriber_list(request):
         return render(request, "backend/_subscriber_list_results.html", context)
 
     return render(request, "backend/subscriber_list.html", context)
-
-
-@login_required
-@permission_required("backend.manage_subscriber_csv", raise_exception=True)
-@require_POST
-def user_toggle_recommend(request, user_id):
-    """Toggle the can_recommend permission for a user."""
-    from django.contrib.auth.models import Permission as DjangoPerm
-
-    User = get_user_model()
-    target_user = get_object_or_404(User, pk=user_id)
-    perm = DjangoPerm.objects.get(content_type__app_label="submissions", codename="can_recommend")
-    if target_user.has_perm("submissions.can_recommend"):
-        target_user.user_permissions.remove(perm)
-        messages.success(request, f"Removed recommend permission from {target_user.email}")
-    else:
-        target_user.user_permissions.add(perm)
-        messages.success(request, f"Granted recommend permission to {target_user.email}")
-    return redirect(reverse("backend:subscriber_list") + "?view=users")
 
 
 @login_required
@@ -732,7 +706,6 @@ def user_toggle_chief_editor(request, user_id):
             ("submissions", "chief_editor"),
             ("submissions", "manage_issue_builder"),
             ("submissions", "regional_coordinator"),
-            ("submissions", "can_recommend"),
             ("backend", "manage_subscriber_csv"),
             ("backend", "send_newsletters"),
             ("backend", "view_newsletter_stats"),
@@ -4704,7 +4677,6 @@ def chief_editor_invite_accept(request, token):
             ("submissions", "chief_editor"),
             ("submissions", "manage_issue_builder"),
             ("submissions", "regional_coordinator"),
-            ("submissions", "can_recommend"),
             ("submissions", "invited_contributor"),
             ("backend", "manage_subscriber_csv"),
             ("backend", "send_newsletters"),
@@ -5708,9 +5680,9 @@ def issue_invite_accept(request, token):
 
         logger = logging.getLogger(__name__)
 
-        # All accepted contributors can recommend articles and access editorial tools
+        # All accepted contributors get access to the editorial landing page.
+        # Recommending articles only needs a signed-in account.
         perms_to_grant = [
-            ("submissions", "can_recommend"),
             ("submissions", "invited_contributor"),
         ]
         # Coordinators also get backend access

@@ -253,7 +253,6 @@ urlpatterns = [
     ),
     path("subscribers/upload", views.upload_subscriber_csv, name="upload_subscribers"),
     path("subscribers/list", views.subscriber_list, name="subscriber_list"),
-    path("users/<int:user_id>/toggle-recommend", views.user_toggle_recommend, name="user_toggle_recommend"),
     path("users/<int:user_id>/toggle-active", views.user_toggle_active, name="user_toggle_active"),
     path("users/<int:user_id>/toggle-chief-editor", views.user_toggle_chief_editor, name="user_toggle_chief_editor"),
     path("subscribers/upload/change-header/<str:save_token>", views.edit_csv_header, name="edit_csv_header"),

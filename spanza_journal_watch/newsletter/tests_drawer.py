@@ -183,7 +183,7 @@ class TestDrawerTemplate:
         content = response.content.decode()
         assert "drawer-subscribe-container" in content
         assert "Reviews in your inbox every few months" in content
-        assert "Want more?" in content
+        assert "Your account" in content
 
     def test_authenticated_sees_profile_sections(self, client):
         user = User.objects.create_user(email="dt@example.com", password="pw")
@@ -206,24 +206,27 @@ class TestMastheadButton:
     def test_anon_shows_subscribe_label(self, client):
         response = client.get("/")
         content = response.content.decode()
-        assert 'aria-label="Subscribe"' in content
-        assert ">Subscribe<" in content
-        assert "#icon-email" in content
+        assert 'aria-label="Sign in or subscribe"' in content
+        assert ">Sign in<" in content
+        assert "#icon-person" in content
 
     def test_anon_with_cookie_shows_profile_label(self, client):
         client.cookies[JW_SUB_COOKIE_NAME] = "1"
         response = client.get("/")
         content = response.content.decode()
-        assert 'aria-label="User menu"' in content
-        assert ">Profile<" in content
+        # A subscriber cookie is not a sign-in: the button must not look signed in.
+        assert 'aria-label="Newsletter and sign in"' in content
+        assert ">Sign in<" in content
+        assert "jw-profile-btn__initials" not in content
 
     def test_authenticated_shows_profile_label(self, client):
         user = User.objects.create_user(email="mb@example.com", password="pw")
         client.force_login(user)
         response = client.get("/")
         content = response.content.decode()
-        assert 'aria-label="User menu"' in content
-        assert ">Profile<" in content
+        assert 'aria-label="Account menu"' in content
+        assert 'jw-profile-btn__initials" aria-hidden="true">M<' in content
+        assert ">Signed in<" in content
 
 
 # ---------------------------------------------------------------------------
@@ -272,9 +275,10 @@ class TestDrawerSubscribeOOBSwap:
         # OOB masthead fragment
         assert 'id="masthead-profile-button"' in content
         assert 'hx-swap-oob="true"' in content
-        # Post-subscribe state should show Profile, not Subscribe
-        assert ">Profile<" in content
-        assert 'aria-label="User menu"' in content
+        # Post-subscribe state is still anonymous, so the button invites sign-in
+        assert 'aria-label="Newsletter and sign in"' in content
+        assert ">Sign in<" in content
+        assert 'aria-label="Newsletter and sign in"' in content
 
     @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
     def test_nondrawer_success_does_not_include_oob(self, mock_task, client):

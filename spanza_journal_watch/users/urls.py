@@ -1,6 +1,7 @@
 from django.urls import path
 
 from spanza_journal_watch.users.views import (
+    email_start,
     update_profile_name,
     user_detail_view,
     user_redirect_view,
@@ -9,6 +10,7 @@ from spanza_journal_watch.users.views import (
 
 app_name = "users"
 urlpatterns = [
+    path("~start/", view=email_start, name="start"),
     path("~redirect/", view=user_redirect_view, name="redirect"),
     path("~update/", view=user_update_view, name="update"),
     path("~update-name/", view=update_profile_name, name="update_name"),

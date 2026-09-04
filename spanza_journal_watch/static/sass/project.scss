@@ -3532,6 +3532,25 @@ body.jw-modal-open {
   background: rgba(var(--bs-body-color-rgb), 0.14);
 }
 
+// Signed-in state: initials on the brand colour, so being signed in is
+// visible at a glance rather than only inside the drawer.
+.jw-profile-btn__initials {
+  background: var(--bs-primary);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.jw-profile-btn--signed-in:hover .jw-profile-btn__icon {
+  background: var(--bs-primary);
+  filter: brightness(1.1);
+}
+
+.jw-profile-btn--signed-in .jw-profile-btn__label {
+  max-width: 7rem;
+}
+
 .jw-profile-btn__arrow {
   opacity: 0.5;
   transition: transform 0.2s;

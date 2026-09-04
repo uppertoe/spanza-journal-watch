@@ -1,1 +1,1 @@
-Password reset request — Journal Watch
+{% autoescape off %}No Journal Watch account for this address{% endautoescape %}

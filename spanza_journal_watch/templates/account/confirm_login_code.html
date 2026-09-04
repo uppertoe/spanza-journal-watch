@@ -1,0 +1,9 @@
+{% extends "account/base.html" %}
+{% load i18n %}
+
+{% block head_title %}Sign in{% endblock %}
+
+{% block inner %}
+  {% url 'account_confirm_login_code' as action_url %}
+  {% include "account/_confirm_code_form.html" with title="Enter your sign-in code" recipient=email|default:phone action_url=action_url %}
+{% endblock %}

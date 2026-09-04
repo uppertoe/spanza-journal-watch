@@ -41,12 +41,8 @@ class UserSignupForm(SignupForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["name"] = forms.CharField(
-            label=_("Full name"),
-            required=False,
-            max_length=255,
-            widget=forms.TextInput(attrs={"autocomplete": "name"}),
-        )
+        # No name field: we usually only know members by email, and a name can be
+        # added from the account drawer later.
         self.fields["subscribe_to_newsletter"] = forms.BooleanField(
             label=_("Subscribe to the Journal Watch newsletter"),
             required=False,
@@ -59,8 +55,6 @@ class UserSignupForm(SignupForm):
         from spanza_journal_watch.users.adapters import AccountAdapter
 
         AccountAdapter.confirm_email_on_invite(user)
-        user.name = (self.cleaned_data.get("name") or user.name or "").strip()
-        user.save(update_fields=["name"])
 
         # Optionally subscribe to newsletter
         if self.cleaned_data.get("subscribe_to_newsletter"):

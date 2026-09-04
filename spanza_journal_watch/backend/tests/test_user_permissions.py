@@ -3,10 +3,10 @@ Smoke tests for user creation, linking, and permission flows.
 
 Covers:
 1. Freshly signed-up users have no editorial or Planka access
-2. Reviewer invite acceptance grants can_recommend but NOT editorial permissions
-3. Coordinator invite acceptance grants can_recommend + editorial access + is_staff
+2. Reviewer invite acceptance grants invited_contributor but NOT editorial permissions
+3. Coordinator invite acceptance grants editorial access + is_staff
 4. Accepted contributors (both roles) can access /journals
-5. can_recommend permission gates the recommend action
+5. Recommending needs a signed-in account, nothing more
 6. Subscriber records are linked to user accounts on login
 """
 
@@ -119,12 +119,12 @@ class TestFreshUserHasNoAccess:
 
 
 # ---------------------------------------------------------------------------
-# 2. Reviewer invite grants can_recommend but NOT editorial
+# 2. Reviewer invite grants invited_contributor but NOT editorial
 # ---------------------------------------------------------------------------
 
 
 class TestReviewerInvitePermissions:
-    def test_reviewer_gets_can_recommend(self):
+    def test_reviewer_does_not_get_can_recommend(self):
         issue = make_issue()
         user = UserFactory(email="reviewer@example.com")
         contributor = make_contributor(issue, "reviewer@example.com", IssueContributor.Role.REVIEWER)
@@ -134,7 +134,8 @@ class TestReviewerInvitePermissions:
 
         # Refresh permission cache
         user = User.objects.get(pk=user.pk)
-        assert user.has_perm("submissions.can_recommend") is True
+        # The can_recommend permission is no longer granted: recommending only needs an account.
+        assert user.has_perm("submissions.can_recommend") is False
 
     def test_reviewer_cannot_manage_issues(self):
         issue = make_issue()
@@ -171,12 +172,12 @@ class TestReviewerInvitePermissions:
 
 
 # ---------------------------------------------------------------------------
-# 3. Coordinator invite grants can_recommend + editorial + is_staff
+# 3. Coordinator invite grants editorial + is_staff
 # ---------------------------------------------------------------------------
 
 
 class TestCoordinatorInvitePermissions:
-    def test_coordinator_gets_can_recommend(self):
+    def test_coordinator_does_not_get_can_recommend(self):
         issue = make_issue()
         user = UserFactory(email="coord@example.com")
         contributor = make_contributor(issue, "coord@example.com", IssueContributor.Role.COORDINATOR)
@@ -185,7 +186,8 @@ class TestCoordinatorInvitePermissions:
         accept_invite(user, raw_token)
 
         user = User.objects.get(pk=user.pk)
-        assert user.has_perm("submissions.can_recommend") is True
+        # The can_recommend permission is no longer granted: recommending only needs an account.
+        assert user.has_perm("submissions.can_recommend") is False
 
     def test_coordinator_gets_manage_issue_builder(self):
         issue = make_issue()
@@ -266,7 +268,7 @@ class TestAcceptedContributorsAccessJournals:
 
 
 # ---------------------------------------------------------------------------
-# 5. can_recommend gates the recommend action
+# 5. Recommending needs a signed-in account
 # ---------------------------------------------------------------------------
 
 
@@ -385,7 +387,7 @@ class TestChiefEditorPromotion:
         target = User.objects.get(pk=target.pk)
         assert target.has_perm("submissions.chief_editor") is True
         assert target.has_perm("submissions.manage_issue_builder") is True
-        assert target.has_perm("submissions.can_recommend") is True
+        assert target.has_perm("submissions.can_recommend") is False
         assert target.has_perm("backend.manage_subscriber_csv") is True
         assert target.has_perm("backend.send_newsletters") is True
         assert target.is_staff is True
@@ -532,7 +534,8 @@ class TestChiefEditorInviteFlow:
         user = User.objects.get(pk=user.pk)
         assert user.has_perm("submissions.chief_editor") is True
         assert user.has_perm("submissions.manage_issue_builder") is True
-        assert user.has_perm("submissions.can_recommend") is True
+        # The can_recommend permission is no longer granted: recommending only needs an account.
+        assert user.has_perm("submissions.can_recommend") is False
         assert user.has_perm("backend.manage_subscriber_csv") is True
         assert user.has_perm("backend.send_newsletters") is True
         assert user.is_staff is True

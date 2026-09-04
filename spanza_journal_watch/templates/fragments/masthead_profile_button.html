@@ -1,22 +1,31 @@
+{# Masthead account button. Three states: signed in (initials + first name), known newsletter subscriber (Profile), everyone else (Sign in). Previously the subscriber cookie alone produced the "Profile" look, so a subscribed visitor was indistinguishable from a signed-in member. #}
 <div class="jw-masthead__profile flex-shrink-0" id="masthead-profile-button"{% if oob %} hx-swap-oob="true"{% endif %}>
-  {% if is_known_subscriber %}
+  {% if request.user.is_authenticated %}
+    <button class="jw-profile-btn jw-profile-btn--signed-in" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
+            aria-controls="user-profile-drawer" aria-label="Account menu">
+      <span class="jw-profile-btn__icon jw-profile-btn__initials" aria-hidden="true">{{ user_initials }}</span>
+      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold text-truncate">{{ user_masthead_label }}</span>
+      <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
+    </button>
+  {% elif is_known_subscriber %}
     <button class="jw-profile-btn" type="button"
             data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
-            aria-controls="user-profile-drawer" aria-label="User menu">
+            aria-controls="user-profile-drawer" aria-label="Newsletter and sign in">
       <span class="jw-profile-btn__icon">
         <svg class="bi" width="1.2em" height="1.2em"><use href="#icon-person"></use></svg>
       </span>
-      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold">Profile</span>
+      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold">Sign in</span>
       <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
     </button>
   {% else %}
     <button class="jw-profile-btn" type="button"
             data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
-            aria-controls="user-profile-drawer" aria-label="Subscribe">
+            aria-controls="user-profile-drawer" aria-label="Sign in or subscribe">
       <span class="jw-profile-btn__icon">
-        <svg class="bi" width="1.2em" height="1.2em"><use href="#icon-email"></use></svg>
+        <svg class="bi" width="1.2em" height="1.2em"><use href="#icon-person"></use></svg>
       </span>
-      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold">Subscribe</span>
+      <span class="jw-profile-btn__label d-none d-md-inline-block small fw-semibold">Sign in</span>
       <svg class="bi jw-profile-btn__arrow d-none d-sm-inline" width="0.65em" height="0.65em"><use href="#chevron-down"></use></svg>
     </button>
   {% endif %}

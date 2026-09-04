@@ -76,7 +76,6 @@
             {% else %}
               {% if u.is_staff %}<span class="badge text-bg-primary">Staff</span>{% endif %}
               {% for perm in u.user_permissions.all %}
-                {% if perm.codename == "can_recommend" %}<span class="badge text-bg-warning">Recommend</span>{% endif %}
                 {% if perm.codename == "manage_issue_builder" %}<span class="badge text-bg-info">Editor</span>{% endif %}
                 {% if perm.codename == "regional_coordinator" %}<span class="badge text-bg-secondary">Coordinator</span>{% endif %}
                 {% if perm.codename == "chief_editor" %}<span class="badge text-bg-danger">Chief editor</span>{% endif %}
@@ -94,14 +93,6 @@
           </td>
           <td>
             <div class="d-flex gap-1">
-              <form method="post" action="{% url 'backend:user_toggle_recommend' u.pk %}">
-                {% csrf_token %}
-                {% if u.has_perm_can_recommend %}
-                  <button type="submit" class="btn btn-sm btn-outline-warning py-0" title="Remove recommend permission">- Recommend</button>
-                {% else %}
-                  <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Grant recommend permission">+ Recommend</button>
-                {% endif %}
-              </form>
 
 
               {% if u.pk != request.user.pk %}

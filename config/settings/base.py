@@ -418,7 +418,19 @@ ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_LOGIN_METHODS = {"email"}
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
-ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+# Passwordless: members sign up with an email address and verify it with a code
+# (ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED), then sign in with a code each
+# time (ACCOUNT_LOGIN_BY_CODE_ENABLED). Anyone who prefers a password can set one
+# from the "Forgot password?" link; the login form still accepts passwords.
+ACCOUNT_SIGNUP_FIELDS = ["email*"]
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
+# Six digits, no letters or dashes: easy to read from a phone and to type.
+_SIX_DIGIT_CODE = {"length": 6, "numeric": True, "dashed": False}
+ACCOUNT_LOGIN_BY_CODE_FORMAT = _SIX_DIGIT_CODE
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_FORMAT = _SIX_DIGIT_CODE
+# Our subject templates already name Journal Watch; drop allauth's "[site name] " prefix.
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
@@ -429,8 +441,7 @@ ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_ADAPTER = "spanza_journal_watch.users.adapters.AccountAdapter"
 # https://django-allauth.readthedocs.io/en/latest/forms.html
 ACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSignupForm"}
-# https://django-allauth.readthedocs.io/en/latest/configuration.html
-SOCIALACCOUNT_ADAPTER = "spanza_journal_watch.users.adapters.SocialAccountAdapter"
+# No social providers are installed, so allauth's default social adapter applies.
 # https://django-allauth.readthedocs.io/en/latest/forms.html
 SOCIALACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSocialSignupForm"}
 

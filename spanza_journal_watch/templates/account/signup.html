@@ -7,19 +7,20 @@
 <h5 class="mb-1">Create account</h5>
 
 {% if invite_email %}
-<p class="text-muted small mb-4">Creating an account to accept your invitation.</p>
+<p class="text-muted small mb-3">Creating an account to accept your invitation.</p>
+{% else %}
+<p class="text-muted small mb-3">We will email you a code to confirm your address. There is no password to set.</p>
 {% endif %}
 
 <form class="signup" id="signup_form" method="post" action="{% url 'account_signup' %}">
   {% csrf_token %}
   {% if invite_email %}
-    {# Email is known from the invite — show it read-only and inject as hidden field #}
+    {# Email is known from the invite: show it read-only and inject as a hidden field #}
     <div class="mb-3">
       <label class="form-label small fw-semibold">Email</label>
       <input type="email" class="form-control" value="{{ invite_email }}" readonly disabled>
       <input type="hidden" name="email" value="{{ invite_email }}">
     </div>
-    {# Render only the non-email fields (i.e. passwords) #}
     {% for field in form %}
       {% if field.html_name != "email" %}
         {{ field|as_crispy_field }}
@@ -32,7 +33,14 @@
     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
   {% endif %}
   <div class="d-grid mt-3">
-    <button class="btn btn-primary" type="submit">Create account</button>
+    <button class="btn btn-primary" type="submit">Email me a code</button>
   </div>
 </form>
+
+{% if not invite_email %}
+<hr class="my-4">
+<p class="small text-muted text-center mb-0">
+  Already have an account? <a href="{% url 'account_login' %}{% if redirect_field_value %}?{{ redirect_field_name }}={{ redirect_field_value|urlencode }}{% endif %}">Sign in</a>
+</p>
+{% endif %}
 {% endblock %}

@@ -57,7 +57,6 @@
       <select class="form-select" name="role">
         <option value="">Role: any</option>
         <option value="staff" {% if subscriber_filters.role == "staff" %}selected{% endif %}>Staff</option>
-        <option value="can_recommend" {% if subscriber_filters.role == "can_recommend" %}selected{% endif %}>Can recommend</option>
         <option value="locked" {% if subscriber_filters.role == "locked" %}selected{% endif %}>Locked</option>
       </select>
     </div>

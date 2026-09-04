@@ -38,8 +38,7 @@
         <p class="small text-muted mb-0">Star articles while browsing to add them here. Archive articles once you've read them.</p>
       {% else %}
         <p class="small text-muted mb-0">
-          <a href="{% url 'account_signup' %}?next={% url 'submissions:journal_list' %}">Sign up</a> or
-          <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}">log in</a> to archive articles and keep your list permanently.
+          <a href="{% url 'account_login' %}?next={% url 'submissions:journal_list' %}">Sign in</a> to keep this list on every device, archive what you have read, and recommend articles for review.
         </p>
       {% endif %}
     </div>

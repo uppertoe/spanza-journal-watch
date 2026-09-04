@@ -1,0 +1,1 @@
+{% autoescape off %}Confirm your email address for Journal Watch{% endautoescape %}

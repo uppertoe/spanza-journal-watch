@@ -95,10 +95,10 @@ class TestInviteUnauthenticatedRouting:
         # be present as an invite-accept button (the nav may still have a sign-in link).
         signup_url_str = reverse("account_signup")
         login_url_str = reverse("account_login")
-        assert signup_url_str in content
-        # The login URL should not appear as the primary invite CTA
-        # (check it's absent from the invite card specifically via button href)
-        assert f'href="{login_url_str}?next=' not in content
+        assert f'class="btn btn-primary" href="{signup_url_str}' in content
+        # The login URL should not appear as the primary invite CTA. The account
+        # drawer on every page links to sign-in too, so check the button itself.
+        assert f'class="btn btn-primary" href="{login_url_str}' not in content
 
     def test_session_token_set_for_unauthenticated_visitor(self):
         """Visiting an invite page should store the raw token in the session."""

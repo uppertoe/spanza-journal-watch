@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
+from django.core.exceptions import ValidationError
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -105,3 +106,34 @@ class InviteAwareSignupView(AllauthSignupView):
 
 
 invite_aware_signup_view = InviteAwareSignupView.as_view()
+
+
+@require_POST
+def email_start(request):
+    """One email field that covers both sign-in and sign-up.
+
+    Members are usually known to us by email alone, so the entry point asks for
+    nothing else. An existing account is handed to allauth's sign-in-code flow;
+    a new address is signed up on the spot (email only) and sent a verification
+    code. Either way the next page is the code entry form.
+    """
+    from allauth.account.adapter import get_adapter
+    from allauth.account.views import RequestLoginCodeView
+    from django.contrib import messages
+    from django.core.validators import validate_email
+    from django.shortcuts import redirect
+
+    email = (request.POST.get("email") or "").strip()
+    try:
+        validate_email(email)
+    except ValidationError:
+        messages.error(request, "Please enter a valid email address.")
+        return redirect("account_login")
+
+    if User.objects.filter(email__iexact=email).exists():
+        return RequestLoginCodeView.as_view()(request)
+
+    if not get_adapter(request).is_open_for_signup(request):
+        messages.error(request, "There is no account for that address, and registration is closed.")
+        return redirect("account_login")
+    return invite_aware_signup_view(request)
