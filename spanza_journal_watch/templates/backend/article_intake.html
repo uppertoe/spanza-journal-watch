@@ -5,36 +5,29 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Article Intake</h1>
 </div>
-<p class="text-muted">Build intake batches from the cached PubMed journal feed, then stage candidate articles for Planka.</p>
+<p class="text-muted">Load the issue's articles, stage the ones worth reviewing, and push the shortlist to the Planka board.</p>
 
 <div id="article-intake-page">
 
-{% if not pubmed_credential or not pubmed_credential.get_api_key %}
-  <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3">
-    <span>No PubMed API key configured. An NCBI key is optional but recommended for higher rate limits.</span>
-    <a class="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2" href="{% url "backend:backend_settings" %}">Configure in Settings</a>
-  </div>
+{# Setup warnings only for people who can act on them. #}
+{% if perms.submissions.chief_editor %}
+  {% if not pubmed_credential or not pubmed_credential.get_api_key %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3">
+      <span>No PubMed API key configured. An NCBI key is optional but recommended for higher rate limits.</span>
+      <a class="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2" href="{% url "backend:backend_settings" %}">Configure in Settings</a>
+    </div>
+  {% endif %}
 {% endif %}
 {% if not planka_credential %}
   <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3">
-    <span>No Planka connection configured. Required to push articles to Planka.</span>
-    <a class="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2" href="{% url "backend:backend_settings" %}">Configure in Settings</a>
+    <span>No Planka connection configured, so the shortlist cannot be pushed yet.{% if not perms.submissions.chief_editor %} Ask the chief editor.{% endif %}</span>
+    {% if perms.submissions.chief_editor %}<a class="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2" href="{% url "backend:backend_settings" %}">Configure in Settings</a>{% endif %}
   </div>
 {% endif %}
 
-<div class="alert alert-light border mb-3">
-  <div class="fw-semibold mb-1">Workflow</div>
-  <ol class="mb-0 small">
-    <li><strong>Build intake batch</strong>: choose month range + watched journals, then load cached articles.</li>
-    <li><strong>Keep the list up to date</strong>: check PubMed again at the end of each month in the window, and a fortnight after it closes.</li>
-    <li><strong>Stage articles</strong>: filter list and mark rows as staged.</li>
-    <li><strong>Push to Planka</strong>: send staged rows to Candidates.</li>
-  </ol>
-</div>
-
 {% if selected_issue %}
 <div class="card mb-3">
-  <div class="card-header">Step 1 · Load articles from local cache</div>
+  <div class="card-header">Step 1 · Load articles</div>
   <div class="card-body">
     <form method="post" class="row g-3" hx-post="{% url "backend:article_intake" %}" hx-target="#article-intake-page" hx-select="#article-intake-page" hx-swap="outerHTML" hx-push-url="true">
       {% csrf_token %}
@@ -102,7 +95,7 @@
       </div>
       <div class="col-12">
         <button type="submit" class="btn btn-primary">Start intake</button>
-        <p class="text-muted small mt-2 mb-0">Loads cached articles immediately, then automatically checks PubMed for newer ones in the background.</p>
+        <p class="text-muted small mt-2 mb-0">The list appears straight away; PubMed is then checked for anything newer.</p>
       </div>
     </form>
   </div>
@@ -130,13 +123,13 @@
   </div>
 
   <div class="card mb-3">
-    <div class="card-header">Step 2 · Stage and review articles</div>
+    <div class="card-header">Step 2 · Stage the shortlist</div>
     <div class="card-body">
       <div class="mb-2">
         <strong>Range:</strong> {{ batch.from_month|date:"F Y" }} to {{ batch.to_month|date:"F Y" }}
       </div>
       <div class="text-muted small mb-3">
-        Loaded {{ batch.result_count }} articles · Selected {{ batch.selected_count }} in staging
+        {{ batch.result_count }} article{{ batch.result_count|pluralize }} · {{ batch.selected_count }} staged
       </div>
 
       <div class="card mb-3 border-0 bg-body-secondary">
@@ -200,7 +193,7 @@
     </div>
   </div>
 {% else %}
-  <div class="alert alert-info">No intake batch yet for this issue. Run Step 1 to fetch articles.</div>
+  <div class="alert alert-info">No articles loaded for this issue yet. Use Step 1.</div>
 {% endif %}
 {% else %}
   <div class="alert alert-info">Select an issue to start article intake.</div>

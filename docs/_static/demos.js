@@ -89,16 +89,16 @@
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("The list shows what the watched journals published in the window, retrieved from PubMed. The <b>paediatric MeSH filter</b> is already applied."); }],
-        [3800, function () { d.say("Switch the filter off if you would like to see everything, including articles without paediatric MeSH terms."); d.moveTo(chip); }],
+        [100, function () { reset(); d.say("The <b>paediatric MeSH filter</b> is already on."); }],
+        [3800, function () { d.say("Switch it off to see everything."); d.moveTo(chip); }],
         [4700, function () { d.click(); filter(false); }],
         [6500, function () { d.click(); filter(true); }],
-        [7500, function () { d.say("Click the toggle to stage an article. <b>Staged means shortlisted.</b> Nothing has been sent anywhere and the public website is unaffected."); d.moveTo(tog(0)); }],
+        [7500, function () { d.say("Click the toggle to stage an article. <b>Staged means shortlisted.</b> Nothing is sent yet."); d.moveTo(tog(0)); }],
         [8400, function () { d.click(); setRow(paed[0], true); counts(); }],
         [9200, function () { d.moveTo(tog(2)); }],
         [9900, function () { d.click(); setRow(paed[2], true); counts(); }],
         [11000, function () { d.hideCursor(); }],
-        [12000, function () { d.say("Staging is reversible. Click the toggle again to take an article off the shortlist."); d.moveTo(tog(2)); }],
+        [12000, function () { d.say("Click again to unstage."); d.moveTo(tog(2)); }],
         [12900, function () { d.click(); setRow(paed[2], false); counts(); }],
         [13900, function () { d.hideCursor(); }]
       ];
@@ -135,12 +135,12 @@
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("Staged articles remain here until you push them."); }],
+        [100, function () { reset(); d.say("Staged articles wait here until you push."); }],
         [2500, function () { d.moveTo(btn); }],
         [3200, function () { d.click(); d.press(btn); }],
-        [3500, function () { push(); d.say("Push creates a card on the Planka board for each staged article."); }],
-        [6000, function () { d.hideCursor(); cand.classList.add("hot"); d.say("Cards arrive in <b>Candidates</b>, where reviewers choose which articles to take on."); }],
-        [8600, function () { cand.classList.remove("hot"); d.say("Stage further articles and push again at any time. Articles already on the board are not duplicated."); d.moveTo(rows[2].querySelector(".dm-tog")); }],
+        [3500, function () { push(); d.say("Push creates a card for each staged article."); }],
+        [6000, function () { d.hideCursor(); cand.classList.add("hot"); d.say("Cards arrive in <b>Candidates</b> for reviewers to pick from."); }],
+        [8600, function () { cand.classList.remove("hot"); d.say("Stage more and push again any time. Nothing is duplicated."); d.moveTo(rows[2].querySelector(".dm-tog")); }],
         [9500, function () { d.click(); stage(2, true); counts(); }],
         [10300, function () { d.moveTo(btn); }],
         [11000, function () { d.click(); d.press(btn); }],
@@ -170,14 +170,14 @@
     }
     return makeRunner(function () {
       var s = [], t;
-      s.push([100, function () { reset(); d.say("Add each reviewer's name and email address."); }]);
+      s.push([100, function () { reset(); d.say("Add each reviewer's name and email."); }]);
       s.push([700, function () { name.classList.add("lit"); }]);
       t = typeInto(s, 800, name, "Dr Priya Nair", 45);
       s.push([t + 250, function () { name.classList.remove("lit"); email.classList.add("lit"); }]);
       t = typeInto(s, t + 350, email, "priya.nair@example.org", 32);
       s.push([t + 250, function () { email.classList.remove("lit"); d.moveTo(add); }]);
       s.push([t + 850, function () { d.click(); d.press(add); }]);
-      s.push([t + 1100, function () { name.textContent = ""; email.textContent = ""; rows[0].classList.add("show"); d.say("Reviewers are listed as Pending until the invitations are sent."); }]);
+      s.push([t + 1100, function () { name.textContent = ""; email.textContent = ""; rows[0].classList.add("show"); d.say("Reviewers sit as Pending until you send the invites."); }]);
       var t2 = t + 2300;
       s.push([t2, function () { name.classList.add("lit"); }]);
       t = typeInto(s, t2 + 100, name, "Dr Tom Whitlock", 30);
@@ -187,12 +187,12 @@
       s.push([t + 700, function () { d.click(); d.press(add); }]);
       s.push([t + 950, function () { name.textContent = ""; email.textContent = ""; rows[1].classList.add("show"); }]);
       var t3 = t + 1700;
-      s.push([t3, function () { d.say("<b>Send initial invites</b> emails everyone who is still pending. Each link remains valid for six months."); d.moveTo(send); }]);
+      s.push([t3, function () { d.say("<b>Send initial invites</b> emails everyone still pending."); d.moveTo(send); }]);
       s.push([t3 + 900, function () { d.click(); d.press(send); }]);
       s.push([t3 + 1200, function () { status(0, "info", "Invited"); status(1, "info", "Invited"); d.hideCursor(); }]);
-      s.push([t3 + 3600, function () { d.say("When a reviewer accepts, their status changes to Active and they are added to the Planka board automatically."); }]);
+      s.push([t3 + 3600, function () { d.say("On accepting, a reviewer becomes Active and joins the board automatically."); }]);
       s.push([t3 + 4100, function () { status(0, "ok", "Active"); planka(0, true); }]);
-      s.push([t3 + 7000, function () { d.say("To send a reminder, tick the reviewer and use <b>Resend to selected</b>."); d.moveTo(rows[1].querySelector(".dm-tick")); }]);
+      s.push([t3 + 7000, function () { d.say("To remind someone, tick them and use <b>Resend to selected</b>."); d.moveTo(rows[1].querySelector(".dm-tick")); }]);
       s.push([t3 + 7800, function () { d.click(); tick(1, true); resend.classList.remove("dim"); }]);
       s.push([t3 + 8400, function () { d.moveTo(resend); }]);
       s.push([t3 + 9000, function () { d.click(); d.press(resend); }]);
@@ -316,24 +316,24 @@
       reset(); months.forEach(function (m) { m.classList.add("on"); }); chips.forEach(function (c) { c.classList.add("on"); });
       Object.keys(nodes).forEach(function (k) { nodes[k].classList.add("on"); });
       num("pulled").textContent = "184"; num("filtered").textContent = "31"; num("staged").textContent = "8";
-      d.sayNow("The platform retrieves every article from PubMed for your window, applies the paediatric filter, and sends your shortlist to the shared Planka board.");
+      d.sayNow("PubMed, paediatric filter, your shortlist, the Planka board.");
       return null;
     }
     return makeRunner(function () {
       var s = [
-        [100, function () { reset(); d.say("Each issue covers a window of a month or two, for example <b>November and December</b>."); }],
+        [100, function () { reset(); d.say("An issue covers a window of a month or two, for example <b>November and December</b>."); }],
         [1200, function () { months[0].classList.add("on"); }],
         [1450, function () { months[1].classList.add("on"); }],
-        [3600, function () { d.say("For that window, the platform retrieves every article the watched journals published, directly from <b>PubMed</b>."); }]
+        [3600, function () { d.say("The platform retrieves the window's articles from <b>PubMed</b>."); }]
       ];
       chips.forEach(function (c, i) { s.push([3900 + i * 220, function () { c.classList.add("on"); }]); });
       s.push([4000, function () { lit("pulled"); }]);
       countSteps(s, 4200, num("pulled"), 0, 184, 1700);
-      s.push([7000, function () { d.say("The paediatric MeSH filter is applied before you see the list, so only relevant articles remain."); lit("filtered"); }]);
+      s.push([7000, function () { d.say("The paediatric MeSH filter is applied before you see the list."); lit("filtered"); }]);
       countSteps(s, 7300, num("filtered"), 184, 31, 1300);
       s.push([9800, function () { d.say("You shortlist the articles that merit a review."); lit("staged"); }]);
       countSteps(s, 10100, num("staged"), 31, 8, 1100);
-      s.push([12400, function () { d.say("The shortlist goes to the shared <b>Planka board</b>, where reviewers claim articles and write their reviews."); lit("out"); flash(nodes.out); }]);
+      s.push([12400, function () { d.say("The shortlist goes to the <b>Planka board</b>, where reviewers claim and write."); lit("out"); flash(nodes.out); }]);
       return s;
     }, 16200);
   }
@@ -345,15 +345,15 @@
     if (reduced) { show(2); d.sayNow("Sign in at /editorial/go, choose the editorial backend, and open an issue from your dashboard."); return null; }
     return makeRunner(function () {
       return [
-        [100, function () { show(0); d.hideCursor(); d.say("Sign in at <b>/editorial/go</b>, or choose <b>Editor</b> from the account menu on the main site. The editorial backend is where article intake and reviewer invitations are managed. Planka is the reviewers' board."); }],
+        [100, function () { show(0); d.hideCursor(); d.say("Sign in at <b>/editorial/go</b> and choose <b>Editorial backend</b>."); }],
         [4200, function () { d.moveTo(go); }],
         [4900, function () { d.click(); d.press(go); }],
         [5200, function () { show(1); d.hideCursor(); }],
-        [5400, function () { d.say("The dashboard lists the issues assigned to you. Each card links to Articles and Reviewers for that issue."); }],
+        [5400, function () { d.say("Open your issue with <b>Articles</b> or <b>Reviewers</b>."); }],
         [8200, function () { d.moveTo(articles); }],
         [8900, function () { d.click(); d.press(articles); }],
         [9200, function () { show(2); d.hideCursor(); }],
-        [9400, function () { d.say("The bar at the top of every page shows which issue you are working in, with tabs for the two steps that are yours. The greyed tabs are managed by the chief editor."); }]
+        [9400, function () { d.say("The bar at the top shows which issue you are in. The greyed tabs belong to the chief editor."); }]
       ];
     }, 14000);
   }
@@ -379,29 +379,29 @@
     if (reduced) {
       reset(); to.textContent = "October 2026"; untick.classList.add("on"); results.hidden = false;
       statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed";
-      d.sayNow("Choose the months and journals, then Start intake. The list loads from the platform's own copy of the feed, and PubMed is checked in the background.");
+      d.sayNow("Set the months and journals, then Start intake.");
       return null;
     }
     return makeRunner(function () {
       var s = [
-        [100, function () { reset(); d.say("Choose the months the issue covers. This issue covers <b>September and October</b>, so the range runs from September to October."); }],
+        [100, function () { reset(); d.say("Set the months to the issue's window, here <b>September to October</b>."); }],
         [1600, function () { d.moveTo(to); }],
         [2300, function () { d.click(); to.classList.add("lit"); }],
         [2700, function () { to.textContent = "October 2026"; }],
         [3400, function () { to.classList.remove("lit"); }],
-        [4400, function () { d.say("Tick the journals to search. The list opens with the journals used last time, so usually there is nothing to change."); d.moveTo(untick); }],
+        [4400, function () { d.say("Tick the journals. On a return visit they are already set."); d.moveTo(untick); }],
         [5500, function () { d.click(); untick.classList.add("on"); }],
         [6600, function () { d.moveTo(start); }],
         [7300, function () { d.click(); d.press(start); }],
-        [7600, function () { d.hideCursor(); results.hidden = false; pop(results); statusLine(status, "ok", "Loaded 112 cached article(s). Checking PubMed for newer articles in the background."); d.say("The platform keeps its own copy of the PubMed feed for the watched journals, so the list is ready within seconds."); }]
+        [7600, function () { d.hideCursor(); results.hidden = false; pop(results); statusLine(status, "ok", "Loaded 112 cached article(s). Checking PubMed for newer articles in the background."); d.say("The list appears within seconds."); }]
       ];
       JOURNALS.forEach(function (name, i) {
         s.push([10200 + i * 700, function () {
-          if (i === 0) d.say("In the background, PubMed is asked for anything published in the window that the copy does not yet hold. This takes a minute or two.");
+          if (i === 0) d.say("PubMed is then checked for anything newer. This takes a minute or two.");
           statusLine(status, "", "Checking PubMed (" + (i + 1) + "/" + JOURNALS.length + ") · finished " + name, true);
         }]);
       });
-      s.push([14400, function () { statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed"; flash(results); d.say("Anything PubMed has indexed since the copy was last refreshed is added to the list. You can begin shortlisting while the check runs."); }]);
+      s.push([14400, function () { statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed"; flash(results); d.say("New arrivals are added to the list. You can start shortlisting while the check runs."); }]);
       return s;
     }, 18400);
   }
@@ -445,24 +445,24 @@
       reset(); place(POS.midNov); rows.forEach(function (r) { r.classList.remove("gone"); });
       rows.filter(function (r) { return r.getAttribute("data-wave") === "2"; }).forEach(function (r) { r.querySelector(".dm-dot").classList.add("on"); });
       setNew(1); count.textContent = "41 shown"; last.textContent = "Last checked just now"; setPhase(false, false);
-      d.sayNow("Return at the end of each month in the window, and once more a fortnight after it closes, and use Check for new articles. Additions are marked with a blue dot.");
+      d.sayNow("Check for new articles at the end of each month, and a fortnight after the window closes.");
       return null;
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("An issue covering <b>September and October</b>, set up in the first week of September, holds only what PubMed has indexed so far. The <b>Keep the list up to date</b> card says how far the window has run."); }],
-        [4600, function () { d.say("Journals publish throughout the window, and PubMed indexes each article some days after it appears online. Return at the <b>end of each month</b>. The card turns amber when a check is overdue."); place(POS.lateSep); }],
+        [100, function () { reset(); d.say("Set up in early September, an issue for <b>September and October</b> holds only what PubMed has so far."); }],
+        [4600, function () { d.say("Come back at the <b>end of each month</b>. The card turns amber when a check is due."); place(POS.lateSep); }],
         [7800, function () { d.moveTo(check); }],
         [8500, function () { d.click(); d.press(check); }],
         [8800, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
         [10600, function () { statusLine(status, "ok", "Found 2 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(1); setNew(2); setPhase(true, false); }],
-        [11200, function () { d.say("Additions are marked with a <b>blue dot</b> and counted at the top. Articles already staged or pushed are not disturbed."); }],
-        [15200, function () { d.say("Check once more a <b>fortnight or so after the window closes</b>, when the last of October's articles have been indexed."); place(POS.midNov); status.hidden = true; last.textContent = "Last checked 4 weeks ago"; setPhase(false, true); }],
+        [11200, function () { d.say("New arrivals carry a <b>blue dot</b>. Staged and pushed articles are not disturbed."); }],
+        [15200, function () { d.say("Check once more a <b>fortnight after the window closes</b>."); place(POS.midNov); status.hidden = true; last.textContent = "Last checked 4 weeks ago"; setPhase(false, true); }],
         [18600, function () { d.moveTo(check); }],
         [19300, function () { d.click(); d.press(check); }],
         [19600, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
         [21400, function () { statusLine(status, "ok", "Found 1 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(2); setNew(3); setPhase(false, false); }],
-        [23400, function () { d.say("Once you have looked through the additions, <b>Mark all seen</b> clears the markers."); d.moveTo(seen); }],
+        [23400, function () { d.say("<b>Mark all seen</b> clears the dots."); d.moveTo(seen); }],
         [24600, function () { d.click(); clearDots(); }],
         [25400, function () { d.hideCursor(); }]
       ];

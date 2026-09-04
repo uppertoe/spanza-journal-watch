@@ -226,8 +226,8 @@ they are; additions are marked with a blue dot and can be isolated with the
 **New only** filter. A list can be checked once every fifteen minutes. Issues
 whose window is still open should be checked at the end of each month and
 again a fortnight after the window closes; see
-:ref:`Checking again as the window fills <coordinator-recheck>` in the
-coordinator guide.
+:ref:`Keep the list up to date <coordinator-recheck>` in the coordinator
+guide.
 
 
 Step 3: Reviewers
