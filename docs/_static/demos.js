@@ -90,7 +90,7 @@
     return makeRunner(function () {
       return [
         [100, function () { reset(); d.say("The <b>paediatric MeSH filter</b> is already on."); }],
-        [3800, function () { d.say("Switch it off to see everything."); d.moveTo(chip); }],
+        [3800, function () { d.say("Switch it off if you want to see everything."); d.moveTo(chip); }],
         [4700, function () { d.click(); filter(false); }],
         [6500, function () { d.click(); filter(true); }],
         [7500, function () { d.say("Click the toggle to stage an article. <b>Staged means shortlisted.</b> Nothing is sent yet."); d.moveTo(tog(0)); }],
@@ -98,7 +98,7 @@
         [9200, function () { d.moveTo(tog(2)); }],
         [9900, function () { d.click(); setRow(paed[2], true); counts(); }],
         [11000, function () { d.hideCursor(); }],
-        [12000, function () { d.say("Click again to unstage."); d.moveTo(tog(2)); }],
+        [12000, function () { d.say("Click the toggle again to take an article off the shortlist."); d.moveTo(tog(2)); }],
         [12900, function () { d.click(); setRow(paed[2], false); counts(); }],
         [13900, function () { d.hideCursor(); }]
       ];
@@ -135,12 +135,12 @@
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("Staged articles wait here until you push."); }],
+        [100, function () { reset(); d.say("Staged articles stay here until you push them."); }],
         [2500, function () { d.moveTo(btn); }],
         [3200, function () { d.click(); d.press(btn); }],
-        [3500, function () { push(); d.say("Push creates a card for each staged article."); }],
+        [3500, function () { push(); d.say("Pushing creates a card on the board for each staged article."); }],
         [6000, function () { d.hideCursor(); cand.classList.add("hot"); d.say("Cards arrive in <b>Candidates</b> for reviewers to pick from."); }],
-        [8600, function () { cand.classList.remove("hot"); d.say("Stage more and push again any time. Nothing is duplicated."); d.moveTo(rows[2].querySelector(".dm-tog")); }],
+        [8600, function () { cand.classList.remove("hot"); d.say("You can stage more and push again whenever you like. Nothing is duplicated."); d.moveTo(rows[2].querySelector(".dm-tog")); }],
         [9500, function () { d.click(); stage(2, true); counts(); }],
         [10300, function () { d.moveTo(btn); }],
         [11000, function () { d.click(); d.press(btn); }],
@@ -170,14 +170,14 @@
     }
     return makeRunner(function () {
       var s = [], t;
-      s.push([100, function () { reset(); d.say("Add each reviewer's name and email."); }]);
+      s.push([100, function () { reset(); d.say("Add each reviewer's name and email address."); }]);
       s.push([700, function () { name.classList.add("lit"); }]);
       t = typeInto(s, 800, name, "Dr Priya Nair", 45);
       s.push([t + 250, function () { name.classList.remove("lit"); email.classList.add("lit"); }]);
       t = typeInto(s, t + 350, email, "priya.nair@example.org", 32);
       s.push([t + 250, function () { email.classList.remove("lit"); d.moveTo(add); }]);
       s.push([t + 850, function () { d.click(); d.press(add); }]);
-      s.push([t + 1100, function () { name.textContent = ""; email.textContent = ""; rows[0].classList.add("show"); d.say("Reviewers sit as Pending until you send the invites."); }]);
+      s.push([t + 1100, function () { name.textContent = ""; email.textContent = ""; rows[0].classList.add("show"); d.say("Reviewers show as Pending until the invitations are sent."); }]);
       var t2 = t + 2300;
       s.push([t2, function () { name.classList.add("lit"); }]);
       t = typeInto(s, t2 + 100, name, "Dr Tom Whitlock", 30);
@@ -187,12 +187,12 @@
       s.push([t + 700, function () { d.click(); d.press(add); }]);
       s.push([t + 950, function () { name.textContent = ""; email.textContent = ""; rows[1].classList.add("show"); }]);
       var t3 = t + 1700;
-      s.push([t3, function () { d.say("<b>Send initial invites</b> emails everyone still pending."); d.moveTo(send); }]);
+      s.push([t3, function () { d.say("<b>Send initial invites</b> emails everyone who is still pending."); d.moveTo(send); }]);
       s.push([t3 + 900, function () { d.click(); d.press(send); }]);
       s.push([t3 + 1200, function () { status(0, "info", "Invited"); status(1, "info", "Invited"); d.hideCursor(); }]);
-      s.push([t3 + 3600, function () { d.say("On accepting, a reviewer becomes Active and joins the board automatically."); }]);
+      s.push([t3 + 3600, function () { d.say("Once a reviewer accepts, they become Active and join the board automatically."); }]);
       s.push([t3 + 4100, function () { status(0, "ok", "Active"); planka(0, true); }]);
-      s.push([t3 + 7000, function () { d.say("To remind someone, tick them and use <b>Resend to selected</b>."); d.moveTo(rows[1].querySelector(".dm-tick")); }]);
+      s.push([t3 + 7000, function () { d.say("To send a reminder, tick the reviewer and use <b>Resend to selected</b>."); d.moveTo(rows[1].querySelector(".dm-tick")); }]);
       s.push([t3 + 7800, function () { d.click(); tick(1, true); resend.classList.remove("dim"); }]);
       s.push([t3 + 8400, function () { d.moveTo(resend); }]);
       s.push([t3 + 9000, function () { d.click(); d.press(resend); }]);
@@ -316,7 +316,7 @@
       reset(); months.forEach(function (m) { m.classList.add("on"); }); chips.forEach(function (c) { c.classList.add("on"); });
       Object.keys(nodes).forEach(function (k) { nodes[k].classList.add("on"); });
       num("pulled").textContent = "184"; num("filtered").textContent = "31"; num("staged").textContent = "8";
-      d.sayNow("PubMed, paediatric filter, your shortlist, the Planka board.");
+      d.sayNow("The articles come from PubMed, the paediatric filter narrows them, you shortlist, and the shortlist goes to the Planka board.");
       return null;
     }
     return makeRunner(function () {
@@ -324,7 +324,7 @@
         [100, function () { reset(); d.say("An issue covers a window of a month or two, for example <b>November and December</b>."); }],
         [1200, function () { months[0].classList.add("on"); }],
         [1450, function () { months[1].classList.add("on"); }],
-        [3600, function () { d.say("The platform retrieves the window's articles from <b>PubMed</b>."); }]
+        [3600, function () { d.say("The platform retrieves the articles for that window from <b>PubMed</b>."); }]
       ];
       chips.forEach(function (c, i) { s.push([3900 + i * 220, function () { c.classList.add("on"); }]); });
       s.push([4000, function () { lit("pulled"); }]);
@@ -333,7 +333,7 @@
       countSteps(s, 7300, num("filtered"), 184, 31, 1300);
       s.push([9800, function () { d.say("You shortlist the articles that merit a review."); lit("staged"); }]);
       countSteps(s, 10100, num("staged"), 31, 8, 1100);
-      s.push([12400, function () { d.say("The shortlist goes to the <b>Planka board</b>, where reviewers claim and write."); lit("out"); flash(nodes.out); }]);
+      s.push([12400, function () { d.say("The shortlist goes to the <b>Planka board</b>, where reviewers claim articles and write their reviews."); lit("out"); flash(nodes.out); }]);
       return s;
     }, 16200);
   }
@@ -349,11 +349,11 @@
         [4200, function () { d.moveTo(go); }],
         [4900, function () { d.click(); d.press(go); }],
         [5200, function () { show(1); d.hideCursor(); }],
-        [5400, function () { d.say("Open your issue with <b>Articles</b> or <b>Reviewers</b>."); }],
+        [5400, function () { d.say("Open an issue with <b>Articles</b> or <b>Reviewers</b>."); }],
         [8200, function () { d.moveTo(articles); }],
         [8900, function () { d.click(); d.press(articles); }],
         [9200, function () { show(2); d.hideCursor(); }],
-        [9400, function () { d.say("The bar at the top shows which issue you are in. The greyed tabs belong to the chief editor."); }]
+        [9400, function () { d.say("The bar at the top shows which issue you are working in. The greyed tabs are the chief editor's."); }]
       ];
     }, 14000);
   }
@@ -379,21 +379,21 @@
     if (reduced) {
       reset(); to.textContent = "October 2026"; untick.classList.add("on"); results.hidden = false;
       statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed";
-      d.sayNow("Set the months and journals, then Start intake.");
+      d.sayNow("Set the months and the journals, then click Start intake.");
       return null;
     }
     return makeRunner(function () {
       var s = [
-        [100, function () { reset(); d.say("Set the months to the issue's window, here <b>September to October</b>."); }],
+        [100, function () { reset(); d.say("Set the months to the issue's window, in this case <b>September to October</b>."); }],
         [1600, function () { d.moveTo(to); }],
         [2300, function () { d.click(); to.classList.add("lit"); }],
         [2700, function () { to.textContent = "October 2026"; }],
         [3400, function () { to.classList.remove("lit"); }],
-        [4400, function () { d.say("Tick the journals. On a return visit they are already set."); d.moveTo(untick); }],
+        [4400, function () { d.say("Tick the journals. When you come back, they are already set."); d.moveTo(untick); }],
         [5500, function () { d.click(); untick.classList.add("on"); }],
         [6600, function () { d.moveTo(start); }],
         [7300, function () { d.click(); d.press(start); }],
-        [7600, function () { d.hideCursor(); results.hidden = false; pop(results); statusLine(status, "ok", "Loaded 112 cached article(s). Checking PubMed for newer articles in the background."); d.say("The list appears within seconds."); }]
+        [7600, function () { d.hideCursor(); results.hidden = false; pop(results); statusLine(status, "ok", "Loaded 112 cached article(s). Checking PubMed for newer articles in the background."); d.say("The list appears within a few seconds."); }]
       ];
       JOURNALS.forEach(function (name, i) {
         s.push([10200 + i * 700, function () {
@@ -445,24 +445,24 @@
       reset(); place(POS.midNov); rows.forEach(function (r) { r.classList.remove("gone"); });
       rows.filter(function (r) { return r.getAttribute("data-wave") === "2"; }).forEach(function (r) { r.querySelector(".dm-dot").classList.add("on"); });
       setNew(1); count.textContent = "41 shown"; last.textContent = "Last checked just now"; setPhase(false, false);
-      d.sayNow("Check for new articles at the end of each month, and a fortnight after the window closes.");
+      d.sayNow("Check for new articles at the end of each month, and once more a fortnight after the window closes.");
       return null;
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("Set up in early September, an issue for <b>September and October</b> holds only what PubMed has so far."); }],
-        [4600, function () { d.say("Come back at the <b>end of each month</b>. The card turns amber when a check is due."); place(POS.lateSep); }],
+        [100, function () { reset(); d.say("An issue for <b>September and October</b>, set up in early September, holds only what PubMed has indexed so far."); }],
+        [4600, function () { d.say("Come back at the <b>end of each month</b>. The card turns amber when a check is overdue."); place(POS.lateSep); }],
         [7800, function () { d.moveTo(check); }],
         [8500, function () { d.click(); d.press(check); }],
         [8800, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
         [10600, function () { statusLine(status, "ok", "Found 2 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(1); setNew(2); setPhase(true, false); }],
-        [11200, function () { d.say("New arrivals carry a <b>blue dot</b>. Staged and pushed articles are not disturbed."); }],
+        [11200, function () { d.say("New arrivals are marked with a <b>blue dot</b>. Anything already staged or pushed is left as it was."); }],
         [15200, function () { d.say("Check once more a <b>fortnight after the window closes</b>."); place(POS.midNov); status.hidden = true; last.textContent = "Last checked 4 weeks ago"; setPhase(false, true); }],
         [18600, function () { d.moveTo(check); }],
         [19300, function () { d.click(); d.press(check); }],
         [19600, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
         [21400, function () { statusLine(status, "ok", "Found 1 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(2); setNew(3); setPhase(false, false); }],
-        [23400, function () { d.say("<b>Mark all seen</b> clears the dots."); d.moveTo(seen); }],
+        [23400, function () { d.say("<b>Mark all seen</b> clears the markers."); d.moveTo(seen); }],
         [24600, function () { d.click(); clearDots(); }],
         [25400, function () { d.hideCursor(); }]
       ];

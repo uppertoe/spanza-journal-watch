@@ -3,9 +3,9 @@
 Regional Coordinator Guide
 ==========================
 
-The chief editor assigns you to an issue. You have two jobs for it: shortlist
-the articles, and invite the reviewers. This page is a reminder of which
-buttons to press.
+When the chief editor assigns you an issue, two things fall to you:
+shortlisting the articles, and inviting the reviewers. The rest of this page
+is a quick reminder of where the buttons are.
 
 How it fits together
 --------------------
@@ -14,11 +14,12 @@ How it fits together
 
    .. container:: feature-text
 
-      1. The platform retrieves the window's articles from PubMed and
-         applies the paediatric filter.
-      2. You shortlist the articles worth reviewing and push them to the
-         Planka board.
-      3. Reviewers claim and write their reviews on the board.
+      1. The platform pulls the articles for the issue's window from PubMed
+         and applies the paediatric filter.
+      2. You pick out the articles worth reviewing and send them across to
+         the Planka board.
+      3. Reviewers claim articles on the board and write their reviews
+         there.
 
    .. raw:: html
       :file: _demos/overview.html
@@ -31,15 +32,15 @@ Logging in
 
    .. container:: feature-text
 
-      1. Go to `/editorial/go </editorial/go>`_ and sign in. Once signed in,
-         the same page is under **Editor** in the account menu on the main
-         site.
+      1. Go to `/editorial/go </editorial/go>`_ and sign in. Once you are
+         signed in, the same page is available under **Editor** in the
+         account menu on the main site.
       2. Choose **Editorial backend**.
-      3. Your dashboard lists your issues. Open one with **Articles** or
-         **Reviewers**.
+      3. Your dashboard lists the issues you have been assigned. Open one
+         with **Articles** or **Reviewers**.
 
-      If the dashboard is empty, you have not been assigned to an issue yet.
-      Ask the chief editor.
+      If the dashboard is empty, you have not been assigned an issue yet, so
+      ask the chief editor to add you.
 
    .. raw:: html
       :file: _demos/go.html
@@ -48,8 +49,9 @@ Logging in
 Shortlisting articles
 ---------------------
 
-Open **Articles** for the issue. The page runs top to bottom: load, keep up
-to date, stage, push.
+Open **Articles** for the issue. The page runs from top to bottom: load the
+articles, keep the list up to date, stage your shortlist, and push it to the
+board.
 
 Step 1: Load the articles
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,12 +61,12 @@ Step 1: Load the articles
    .. container:: feature-text
 
       1. Set **From month** and **To month** to the issue's window.
-      2. Tick the journals, or **Select all**.
-      3. Click **Start intake**. The list appears within seconds, and PubMed
-         is checked for anything newer in the background.
+      2. Tick the journals you want, or use **Select all**.
+      3. Click **Start intake**. The list appears within a few seconds, and
+         PubMed is checked for anything newer in the background.
 
-      On a return visit the months and journals are already set. Skip to the
-      **Keep the list up to date** card.
+      When you come back to an issue, the months and journals are already
+      set, so you can go straight to the **Keep the list up to date** card.
 
    .. raw:: html
       :file: _demos/load.html
@@ -79,16 +81,17 @@ Keep the list up to date
    .. container:: feature-text
 
       Articles keep arriving in PubMed for weeks after they are published,
-      so the list is only complete a fortnight or so after the window
+      so the list is not complete until a fortnight or so after the window
       closes.
 
       1. Click **Check for new articles** on the card at the end of each
          month in the window, and once more a fortnight after it closes.
-         The card turns amber when a check is due.
-      2. New arrivals carry a blue dot. Tick **New only** to see just those,
-         then **Mark all seen**.
+         The card turns amber when a check is overdue.
+      2. New arrivals are marked with a blue dot. Tick **New only** to see
+         just those, and **Mark all seen** once you have looked through
+         them.
 
-      Staged and pushed articles are never disturbed.
+      Anything you have already staged or pushed is left exactly as it was.
 
    .. raw:: html
       :file: _demos/recheck.html
@@ -101,13 +104,13 @@ Step 2: Stage the shortlist
    .. container:: feature-text
 
       The **Paediatric (MeSH)** filter is on when the page opens. Switch it
-      off to see everything.
+      off if you want to see everything.
 
-      1. Click the toggle on each article to review. It turns green and
-         reads *Staged*.
+      1. Click the toggle on each article you want reviewed. It turns green
+         and reads *Staged*.
       2. **Stage all (filtered)** takes everything currently showing.
 
-      Staging changes nothing on the public website or the board.
+      Staging changes nothing on the public website or on the board.
 
    .. raw:: html
       :file: _demos/stage.html
@@ -120,10 +123,11 @@ Step 3: Push to the review board
    .. container:: feature-text
 
       1. Click **Push staged articles to Planka candidates**.
-      2. Each staged article becomes a card in *Candidates* on the board.
+      2. Each staged article becomes a card in the *Candidates* list on the
+         board.
 
-      Push again whenever you stage more. Cards already on the board are
-      left alone.
+      You can stage more and push again whenever you like. Cards already on
+      the board are left alone.
 
    .. raw:: html
       :file: _demos/push.html
@@ -139,11 +143,11 @@ Open **Reviewers** for the issue.
    .. container:: feature-text
 
       1. Enter the reviewer's name and email address and click **Add**.
-      2. Click **Send initial invites**. Links stay valid for 180 days.
-      3. *Invited* means the email has gone out. *Active* means they have
-         accepted and are on the board.
-      4. To remind someone, tick their row and click **Resend to
-         selected**. **Revoke** removes them from the issue.
+      2. Click **Send initial invites**. The links stay valid for 180 days.
+      3. *Invited* means the email has gone out. *Active* means the reviewer
+         has accepted and is on the board.
+      4. To send a reminder, tick the reviewer's row and click **Resend to
+         selected**. **Revoke** removes someone from the issue.
 
    .. raw:: html
       :file: _demos/invite.html
@@ -152,6 +156,7 @@ Open **Reviewers** for the issue.
 Working in Planka
 -----------------
 
-On the Planka login page click **Sign in with Journal Watch**. You are a
-member of the board for each issue you coordinate: move cards between lists,
-comment on them, and see at a glance which list each review is in.
+On the Planka login page, click **Sign in with Journal Watch**. You are a
+member of the board for every issue you coordinate, so you can move cards
+between lists, comment on them, and see at a glance where each review is up
+to.
