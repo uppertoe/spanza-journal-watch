@@ -8,6 +8,10 @@ alabaster==1.0.0
     # via sphinx
 amqp==5.3.1
     # via kombu
+annotated-types==0.8.0
+    # via pydantic
+anthropic==1.3.0
+    # via -r requirements/base.in
 anyio==4.13.0
     # via
     #   starlette
@@ -159,6 +163,8 @@ django-view-breadcrumbs==2.5.1
     # via -r requirements/base.in
 django-webpack-loader==3.2.3
     # via -r requirements/base.in
+docstring-parser==0.18.0
+    # via anthropic
 docutils==0.22.4
     # via sphinx
 et-xmlfile==2.0.0
@@ -183,6 +189,14 @@ h11==0.16.0
     # via uvicorn
 hiredis==3.3.1
     # via -r requirements/base.in
+httpcore2==2.3.0
+    # via httpx2
+httpx2==2.3.0
+    # via anthropic
+    # via
+    #   anyio
+    #   httpx2
+    #   requests
 humanize==4.15.0
     # via flower
 identify==2.6.18
@@ -209,6 +223,8 @@ jinja2==3.1.6
     # via
     #   moto
     #   sphinx
+jiter==0.16.0
+    # via anthropic
 jmespath==1.1.0
     # via
     #   boto3
@@ -288,6 +304,10 @@ py-partiql-parser==0.6.3
     # via moto
 pycparser==3.0
     # via cffi
+pydantic==2.13.5
+    # via anthropic
+pydantic-core==2.46.5
+    # via pydantic
 pygments==2.20.0
     # via
     #   ipython
@@ -360,6 +380,8 @@ s3transfer==0.16.0
     # via boto3
 six==1.17.0
     # via python-dateutil
+sniffio==1.3.1
+    # via anthropic
 snowballstemmer==3.0.1
     # via sphinx
 sphinx==9.1.0
@@ -400,6 +422,16 @@ traitlets==5.14.3
     # via
     #   ipython
     #   matplotlib-inline
+truststore==0.10.4
+    # via
+    #   httpcore2
+    #   httpx2
+    # via
+    #   anthropic
+    #   jwcrypto
+    #   pydantic
+    #   pydantic-core
+    #   typing-inspection
 types-pyyaml==6.0.12.20260408
     # via django-stubs
 typing-extensions==4.15.0
@@ -408,6 +440,8 @@ typing-extensions==4.15.0
     #   django-stubs-ext
     #   jwcrypto
     #   mypy
+typing-inspection==0.4.4
+    # via pydantic
 tzdata==2026.1
     # via
     #   django-celery-beat
