@@ -62,8 +62,10 @@ class HtmxMixin:
 
     htmx_templates = []
 
-    def render_htmx_response(self):
-        context = self.get_context_data()
+    def render_htmx_response(self, context):
+        # Reuse the context the view already built; calling get_context_data()
+        # again here used to run every context query a second time on HTMX
+        # requests (pagination, search, reading list).
         response = []
         for template in self.htmx_templates:
             response.append(render_to_string(template, context, request=self.request))
@@ -71,7 +73,7 @@ class HtmxMixin:
 
     def render_to_response(self, context, **response_kwargs):
         if self.request.headers.get("HX-Request") == "true":
-            return self.render_htmx_response()
+            return self.render_htmx_response(context)
         return super().render_to_response(context, **response_kwargs)
 
 

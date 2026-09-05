@@ -16,6 +16,7 @@ Covers:
 import pytest
 from django.contrib.auth.models import Permission
 from django.test import RequestFactory
+from django.urls import resolve
 
 from spanza_journal_watch.backend.context_processors import frontend_banner, selected_issue
 from spanza_journal_watch.backend.models import BackendPreference, IssueContributor
@@ -52,7 +53,7 @@ def make_request(user=None, *, htmx=False, session=None):
     if htmx:
         request.META["HTTP_HX_REQUEST"] = "true"
     request.session = session or {}
-    request.resolver_match = None
+    request.resolver_match = resolve(request.path)
     return request
 
 
@@ -164,10 +165,10 @@ class TestIsHtmx:
     def test_is_htmx_true_with_header(self):
         user = UserFactory()
         factory = RequestFactory()
-        request = factory.get("/", HTTP_HX_REQUEST="true")
+        request = factory.get("/editorial/", HTTP_HX_REQUEST="true")
         request.user = user
         request.session = {}
-        request.resolver_match = None
+        request.resolver_match = resolve(request.path)
         ctx = selected_issue(request)
         assert ctx["is_htmx"] is True
 
@@ -256,3 +257,24 @@ class TestFrontendBanner:
         ctx = frontend_banner(request)
         assert ctx["frontend_banner"]["title"] == "New journals browser"
         assert ctx["frontend_banner"]["link_url"] == "/journals"
+
+
+class TestEditorialScope:
+    def test_public_page_skips_editorial_context(self):
+        user = UserFactory()
+        _grant(user, "submissions.chief_editor")
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+        request.session = {}
+        request.resolver_match = resolve("/")
+        assert selected_issue(request) == {}
+
+    def test_users_pages_get_editorial_context(self):
+        user = UserFactory()
+        factory = RequestFactory()
+        request = factory.get("/users/~update/")
+        request.user = user
+        request.session = {}
+        request.resolver_match = resolve("/users/~update/")
+        assert "issues_for_sidebar" in selected_issue(request)

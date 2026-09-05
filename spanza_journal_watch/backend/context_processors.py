@@ -48,9 +48,20 @@ ISSUE_PAGE_URL_NAMES = frozenset(
 )
 
 
+# URL namespaces whose pages render the editorial shell (backend_base.html).
+EDITORIAL_NAMESPACES = frozenset(["backend", "users"])
+
+
 def selected_issue(request):
-    """Inject the session-persisted selected issue, issue list, and inbox badge into every template context."""
+    """Inject the session-persisted selected issue, issue list, and inbox badge into editorial template contexts.
+
+    Only pages that render the editorial shell need this, so public pages
+    viewed by a signed-in member skip the issue and inbox queries.
+    """
     if not hasattr(request, "user") or not request.user.is_authenticated:
+        return {}
+    match = getattr(request, "resolver_match", None)
+    if match is None or match.namespace not in EDITORIAL_NAMESPACES:
         return {}
 
     is_coordinator_only = request.user.has_perm("submissions.regional_coordinator") and not request.user.has_perm(
