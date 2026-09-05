@@ -9,9 +9,9 @@
 
 {% block main-feature %}
     {% if page_header %}
-    {% with page_header as content %}{% include "fragments/main_feature.html" with header_kicker="Explore" %}{% endwith %}
+    {% with page_header as content %}{% include "fragments/main_feature.html" with header_kicker="Find a review" %}{% endwith %}
     {% else %}
-    {% include "fragments/main_feature.html" with title="Search" body="Find reviews, articles and journals here." header_theme="search" header_pattern="band" header_kicker="Explore" %}
+    {% include "fragments/main_feature.html" with title="Search" body="Find reviews, articles and journals here." header_theme="search" header_pattern="band" header_kicker="Find a review" %}
     {% endif %}
 {% endblock main-feature %}
 

@@ -24,13 +24,31 @@
   {% endfor %}
 </ul>
 
-<div id="headline-rows" class="d-flex flex-column gap-3">
+{% if page_obj.paginator.num_pages > 1 %}
+  <p class="small text-muted mb-2">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}.</p>
+{% endif %}
+<div id="headline-rows" class="d-flex flex-column gap-2">
   {% for row in rows %}
     {% include "backend/_headline_row.html" with review=row.review take_home=row.take_home headline_value=row.headline_value bottom_line_value=row.bottom_line_value anthropic_configured=row.anthropic_configured %}
   {% empty %}
     <div class="alert alert-light border">Nothing in this list.</div>
   {% endfor %}
 </div>
+{% if page_obj.paginator.num_pages > 1 %}
+  <nav class="mt-3" aria-label="Headline queue pages">
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item{% if not page_obj.has_previous %} disabled{% endif %}">
+        <a class="page-link" href="?status={{ status }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Previous</a>
+      </li>
+      {% for n in page_obj.paginator.page_range %}
+        <li class="page-item{% if n == page_obj.number %} active{% endif %}"><a class="page-link" href="?status={{ status }}&page={{ n }}">{{ n }}</a></li>
+      {% endfor %}
+      <li class="page-item{% if not page_obj.has_next %} disabled{% endif %}">
+        <a class="page-link" href="?status={{ status }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.number }}{% endif %}">Next</a>
+      </li>
+    </ul>
+  </nav>
+{% endif %}
 <style>
   .headline-review-scroll { max-height: 32rem; }
   .headline-review-scroll :is(h1, h2, h3, h4, h5, h6) { font-size: 1rem; font-weight: 600; margin-top: 1rem; }

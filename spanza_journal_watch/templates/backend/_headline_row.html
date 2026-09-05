@@ -1,23 +1,19 @@
-{# One review in the headlines queue; swapped whole after Draft or Save. #}
+{# One review in the headlines queue; swapped whole after Draft or Save. Collapsed to one line until opened. #}
 <div id="headline-row-{{ review.pk }}" class="card">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+  <div class="card-body py-2">
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
       <div class="min-w-0">
-        <div class="fw-semibold">
+        <div class="fw-semibold text-truncate">
           <a href="{{ review.get_absolute_url }}" target="_blank" rel="noopener noreferrer">{{ review.article.get_title }}</a>
         </div>
         <div class="small text-muted">
           {{ review.article.journal|default:review.article.source_journal_name }}
           {% if review.author %} · {{ review.author }}{% endif %}
           · {{ review.get_review_date|date:"F Y" }}
+          {% if review.editorial_headline %} · <span class="text-body">{{ review.editorial_headline }}</span>{% endif %}
         </div>
       </div>
       <div class="flex-shrink-0 d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary"
-                data-bs-toggle="collapse" data-bs-target="#review-text-{{ review.pk }}"
-                aria-expanded="false" aria-controls="review-text-{{ review.pk }}">
-          Show review text
-        </button>
         {% if review.headline_status == "done" %}
           <span class="badge text-bg-success">Done</span>
         {% elif review.headline_status == "draft" %}
@@ -25,59 +21,69 @@
         {% else %}
           <span class="badge text-bg-warning">Needs headline</span>
         {% endif %}
-      </div>
-    </div>
-
-    {% if take_home %}
-      <details class="mt-2">
-        <summary class="small text-muted">Reviewer's take-home section</summary>
-        <p class="small mt-2 mb-0 border rounded p-2 bg-body-tertiary">{{ take_home }}</p>
-      </details>
-    {% endif %}
-
-    {% if row_error %}<div class="alert alert-warning py-2 small mt-3 mb-0">{{ row_error }}</div>{% endif %}
-    {% if row_saved %}<div class="alert alert-success py-2 small mt-3 mb-0">Saved. The page now uses this headline.</div>{% endif %}
-
-    <div class="row g-3 mt-1 headline-row-layout">
-    {# The review text sits beside the fields once opened, so the headline can be written while reading. #}
-    <div class="col-lg-7 order-lg-2 collapse headline-review-text" id="review-text-{{ review.pk }}">
-      <div class="border rounded p-3 bg-body-tertiary overflow-auto headline-review-scroll">
-        <h2 class="h6 mb-2">{{ review.article.get_title }}</h2>
-        <div class="small">{{ review.get_markdown_body|safe }}</div>
-      </div>
-    </div>
-    <div class="col-12 order-lg-1 headline-fields">
-    <form
-          hx-post="{% url 'backend:headline_save' review.pk %}"
-          hx-target="#headline-row-{{ review.pk }}" hx-swap="outerHTML"
-          hx-disabled-elt="find button[type=submit]">
-      {% csrf_token %}
-      <div class="mb-2">
-        <label class="form-label small fw-semibold mb-1" for="headline-{{ review.pk }}">Headline</label>
-        <input type="text" class="form-control" id="headline-{{ review.pk }}" name="headline" maxlength="140"
-               value="{{ headline_value }}" placeholder="What the review found, in one line">
-      </div>
-      <div class="mb-2">
-        <label class="form-label small fw-semibold mb-1" for="bottom-line-{{ review.pk }}">Bottom line</label>
-        <textarea class="form-control" id="bottom-line-{{ review.pk }}" name="bottom_line" rows="3"
-                  placeholder="Two to four sentences for practice">{{ bottom_line_value }}</textarea>
-      </div>
-      <div class="d-flex gap-2 align-items-center flex-wrap">
-        <button type="submit" class="btn btn-primary btn-sm">Save</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm"
-                hx-post="{% url 'backend:headline_draft' review.pk %}"
-                hx-target="#headline-row-{{ review.pk }}" hx-swap="outerHTML"
-                hx-indicator="#draft-spinner-{{ review.pk }}" hx-disabled-elt="this"
-                {% if not anthropic_configured %}disabled title="ANTHROPIC_API_KEY is not configured"{% endif %}>
-          {% if review.draft_headline %}Redraft with Claude{% else %}Draft with Claude{% endif %}
+        <button type="button" class="btn btn-sm btn-outline-primary"
+                data-bs-toggle="collapse" data-bs-target="#headline-edit-{{ review.pk }}"
+                aria-expanded="{% if expanded %}true{% else %}false{% endif %}" aria-controls="headline-edit-{{ review.pk }}">
+          {% if review.headline_status == "done" %}Edit{% else %}Write{% endif %}
         </button>
-        <span id="draft-spinner-{{ review.pk }}" class="htmx-indicator small text-muted">Reading the review and drafting…</span>
-        {% if review.draft_generated_at and review.headline_status == "draft" %}
-          <span class="small text-muted ms-auto">Drafted {{ review.draft_generated_at|timesince }} ago</span>
-        {% endif %}
       </div>
-    </form>
     </div>
+
+    <div class="collapse{% if expanded %} show{% endif %} headline-edit" id="headline-edit-{{ review.pk }}">
+      {% if take_home %}
+        <details class="mt-3">
+          <summary class="small text-muted">Reviewer's take-home section</summary>
+          <p class="small mt-2 mb-0 border rounded p-2 bg-body-tertiary">{{ take_home }}</p>
+        </details>
+      {% endif %}
+
+      {% if row_error %}<div class="alert alert-warning py-2 small mt-3 mb-0">{{ row_error }}</div>{% endif %}
+      {% if row_saved %}<div class="alert alert-success py-2 small mt-3 mb-0">Saved. The page now uses this headline.</div>{% endif %}
+
+      <div class="row g-3 mt-1 headline-row-layout">
+        {# The review text sits beside the fields once opened, so the headline can be written while reading. #}
+        <div class="col-lg-7 order-lg-2 collapse headline-review-text" id="review-text-{{ review.pk }}"
+             hx-get="{% url 'backend:headline_review_text' review.pk %}" hx-trigger="show.bs.collapse once" hx-swap="innerHTML">
+          <div class="border rounded p-3 bg-body-tertiary small text-muted">Loading the review…</div>
+        </div>
+        <div class="col-12 order-lg-1 headline-fields">
+          <form
+                hx-post="{% url 'backend:headline_save' review.pk %}"
+                hx-target="#headline-row-{{ review.pk }}" hx-swap="outerHTML"
+                hx-disabled-elt="find button[type=submit]">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label small fw-semibold mb-1" for="headline-{{ review.pk }}">Headline</label>
+              <input type="text" class="form-control" id="headline-{{ review.pk }}" name="headline" maxlength="140"
+                     value="{{ headline_value }}" placeholder="What the review found, in one line">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold mb-1" for="bottom-line-{{ review.pk }}">Bottom line</label>
+              <textarea class="form-control" id="bottom-line-{{ review.pk }}" name="bottom_line" rows="3"
+                        placeholder="Two to four sentences for practice">{{ bottom_line_value }}</textarea>
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      hx-post="{% url 'backend:headline_draft' review.pk %}"
+                      hx-target="#headline-row-{{ review.pk }}" hx-swap="outerHTML"
+                      hx-indicator="#draft-spinner-{{ review.pk }}" hx-disabled-elt="this"
+                      {% if not anthropic_configured %}disabled title="ANTHROPIC_API_KEY is not configured"{% endif %}>
+                {% if review.draft_headline %}Redraft with Claude{% else %}Draft with Claude{% endif %}
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      data-bs-toggle="collapse" data-bs-target="#review-text-{{ review.pk }}"
+                      aria-expanded="false" aria-controls="review-text-{{ review.pk }}">
+                Show review text
+              </button>
+              <span id="draft-spinner-{{ review.pk }}" class="htmx-indicator small text-muted">Reading the review and drafting…</span>
+              {% if review.draft_generated_at and review.headline_status == "draft" %}
+                <span class="small text-muted ms-auto">Drafted {{ review.draft_generated_at|timesince }} ago</span>
+              {% endif %}
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </div>

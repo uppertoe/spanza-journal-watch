@@ -5,6 +5,7 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -97,6 +98,9 @@ def _headline_queue_queryset(status):
     return qs
 
 
+HEADLINE_QUEUE_PAGE_SIZE = 20
+
+
 def _headline_row_context(review):
     from spanza_journal_watch.submissions.headlines import extract_bottom_line
 
@@ -116,7 +120,9 @@ def headline_queue(request):
     status = (request.GET.get("status") or "missing").strip()
     if status not in {"missing", "draft", "done", "all"}:
         status = "missing"
-    reviews = list(_headline_queue_queryset(status)[:200])
+    paginator = Paginator(_headline_queue_queryset(status), HEADLINE_QUEUE_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    reviews = list(page_obj.object_list)
     counts = {
         "missing": _headline_queue_queryset("missing").count(),
         "draft": _headline_queue_queryset("draft").count(),
@@ -135,8 +141,17 @@ def headline_queue(request):
         "status_tabs": status_tabs,
         "rows": [_headline_row_context(review) for review in reviews],
         "anthropic_configured": bool(getattr(settings, "ANTHROPIC_API_KEY", "")),
+        "page_obj": page_obj,
     }
     return render(request, "backend/headlines.html", context)
+
+
+@login_required
+@permission_required("submissions.chief_editor", raise_exception=True)
+def headline_review_text(request, review_id):
+    """The rendered review body for one queue row, fetched only when the editor opens it."""
+    review = get_object_or_404(Review.objects.select_related("article"), pk=review_id)
+    return render(request, "backend/_headline_review_text.html", {"review": review})
 
 
 @login_required
@@ -159,6 +174,7 @@ def headline_draft(request, review_id):
     review.refresh_from_db()
     context = _headline_row_context(review)
     context["row_error"] = error
+    context["expanded"] = True
     return render(request, "backend/_headline_row.html", context)
 
 
@@ -195,4 +211,5 @@ def headline_save(request, review_id):
     _queue_indexnow_for_review(review)
     context = _headline_row_context(review)
     context["row_saved"] = True
+    context["expanded"] = True
     return render(request, "backend/_headline_row.html", context)

@@ -244,10 +244,11 @@ class TestHeadlineQueue:
         page = client.get(reverse("backend:headline_queue")).content.decode()
         assert "A paper about neuromuscular block" in page and "Drafted paper" not in page
         assert "Needs headline" in page and "Monitor quantitatively." in page  # take-home shown for reference
-        # The full review text is available beside the fields, rendered from markdown.
+        # The review text panel is on the page but its body loads on demand, rendered from markdown.
         assert f'id="review-text-{missing.pk}"' in page
         assert "Show review text" in page
-        assert "<h2>Bottom line</h2>" in page or "Bottom line</h2>" in page
+        text = client.get(reverse("backend:headline_review_text", kwargs={"review_id": missing.pk})).content.decode()
+        assert "<h2>Bottom line</h2>" in text or "Bottom line</h2>" in text
 
         page = client.get(reverse("backend:headline_queue") + "?status=draft").content.decode()
         assert "Drafted paper" in page and 'value="A draft"' in page

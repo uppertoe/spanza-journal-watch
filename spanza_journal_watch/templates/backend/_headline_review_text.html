@@ -1,0 +1,5 @@
+{# Rendered review body for one headlines-queue row, loaded on demand. #}
+<div class="border rounded p-3 bg-body-tertiary overflow-auto headline-review-scroll">
+  <h2 class="h6 mb-2">{{ review.article.get_title }}</h2>
+  <div class="small">{{ review.get_markdown_body|safe }}</div>
+</div>

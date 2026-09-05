@@ -98,6 +98,7 @@ urlpatterns = [
     path("headlines/draft-all", views.headline_draft_all, name="headline_draft_all"),
     path("headlines/<int:review_id>/draft", views.headline_draft, name="headline_draft"),
     path("headlines/<int:review_id>/save", views.headline_save, name="headline_save"),
+    path("headlines/<int:review_id>/text", views.headline_review_text, name="headline_review_text"),
     path("settings", views.backend_settings, name="backend_settings"),
     path("settings/fetch-monitoring", views.fetch_monitoring, name="fetch_monitoring"),
     path("settings/refresh-mesh", views.trigger_mesh_refresh, name="trigger_mesh_refresh"),

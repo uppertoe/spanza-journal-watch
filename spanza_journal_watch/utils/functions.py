@@ -148,3 +148,31 @@ class HTMLShortener(HTMLParser):
             self.output.append(f"</{self.tag_stack.pop()}>")
 
         return self.get_shortened_html()
+
+
+# A subtitle follows the first colon or spaced dash (hyphen, en dash or em dash).
+# A bare hyphen never splits: it lives inside words such as "pre-operative",
+# "Point-of-care" and "SARS-CoV-2", never between a title and its subtitle.
+TITLE_SEPARATORS = (":", " - ", " – ", " — ")
+MIN_TITLE_WORDS = 3
+
+
+def split_title(title):
+    """Split an article title into (title, subtitle) at its first real separator.
+
+    Returns the whole title and an empty subtitle when there is no separator, when
+    the part before it is shorter than three words, or when nothing follows it, so
+    a colon in "Figure 1: ..." style prefixes or a trailing dash cannot mangle the
+    display. Every caller reads the same pair, so title and subtitle always agree.
+    """
+    text = (title or "").strip()
+    if not text:
+        return "", ""
+    candidates = [(text.find(sep), sep) for sep in TITLE_SEPARATORS if text.find(sep) != -1]
+    if not candidates:
+        return text, ""
+    index, sep = min(candidates)
+    head, tail = text[:index].strip(), text[index + len(sep) :].strip()
+    if len(head.split()) < MIN_TITLE_WORDS or not tail:
+        return text, ""
+    return head, tail

@@ -157,7 +157,7 @@
   line-height: 1.35;
   color: var(--bs-body-color);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -196,4 +196,3 @@
   margin: 0 0.35rem;
   color: var(--bs-tertiary-color);
 }
-

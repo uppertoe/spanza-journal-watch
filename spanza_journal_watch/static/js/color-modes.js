@@ -43,9 +43,15 @@
 
     const themeSwitcherText = document.querySelector('#bd-theme-text');
     const activeThemeIcon = document.querySelector('.theme-icon-active use');
-    const btnToActive = document.querySelector(
+    // More than one switcher can be on the page (account drawer, mobile
+    // toolbar), so mark every button for the chosen theme, not only the first.
+    const buttonsToActive = document.querySelectorAll(
       `[data-bs-theme-value="${theme}"]`,
     );
+    if (!buttonsToActive.length) {
+      return;
+    }
+    const btnToActive = buttonsToActive[0];
     const svgOfActiveBtn = btnToActive
       .querySelector('svg use')
       .getAttribute('href');
@@ -55,9 +61,13 @@
       element.setAttribute('aria-pressed', 'false');
     });
 
-    btnToActive.classList.add('active');
-    btnToActive.setAttribute('aria-pressed', 'true');
-    activeThemeIcon.setAttribute('href', svgOfActiveBtn);
+    buttonsToActive.forEach((element) => {
+      element.classList.add('active');
+      element.setAttribute('aria-pressed', 'true');
+    });
+    if (activeThemeIcon) {
+      activeThemeIcon.setAttribute('href', svgOfActiveBtn);
+    }
     const themeSwitcherLabel = `${themeSwitcherText.textContent} (${btnToActive.dataset.bsThemeValue})`;
     themeSwitcher.setAttribute('aria-label', themeSwitcherLabel);
 

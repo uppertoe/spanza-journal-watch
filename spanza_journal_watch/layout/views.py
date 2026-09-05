@@ -30,7 +30,7 @@ class HomepageView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListView):
     # Layout variables
     number_of_card_features = 2
     article_cols = 1
-    feature_text_styles = ["text-primary", "text-secondary", "text-primary-emphasis", "text-success", "text_danger"]
+    feature_text_styles = ["text-primary", "text-secondary", "text-primary-emphasis", "text-success", "text-danger"]
 
     def get_queryset(self):
         self._homepage = Homepage.get_current_homepage()

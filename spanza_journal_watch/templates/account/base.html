@@ -1,7 +1,7 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head>{% include "fragments/head_theme_bootstrap.html" %}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
@@ -24,6 +24,7 @@
       max-width: 26rem;
       padding: 1rem;
     }
+    .auth-wordmark { font-size: 2.25rem; }
     .auth-logo {
       font-size: 0.8rem;
       font-weight: 700;
@@ -37,7 +38,7 @@
   <div class="auth-card">
     <div class="text-center mb-4">
       <div class="auth-logo mb-1">SPANZA</div>
-      <div class="fs-5 fw-semibold">Journal Watch</div>
+      <a class="blog-header-logo text-body-emphasis text-decoration-none" href="{% url 'home' %}"><span class="blog-header-logo__text auth-wordmark">Journal Watch</span></a>
     </div>
     <div class="card shadow-sm">
       <div class="card-body p-4">

@@ -3,7 +3,8 @@
 The views are grouped by workflow area in the modules below. Everything is
 re-exported here so URL configuration, tests and the analytics views can keep
 importing from ``spanza_journal_watch.backend.views``; new code should import
-from the specific module.
+from the specific module. A new view must be added to the import block for its
+module below (and to ``__all__``) before ``urls.py`` can reference it.
 """
 
 from .analytics_page import (
@@ -51,6 +52,7 @@ from .headlines import (
     headline_draft,
     headline_draft_all,
     headline_queue,
+    headline_review_text,
     headline_save,
     suggest_review_headline,
 )
@@ -470,6 +472,7 @@ __all__ = [
     "headline_draft",
     "headline_draft_all",
     "headline_queue",
+    "headline_review_text",
     "headline_save",
     "inbox",
     "inbox_mark_all_read",

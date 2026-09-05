@@ -1050,19 +1050,17 @@ class PubmedArticle(TimeStampedModel):
 
     # ── Title / subtitle helpers (ported from submissions.Article) ──
 
+    def split_title(self):
+        """The (title, subtitle) pair; see ``utils.functions.split_title`` for the rules."""
+        from spanza_journal_watch.utils.functions import split_title
+
+        return split_title(self.title)
+
     def get_title(self):
-        separators = [":", " - "]
-        for sep in separators:
-            if sep in self.title:
-                return self.title.split(sep, 1)[0].strip()
-        return self.title
+        return self.split_title()[0]
 
     def get_subtitle(self):
-        separators = [":", "-"]
-        for sep in separators:
-            if sep in self.title:
-                return self.title.split(sep, 1)[1].strip()
-        return ""
+        return self.split_title()[1]
 
     def get_truncated_name(self):
         from spanza_journal_watch.utils.functions import shorten_text

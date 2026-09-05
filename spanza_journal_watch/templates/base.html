@@ -214,38 +214,28 @@
     {% block modal %}{% endblock modal %}
 
     <div class="sticky-mobile-toolbar d-md-none" aria-label="Quick navigation">
-      {% block mobile_toolbar_banner %}{% endblock mobile_toolbar_banner %}
+      {% block mobile_toolbar_banner %}
+        {% if not request.user.is_authenticated %}
+          {# Shown after starring while signed out; JS fills the count. Desktop uses the toast below. #}
+          <div id="mobile-login-prompt" class="journal-mobile-login-prompt d-none">
+            <div class="d-flex align-items-center justify-content-center gap-2 small">
+              <svg class="bi text-warning flex-shrink-0" width="1em" height="1em" aria-hidden="true"><use href="#icon-star-fill"></use></svg>
+              <span><strong data-star-count-mobile>0</strong> starred.</span>
+              <a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}" class="fw-semibold text-decoration-none">Sign in</a>
+              <span class="text-muted">to keep them</span>
+            </div>
+          </div>
+        {% endif %}
+      {% endblock mobile_toolbar_banner %}
       <div class="sticky-mobile-toolbar__inner">
         <div class="sticky-mobile-toolbar__wing sticky-mobile-toolbar__wing--start">
-          <div class="dropup">
-            <button class="btn btn-bd-primary d-flex align-items-center gap-2" id="bd-theme-mobile" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle theme">
-              <svg class="bi" width="1em" height="1em"><use href="#circle-half"></use></svg>
-              <span class="small fw-semibold d-none d-sm-inline">Theme</span>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-mobile">
-              <li>
-                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
-                  <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
-                  Light
-                  <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
-                  <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
-                  Dark
-                  <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
-                  <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
-                  Auto
-                  <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-                </button>
-              </li>
-            </ul>
-          </div>
+          {# Account drawer: sign in, newsletter, CPD and the theme switch. #}
+          <button class="btn btn-bd-primary d-flex align-items-center gap-2" type="button"
+                  data-bs-toggle="offcanvas" data-bs-target="#user-profile-drawer"
+                  aria-controls="user-profile-drawer" aria-label="{% if request.user.is_authenticated %}Account{% else %}Sign in{% endif %}">
+            <svg class="bi" width="1em" height="1em"><use href="#icon-person"></use></svg>
+            <span class="small fw-semibold d-none d-sm-inline">{% if request.user.is_authenticated %}Account{% else %}Sign in{% endif %}</span>
+          </button>
         </div>
         <div class="sticky-mobile-toolbar__actions" id="mobile-action-dock-slot">
           {% block mobile_action_dock %}{% endblock mobile_action_dock %}
@@ -261,40 +251,6 @@
 
     <div class="sticky-desktop-toolbar d-none d-md-block">
       <div class="sticky-desktop-toolbar__inner">
-        <div class="sticky-desktop-toolbar__theme dropup">
-          <button class="btn btn-bd-primary dropdown-toggle d-flex align-items-center gap-2"
-                  id="bd-theme"
-                  type="button"
-                  aria-expanded="false"
-                  data-bs-toggle="dropdown"
-                  aria-label="Toggle theme (auto)">
-            <svg class="bi theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
-            <span class="small fw-semibold" id="bd-theme-text">Theme</span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
-            <li>
-              <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
-                Light
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-              </button>
-            </li>
-            <li>
-              <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
-                Dark
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-              </button>
-            </li>
-            <li>
-              <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
-                Auto
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-              </button>
-            </li>
-          </ul>
-        </div>
         <div class="sticky-desktop-toolbar__actions" id="desktop-action-dock-slot">
           {% block desktop_action_dock %}{% endblock desktop_action_dock %}
         </div>

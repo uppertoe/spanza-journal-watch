@@ -75,5 +75,24 @@
         {% endif %}
       </div>
     {% endif %}
+
+    {# ── Appearance ───────────────────────────────── #}
+    <div class="mt-4 pt-3 border-top" id="bd-theme" role="group" aria-label="Toggle theme (auto)">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="small fw-semibold" id="bd-theme-text">Theme</span>
+        <svg class="bi theme-icon-active text-muted" width="1em" height="1em" aria-hidden="true"><use href="#circle-half"></use></svg>
+      </div>
+      <div class="btn-group w-100" role="group">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-theme-value="light" aria-pressed="false">
+          <svg class="bi me-1 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>Light
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-theme-value="dark" aria-pressed="false">
+          <svg class="bi me-1 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>Dark
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm active" data-bs-theme-value="auto" aria-pressed="true">
+          <svg class="bi me-1 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>Auto
+        </button>
+      </div>
+    </div>
   </div>
 </div>

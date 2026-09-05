@@ -1,7 +1,8 @@
 /* ── Login prompt toast (desktop, fixed position) ──────── */
 .jw-login-toast-wrapper {
   position: fixed;
-  bottom: 1.5rem;
+  // Clear the pager dock, which is also fixed to the bottom centre on desktop.
+  bottom: 6.5rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1950;
@@ -146,4 +147,3 @@
   top: -0.3rem;
   right: -0.3rem;
 }
-
