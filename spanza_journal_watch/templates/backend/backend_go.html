@@ -9,11 +9,11 @@
 <div class="d-grid gap-2">
   <a class="btn btn-primary" href="{% url 'backend:dashboard' %}">
     Editorial backend
-    <span class="d-block small fw-normal opacity-75">Manage issues, reviews and newsletter</span>
+    <span class="d-block small fw-normal opacity-75">{% if is_chief_editor %}Manage issues, reviews and newsletter{% else %}Invite reviewers and select articles{% endif %}</span>
   </a>
 
   {% if planka_url %}
-  <a class="btn btn-outline-secondary" href="{{ planka_url }}" target="_blank" rel="noopener noreferrer">
+  <a class="btn btn-outline-secondary" href="{{ planka_url }}" rel="noopener noreferrer">
     Planka
     <span class="d-block small fw-normal opacity-75">Review board and task management</span>
   </a>
