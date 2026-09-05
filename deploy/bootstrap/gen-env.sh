@@ -7,7 +7,7 @@
 #   bash deploy/bootstrap/gen-env.sh --dry-run  # print to stdout instead
 #
 # The script prompts for the four values that come from outside:
-#   DOMAIN, PLANKA_DOMAIN, ADMIN_EMAIL, DOCKERHUB_NAMESPACE
+#   DOMAIN, PLANKA_DOMAIN, ADMIN_EMAIL, JW_DOCKERHUB_NAMESPACE
 #
 # Everything else (keys, passwords, RSA key) is generated automatically.
 # The OIDC RSA key generation (openssl genrsa 4096) takes ~5 seconds.
@@ -78,6 +78,7 @@ FLOWER_USER="flower"
 FLOWER_PASSWORD="$(gen_token 24)"
 OIDC_CLIENT_SECRET="$(gen_hex 32)"
 PLANKA_SECRET_KEY="$(gen_hex 32)"
+PLANKA_WEBHOOK_SECRET="$(gen_hex 32)"
 PLANKA_POSTGRES_PASSWORD="$(gen_token 24)"
 DJANGO_ADMIN_PATH="$(gen_token 12 | tr -dc 'a-zA-Z0-9' | head -c 12)"
 DEFAULT_ADMIN_PASSWORD="$(gen_token 16)"
@@ -103,8 +104,8 @@ ENV_CONTENT="# =================================================================
 # Docker Hub
 # =============================================================================
 
-DOCKERHUB_NAMESPACE=${DOCKERHUB_NS}
-APP_TAG=latest
+JW_DOCKERHUB_NAMESPACE=${DOCKERHUB_NS}
+JW_APP_TAG=latest
 
 
 # =============================================================================
@@ -139,8 +140,8 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
 # =============================================================================
 # AWS (S3 media storage + SES email)
-# These values are also passed to Planka for S3 attachment storage —
-# no need to duplicate them; see compose.prod.example.yml.
+# Planka uses its own IAM user and bucket (PLANKA_S3_* below); see
+# deploy/journalwatch/docker-compose.yml for how each is wired in.
 # =============================================================================
 
 DJANGO_AWS_ACCESS_KEY_ID=REPLACE_WITH_IAM_ACCESS_KEY
@@ -159,6 +160,9 @@ DJANGO_AWS_DEFAULT_REGION=ap-southeast-2
 # the SNS subscription endpoint URL.
 WEBHOOK_SECRET=${WEBHOOK_SECRET}
 DJANGO_ANYMAIL_INBOUND_S3_OBJECT_PREFIX=email
+
+# SES configuration set — use TrackingConfigSet-staging for staging
+ANYMAIL_CONFIGURATION_SET_NAME=TrackingConfigSet
 
 
 # =============================================================================
@@ -195,6 +199,9 @@ OIDC_ISS_ENDPOINT=https://${DOMAIN}/o
 
 PLANKA_EXTERNAL_URL=https://${PLANKA_DOMAIN}
 PLANKA_ADMIN_EMAIL=${ADMIN_EMAIL}
+
+# Shared secret Django checks on card-update webhooks that Planka sends back
+PLANKA_WEBHOOK_SECRET=${PLANKA_WEBHOOK_SECRET}
 
 
 # =============================================================================
@@ -237,7 +244,14 @@ DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
 PLANKA_S3_BUCKET=REPLACE_WITH_PLANKA_BUCKET_NAME
 PLANKA_S3_ACCESS_KEY_ID=REPLACE_WITH_PLANKA_IAM_ACCESS_KEY
 PLANKA_S3_SECRET_ACCESS_KEY=REPLACE_WITH_PLANKA_IAM_SECRET_KEY
-PLANKA_S3_REGION=${DJANGO_AWS_S3_REGION_NAME:-ap-southeast-2}
+PLANKA_S3_REGION=ap-southeast-2
+
+
+# =============================================================================
+# IndexNow (Bing / Yandex instant indexing) — blank disables it
+# =============================================================================
+
+INDEXNOW_KEY=
 "
 
 # ---------------------------------------------------------------------------
@@ -265,11 +279,11 @@ cat << NEXT
      DJANGO_AWS_STORAGE_BUCKET_NAME
 
 2. Copy the generated .env into the server repo:
-     apps/journalwatch/.env
+     apps/journal-watch/.env
 
 3. Set up the Planka API key:
-     Open https://${DOMAIN}/backend/settings/ → "Set up Planka API key"
-     Then add OIDC_ENFORCED=true to apps/journalwatch/.env and restart Planka
+     Open https://${DOMAIN}/editorial/settings → "Set up Planka API key"
+     Then add OIDC_ENFORCED=true to apps/journal-watch/.env and restart Planka
 
 4. Configure backups in the server repo / VPS layer if required
 

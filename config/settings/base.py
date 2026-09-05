@@ -70,7 +70,6 @@ if not DATABASE_URL:
 DATABASES = {"default": env.db("DATABASE_URL", default=DATABASE_URL)}
 DATABASES["default"]["ATOMIC_REQUESTS"] = env.bool("DJANGO_ATOMIC_REQUESTS", default=False)
 # https://docs.djangoproject.com/en/stable/ref/settings/#std:setting-DEFAULT_AUTO_FIELD
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # URLS
 # ------------------------------------------------------------------------------
@@ -333,7 +332,8 @@ PUBMED_CREDENTIAL_ENCRYPTION_KEY = env("PUBMED_CREDENTIAL_ENCRYPTION_KEY", defau
 # Django Admin URL.
 ADMIN_URL = "admin/"
 # https://docs.djangoproject.com/en/dev/ref/settings/#admins
-ADMINS = ["eamonn.upperton@gmail.com"]
+# Comma-separated email addresses that receive error reports.
+ADMINS = env.list("DJANGO_ADMINS", default=[])
 # https://docs.djangoproject.com/en/dev/ref/settings/#managers
 MANAGERS = ADMINS
 

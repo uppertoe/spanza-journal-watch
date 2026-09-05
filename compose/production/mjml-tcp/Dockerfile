@@ -1,6 +1,6 @@
-FROM node:22-bookworm-slim
+# Pinned by digest; bump deliberately (Dependabot opens PRs for this).
+FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5
 
-ARG MJML_VERSION=4.14.1
 ARG EXPOSE=28101
 
 ENV WORKDIR=/app
@@ -14,9 +14,10 @@ RUN chmod +x $SCRIPTSDIR/*.sh
 
 WORKDIR $WORKDIR
 
-RUN set -ex; \
-    npm init -y; \
-    npm install mjml@${MJML_VERSION}
+# mjml and its whole dependency tree come from the committed lockfile, so two
+# builds of the same commit produce the same renderer.
+COPY ./compose/production/mjml-tcp/package.json ./compose/production/mjml-tcp/package-lock.json $WORKDIR/
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY ./compose/production/mjml-tcp/tcpserver.js $WORKDIR/
 

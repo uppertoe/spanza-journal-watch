@@ -159,9 +159,9 @@ class TestPolicyDocuments:
                 r = stmt.get("Resource", "")
                 resources += r if isinstance(r, list) else [r]
             bucket_resources = [r for r in resources if r != "*" and not r.startswith("arn:aws:sns:")]
-            assert all(
-                other in r for r in bucket_resources
-            ), f"{policy_fn.__name__} has resources not scoped to bucket '{other}'"
+            assert all(other in r for r in bucket_resources), (
+                f"{policy_fn.__name__} has resources not scoped to bucket '{other}'"
+            )
 
     def test_bucket_policy_public_read_only_exposes_media_prefix(self):
         doc = bucket_policy(BUCKET)
@@ -370,9 +370,9 @@ class TestSetupSNS:
         setup_sns(sns, ses_v2, REGION, ACCOUNT_ID, DOMAIN, WEBHOOK_SECRET, suffix="staging")
         topics = [t["TopicArn"] for t in sns.list_topics()["Topics"]]
         assert any("journalwatch-ses-events-staging" in arn for arn in topics)
-        assert not any(
-            arn.endswith("journalwatch-ses-events") for arn in topics
-        ), "Un-suffixed topic must not be created"
+        assert not any(arn.endswith("journalwatch-ses-events") for arn in topics), (
+            "Un-suffixed topic must not be created"
+        )
 
     def test_returns_topic_arn(self, sns, ses_v2):
         topic_arn = setup_sns(sns, ses_v2, REGION, ACCOUNT_ID, DOMAIN, WEBHOOK_SECRET)
@@ -651,9 +651,11 @@ class TestProfileArg:
             ses_mock.create_configuration_set.return_value = {}
             ses_mock.create_configuration_set_event_destination.return_value = {}
 
-            with patch("deploy.bootstrap.aws_setup.boto3.Session", side_effect=fake_session), patch(
-                "sys.argv", argv
-            ), patch("deploy.bootstrap.aws_setup.boto3.Session") as mock_boto_session:
+            with (
+                patch("deploy.bootstrap.aws_setup.boto3.Session", side_effect=fake_session),
+                patch("sys.argv", argv),
+                patch("deploy.bootstrap.aws_setup.boto3.Session") as mock_boto_session,
+            ):
                 mock_boto_session.return_value.client.return_value = ses_mock
                 # We just need to verify the call signature — don't run full main()
                 mock_boto_session.reset_mock()

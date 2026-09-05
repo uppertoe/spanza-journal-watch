@@ -1,7 +1,14 @@
-# Docs build stage — produces the static HTML served at /editorial/docs/
-FROM python:3.13-slim-bookworm AS docs-builder
+# Base images are pinned by digest so every build of a given commit uses the
+# same layers. Bump the digest deliberately (Dependabot opens PRs for these):
+#   docker buildx imagetools inspect python:3.13-alpine3.21 | grep Digest
+FROM python:3.13-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS docs-builder
 
-RUN pip install --no-cache-dir sphinx myst-parser furo
+# Sphinx and friends at the versions locked in requirements/docs.txt, without
+# installing the Django stack that file also carries. pip constraints may not
+# carry extras, so strip the [oidc]-style suffixes first.
+COPY ./requirements/docs.txt /tmp/docs.txt
+RUN sed -E 's/\[[^]]+\]//' /tmp/docs.txt > /tmp/constraints.txt \
+  && pip install --no-cache-dir -c /tmp/constraints.txt sphinx myst-parser furo
 
 WORKDIR /docs-src
 COPY ./docs /docs-src/docs
@@ -9,18 +16,20 @@ COPY ./docs /docs-src/docs
 RUN python -m sphinx docs/ /docs-build -q
 
 
-FROM node:22-bookworm-slim AS client-builder
+FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS client-builder
 
 ARG APP_HOME=/app
 WORKDIR ${APP_HOME}
 
-COPY ./package.json ${APP_HOME}/
-RUN yarn install && yarn cache clean --force
+# npm ci installs exactly what package-lock.json records; a lockfile drift
+# fails the build instead of silently floating package versions.
+COPY ./package.json ./package-lock.json ${APP_HOME}/
+RUN npm ci --no-audit --no-fund && npm cache clean --force
 COPY ./webpack ${APP_HOME}/webpack
 COPY ./spanza_journal_watch/static ${APP_HOME}/spanza_journal_watch/static
-RUN yarn run build
+RUN npm run build
 # define an alias for the specific python version used in this file.
-FROM python:3.13-alpine3.21 AS python
+FROM python:3.13-alpine3.21@sha256:e77011e08668411a8db356ec6bae7d39cdb0ff531db49bf1de9d5a64d8f75a6a AS python
 
 # Python build stage
 FROM python AS python-build-stage

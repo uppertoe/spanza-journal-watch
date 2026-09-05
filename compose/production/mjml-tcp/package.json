@@ -1,0 +1,10 @@
+{
+  "name": "journalwatch-mjml-tcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MJML TCP rendering server for Journal Watch newsletters",
+  "license": "MIT",
+  "dependencies": {
+    "mjml": "4.14.1"
+  }
+}

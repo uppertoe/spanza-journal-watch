@@ -1,0 +1,30 @@
+# Keeps the pinned base-image digests, the npm lockfile, the pip-compiled
+# requirement files and the workflow actions moving on a schedule. Each PR is
+# small enough to review; CI must pass before any of them merge.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directories:
+      - /compose/production/django
+      - /compose/production/mjml-tcp
+      - /compose/local/django
+      - /compose/local/node
+      - /compose/local/docs
+    schedule:
+      interval: monthly
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      build-tooling:
+        patterns: ['*']
+  - package-ecosystem: pip
+    directory: /requirements
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

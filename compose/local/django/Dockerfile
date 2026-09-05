@@ -1,5 +1,5 @@
 # define an alias for the specific python version used in this file.
-FROM python:3.13-alpine3.21 AS python
+FROM python:3.13-alpine3.21@sha256:e77011e08668411a8db356ec6bae7d39cdb0ff531db49bf1de9d5a64d8f75a6a AS python
 
 # Python build stage
 FROM python AS python-build-stage

@@ -1,12 +1,65 @@
-name: Build and push Docker images
+name: Test, build and push Docker images
 
 on:
   push:
     branches: ['main']
     tags: ['v*']
+  pull_request:
+    branches: ['main']
   workflow_dispatch:
 
 jobs:
+  # Lint and the full test suite gate every image push. The job mirrors the
+  # local container: Python 3.13, Postgres 17, Redis 7, config.settings.test.
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: spanza_journal_watch
+          POSTGRES_USER: jw
+          POSTGRES_PASSWORD: jw
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jw -d spanza_journal_watch"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DATABASE_URL: postgres://jw:jw@localhost:5432/spanza_journal_watch
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      USE_DOCKER: 'no'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements/local.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements/local.txt
+
+      - name: Ruff lint and format
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Pytest
+        run: pytest -q -p no:sugar
+
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -26,7 +79,9 @@ jobs:
               - 'compose/production/mjml-tcp/**'
 
   dockerhub:
-    needs: changes
+    # Images are pushed only from main or a v* tag, and only once tests pass.
+    if: github.event_name != 'pull_request'
+    needs: [test, changes]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,6 +134,8 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ${{ steps.refs.outputs.app_tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push mjml image
         if: needs.changes.outputs.mjml == 'true' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'

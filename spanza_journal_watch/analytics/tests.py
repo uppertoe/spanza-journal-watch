@@ -613,10 +613,14 @@ def test_analytics_email_uses_event_counts_for_bot_share_and_marks_partial_site_
         automated=False,
         js_verified=True,
     )
-    rollout_ts = timezone.make_aware(datetime.datetime(2026, 2, 10, 12, 0))
+    # Dates are relative to now so the newsletter stays inside the panel's
+    # default 90-day window: sent 40 days ago, site analytics rolled out 20
+    # days ago, so the send predates the rollout and the row is marked partial.
+    now = timezone.now()
+    rollout_ts = now - timedelta(days=20)
     AnalyticsEvent.objects.filter(pk=rollout_event.pk).update(timestamp=rollout_ts)
 
-    newsletter = _make_newsletter(send_date=timezone.make_aware(datetime.datetime(2026, 1, 23, 9, 0)))
+    newsletter = _make_newsletter(send_date=now - timedelta(days=40))
     newsletter.is_sent = True
     newsletter.emails_sent = 10
     newsletter.save(update_fields=["is_sent", "emails_sent", "send_date"])

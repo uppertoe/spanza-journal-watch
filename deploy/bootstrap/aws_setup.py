@@ -321,10 +321,7 @@ def setup_s3(
         LifecycleConfiguration={"Rules": rules},
     )
     if backup_noncurrent_expiration_days and backup_noncurrent_expiration_days > 0:
-        ok(
-            "Lifecycle rules: incomplete multipart (7d) + old backup versions "
-            f"({backup_noncurrent_expiration_days}d)"
-        )
+        ok(f"Lifecycle rules: incomplete multipart (7d) + old backup versions ({backup_noncurrent_expiration_days}d)")
     else:
         ok("Lifecycle rules: incomplete multipart uploads expire after 7d")
 
@@ -604,7 +601,7 @@ def print_dns_records(ses_domain, dkim_tokens, region, reusing_identity=False):
 
     records = [
         f"  {'Type':<8}  {'Name':<50}  Value",
-        f"  {'─'*8}  {'─'*50}  {'─'*40}",
+        f"  {'─' * 8}  {'─' * 50}  {'─' * 40}",
         f"  {'TXT':<8}  {'_amazonses.' + ses_domain:<50}  (shown in SES console after identity creation)",
     ]
 
@@ -806,7 +803,7 @@ def parse_args(argv=None):
     p.add_argument(
         "--profile",
         default=None,
-        help="AWS named profile from ~/.aws/config (e.g. jw-admin). " "Omit to use the default credential chain.",
+        help="AWS named profile from ~/.aws/config (e.g. jw-admin). Omit to use the default credential chain.",
     )
     p.add_argument(
         "--webhook-secret",

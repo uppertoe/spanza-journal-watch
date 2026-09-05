@@ -1,6 +1,23 @@
-  # Journal Watch — main app
-  {$DOMAIN} {
-      handle_path /static/* {
+# Redirect www to apex
+www.{$DOMAIN} {
+    redir https://{$DOMAIN}{uri} permanent
+}
+
+# Journal Watch — main app
+# (Keep comments free of curly braces: the scaffold renderer counts braces.)
+{$DOMAIN} {
+    # Per-request JSON access logging (/var/log/caddy/access.log on the
+    # caddy_logs volume, size-capped rotation), compression and baseline
+    # security headers are injected into every site by
+    # scaffold/docker/render-caddy-routes.sh — don't redeclare them here.
+
+    # Security headers (in addition to the scaffold baseline)
+    header {
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        -Server
+    }
+
+    handle_path /static/* {
         root * /srv/static/journal-watch
 
         @immutable path_regexp immutable ^.+(?:[.-][0-9a-f]{8,64})\..+$
@@ -9,27 +26,56 @@
         header @immutable Cache-Control "public, max-age=31536000, immutable"
         header @nonimmutable Cache-Control "public, max-age=3600"
 
+        file_server {
+            precompressed br gzip
+        }
+    }
+
+    # Media — proxy to S3 so images are same-origin (one H2 connection, no
+    # per-image DNS/TLS to S3) and Cloudflare can edge-cache them. Requires
+    # DJANGO_AWS_S3_CUSTOM_DOMAIN set to the site domain in the app env, which
+    # rewrites MEDIA_URL to https://<domain>/media/. S3 object keys already
+    # start with "media/", so the request path maps 1:1 — no rewrite needed.
+    #
+    # `immutable` is the piece the S3 headers were missing: without it,
+    # Safari/Firefox revalidate every image on reload, repainting the
+    # placeholder frames while they wait (the homepage flicker).
+    handle /media/* {
+        header {
+            Cache-Control "public, max-age=604800, immutable"
+            -x-amz-server-side-encryption
+            -x-amz-version-id
+            defer
+        }
+        reverse_proxy https://spanza-journal-watch-production-v2.s3.amazonaws.com {
+            header_up Host spanza-journal-watch-production-v2.s3.amazonaws.com
+            header_up -Cookie
+        }
+    }
+
+    reverse_proxy journal-watch:5000
+}
+
+# Planka — project management
+planka.{$DOMAIN} {
+    @custom_cover path_regexp cover ^/assets/(login-)?cover-[A-Za-z0-9-]+\.jpg$
+
+    # /srv/planka is apps/journal-watch/planka, mounted read-only in docker-compose.yml
+    handle @custom_cover {
+        root * /srv/planka
+        rewrite * /cover-journalwatch.webp
         file_server
-      }
-      reverse_proxy jw_django:5000
-  }
+    }
 
-  # Planka — project management
-  planka.{$DOMAIN} {
-      @custom_cover path_regexp cover ^/assets/(login-)?cover-[A-Za-z0-9-]+\.jpg$
+    handle {
+        reverse_proxy jw_planka:1337
+    }
+}
 
-      handle @custom_cover {
-          root * /srv/repo/apps/journal-watch/planka
-          rewrite * /cover-journalwatch.webp
-          file_server
-      }
-
-      handle {
-          reverse_proxy jw_planka:1337
-      }
-  }
-
-  # Flower — Celery monitoring
-  flower.{$DOMAIN} {
-      reverse_proxy jw_flower:5555
-  }
+# Flower (Celery monitoring) is not deployed: the jw_flower service sits behind
+# the compose "flower" profile, which is not enabled, and flower.journalwatch
+# has no DNS record. An unconditional site block here made Caddy retry an ACME
+# challenge for the name every few minutes. To bring Flower back, add the DNS
+# record, enable the profile, and restore a flower.DOMAIN site block that
+# reverse-proxies to jw_flower:5555. Keep this comment free of curly braces:
+# the route renderer treats them as block delimiters.

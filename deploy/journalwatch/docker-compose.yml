@@ -1,9 +1,19 @@
 # Journal Watch — included into the server master docker-compose.yml
+#
+# Scaffold conventions (scaffold/docs/04-server-repo.md):
+#   * The web-facing service is named after this directory (journal-watch).
+#     The rendered .generated/caddy/networks.yml attaches it — and Caddy — to
+#     the private journal-watch_proxy network, so no proxy network is declared
+#     for it here. Re-render after editing routes or includes:
+#       bash scaffold/docker/render-caddy-routes.sh
+#   * Planka and Flower are further web-facing services of the same app, so
+#     they join the same generated journal-watch_proxy network explicitly.
+#   * jw_internal is this app's private backend network (Django ↔ Postgres,
+#     Redis, MJML, Planka).
+#
 # Bring up with:  docker compose --profile workers --profile planka up -d
 
 networks:
-  caddy:
-    external: true # created by scaffold/docker/caddy.base.yml
   jw_internal:
     name: jw_internal
     driver: bridge
@@ -16,54 +26,72 @@ volumes:
   jw_access_logs: {}
   jw_staticfiles: {}
 
+# Shared definition for every container built from the Django image (web,
+# Celery worker, Flower). An extension field rather than an anchor on the web
+# service itself keeps `journal-watch:` a bare key, which the scaffold renderer
+# greps for when wiring proxy networks.
+x-journal-watch-base: &journal_watch_base
+  image: ${JW_DOCKERHUB_NAMESPACE}/journalwatch-app:${JW_APP_TAG:-latest}
+  restart: unless-stopped
+  mem_reservation: 256m
+  mem_limit: 700m
+  oom_score_adj: -300
+  pids_limit: 128
+  command: /start
+  depends_on:
+    jw_postgres:
+      condition: service_healthy
+    jw_redis:
+      condition: service_healthy
+    jw_mjml:
+      condition: service_healthy
+  env_file: .env
+  environment:
+    # Docker-internal addresses — always override these here, not in .env
+    POSTGRES_HOST: jw_postgres
+    POSTGRES_PORT: "5432"
+    REDIS_URL: redis://jw_redis:6379/0
+    PLANKA_BASE_URL: http://jw_planka:1337
+    PLANKA_DB_URL: postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
+    PLANKA_CALLBACK_BASE_URL: "http://jw-django:5000"
+    AWS_ACCESS_KEY_ID: ${DJANGO_AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${DJANGO_AWS_SECRET_ACCESS_KEY}
+    AWS_DEFAULT_REGION: ${DJANGO_AWS_DEFAULT_REGION}
+  volumes:
+    - jw_access_logs:/app/access_logs
+    - jw_staticfiles:/app/staticfiles
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "python",
+        "-c",
+        "import os, urllib.request; hosts=[h.strip().lstrip('.') for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]; host=hosts[0] if hosts else 'localhost'; req=urllib.request.Request('http://127.0.0.1:5000/healthz', headers={'Host': host}); urllib.request.urlopen(req, timeout=5)",
+      ]
+    interval: 30s
+    timeout: 5s
+    retries: 5
+    start_period: 60s
+  networks:
+    jw_internal:
+      aliases:
+        - jw-django
+
 services:
+
   # ---------------------------------------------------------------------------
-  # Django (gunicorn)
+  # Django (gunicorn) — the app's web-facing service; Caddy reaches it over the
+  # generated journal-watch_proxy network as journal-watch:5000
   # ---------------------------------------------------------------------------
-  jw_django: &jw_django
-    image: ${JW_DOCKERHUB_NAMESPACE}/journalwatch-app:${JW_APP_TAG:-latest}
-    restart: unless-stopped
-    mem_reservation: 256m
-    oom_score_adj: -300
-    pids_limit: 128
-    command: /start
-    depends_on:
-      jw_postgres:
-        condition: service_healthy
-      jw_redis:
-        condition: service_healthy
-      jw_mjml:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      # Docker-internal addresses — always override these here, not in .env
-      POSTGRES_HOST: jw_postgres
-      POSTGRES_PORT: '5432'
-      REDIS_URL: redis://jw_redis:6379/0
-      PLANKA_BASE_URL: http://jw_planka:1337
-      PLANKA_DB_URL: postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
-    volumes:
-      - jw_access_logs:/app/access_logs
-      - jw_staticfiles:/app/staticfiles
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'python',
-          '-c',
-          "import urllib.request; req = urllib.request.Request('http://127.0.0.1:5000/healthz', headers={'Host': 'journalwatch.org.au'}); urllib.request.urlopen(req, timeout=5)",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    networks:
-      - caddy
-      - jw_internal
+  journal-watch:
+    <<: *journal_watch_base
 
   caddy:
     volumes:
       - jw_staticfiles:/srv/static/journal-watch:ro
+      # Planka cover artwork served by Caddy. The hardened Caddy no longer
+      # mounts the deploy repo, so expose only this asset directory.
+      - ./planka:/srv/planka:ro
 
   # ---------------------------------------------------------------------------
   # PostgreSQL (Django)
@@ -72,33 +100,41 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     command:
-      - postgres
-      - -c
-      - shared_preload_libraries=pg_stat_statements
-      - -c
-      - pg_stat_statements.track=all
-      - -c
-      - pg_stat_statements.max=10000
-      - -c
-      - track_io_timing=on
-      - -c
-      - log_min_duration_statement=250ms
+    - postgres
+    - -c
+    - shared_preload_libraries=pg_stat_statements
+    - -c
+    - pg_stat_statements.track=all
+    - -c
+    - pg_stat_statements.max=10000
+    - -c
+    - track_io_timing=on
+    - -c
+    - log_min_duration_statement=250ms
+    # Tuning for 1.9GB-RAM VPS — give PG enough cache/work_mem to avoid disk
+    # spills, but cap so it doesn't crowd out Django/Celery.
+    - -c
+    - shared_buffers=192MB
+    - -c
+    - effective_cache_size=512MB
+    - -c
+    - work_mem=8MB
+    - -c
+    - maintenance_work_mem=64MB
+    - -c
+    - max_connections=30
     oom_score_adj: -500
     pids_limit: 128
     env_file: .env
     volumes:
       - jw_postgres_data:/var/lib/postgresql/data
       - jw_postgres_backups:/backups
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres:/docker-entrypoint-initdb.d:ro
     # Exposed on loopback only so the VPS backup agent can connect from the host
     ports:
-      - '127.0.0.1:5432:5432'
+      - "127.0.0.1:5432:5432"
     healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-spanza_journal_watch}',
-        ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-spanza_journal_watch}"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -115,7 +151,7 @@ services:
     oom_score_adj: 300
     pids_limit: 64
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -132,13 +168,13 @@ services:
     mem_limit: 128m
     oom_score_adj: 400
     pids_limit: 64
-    command: ['--mjml.minify=true', '--mjml.validationLevel=strict']
+    command: ["--mjml.minify=true", "--mjml.validationLevel=strict"]
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
-          '-e',
+          "CMD",
+          "node",
+          "-e",
           "const net=require('net'); const socket=net.connect({host:'127.0.0.1',port:28101},()=>{socket.end(); process.exit(0)}); socket.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1),5000);",
         ]
       interval: 30s
@@ -151,37 +187,36 @@ services:
           - mjml
 
   # ---------------------------------------------------------------------------
-  # Celery worker + beat
+  # Celery worker + Flower
   # ---------------------------------------------------------------------------
   jw_celeryworker:
-    <<: *jw_django
-    command: /start-celeryworker
+    <<: *journal_watch_base
+    # Bound RSS growth on the 350m-limited worker: recycle the prefork child
+    # every 100 tasks (--max-tasks-per-child) so leaked memory is reclaimed.
+    # Mirrors /start-celeryworker (which just execs this) but adds the flags.
+    # Keep --beat: it runs the periodic scheduler (newsletters, analytics
+    # prune) in the main process, unaffected by child recycling. concurrency=1
+    # matches the 1-vCPU box; prefork pool (not solo) is required for
+    # --max-tasks-per-child to take effect.
+    command: celery -A config.celery_app worker --beat -l INFO --concurrency=1 --max-tasks-per-child=100
     mem_reservation: 192m
+    mem_limit: 350m
     oom_score_adj: -100
+    healthcheck:
+      disable: true
     volumes:
       - jw_access_logs:/app/access_logs
       - jw_staticfiles:/app/staticfiles
     networks:
-      - jw_internal # workers don't need caddy
-
-  jw_celerybeat:
-    <<: *jw_django
-    command: /start-celerybeat
-    mem_reservation: 64m
-    mem_limit: 128m
-    oom_score_adj: 350
-    pids_limit: 64
-    volumes:
-      - jw_access_logs:/app/access_logs
-    networks:
-      - jw_internal
+      - jw_internal   # workers don't need caddy
 
   jw_flower:
-    <<: *jw_django
+    <<: *journal_watch_base
     command: /start-flower
     mem_reservation: 96m
     mem_limit: 192m
     oom_score_adj: 200
+    profiles: ['flower']
     pids_limit: 64
     volumes:
       - jw_access_logs:/app/access_logs
@@ -198,14 +233,16 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - caddy
+      - journal-watch_proxy   # generated in .generated/caddy/networks.yml
       - jw_internal
 
   # ---------------------------------------------------------------------------
   # Planka (profile: planka)
   # ---------------------------------------------------------------------------
   jw_planka:
-    image: ghcr.io/plankanban/planka:2.1.0
+    # PINNED BY DIGEST — newer Planka releases break the OIDC login flow. Do not
+    # bump without re-testing SSO against Django (see docs/07 in the app repo).
+    image: ghcr.io/plankanban/planka:2.1.0@sha256:32c919d9e65b0479d1bbf0e4fb8e00fb11403a5234242b9f5fc900e595c2e2ce
     restart: unless-stopped
     mem_limit: 256m
     oom_score_adj: 250
@@ -223,15 +260,15 @@ services:
       S3_ACCESS_KEY_ID: ${PLANKA_S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${PLANKA_S3_SECRET_ACCESS_KEY}
       S3_BUCKET: ${PLANKA_S3_BUCKET}
-      S3_FORCE_PATH_STYLE: 'false'
+      S3_FORCE_PATH_STYLE: "false"
     volumes:
       - ./planka/custom:/app/terms/custom:ro
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
-          '-e',
+          "CMD",
+          "node",
+          "-e",
           "const http=require('http'); const req=http.get('http://127.0.0.1:1337/', (res)=>{process.exit(res.statusCode === 200 ? 0 : 1)}); req.on('error',()=>process.exit(1)); req.setTimeout(5000,()=>{req.destroy(); process.exit(1)});",
         ]
       interval: 30s
@@ -239,7 +276,7 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - caddy
+      - journal-watch_proxy   # generated in .generated/caddy/networks.yml
       - jw_internal
 
   # ---------------------------------------------------------------------------
@@ -257,15 +294,12 @@ services:
       - jw_planka_postgres_data:/var/lib/postgresql/data
     # Port 5433 avoids conflict with Django postgres on 5432
     ports:
-      - '127.0.0.1:5433:5432'
+      - "127.0.0.1:5433:5432"
     healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'PGPASSWORD=$${POSTGRES_PASSWORD} pg_isready -U postgres -d planka',
-        ]
+      test: ["CMD-SHELL", "PGPASSWORD=$${POSTGRES_PASSWORD} pg_isready -U postgres -d planka"]
       interval: 30s
       timeout: 5s
       retries: 5
     networks:
       - jw_internal
+

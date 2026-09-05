@@ -31,10 +31,10 @@ The server repo follows the hardened-Caddy scaffold
 owns the Caddy base service, the Ansible hardening roles and the backup
 tooling; the server repo owns `apps/journal-watch/`.
 
-> **The files under `deploy/journalwatch/` in this application repo are a
-> stale mirror** of an earlier server layout. They are not what production
-> runs. Treat `apps/journal-watch/` in the server repo as the only source of
-> truth for compose, Caddy and `.env.example`.
+> The files under `deploy/journalwatch/` in this application repo are a
+> **synced copy** of `apps/journal-watch/` (last synced 2026-09-05). The
+> server repo remains the runtime source of truth: make the change there,
+> then copy it back so the two stay identical.
 
 ---
 
@@ -95,9 +95,9 @@ No build happens on the server and no manual `migrate` or `collectstatic` is
 needed.
 
 1. Merge or push to `main` in this repo. The GitHub Actions workflow
-   `.github/workflows/dockerhub-images.yml` builds
-   `uppertoe/journalwatch-app` and pushes it tagged `latest` and
-   `sha-<7-char commit>`. The MJML image is rebuilt only when
+   `.github/workflows/dockerhub-images.yml` first runs ruff and the full
+   test suite; only when they pass does it build `uppertoe/journalwatch-app`
+   and push it tagged `latest` and `sha-<7-char commit>`. The MJML image is rebuilt only when
    `compose/production/mjml-tcp/**` changes, on a `v*` tag, or on a manual
    `workflow_dispatch`. A `v*` tag produces `<version>` tags instead of
    `latest`.

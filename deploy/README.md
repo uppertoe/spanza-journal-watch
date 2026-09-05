@@ -3,8 +3,10 @@
 This repository contains two kinds of non-application files:
 
 - `deploy/journalwatch/`
-  App-specific files that are copied into `apps/journalwatch/` in the
-  `server-instance-template` server repo.
+  A synced copy of `apps/journal-watch/` in the `journal-watch-vps` server
+  repo (the runtime source of truth). Last synced from the server on
+  2026-09-05. When a change here is needed in production, apply it in the
+  server repo and copy it back so the two stay identical.
 - `deploy/bootstrap/`
   One-off or occasional helper tools run from a local machine when creating or
   updating an environment.
@@ -14,22 +16,27 @@ This repository contains two kinds of non-application files:
 `deploy/journalwatch/`
 
 - `docker-compose.yml`
-  Use when wiring Journal Watch into the server repo under `apps/journalwatch/`.
+  The app's services, pulled into the server's root compose file through
+  `include:`. The Celery worker runs the beat scheduler in-process; there is
+  no separate beat service, and Flower sits behind the unused `flower` profile.
+- `deploy.sh`
+  The per-app hook `~/deploy` runs on the host: starts Postgres, then runs
+  `migrate` and `collectstatic` in a throw-away app container.
 - `postgres/init/`
-  Use to bootstrap Postgres query observability such as `pg_stat_statements`
-  on fresh databases.
+  Bootstraps Postgres query observability such as `pg_stat_statements` on
+  fresh databases.
 - `journalwatch.caddy`
-  Use when exposing the app through the server repo's Caddy setup.
+  The app's Caddy site blocks (static files, `/media/*` proxy to S3, Planka).
 - `.env.example`
-  Use as the per-app env template in the server repo.
-- `planka/custom/`
-  Use for the Planka terms pages mounted into the Planka container.
+  The per-app env template; `bootstrap/gen-env.sh` writes a populated copy.
+- `planka/`
+  The Planka terms pages and the login cover image mounted into the containers.
 
 `deploy/bootstrap/`
 
 - `gen-env.sh`
   Use to generate a starting `.env` locally for a new Journal Watch
-  environment.
+  environment; it emits the same variable set the server compose file reads.
 - `aws_setup.py`
   Use to provision the Journal Watch AWS resources from a local machine with
   AWS admin credentials.

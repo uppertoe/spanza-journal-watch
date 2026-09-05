@@ -39,28 +39,48 @@ A web application for the [Society of Paediatric Anaesthesia in New Zealand and 
 
 ## Deployment
 
-Production uses pre-built Docker Hub images — no build step is required on the server.
+Production runs pre-built Docker Hub images on a single VPS behind the
+hardened-Caddy scaffold. Nothing is built on the server.
 
-| Image                                 | Purpose                          |
-| ------------------------------------- | -------------------------------- |
-| `{namespace}/journalwatch-app:{tag}`  | Django app + Celery workers      |
-| `{namespace}/journalwatch-mjml:{tag}` | MJML TCP rendering server        |
-| `ghcr.io/plankanban/planka:2.1.0`     | Planka kanban (optional profile) |
-| `postgres:17-alpine`                  | Django database                  |
-| `postgres:16-alpine`                  | Planka database                  |
-| `redis:7-alpine`                      | Celery broker                    |
+| Image                                 | Purpose                                   |
+| ------------------------------------- | ----------------------------------------- |
+| `{namespace}/journalwatch-app:{tag}`  | Django under gunicorn, Celery worker      |
+| `{namespace}/journalwatch-mjml:{tag}` | MJML TCP rendering server                 |
+| `ghcr.io/plankanban/planka:2.1.0`     | Planka kanban (digest-pinned; SSO tested) |
+| `postgres:17-alpine`                  | Django database                           |
+| `postgres:16-alpine`                  | Planka database                           |
+| `redis:7-alpine`                      | Celery broker, Django cache and sessions  |
 
-| Profile   | Services added                     |
-| --------- | ---------------------------------- |
-| _(none)_  | Django, Postgres, Redis, MJML      |
-| `workers` | Celery worker, Celery beat, Flower |
-| `planka`  | Planka, Planka Postgres            |
+Every push to `main` runs lint and the full test suite in GitHub Actions and,
+only if they pass, builds both images and pushes them tagged `latest` and
+`sha-<commit>`. A `v*` tag produces a versioned image instead. Base images and
+the npm dependency trees are pinned, so a given commit always builds the same
+image; Dependabot proposes the bumps.
+
+The server repo (`journal-watch-vps`) is the runtime source of truth. The
+files under [deploy/journalwatch](deploy/journalwatch) are a synced copy of its
+`apps/journal-watch/` directory, kept here so application changes that need a
+compose, Caddy or env change can be reviewed alongside them.
 
 See **[docs/operations/production-deploy.md](docs/operations/production-deploy.md)** for the complete step-by-step deployment guide.
 
-App-specific server export files live in [deploy/journalwatch](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/deploy/journalwatch), ready to be copied into `apps/journalwatch/` inside the `server-instance-template` repo. One-off bootstrap helpers live in [deploy/bootstrap](/Users/eamonnupperton/Documents/developer/spanza_journal_watch/deploy/bootstrap).
+App-specific server export files live in [deploy/journalwatch](deploy/journalwatch). One-off bootstrap helpers live in [deploy/bootstrap](deploy/bootstrap).
 
 ---
+
+## Code layout
+
+Django apps live under `spanza_journal_watch/`: `submissions` (reviews, issues,
+tags, the journal browser), `layout` (homepage, feeds, sitemaps), `newsletter`,
+`analytics`, `cpd`, `events`, `users` and `backend`. Views are packages with one
+module per page or workflow area and an `__init__.py` that re-exports every
+view for the URL configuration: `submissions/views/` (reviews, issues, topics,
+search, contributors, journal browser), `backend/views/` (intake, issue pages,
+contributors, Planka, newsletter release, headlines, settings and so on) and
+`backend/analytics_views/` (one module per analytics panel plus shared
+helpers). A new view goes in its module and in that package's import block.
+Styles are Sass partials under `static/sass/project/`, imported in order by
+`project.scss`.
 
 ## Local development
 
