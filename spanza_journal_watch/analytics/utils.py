@@ -1,4 +1,5 @@
 import datetime
+import re
 from datetime import timedelta
 from urllib.parse import urlparse
 
@@ -94,6 +95,14 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "applebot",
     # Miscellaneous crawlers observed in prod analytics
     "leads-enricher",
+    # Google's non-search fetchers (GoogleOther, Google-InspectionTool, ...)
+    # carry no "bot" token, so the generic marker above misses them.
+    "googleother",
+    "google-inspectiontool",
+    "google-safety",
+    "google-site-verification",
+    # Baidu's rendering fetcher: a 2016 Nexus 5 emulator UA ending in "T7/x.y".
+    "t7/",
 ]
 
 NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=60)
@@ -102,6 +111,94 @@ NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=60)
 # sec-fetch-* headers. Missing those headers on these events strongly implies a
 # non-browser client that still got through the UA markers.
 _SEC_FETCH_STRICT_EVENT_TYPES = frozenset({"search"})
+
+# Chromium has sent the low-entropy client hints (sec-ch-ua, sec-ch-ua-mobile,
+# sec-ch-ua-platform) on every request, beacons included, since version 89.
+CLIENT_HINTS_MIN_CHROMIUM_MAJOR = 89
+
+_CHROMIUM_MAJOR_RE = re.compile(r"(?<![a-z])chrome/(\d+)")
+_SEC_CH_UA_VERSION_RE = re.compile(r'v="(\d+)')
+_IOS_MAJOR_RE = re.compile(r"(?:iphone|cpu) os (\d+)_")
+
+# Platform token in sec-ch-ua-platform -> the substring a matching UA string carries.
+_CLIENT_HINT_PLATFORM_MARKERS = {
+    "windows": ("windows nt",),
+    "macos": ("macintosh",),
+    "android": ("android",),
+    "chrome os": ("cros",),
+    "chromium os": ("cros",),
+    "linux": ("linux",),
+}
+
+# Chrome 100 shipped on 2022-03-29 and a new major has followed every four weeks
+# since. The estimate runs a little ahead of reality, which only makes the
+# stale-browser check more lenient.
+_CHROMIUM_ANCHOR_MAJOR = 100
+_CHROMIUM_ANCHOR_DATE = datetime.date(2022, 3, 29)
+_CHROMIUM_RELEASE_CADENCE_DAYS = 28
+# Majors behind the estimated current release before a Chromium UA counts as
+# stale. Thirty majors is roughly two and a half years; real installs that old
+# are rare, and interactors are protected by the sweeper regardless.
+STALE_CHROMIUM_MAJORS_BEHIND = 30
+# iOS releases before this are no longer able to run a current Safari or Chrome.
+STALE_IOS_MAJOR_BEFORE = 15
+
+
+def chromium_major(user_agent):
+    """Return the Chrome/NNN major from a lower-cased UA, or None."""
+    match = _CHROMIUM_MAJOR_RE.search(user_agent)
+    return int(match.group(1)) if match else None
+
+
+def client_hints_anomaly(request):
+    """Return a reason token when a Chromium UA and its client hints disagree.
+
+    Every Chromium build since 89 sends sec-ch-ua and sec-ch-ua-platform with
+    every request. A UA string claiming such a build without the headers, or
+    with a hinted major or platform that contradicts the string, was typed in
+    by a script rather than produced by a browser. Firefox and Safari (CriOS
+    included) never send the hints and never claim "Chrome/", so they are out
+    of scope.
+    """
+    user_agent = (request.headers.get("user-agent") or "").lower()
+    major = chromium_major(user_agent)
+    if major is None or major < CLIENT_HINTS_MIN_CHROMIUM_MAJOR:
+        return None
+
+    sec_ch_ua = request.headers.get("sec-ch-ua") or ""
+    if not sec_ch_ua:
+        return "client_hints_missing"
+    hinted_majors = {int(v) for v in _SEC_CH_UA_VERSION_RE.findall(sec_ch_ua)}
+    if hinted_majors and major not in hinted_majors:
+        return "client_hints_mismatch"
+
+    platform = (request.headers.get("sec-ch-ua-platform") or "").strip('"').lower()
+    markers = _CLIENT_HINT_PLATFORM_MARKERS.get(platform)
+    if markers and not any(marker in user_agent for marker in markers):
+        return "client_hints_mismatch"
+    return None
+
+
+def client_hints_enforced():
+    return bool(getattr(settings, "ANALYTICS_ENFORCE_CLIENT_HINTS", False))
+
+
+def expected_chromium_major(today=None):
+    today = today or timezone.localdate()
+    elapsed = (today - _CHROMIUM_ANCHOR_DATE).days
+    return _CHROMIUM_ANCHOR_MAJOR + max(0, elapsed) // _CHROMIUM_RELEASE_CADENCE_DAYS
+
+
+def stale_browser_reason(user_agent, today=None):
+    """Return a token when a UA claims a browser too old to be in real use."""
+    user_agent = (user_agent or "").lower()
+    major = chromium_major(user_agent)
+    if major is not None and major < expected_chromium_major(today) - STALE_CHROMIUM_MAJORS_BEHIND:
+        return "stale_chromium"
+    ios = _IOS_MAJOR_RE.search(user_agent)
+    if ios and int(ios.group(1)) < STALE_IOS_MAJOR_BEFORE:
+        return "stale_ios"
+    return None
 
 
 def _automated_ua_markers():
@@ -132,6 +229,10 @@ def classify_automated_reason(request, event_type=None):
     # fabricate a "Chrome/NNN.0.0.0" stub — catch the mismatch.
     if "chrome/" in user_agent and "applewebkit/" not in user_agent:
         return "chrome_fabrication"
+    if client_hints_enforced():
+        anomaly = client_hints_anomaly(request)
+        if anomaly is not None:
+            return anomaly
 
     # Common prefetch/scanner headers
     if (request.headers.get("purpose") or "").lower() in {"prefetch", "preview"}:

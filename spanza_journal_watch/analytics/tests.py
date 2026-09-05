@@ -1670,7 +1670,7 @@ def test_ua_cohort_below_threshold_not_swept():
 
     result = downgrade_ua_cohort_visitors_task(min_cohort_size=3)
 
-    assert result == {"downgraded": 0, "cohorts": 0, "dry_run": False}
+    assert result == {"downgraded": 0, "cohorts": 0, "shape_cohorts": 0, "dry_run": False}
     for e in survivors:
         e.refresh_from_db()
         assert e.automated is False
@@ -1846,3 +1846,314 @@ def test_non_page_load_events_are_not_path_filtered(client):
         {"source": "scroll_depth", "scroll_depth": 30, "metadata": {"page": "home"}},
     )
     assert AnalyticsEvent.objects.count() == 1
+
+
+# ---- Client hints (observation mode by default) ----
+
+_CHROME_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
+)
+_CHROME_HINTS = {
+    "HTTP_SEC_CH_UA": '"Chromium";v="151", "Google Chrome";v="151", "Not-A.Brand";v="24"',
+    "HTTP_SEC_CH_UA_MOBILE": "?0",
+    "HTTP_SEC_CH_UA_PLATFORM": '"Windows"',
+}
+
+
+def test_client_hints_missing_on_chromium_ua(rf):
+    from spanza_journal_watch.analytics.utils import client_hints_anomaly
+
+    assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=_CHROME_UA)) == "client_hints_missing"
+
+
+def test_client_hints_consistent_is_not_an_anomaly(rf):
+    from spanza_journal_watch.analytics.utils import client_hints_anomaly
+
+    assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=_CHROME_UA, **_CHROME_HINTS)) is None
+
+
+def test_client_hints_major_mismatch(rf):
+    from spanza_journal_watch.analytics.utils import client_hints_anomaly
+
+    stale = _CHROME_UA.replace("Chrome/151", "Chrome/108")
+    assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=stale, **_CHROME_HINTS)) == "client_hints_mismatch"
+
+
+def test_client_hints_platform_mismatch(rf):
+    from spanza_journal_watch.analytics.utils import client_hints_anomaly
+
+    hints = {**_CHROME_HINTS, "HTTP_SEC_CH_UA_PLATFORM": '"macOS"'}
+    assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=_CHROME_UA, **hints)) == "client_hints_mismatch"
+
+
+def test_client_hints_edge_and_samsung_brands_match_chromium_major(rf):
+    from spanza_journal_watch.analytics.utils import client_hints_anomaly
+
+    edge_ua = _CHROME_UA + " Edg/151.0.0.0"
+    edge_hints = {**_CHROME_HINTS, "HTTP_SEC_CH_UA": '"Microsoft Edge";v="151", "Chromium";v="151"'}
+    assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=edge_ua, **edge_hints)) is None
+    samsung_ua = (
+        "Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "SamsungBrowser/27.0 Chrome/125.0.0.0 Mobile Safari/537.36"
+    )
+    samsung_hints = {
+        "HTTP_SEC_CH_UA": '"Samsung Internet";v="27.0", "Chromium";v="125"',
+        "HTTP_SEC_CH_UA_PLATFORM": '"Android"',
+    }
+    assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=samsung_ua, **samsung_hints)) is None
+
+
+def test_client_hints_ignored_for_non_chromium_and_pre_hint_chrome(rf):
+    from spanza_journal_watch.analytics.utils import client_hints_anomaly
+
+    firefox = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:155.0) Gecko/20100101 Firefox/155.0"
+    safari_ios_chrome = (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        "CriOS/151.0.0.0 Mobile/15E148 Safari/604.1"
+    )
+    old_chrome = _CHROME_UA.replace("Chrome/151", "Chrome/88")
+    for ua in (firefox, safari_ios_chrome, old_chrome):
+        assert client_hints_anomaly(rf.get("/", HTTP_USER_AGENT=ua)) is None
+
+
+def _with_session(request):
+    from django.contrib.sessions.backends.db import SessionStore
+
+    request.session = SessionStore()
+    return request
+
+
+def test_client_hints_observation_mode_keeps_row_and_tags_it(rf):
+    request = _with_session(rf.get("/", HTTP_USER_AGENT=_CHROME_UA))
+    event = AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT, request=request)
+    assert event is not None
+    assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
+    assert event.metadata["client_hints"] == "missing"
+    counter = AutomatedRequestCount.objects.get(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT, reason="observe_client_hints_missing"
+    )
+    assert counter.count == 1
+    # A consistent browser leaves no tag and no counter.
+    good_request = _with_session(rf.get("/", HTTP_USER_AGENT=_CHROME_UA, **_CHROME_HINTS))
+    good = AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT, request=good_request)
+    assert "client_hints" not in good.metadata
+    assert AutomatedRequestCount.objects.count() == 1
+
+
+def test_client_hints_enforced_drops_row(rf, settings):
+    settings.ANALYTICS_ENFORCE_CLIENT_HINTS = True
+    request = rf.get("/", HTTP_USER_AGENT=_CHROME_UA)
+    assert classify_automated_reason(request) == "client_hints_missing"
+    assert AnalyticsEvent.record_event(event_type=AnalyticsEvent.EventType.PAGE_VISIT, request=request) is None
+    assert AnalyticsEvent.objects.count() == 0
+    assert AutomatedRequestCount.objects.get(reason="client_hints_missing").count == 1
+
+
+def test_google_fetchers_and_baidu_render_ua_are_automated(rf):
+    google_other = (
+        "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GoogleOther) "
+        "Chrome/151.0.7922.173 Safari/537.36"
+    )
+    inspection = "Mozilla/5.0 (compatible; Google-InspectionTool/1.0;)"
+    baidu = (
+        "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/99.0.4844.51 Mobile Safari/537.36 T7/6.3"
+    )
+    for ua in (google_other, inspection, baidu):
+        assert classify_automated_reason(rf.get("/", HTTP_USER_AGENT=ua)) == "ua_marker", ua
+
+
+# ---- Stale browsers ----
+
+
+def test_expected_chromium_major_tracks_the_calendar():
+    from spanza_journal_watch.analytics.utils import expected_chromium_major
+
+    assert expected_chromium_major(datetime.date(2022, 3, 29)) == 100
+    assert expected_chromium_major(datetime.date(2022, 4, 26)) == 101
+    assert expected_chromium_major(datetime.date(2026, 9, 5)) == 157
+    assert expected_chromium_major(datetime.date(2020, 1, 1)) == 100
+
+
+def test_stale_browser_reason():
+    from spanza_journal_watch.analytics.utils import stale_browser_reason
+
+    today = datetime.date(2026, 9, 5)  # estimated current major 157, stale below 127
+    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/108"), today) == "stale_chromium"
+    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/126"), today) == "stale_chromium"
+    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/127"), today) is None
+    assert stale_browser_reason(_CHROME_UA, today) is None
+    old_iphone = (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        "Version/13.0.3 Mobile/15E148 Safari/604.1"
+    )
+    assert stale_browser_reason(old_iphone, today) == "stale_ios"
+    assert stale_browser_reason(old_iphone.replace("OS 13_2_3", "OS 18_7"), today) is None
+    firefox = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:155.0) Gecko/20100101 Firefox/155.0"
+    assert stale_browser_reason(firefox, today) is None
+    assert stale_browser_reason("", today) is None
+
+
+def test_stale_browser_sweeper_downgrades_and_protects_interactors():
+    from spanza_journal_watch.analytics.tasks import downgrade_stale_browser_visitors_task
+
+    stale_ua = _CHROME_UA.replace("Chrome/151", "Chrome/108")
+    fleet = [_cohort_visitor(stale_ua) for _ in range(2)]
+    current = _cohort_visitor(_CHROME_UA)
+    clicker = _cohort_visitor(stale_ua, event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK)
+    newsletter = _cohort_visitor(stale_ua, referrer_category="newsletter")
+
+    result = downgrade_stale_browser_visitors_task()
+
+    assert result["downgraded"] == 2
+    assert result["user_agents"] == 1
+    for e in fleet:
+        e.refresh_from_db()
+        assert e.automated is True
+    for e in (current, clicker, newsletter):
+        e.refresh_from_db()
+        assert e.automated is False
+    assert AutomatedRequestCount.objects.get(reason="downgrade_stale_browser").count == 2
+
+
+def test_stale_browser_sweeper_dry_run_and_no_op():
+    from spanza_journal_watch.analytics.tasks import downgrade_stale_browser_visitors_task
+
+    assert downgrade_stale_browser_visitors_task() == {"downgraded": 0, "user_agents": 0, "dry_run": False}
+    event = _cohort_visitor(_CHROME_UA.replace("Chrome/151", "Chrome/108"))
+    result = downgrade_stale_browser_visitors_task(dry_run=True)
+    assert result["would_downgrade"] == 1
+    event.refresh_from_db()
+    assert event.automated is False
+
+
+# ---- JS-verified singleton sweeper ----
+
+
+def _js_singleton(referrer_category="direct", *, js_verified=True, subscriber=None, age_hours=48):
+    event = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=uuid.uuid4(),
+        user_agent=_CHROME_UA,
+        referrer_category=referrer_category,
+        subscriber=subscriber,
+        js_verified=js_verified,
+    )
+    _backdate(event, hours=age_hours)
+    return event
+
+
+def test_js_singleton_sweeper_downgrades_direct_one_event_visitor():
+    from spanza_journal_watch.analytics.tasks import downgrade_js_singleton_visitors_task
+
+    swept = _js_singleton()
+    legacy_blank = _js_singleton(referrer_category="")
+    result = downgrade_js_singleton_visitors_task()
+
+    assert result == {"downgraded": 2, "dry_run": False}
+    for e in (swept, legacy_blank):
+        e.refresh_from_db()
+        assert e.human_confidence == AnalyticsEvent.HumanConfidence.SUSPECTED_AUTOMATED
+
+
+def test_js_singleton_sweeper_exemptions():
+    from spanza_journal_watch.analytics.tasks import downgrade_js_singleton_visitors_task
+
+    subscriber = Subscriber.objects.create(email="reader@example.com")
+    kept = [
+        _js_singleton("search"),
+        _js_singleton("newsletter"),
+        _js_singleton("internal"),
+        _js_singleton(subscriber=subscriber),
+        _js_singleton(age_hours=1),  # still inside the day's grace
+        _js_singleton(js_verified=False),  # the no-JS sweeper's job
+    ]
+    returning = _js_singleton()
+    second = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+        automated=False,
+        visitor_id=returning.visitor_id,
+        js_verified=True,
+    )
+    _backdate(second, hours=47)
+
+    result = downgrade_js_singleton_visitors_task()
+
+    assert result == {"downgraded": 0, "dry_run": False}
+    for e in [*kept, returning]:
+        e.refresh_from_db()
+        assert e.automated is False
+
+
+# ---- UA-cohort shape rule ----
+
+
+def _shape_fleet(ua, size):
+    return [_cohort_visitor(ua) for _ in range(size)]
+
+
+def test_ua_cohort_shape_rule_sweeps_small_rotating_cohort():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    ua_a = _FLEET_UA.replace("Chrome/142", "Chrome/108")
+    ua_b = _FLEET_UA.replace("Chrome/142", "Chrome/112")
+    fleet = _shape_fleet(ua_a, 4) + _shape_fleet(ua_b, 4)
+
+    result = downgrade_ua_cohort_visitors_task(min_cohort_size=25, shape_cohort_size=4)
+
+    assert result["downgraded"] == 8
+    assert result["cohorts"] == 2
+    assert result["shape_cohorts"] == 2
+    for e in fleet:
+        e.refresh_from_db()
+        assert e.automated is True
+
+
+def test_ua_cohort_shape_rule_spares_cohorts_with_human_signals():
+    from spanza_journal_watch.analytics.tasks import downgrade_ua_cohort_visitors_task
+
+    # A returning visitor breaks the shape.
+    returner_ua = _FLEET_UA.replace("Chrome/142", "Chrome/150")
+    returners = _shape_fleet(returner_ua, 4)
+    again = AnalyticsEvent.objects.create(
+        event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+        automated=False,
+        visitor_id=returners[0].visitor_id,
+        user_agent=returner_ua,
+        js_verified=True,
+    )
+    _backdate(again, hours=60)
+    # A search-engine arrival breaks the shape.
+    search_ua = _FLEET_UA.replace("Chrome/142", "Chrome/149")
+    searchers = _shape_fleet(search_ua, 3) + [_cohort_visitor(search_ua, referrer_category="search")]
+    # Too many multi-event visitors breaks the shape.
+    busy_ua = _FLEET_UA.replace("Chrome/142", "Chrome/148")
+    busy = _shape_fleet(busy_ua, 4)
+    for visitor in busy[:2]:
+        extra = AnalyticsEvent.objects.create(
+            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+            automated=False,
+            visitor_id=visitor.visitor_id,
+            user_agent=busy_ua,
+            js_verified=True,
+        )
+        _backdate(extra, hours=24)
+    # Below the shape threshold is never considered.
+    tiny = _shape_fleet(_FLEET_UA.replace("Chrome/142", "Chrome/147"), 3)
+
+    result = downgrade_ua_cohort_visitors_task(min_cohort_size=25, shape_cohort_size=4)
+
+    assert result == {"downgraded": 0, "cohorts": 0, "shape_cohorts": 0, "dry_run": False}
+    for e in [*returners, *searchers, *busy, *tiny]:
+        e.refresh_from_db()
+        assert e.automated is False
+
+
+def test_overview_filtered_count_excludes_observation_reasons():
+    AutomatedRequestCount.bump(AnalyticsEvent.EventType.PAGE_VISIT, reason="ua_marker", by=5)
+    AutomatedRequestCount.bump(AnalyticsEvent.EventType.PAGE_VISIT, reason="observe_client_hints_missing", by=7)
+    from django.db.models import Sum
+
+    filtered = AutomatedRequestCount.objects.exclude(reason__startswith="observe_").aggregate(t=Sum("count"))["t"]
+    assert filtered == 5

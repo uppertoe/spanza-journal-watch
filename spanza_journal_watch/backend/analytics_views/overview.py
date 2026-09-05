@@ -200,10 +200,11 @@ def analytics_overview(request):
         date__gte=start_ts.date(),
         date__lte=end_ts.date(),
     )
-    automated_count = automated_counter_qs.aggregate(total=Coalesce(Sum("count"), 0))["total"]
-    automated_breakdown = list(
-        automated_counter_qs.values("event_type").annotate(total=Sum("count")).order_by("-total")
-    )
+    # "observe_*" reasons are rules running in observation mode: the rows they
+    # flag are still stored as human, so they must not be counted as filtered.
+    filtered_qs = automated_counter_qs.exclude(reason__startswith="observe_")
+    automated_count = filtered_qs.aggregate(total=Coalesce(Sum("count"), 0))["total"]
+    automated_breakdown = list(filtered_qs.values("event_type").annotate(total=Sum("count")).order_by("-total"))
     automated_reason_breakdown = list(
         automated_counter_qs.values("reason").annotate(total=Sum("count")).order_by("-total")
     )

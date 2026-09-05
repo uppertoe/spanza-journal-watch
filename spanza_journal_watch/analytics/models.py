@@ -13,6 +13,8 @@ from spanza_journal_watch.analytics.utils import (
     categorize_referrer,
     classify_automated_reason,
     classify_event_confidence,
+    client_hints_anomaly,
+    client_hints_enforced,
     extract_referrer_domain,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
@@ -55,7 +57,7 @@ class NewsletterOpen(models.Model):
     automated = models.BooleanField(default=False)
     human_confidence = models.CharField(
         max_length=32,
-        choices=HumanConfidence.choices,
+        choices=HumanConfidence,
         default=HumanConfidence.PROBABLE_HUMAN,
     )
 
@@ -81,7 +83,7 @@ class NewsletterClick(models.Model):
     automated = models.BooleanField(default=False)
     human_confidence = models.CharField(
         max_length=32,
-        choices=HumanConfidence.choices,
+        choices=HumanConfidence,
         default=HumanConfidence.PROBABLE_HUMAN,
     )
     destination_url = models.URLField(max_length=512, blank=True, default="")
@@ -145,7 +147,7 @@ class AnalyticsEvent(models.Model):
     session_key = models.CharField(max_length=64, blank=True, default="")
     human_confidence = models.CharField(
         max_length=32,
-        choices=HumanConfidence.choices,
+        choices=HumanConfidence,
         default=HumanConfidence.PROBABLE_HUMAN,
     )
     visitor_id = models.UUIDField(null=True, blank=True, db_index=True)
@@ -203,6 +205,14 @@ class AnalyticsEvent(models.Model):
             if automated_reason is not None:
                 AutomatedRequestCount.bump(event_type, reason=automated_reason)
                 return None
+            if not client_hints_enforced():
+                # Observation mode: count and tag client-hint anomalies without
+                # dropping the row, so the rule can be judged against real
+                # traffic before ANALYTICS_ENFORCE_CLIENT_HINTS is switched on.
+                anomaly = client_hints_anomaly(request)
+                if anomaly is not None:
+                    AutomatedRequestCount.bump(event_type, reason=f"observe_{anomaly}")
+                    metadata = {**(metadata or {}), "client_hints": anomaly.removeprefix("client_hints_")}
             user_agent = request.headers.get("user-agent", "")
             session_key = request.session.session_key or ""
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
