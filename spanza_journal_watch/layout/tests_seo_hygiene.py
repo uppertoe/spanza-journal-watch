@@ -25,7 +25,8 @@ def _review(title, author=None, active=True, tags=()):
 
 class TestSitemapMatchesTheSite:
     def test_only_curated_topics_with_live_reviews(self):
-        curated_used = Tag.objects.create(text="airway", curated=True, active=True)
+        # "airway" is also created by the curated-tags data migration on a fresh database.
+        curated_used, _ = Tag.objects.update_or_create(text="airway", defaults={"curated": True, "active": True})
         curated_empty = Tag.objects.create(text="empty", curated=True, active=True)
         uncurated_used = Tag.objects.create(text="misc", curated=False, active=True)
         _review("Airway paper", tags=[curated_used, uncurated_used])
