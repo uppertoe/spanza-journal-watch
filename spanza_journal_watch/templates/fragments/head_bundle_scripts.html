@@ -1,0 +1,8 @@
+{% load static %}{% load render_bundle from webpack_loader %}{# Deferred site scripts: theme switcher, vendor bundle, project bundle. #}
+      <script defer src="{% static 'js/color-modes.js' %}"></script>
+
+      <!-- Vendor dependencies bundled as one file -->
+      {% render_bundle 'vendors' 'js' attrs='defer' %}
+
+      <!-- place project specific Javascript in this file -->
+      {% render_bundle 'project' 'js' attrs='defer' %}

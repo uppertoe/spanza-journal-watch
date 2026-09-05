@@ -305,3 +305,6 @@ new_har
 tmp_prod_login_check.js
 tmp_har
 tests/regression/browser/
+
+# Rendered copies left beside regression snapshots on a mismatch
+tests/regression/snapshots/*.actual.html

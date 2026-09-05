@@ -69,7 +69,7 @@ class TestSendTestNewsletter:
         client, user = _make_newsletter_manager()
         newsletter = _make_newsletter()
 
-        with patch("spanza_journal_watch.backend.views.send_newsletter_test_email") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter_test_email") as mock_task:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_test_newsletter",
@@ -87,7 +87,7 @@ class TestSendTestNewsletter:
         client, user = _make_newsletter_manager()
         newsletter = _make_newsletter()
 
-        with patch("spanza_journal_watch.backend.views.send_newsletter_test_email") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter_test_email") as mock_task:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_test_newsletter",
@@ -139,12 +139,15 @@ class TestSendNewsletterTestEmailTask:
 
         assert newsletter.is_test_sent is False
 
-        with patch(
-            "spanza_journal_watch.newsletter.models.Newsletter.generate_html_content",
-            return_value="<html>Test newsletter</html>",
-        ), patch(
-            "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
-            return_value="Test newsletter",
+        with (
+            patch(
+                "spanza_journal_watch.newsletter.models.Newsletter.generate_html_content",
+                return_value="<html>Test newsletter</html>",
+            ),
+            patch(
+                "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
+                return_value="Test newsletter",
+            ),
         ):
             send_newsletter_test_email(newsletter.pk, "recipient@example.com")
 
@@ -156,12 +159,15 @@ class TestSendNewsletterTestEmailTask:
 
         newsletter = _make_newsletter()
 
-        with patch(
-            "spanza_journal_watch.newsletter.models.Newsletter.generate_html_content",
-            return_value="<html>Test newsletter</html>",
-        ), patch(
-            "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
-            return_value="Test newsletter",
+        with (
+            patch(
+                "spanza_journal_watch.newsletter.models.Newsletter.generate_html_content",
+                return_value="<html>Test newsletter</html>",
+            ),
+            patch(
+                "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
+                return_value="Test newsletter",
+            ),
         ):
             send_newsletter_test_email(newsletter.pk, "test.recipient@example.com")
 
@@ -176,9 +182,10 @@ class TestSendNewsletterTask:
         newsletter.save()
         Subscriber.objects.create(email="sub@example.com", subscribed=True)
 
-        with patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch") as mock_batch, patch(
-            "spanza_journal_watch.newsletter.tasks.send_newsletter_stats"
-        ) as mock_stats:
+        with (
+            patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch") as mock_batch,
+            patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats") as mock_stats,
+        ):
             mock_batch.delay = MagicMock()
             mock_stats.delay = MagicMock()
             send_newsletter(newsletter.pk)
@@ -213,7 +220,7 @@ class TestSendFinalNewsletter:
         newsletter.is_test_sent = True
         newsletter.save()
 
-        with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_final_newsletter",
@@ -231,7 +238,7 @@ class TestSendFinalNewsletter:
         # Not ready: no test send, ready_to_send=False
         assert not newsletter.is_ready_to_send()
 
-        with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_final_newsletter",
@@ -250,7 +257,7 @@ class TestSendFinalNewsletter:
 
         assert not newsletter.is_ready_to_send()
 
-        with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             url = reverse(
                 "backend:send_final_newsletter",

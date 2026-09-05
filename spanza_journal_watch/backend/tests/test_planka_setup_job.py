@@ -69,7 +69,7 @@ class TestSetupRequest:
         PlankaIntegrationCredential.objects.create(api_key="test-api-key")
         issue = Issue.objects.create(name="Setup Issue", body="body")
 
-        with patch("spanza_journal_watch.backend.views.provision_planka_project_task.delay") as delay:
+        with patch("spanza_journal_watch.backend.views.planka_projects.provision_planka_project_task.delay") as delay:
             response = client.post(
                 _setup_url(issue), data={"project_name": "Setup Issue", "from_setup_page": "1"}, HTTP_HX_REQUEST="true"
             )
@@ -90,7 +90,7 @@ class TestSetupRequest:
         PlankaIntegrationCredential.objects.create(api_key="test-api-key")
         issue = Issue.objects.create(name="October 2026", body="body")
 
-        with patch("spanza_journal_watch.backend.views.provision_planka_project_task.delay"):
+        with patch("spanza_journal_watch.backend.views.planka_projects.provision_planka_project_task.delay"):
             response = client.post(_setup_url(issue), data={"from_setup_page": "1"}, HTTP_HX_REQUEST="true")
 
         assert response.status_code == 200
@@ -101,7 +101,7 @@ class TestSetupRequest:
         issue = Issue.objects.create(name="Busy Issue", body="body")
         PlankaProjectSetupJob.objects.create(issue=issue, project_name="x", state=PlankaProjectSetupJob.STATE_RUNNING)
 
-        with patch("spanza_journal_watch.backend.views.provision_planka_project_task.delay") as delay:
+        with patch("spanza_journal_watch.backend.views.planka_projects.provision_planka_project_task.delay") as delay:
             response = client.post(
                 _setup_url(issue), data={"project_name": "again", "from_setup_page": "1"}, HTTP_HX_REQUEST="true"
             )
@@ -194,7 +194,9 @@ class TestProvisionTask:
     def test_task_creates_binding_and_marks_success(self, monkeypatch):
         issue = Issue.objects.create(name="Task Issue", body="body")
         job = PlankaProjectSetupJob.objects.create(issue=issue, project_name="Task Issue")
-        monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient())
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakePlankaClient()
+        )
 
         provision_planka_project_task.apply(args=(job.pk,))
 
@@ -210,7 +212,7 @@ class TestProvisionTask:
         issue = Issue.objects.create(name="Task Error Issue", body="body")
         job = PlankaProjectSetupJob.objects.create(issue=issue, project_name="Task Error Issue")
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient(fail=True)
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakePlankaClient(fail=True)
         )
 
         provision_planka_project_task.apply(args=(job.pk,))
@@ -227,7 +229,7 @@ class TestProvisionTask:
         def boom():
             raise RuntimeError("worker exploded")
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", boom)
+        monkeypatch.setattr("spanza_journal_watch.backend.views.shared._build_planka_client", boom)
 
         provision_planka_project_task.apply(args=(job.pk,))
 

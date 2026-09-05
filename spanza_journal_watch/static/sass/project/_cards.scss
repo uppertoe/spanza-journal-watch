@@ -1,0 +1,138 @@
+.home-feature-grid {
+  margin-bottom: 1.75rem;
+}
+
+.home-article-title {
+  margin-bottom: 1.25rem;
+}
+
+.home-article-block {
+  margin-bottom: 1.5rem;
+}
+
+.card,
+.search-result__item,
+.issue-card,
+.article-card {
+  border-radius: 1.15rem;
+  border-color: var(--jw-outline);
+  background: var(--jw-surface);
+  box-shadow: var(--jw-shadow-soft);
+}
+
+[data-bs-theme='dark'] .card,
+[data-bs-theme='dark'] .search-result__item,
+[data-bs-theme='dark'] .issue-card,
+[data-bs-theme='dark'] .article-card {
+  border-color: var(--jw-outline);
+  background: var(--jw-surface);
+  box-shadow: var(--jw-shadow-soft);
+}
+
+.card .card {
+  box-shadow: none;
+}
+
+.card-feature-tile {
+  --bs-gutter-x: 0;
+  --bs-gutter-y: 0;
+  border-color: var(--jw-outline) !important;
+  border-radius: 1.35rem !important;
+  background: var(--jw-surface);
+  box-shadow: var(--jw-shadow-medium);
+  min-height: 17.75rem;
+  cursor: pointer;
+}
+
+.card-feature-tile__body {
+  position: relative;
+  background: linear-gradient(
+      180deg,
+      rgba(236, 241, 247, 0.95),
+      rgba(229, 236, 243, 0.92)
+    ),
+    var(--jw-surface-cool-strong);
+  min-height: 17.75rem;
+  overflow: hidden;
+}
+
+.card-feature-tile__body > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-bs-theme='dark'] .card-feature-tile__body {
+  background: linear-gradient(
+      180deg,
+      rgba(39, 48, 58, 0.95),
+      rgba(33, 41, 50, 0.94)
+    ),
+    var(--jw-surface-cool-strong);
+}
+
+.card-feature-tile__media {
+  position: relative;
+  min-height: 17.75rem;
+}
+
+.card-feature-tile__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-feature-tile__media::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.sidebar-about-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--jw-outline);
+  background: linear-gradient(
+      180deg,
+      rgba(238, 242, 247, 0.96),
+      rgba(229, 235, 242, 0.92)
+    ),
+    var(--jw-surface-cool);
+  box-shadow: var(--jw-shadow-soft);
+}
+
+.sidebar-about-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.health-service-card {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--jw-outline);
+  background: var(--jw-surface);
+  box-shadow: var(--jw-shadow-soft);
+}
+
+.health-service-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-bs-theme='dark'] .sidebar-about-card {
+  border-color: var(--jw-outline);
+  background: linear-gradient(
+      180deg,
+      rgba(39, 48, 58, 0.96),
+      rgba(33, 41, 50, 0.94)
+    ),
+    var(--jw-surface-cool);
+  box-shadow: var(--jw-shadow-soft);
+}
+
+[data-bs-theme='dark'] .health-service-card {
+  background: var(--jw-surface);
+}
+

@@ -22,6 +22,8 @@ from spanza_journal_watch.backend.planka import PlankaAPIError
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Author, Issue, Journal, Review
 
+from .helpers import EDITORIAL_SNAPSHOT_ROUTES, assert_matches_snapshot
+
 User = get_user_model()
 
 
@@ -230,7 +232,7 @@ class TestBackendWorkflows:
             queued["pk"] = pk
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.process_subscriber_csv.delay",
+            "spanza_journal_watch.backend.views.subscribers.process_subscriber_csv.delay",
             _fake_delay,
         )
 
@@ -282,7 +284,9 @@ class TestBackendWorkflows:
         def _fake_apply_async(*args, **kwargs):
             called["value"] = True
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.newsletter_release.send_newsletter.apply_async", _fake_apply_async
+        )
 
         response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
 
@@ -309,7 +313,9 @@ class TestBackendWorkflows:
         def _fake_apply_async(*args, **kwargs):
             called["value"] = True
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views.send_newsletter.apply_async", _fake_apply_async)
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.newsletter_release.send_newsletter.apply_async", _fake_apply_async
+        )
 
         blocked_response = route_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
         assert blocked_response.status_code == 302
@@ -523,7 +529,7 @@ class TestIssueBuilderPlankaIntegration:
         )
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._extract_board_cards",
+            "spanza_journal_watch.backend.views.planka_boards._extract_board_cards",
             lambda _binding: [
                 {
                     "id": "card-42",
@@ -596,12 +602,14 @@ class TestIssueBuilderPlankaIntegration:
             def get_project(self, project_id):
                 return {"id": project_id}
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient())
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakePlankaClient()
+        )
         # Provisioning runs in Celery; run the task inline so the binding exists after the POST.
         from spanza_journal_watch.backend.tasks import provision_planka_project_task
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.provision_planka_project_task.delay",
+            "spanza_journal_watch.backend.views.planka_projects.provision_planka_project_task.delay",
             lambda job_id: provision_planka_project_task.apply(args=(job_id,)),
         )
 
@@ -646,7 +654,9 @@ class TestIssueBuilderPlankaIntegration:
                 assert project_id == binding.project_id
                 return {"id": project_id, "name": name}
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakeRenameClient())
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakeRenameClient()
+        )
 
         response = route_client.post(
             reverse("backend:planka_update_project_name", kwargs={"issue_id": issue.pk}),
@@ -696,10 +706,10 @@ class TestIssueBuilderPlankaIntegration:
                 return []
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaImportClient()
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakePlankaImportClient()
         )
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._extract_board_cards",
+            "spanza_journal_watch.backend.views.planka_boards._extract_board_cards",
             lambda _binding: [
                 {
                     "id": "card-1",
@@ -775,10 +785,10 @@ class TestIssueBuilderPlankaIntegration:
                 return []
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaImportClientMinimal()
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakePlankaImportClientMinimal()
         )
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._extract_board_cards",
+            "spanza_journal_watch.backend.views.planka_boards._extract_board_cards",
             lambda _binding: [
                 {
                     "id": "card-2",
@@ -839,7 +849,9 @@ class TestIssueBuilderPlankaIntegration:
         def _raise_fetch_error(_binding):
             raise PlankaAPIError("Planka API 500: Internal Server Error")
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._extract_board_cards", _raise_fetch_error)
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.planka_boards._extract_board_cards", _raise_fetch_error
+        )
 
         response = route_client.post(
             reverse("backend:planka_import_publish_card", kwargs={"issue_id": issue.pk}),
@@ -875,7 +887,9 @@ class TestIssueBuilderPlankaIntegration:
         def _raise_connect_error(_binding):
             raise PlankaAPIError("Could not connect to Planka at http://planka:1337: Connection refused")
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._extract_board_cards", _raise_connect_error)
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.planka_boards._extract_board_cards", _raise_connect_error
+        )
 
         response = route_client.get(
             reverse("backend:planka_refresh_publish_cards", kwargs={"issue_id": issue.pk}),
@@ -926,7 +940,7 @@ class TestIssueBuilderPlankaIntegration:
         sync_record.refresh_from_db()
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._extract_board_cards",
+            "spanza_journal_watch.backend.views.planka_boards._extract_board_cards",
             lambda _binding: [
                 {
                     "id": "card-3",
@@ -1020,7 +1034,7 @@ class TestArticleIntakeWorkflow:
                 ]
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._build_pubmed_client",
+            "spanza_journal_watch.backend.views.journal_watchlist._build_pubmed_client",
             lambda **kwargs: _FakePubmedClient(),
         )
 
@@ -1048,7 +1062,9 @@ class TestArticleIntakeWorkflow:
             def ping(self):
                 return None
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._build_pubmed_client", lambda **kwargs: _Validator())
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.intake._build_pubmed_client", lambda **kwargs: _Validator()
+        )
 
         response = route_client.post(
             reverse("backend:pubmed_save_api_key"),
@@ -1136,7 +1152,7 @@ class TestArticleIntakeWorkflow:
             batch.selected_count = 0
             batch.save(update_fields=["result_count", "selected_count", "modified"])
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+        monkeypatch.setattr("spanza_journal_watch.backend.views.intake._import_pubmed_batch", _fake_import)
 
         response = route_client.post(
             reverse("backend:article_intake"),
@@ -1178,7 +1194,7 @@ class TestArticleIntakeWorkflow:
             batch.selected_count = 0
             batch.save(update_fields=["result_count", "selected_count", "modified"])
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._import_pubmed_batch", _fake_import)
+        monkeypatch.setattr("spanza_journal_watch.backend.views.intake._import_pubmed_batch", _fake_import)
 
         response = route_client.post(
             reverse("backend:article_intake"),
@@ -1209,7 +1225,7 @@ class TestArticleIntakeWorkflow:
         watched_two = WatchedJournal.objects.create(name="Remember Watch B", issn_print="9090-2222")
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views._import_pubmed_batch", lambda batch, watched_journals: None
+            "spanza_journal_watch.backend.views.intake._import_pubmed_batch", lambda batch, watched_journals: None
         )
 
         create_response = route_client.post(
@@ -1545,7 +1561,7 @@ class TestArticleIntakeWorkflow:
             return _FakeResult()
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay",
+            "spanza_journal_watch.backend.views.intake.check_batch_for_new_articles_task.delay",
             _fake_delay,
         )
 
@@ -1582,7 +1598,7 @@ class TestArticleIntakeWorkflow:
             called["hit"] = True
 
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay",
+            "spanza_journal_watch.backend.views.intake.check_batch_for_new_articles_task.delay",
             _fake_delay,
         )
 
@@ -1648,7 +1664,9 @@ class TestArticleIntakeWorkflow:
                 assert "Push this paper" in name
                 return {"id": "card-xyz"}
 
-        monkeypatch.setattr("spanza_journal_watch.backend.views._build_planka_client", lambda: FakePlankaClient())
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.shared._build_planka_client", lambda: FakePlankaClient()
+        )
 
         response = route_client.post(
             reverse("backend:article_intake_push_to_planka", kwargs={"batch_id": batch.pk}),
@@ -1659,3 +1677,23 @@ class TestArticleIntakeWorkflow:
         row.refresh_from_db()
         assert row.planka_card_id == "card-xyz"
         assert row.planka_pushed_at is not None
+
+
+@pytest.mark.django_db
+class TestEditorialSnapshots:
+    """Strict HTML snapshots of the editorial pages, rendered as the fixture's first superuser.
+
+    Regenerate after an intended change with
+    ``JW_UPDATE_SNAPSHOTS=1 pytest tests/regression -k editorial_page_matches_snapshot``.
+    """
+
+    @pytest.mark.parametrize("name,path", sorted(EDITORIAL_SNAPSHOT_ROUTES.items()))
+    def test_editorial_page_matches_snapshot(self, route_client, regression_baseline, name, path):
+        admin_user = User.objects.filter(is_superuser=True).order_by("pk").first()
+        assert admin_user is not None
+        route_client.force_login(admin_user)
+
+        response = route_client.get(path, follow=True)
+
+        assert response.status_code == 200
+        assert_matches_snapshot(name, response.content.decode("utf-8", errors="ignore"))

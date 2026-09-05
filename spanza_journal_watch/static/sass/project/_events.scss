@@ -1,0 +1,510 @@
+// Journal Watch Live — event flyer pages (/live)
+// A deliberately poster-like look built from the site's own palette: the brand
+// ink and primary blue for the masthead, the abstract-header terracotta as the
+// accent. Ticket perforation, cool paper body. Distinct from review layouts.
+// ---------------------------------------------------------------------------
+
+.live-flyer,
+.live-flyer-wall {
+  --lf-ink: #152b3b;
+  --lf-ink-2: #2f5a80;
+  --lf-soft: #a9c4da;
+  --lf-accent: #2f5a80;
+  --lf-accent-ink: #2f5a80;
+  --lf-cta-bg: #2f5a80;
+  --lf-cta-text: #fff;
+  --lf-paper: #f2f6f8;
+  --lf-panel: #fff;
+  --lf-text: var(--bs-body-color);
+  --lf-muted: var(--bs-secondary-color);
+  --lf-line: #d9e3ea;
+  max-width: 46rem;
+  margin: 1rem auto 2.5rem;
+}
+
+[data-bs-theme='dark'] .live-flyer,
+[data-bs-theme='dark'] .live-flyer-wall {
+  --lf-ink: #10222f;
+  --lf-ink-2: #24455f;
+  --lf-soft: #93b1c8;
+  --lf-accent: #6a90b0;
+  --lf-accent-ink: #8fb3d1;
+  --lf-cta-bg: #6a90b0;
+  --lf-cta-text: #0f1c27;
+  --lf-paper: #1a232c;
+  --lf-panel: #232e39;
+  --lf-line: #33414d;
+}
+
+// Back links (top and bottom of the flyer body) ------------------------------
+
+.live-flyer__backrow {
+  margin: 0;
+}
+
+.live-flyer__backrow--top {
+  margin-bottom: 1.4rem;
+}
+
+.live-flyer__backrow--end {
+  margin-top: 1.75rem;
+}
+
+.live-flyer__back {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--lf-line);
+  border-radius: 999px;
+  background: var(--lf-panel);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lf-text);
+}
+
+.live-flyer__back:hover,
+.live-flyer__back:focus-visible {
+  border-color: var(--lf-accent-ink);
+  background: var(--lf-panel);
+  color: var(--lf-accent-ink);
+}
+
+// Masthead ------------------------------------------------------------------
+
+.live-flyer__masthead {
+  position: relative;
+  overflow: hidden;
+  padding: 1.9rem 2rem 1.75rem;
+  border-radius: 1.25rem 1.25rem 0 0;
+  background: linear-gradient(135deg, var(--lf-ink-2), var(--lf-ink) 70%);
+  color: #f4f7fa;
+}
+
+.live-flyer__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    38rem 24rem at 88% -20%,
+    rgba(169, 196, 218, 0.22),
+    transparent 62%
+  );
+}
+
+.live-flyer__kicker {
+  position: relative;
+  margin-bottom: 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lf-soft);
+}
+
+.live-flyer__title {
+  position: relative;
+  margin: 0 0 1.1rem;
+  font-size: clamp(1.75rem, 4.5vw, 2.4rem);
+  line-height: 1.12;
+  color: #fff;
+}
+
+.live-flyer__chips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.4rem;
+  padding: 0;
+}
+
+.live-flyer__chip {
+  padding: 0.35rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.live-flyer__chip-note {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.live-flyer__chip--past {
+  border-style: dashed;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.live-flyer__people {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2.5rem;
+  margin: 0;
+}
+
+.live-flyer__person dt {
+  margin-bottom: 0.1rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lf-soft);
+}
+
+.live-flyer__person dd {
+  margin: 0;
+  color: #fff;
+}
+
+// Ticket perforation --------------------------------------------------------
+
+.live-flyer__perforation {
+  position: relative;
+  height: 1.5rem;
+  background-color: var(--lf-paper);
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--lf-line) 0 9px,
+    transparent 9px 18px
+  );
+  background-repeat: no-repeat;
+  background-position: 0 50%;
+  background-size: 100% 2px;
+}
+
+// Body ----------------------------------------------------------------------
+
+.live-flyer__body {
+  padding: 1.75rem 2rem 2rem;
+  border-radius: 0 0 1.25rem 1.25rem;
+  background: var(--lf-paper);
+  color: var(--lf-text);
+}
+
+.live-flyer__blurb {
+  font-size: 1.06rem;
+  line-height: 1.65;
+}
+
+.live-flyer__blurb p:last-child {
+  margin-bottom: 0;
+}
+
+.live-flyer__cta-row {
+  margin: 1.5rem 0 0;
+}
+
+.live-flyer__cta-row-tight {
+  margin: 1rem 0 0;
+}
+
+.live-flyer__cta-note {
+  max-width: 36rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: var(--lf-muted);
+}
+
+.live-flyer__cta-alt {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--lf-muted);
+}
+
+.live-flyer__cta {
+  display: inline-block;
+  padding: 0.65rem 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lf-cta-bg);
+  color: var(--lf-cta-text);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.live-flyer__cta:hover,
+.live-flyer__cta:focus-visible,
+.live-flyer__cta:active {
+  background: var(--lf-cta-bg);
+  color: var(--lf-cta-text);
+  transform: translateY(-1px);
+  box-shadow: 0 0.5rem 1.25rem rgba(47, 90, 128, 0.3);
+}
+
+// Pre-reading ---------------------------------------------------------------
+
+.live-flyer__reading {
+  margin-top: 2rem;
+  padding-top: 1.4rem;
+  border-top: 2px solid var(--lf-line);
+}
+
+.live-flyer__reading-title {
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lf-accent-ink);
+}
+
+.live-flyer__reading-note {
+  margin-bottom: 1.25rem;
+  color: var(--lf-muted);
+}
+
+.live-flyer__reading-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-flyer__reading-card {
+  padding: 1.4rem 1.5rem;
+  border: 1px solid var(--lf-line);
+  border-left: 4px solid var(--lf-accent);
+  border-radius: 0.9rem;
+  background: var(--lf-panel);
+  box-shadow: 0 1px 2px rgba(21, 43, 59, 0.06);
+}
+
+.live-flyer__reading-paper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.live-flyer__paper-title {
+  font-weight: 600;
+}
+
+.live-flyer__paper-source {
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--lf-muted);
+}
+
+.live-flyer__paper-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.live-flyer__pill {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--lf-accent-ink);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--lf-accent-ink);
+  text-decoration: none;
+}
+
+.live-flyer__pill:hover,
+.live-flyer__pill:focus-visible {
+  background: var(--lf-accent-ink);
+  border-color: var(--lf-accent-ink);
+  color: var(--lf-panel);
+}
+
+// Flyer wall (session index) ------------------------------------------------
+
+.live-flyer-wall__intro {
+  margin-bottom: 2rem;
+}
+
+.live-flyer-wall .live-flyer__kicker {
+  color: var(--lf-accent-ink);
+}
+
+.live-flyer-wall__title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  line-height: 1.05;
+}
+
+.live-flyer-wall__lede {
+  max-width: 38rem;
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--bs-secondary-color);
+}
+
+.live-flyer-wall__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.live-flyer-wall__empty {
+  color: var(--bs-secondary-color);
+}
+
+.live-flyer-wall__register {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--lf-line);
+  border-radius: 1.25rem;
+  background: var(--lf-panel);
+}
+
+.live-flyer-wall__register-note {
+  max-width: 38rem;
+  margin: 0;
+  color: var(--lf-text);
+}
+
+.live-flyer-card {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--lf-line);
+  border-radius: 1.25rem;
+  background: var(--lf-panel);
+  color: var(--lf-text);
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.live-flyer-card:hover,
+.live-flyer-card:focus-visible {
+  color: var(--lf-text);
+  transform: translateY(-3px);
+  box-shadow: 0 1rem 2rem rgba(21, 43, 59, 0.12);
+}
+
+.live-flyer-card:focus-visible {
+  outline: 3px solid var(--lf-accent);
+  outline-offset: 3px;
+}
+
+.live-flyer-card--past {
+  opacity: 0.72;
+}
+
+.live-flyer-card__date {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  align-self: flex-start;
+  min-width: 5.4rem;
+  padding: 0.8rem 0.6rem;
+  border-radius: 1rem;
+  background: linear-gradient(160deg, var(--lf-ink-2), var(--lf-ink));
+  color: #fff;
+}
+
+.live-flyer-card__dow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lf-soft);
+}
+
+.live-flyer-card__day {
+  font-family: 'Baloo', 'Trebuchet MS', 'Arial Rounded MT Bold',
+    'Avenir Next Rounded', system-ui, sans-serif;
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.live-flyer-card__month {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-flyer-card__when {
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--lf-muted);
+}
+
+.live-flyer-card__past-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.6rem;
+  border: 1px dashed var(--lf-line);
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.live-flyer-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.45rem;
+}
+
+.live-flyer-card__person {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.live-flyer-card__person span {
+  margin-right: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lf-accent-ink);
+}
+
+.live-flyer-card__go {
+  display: inline-block;
+  margin-top: 0.8rem;
+  font-weight: 600;
+  color: var(--lf-accent-ink);
+}
+
+@media (max-width: 575.98px) {
+  .live-flyer__masthead,
+  .live-flyer__body {
+    padding-right: 1.25rem;
+    padding-left: 1.25rem;
+  }
+
+  .live-flyer__reading-card {
+    padding: 1.1rem 1.15rem;
+  }
+
+  .live-flyer-card {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .live-flyer-card__date {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.45rem 0.9rem;
+  }
+
+  .live-flyer-card__day {
+    font-size: 1.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-flyer-card,
+  .live-flyer__cta {
+    transition: none;
+  }
+
+  .live-flyer-card:hover,
+  .live-flyer__cta:hover {
+    transform: none;
+  }
+}

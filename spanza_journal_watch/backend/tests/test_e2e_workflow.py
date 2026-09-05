@@ -232,7 +232,9 @@ class TestStage2ContributorsAndInvite:
     def test_add_contributor_creates_pending_record(self):
         issue = Issue.objects.create(name="March 2024", active=False, body="Body.")
         client, _ = _make_manager()
-        with patch("spanza_journal_watch.backend.views._sync_contributor_to_planka", return_value=(True, "")):
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
             client.post(
                 reverse("backend:issue_add_contributor", kwargs={"issue_id": issue.pk}),
                 data={
@@ -249,7 +251,7 @@ class TestStage2ContributorsAndInvite:
         issue = Issue.objects.create(name="March 2024", active=False, body="Body.")
         contributor = IssueContributor.objects.create(issue=issue, email="alice@example.com", name="Alice Smith")
         client, manager_user = _make_manager()
-        with patch("spanza_journal_watch.backend.views._send_issue_invite_email") as mock_email:
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email") as mock_email:
             client.post(
                 reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk}),
                 data={"contributor_ids": [contributor.pk]},
@@ -419,8 +421,10 @@ class TestStage5PlankaCardImport:
         card = _mock_card()
 
         with (
-            patch("spanza_journal_watch.backend.views._extract_board_cards", return_value=[card]),
-            patch("spanza_journal_watch.backend.views._build_planka_client", return_value=_mock_planka_client()),
+            patch("spanza_journal_watch.backend.views.planka_boards._extract_board_cards", return_value=[card]),
+            patch(
+                "spanza_journal_watch.backend.views.shared._build_planka_client", return_value=_mock_planka_client()
+            ),
         ):
             response = client.post(
                 reverse("backend:planka_import_publish_card", kwargs={"issue_id": issue.pk}),
@@ -439,8 +443,10 @@ class TestStage5PlankaCardImport:
         card = _mock_card()
 
         with (
-            patch("spanza_journal_watch.backend.views._extract_board_cards", return_value=[card]),
-            patch("spanza_journal_watch.backend.views._build_planka_client", return_value=_mock_planka_client()),
+            patch("spanza_journal_watch.backend.views.planka_boards._extract_board_cards", return_value=[card]),
+            patch(
+                "spanza_journal_watch.backend.views.shared._build_planka_client", return_value=_mock_planka_client()
+            ),
         ):
             client.post(
                 reverse("backend:planka_import_publish_card", kwargs={"issue_id": issue.pk}),
@@ -456,8 +462,10 @@ class TestStage5PlankaCardImport:
         card = _mock_card()
 
         with (
-            patch("spanza_journal_watch.backend.views._extract_board_cards", return_value=[card]),
-            patch("spanza_journal_watch.backend.views._build_planka_client", return_value=_mock_planka_client()),
+            patch("spanza_journal_watch.backend.views.planka_boards._extract_board_cards", return_value=[card]),
+            patch(
+                "spanza_journal_watch.backend.views.shared._build_planka_client", return_value=_mock_planka_client()
+            ),
         ):
             client.post(
                 reverse("backend:planka_import_publish_card", kwargs={"issue_id": issue.pk}),
@@ -468,8 +476,12 @@ class TestStage5PlankaCardImport:
         # Second import attempt — card now has has_associated_review=True
         card_protected = {**card, "has_associated_review": True}
         with (
-            patch("spanza_journal_watch.backend.views._extract_board_cards", return_value=[card_protected]),
-            patch("spanza_journal_watch.backend.views._build_planka_client", return_value=_mock_planka_client()),
+            patch(
+                "spanza_journal_watch.backend.views.planka_boards._extract_board_cards", return_value=[card_protected]
+            ),
+            patch(
+                "spanza_journal_watch.backend.views.shared._build_planka_client", return_value=_mock_planka_client()
+            ),
         ):
             client.post(
                 reverse("backend:planka_import_publish_card", kwargs={"issue_id": issue.pk}),
@@ -554,7 +566,7 @@ class TestStage7Newsletter:
         )
         client, _ = _make_editor()
         url = reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk})
-        with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             client.post(url)
         mock_task.apply_async.assert_called_once()
@@ -588,12 +600,15 @@ class TestStage7Newsletter:
         Subscriber.objects.create(email="reader@example.com", subscribed=True, tester=True)
 
         # Bypass MJML template rendering — we're testing task orchestration, not HTML.
-        with patch(
-            "spanza_journal_watch.newsletter.models.Newsletter.generate_html_content",
-            return_value="<html>Newsletter</html>",
-        ), patch(
-            "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
-            return_value="Newsletter",
+        with (
+            patch(
+                "spanza_journal_watch.newsletter.models.Newsletter.generate_html_content",
+                return_value="<html>Newsletter</html>",
+            ),
+            patch(
+                "spanza_journal_watch.newsletter.models.Newsletter.generate_txt_content",
+                return_value="Newsletter",
+            ),
         ):
             send_newsletter(newsletter.pk)
 
@@ -680,7 +695,9 @@ class TestChainedWorkflow:
         # ── Stage 2: Contributor + invite ───────────────────────────────────
         manager_client, manager_user = _make_manager()
 
-        with patch("spanza_journal_watch.backend.views._sync_contributor_to_planka", return_value=(True, "")):
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
             manager_client.post(
                 reverse("backend:issue_add_contributor", kwargs={"issue_id": issue.pk}),
                 data={
@@ -693,7 +710,7 @@ class TestChainedWorkflow:
         contributor = IssueContributor.objects.get(issue=issue, email="alice@example.com")
         assert contributor.status == IssueContributor.Status.PENDING
 
-        with patch("spanza_journal_watch.backend.views._send_issue_invite_email") as mock_email:
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email") as mock_email:
             manager_client.post(
                 reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk}),
                 data={"contributor_ids": [contributor.pk]},
@@ -765,8 +782,8 @@ class TestChainedWorkflow:
         card = _mock_card()
 
         with (
-            patch("spanza_journal_watch.backend.views._extract_board_cards", return_value=[card]),
-            patch("spanza_journal_watch.backend.views._build_planka_client", return_value=import_client),
+            patch("spanza_journal_watch.backend.views.planka_boards._extract_board_cards", return_value=[card]),
+            patch("spanza_journal_watch.backend.views.shared._build_planka_client", return_value=import_client),
         ):
             editor_client.post(
                 reverse("backend:planka_import_publish_card", kwargs={"issue_id": issue.pk}),
@@ -792,7 +809,7 @@ class TestChainedWorkflow:
         newsletter.is_test_sent = True
         newsletter.save()
 
-        with patch("spanza_journal_watch.backend.views.send_newsletter") as mock_task:
+        with patch("spanza_journal_watch.backend.views.newsletter_release.send_newsletter") as mock_task:
             mock_task.apply_async = MagicMock()
             response = editor_client.post(reverse("backend:send_final_newsletter", kwargs={"pk": newsletter.pk}))
         assert response.status_code == 302

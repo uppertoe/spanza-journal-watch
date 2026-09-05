@@ -358,7 +358,7 @@ class TestInviteSignupEndToEnd:
         )
         # Successful signup redirects (302); a failure would re-render the form (200)
         assert resp.status_code == 302, (
-            f"Signup failed (status {resp.status_code}). " "This may reproduce the AssertionError in setup_user_email."
+            f"Signup failed (status {resp.status_code}). This may reproduce the AssertionError in setup_user_email."
         )
 
         # Step 3: Verify user was created

@@ -10,6 +10,7 @@ from django.test import Client
 
 from spanza_journal_watch.newsletter.models import Subscriber
 from spanza_journal_watch.submissions.models import Author, Issue, Review, Tag
+from spanza_journal_watch.utils.regression_snapshots import normalize_html
 
 MODEL_LABELS = [
     "users.user",
@@ -193,20 +194,7 @@ class Command(BaseCommand):
         return routes
 
     def _normalize_html(self, html: str) -> str:
-        normalized = html
-        normalized = re.sub(r"csrfmiddlewaretoken[^\"]+\"", 'csrfmiddlewaretoken" value="__CSRF__"', normalized)
-        normalized = re.sub(
-            r"name=['\"]csrfmiddlewaretoken['\"] value=['\"][^'\"]+['\"]",
-            'name="csrfmiddlewaretoken" value="__CSRF__"',
-            normalized,
-        )
-        normalized = re.sub(
-            r"\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2})?",
-            "__DATETIME__",
-            normalized,
-        )
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return normalized + "\n"
+        return normalize_html(html)
 
     def _first(self, model: type[Model], **filters):
         queryset = model.objects.filter(**filters) if filters else model.objects.all()

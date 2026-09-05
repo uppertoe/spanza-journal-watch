@@ -395,20 +395,26 @@ class TestIssueAddContributor:
 
     def test_creates_contributor(self, issue):
         client, _ = manager_client()
-        with patch("spanza_journal_watch.backend.views._sync_contributor_to_planka", return_value=(True, "")):
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
             self._post(client, issue)
         assert IssueContributor.objects.filter(issue=issue, email="alice@example.com").exists()
 
     def test_status_pending_on_creation(self, issue):
         client, _ = manager_client()
-        with patch("spanza_journal_watch.backend.views._sync_contributor_to_planka", return_value=(True, "")):
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
             self._post(client, issue)
         c = IssueContributor.objects.get(issue=issue, email="alice@example.com")
         assert c.status == IssueContributor.Status.PENDING
 
     def test_updates_existing_contributor(self, issue, contributor):
         client, _ = manager_client()
-        with patch("spanza_journal_watch.backend.views._sync_contributor_to_planka", return_value=(True, "")):
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
             self._post(
                 client,
                 issue,
@@ -430,7 +436,9 @@ class TestIssueAddContributor:
         author.save()
 
         client, _ = manager_client()
-        with patch("spanza_journal_watch.backend.views._sync_contributor_to_planka", return_value=(True, "")):
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
             self._post(client, issue, name_0="Linked Author", email_0="linked@example.com")
         contributor = IssueContributor.objects.get(issue=issue, email="linked@example.com")
         assert contributor.author_id == author.pk
@@ -457,7 +465,7 @@ class TestIssueSendContributorInvites:
     def test_sets_status_to_invited(self, issue, contributor):
         client, _ = manager_client()
         url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
-        with patch("spanza_journal_watch.backend.views._send_issue_invite_email"):
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email"):
             client.post(url, data={"contributor_ids": [contributor.pk]})
         contributor.refresh_from_db()
         assert contributor.status == IssueContributor.Status.INVITED
@@ -465,7 +473,7 @@ class TestIssueSendContributorInvites:
     def test_sets_invited_by_and_at(self, issue, contributor):
         client, user = manager_client()
         url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
-        with patch("spanza_journal_watch.backend.views._send_issue_invite_email"):
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email"):
             client.post(url, data={"contributor_ids": [contributor.pk]})
         contributor.refresh_from_db()
         assert contributor.invited_by_id == user.pk
@@ -476,7 +484,7 @@ class TestIssueSendContributorInvites:
 
         client, _ = manager_client()
         url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
-        with patch("spanza_journal_watch.backend.views._send_issue_invite_email"):
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email"):
             client.post(url, data={"contributor_ids": [contributor.pk]})
         assert IssueContributorInvite.objects.filter(contributor=contributor).exists()
 
@@ -488,7 +496,7 @@ class TestIssueSendContributorInvites:
         )
         client, _ = manager_client()
         url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
-        with patch("spanza_journal_watch.backend.views._send_issue_invite_email"):
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email"):
             client.post(url, data={"contributor_ids": [revoked.pk]})
         revoked.refresh_from_db()
         # Status should still be REVOKED
@@ -504,7 +512,7 @@ class TestIssueSendContributorInvites:
         client, _ = manager_client()
         url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
         with patch(
-            "spanza_journal_watch.backend.views._send_issue_invite_email",
+            "spanza_journal_watch.backend.views.contributors._send_issue_invite_email",
             side_effect=Exception("SMTP error"),
         ):
             response = client.post(url, data={"contributor_ids": [contributor.pk]})
@@ -561,7 +569,9 @@ class TestWatchedJournalSearch:
 
         mock_client = MagicMock()
         mock_client.search_journals.return_value = results
-        return patch("spanza_journal_watch.backend.views._build_pubmed_client", return_value=mock_client)
+        return patch(
+            "spanza_journal_watch.backend.views.journal_watchlist._build_pubmed_client", return_value=mock_client
+        )
 
     def test_returns_matching_journals(self):
         client, _ = manager_client()

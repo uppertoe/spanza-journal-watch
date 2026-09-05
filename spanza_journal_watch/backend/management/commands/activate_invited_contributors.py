@@ -148,7 +148,7 @@ class Command(BaseCommand):
         )
 
         # Sync to Planka (outside the atomic block — network call).
-        from spanza_journal_watch.backend.views import _sync_contributor_to_planka
+        from spanza_journal_watch.backend.views.planka_boards import _sync_contributor_to_planka
 
         success, error = _sync_contributor_to_planka(contributor)
         if not success:

@@ -249,7 +249,7 @@ def run_pubmed_batch_import_task(self, batch_id):
     from .models import FetchLog, PubmedImportBatch
     from .pubmed import PubmedAPIError
     from .pubmed_cache import populate_pubmed_batch_from_cache
-    from .views import _safe_planka_error
+    from .views.shared import _safe_planka_error
 
     batch = PubmedImportBatch.objects.get(pk=batch_id)
     batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
@@ -301,7 +301,7 @@ def check_batch_for_new_articles_task(self, batch_id):
     from .models import FetchLog, PubmedImportBatch
     from .pubmed import PubmedAPIError
     from .pubmed_cache import populate_pubmed_batch_from_cache, refresh_pubmed_journal_cache
-    from .views import _safe_planka_error
+    from .views.shared import _safe_planka_error
 
     batch = PubmedImportBatch.objects.get(pk=batch_id)
     batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
@@ -546,14 +546,16 @@ def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
 
     from .models import PubmedImportBatch
     from .planka import PlankaAPIError
-    from .views import (
+    from .views.planka_cards import (
         _attach_journal_label_to_card,
-        _build_planka_client,
         _build_pubmed_planka_card,
         _ensure_planka_board_mappings,
         _get_board_label_map,
         _get_board_list_type_map,
         _get_issue_planka_candidates_list,
+    )
+    from .views.shared import (
+        _build_planka_client,
         _is_planka_card_archived,
         _is_planka_card_not_found_error,
         _is_planka_list_not_found_error,
@@ -736,7 +738,9 @@ def provision_planka_project_task(self, job_id):
     """
     from .models import PlankaIssueBinding, PlankaProjectSetupJob
     from .planka import PlankaAPIError
-    from .views import _build_planka_client, _provision_planka_project, _register_planka_webhook
+    from .views.planka_boards import _register_planka_webhook
+    from .views.planka_projects import _provision_planka_project
+    from .views.shared import _build_planka_client
 
     job = PlankaProjectSetupJob.objects.select_related("issue", "background_asset").get(pk=job_id)
     job.state = PlankaProjectSetupJob.STATE_RUNNING

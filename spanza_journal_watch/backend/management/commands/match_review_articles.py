@@ -202,7 +202,7 @@ class Command(BaseCommand):
         crossref_results = {}
         if unresolved_dois:
             self.stdout.write(
-                f"Phase 3: Fetching CrossRef metadata for {len(unresolved_dois)} " f"article(s) not in PubMed...\n"
+                f"Phase 3: Fetching CrossRef metadata for {len(unresolved_dois)} article(s) not in PubMed...\n"
             )
             for doi in unresolved_dois:
                 try:
@@ -240,14 +240,14 @@ class Command(BaseCommand):
 
                 if canonical:
                     self.stdout.write(
-                        f"  MERGE  PK={article.pk} → PK={canonical.pk} (PMID {pmid}) " f"title={article.title[:50]}\n"
+                        f"  MERGE  PK={article.pk} → PK={canonical.pk} (PMID {pmid}) title={article.title[:50]}\n"
                     )
                     moves = _merge_article(article, canonical, dry_run=dry_run)
                     for line in moves:
                         self.stdout.write(f"    {line}\n")
                     stats["pubmed_merged"] += 1
                 else:
-                    self.stdout.write(f"  PUBMED  PK={article.pk} PMID={pmid} " f"title={article.title[:50]}\n")
+                    self.stdout.write(f"  PUBMED  PK={article.pk} PMID={pmid} title={article.title[:50]}\n")
                     if not dry_run:
                         article.pmid = pmid
                         article.save(update_fields=["pmid"])
@@ -267,14 +267,14 @@ class Command(BaseCommand):
 
             elif crossref_payload:
                 # ── CrossRef-only: backfill metadata ───────────────
-                self.stdout.write(f"  CROSSREF  PK={article.pk} doi={doi} " f"title={article.title[:50]}\n")
+                self.stdout.write(f"  CROSSREF  PK={article.pk} doi={doi} title={article.title[:50]}\n")
                 if not dry_run:
                     fill_missing_article_metadata(article, crossref_payload)
                 stats["crossref_backfilled"] += 1
 
             else:
                 stats["unresolved"] += 1
-                self.stdout.write(f"  UNRESOLVED  PK={article.pk} doi={doi or '—'} " f"title={article.title[:60]}\n")
+                self.stdout.write(f"  UNRESOLVED  PK={article.pk} doi={doi or '—'} title={article.title[:60]}\n")
 
         self.stdout.write("\n")
         total_resolved = stats["pubmed_merged"] + stats["pubmed_backfilled"] + stats["crossref_backfilled"]

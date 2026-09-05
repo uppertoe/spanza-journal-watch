@@ -1,0 +1,161 @@
+.nav-scroller {
+  background: transparent;
+  backdrop-filter: none;
+  overflow: visible;
+}
+
+.nav-scroller .nav-link {
+  color: var(--bs-emphasis-color, #152b3b);
+  border-bottom: 0.125rem solid transparent;
+  -webkit-tap-highlight-color: rgba(21, 43, 59, 0.08);
+}
+
+.nav-scroller .nav-link:visited,
+.nav-scroller .nav-link:hover,
+.nav-scroller .nav-link:focus,
+.nav-scroller .nav-link:active {
+  color: var(--bs-emphasis-color, #152b3b);
+}
+
+.nav-scroller .nav-link.active,
+.nav-scroller .nav-link[aria-current='page'] {
+  color: var(--bs-emphasis-color, #152b3b);
+  border-bottom-color: currentColor;
+  font-weight: 600;
+}
+
+.nav-scroller .nav-link:focus-visible {
+  outline: 2px solid rgba(21, 43, 59, 0.28);
+  outline-offset: 0.2rem;
+  border-radius: 999px;
+}
+
+/* On small screens the nav scrolls horizontally — show edge fade hints */
+@media (max-width: 767.98px) {
+  .nav-scroller {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .nav-scroller .nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav-scroller .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-scroller .nav-item {
+    white-space: nowrap;
+  }
+
+  /* Edge fades — toggled by JS via data attributes */
+  .nav-scroller::before,
+  .nav-scroller::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2.5rem;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .nav-scroller::before {
+    left: 0;
+    background: linear-gradient(
+      to left,
+      transparent 0%,
+      var(--bs-body-bg, #fff) 70%
+    );
+  }
+
+  .nav-scroller::after {
+    right: 0;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      var(--bs-body-bg, #fff) 70%
+    );
+  }
+
+  .nav-scroller[data-fade-left]::before {
+    opacity: 1;
+  }
+  .nav-scroller[data-fade-right]::after {
+    opacity: 1;
+  }
+
+  [data-bs-theme='dark'] .nav-scroller::before {
+    background: linear-gradient(
+      to left,
+      transparent 0%,
+      var(--jw-paper, #151c24) 70%
+    );
+  }
+
+  [data-bs-theme='dark'] .nav-scroller::after {
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      var(--jw-paper, #151c24) 70%
+    );
+  }
+
+  .nav-scroller__arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    color: var(--bs-body-color);
+    font-size: 0.6rem;
+    line-height: 1;
+  }
+
+  .nav-scroller__arrow--left {
+    left: 0.2rem;
+  }
+
+  .nav-scroller__arrow--right {
+    right: 0.2rem;
+  }
+
+  .nav-scroller[data-fade-left] .nav-scroller__arrow--left {
+    opacity: 0.6;
+  }
+
+  .nav-scroller[data-fade-right] .nav-scroller__arrow--right {
+    opacity: 0.6;
+  }
+}
+
+a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(
+    .footer-logo-link
+  ):not(.blog-header-logo) {
+  color: var(--jw-primary-strong);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+  text-decoration-color: rgba(66, 105, 141, 0.3);
+  transition:
+    color 0.14s ease,
+    text-decoration-color 0.14s ease;
+}
+
+a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(
+    .footer-logo-link
+  ):not(.blog-header-logo):hover,
+a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(
+    .footer-logo-link
+  ):not(.blog-header-logo):focus-visible {
+  color: var(--jw-secondary-strong);
+  text-decoration-color: currentColor;
+}
+

@@ -417,7 +417,7 @@ class TestPlankaCardRevisionsView:
         )
 
         mock_card = {"id": card_id, "name": "Card", "description": "Current description"}
-        with patch("spanza_journal_watch.backend.views._build_planka_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client") as mock_build:
             mock_client = MagicMock()
             mock_client.get_card.return_value = mock_card
             mock_build.return_value = mock_client
@@ -434,7 +434,7 @@ class TestPlankaCardRevisionsView:
         make_binding(issue)
         make_credential()
 
-        with patch("spanza_journal_watch.backend.views._build_planka_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client") as mock_build:
             mock_client = MagicMock()
             mock_client.get_card.side_effect = PlankaAPIError("Planka API 503: Service Unavailable")
             mock_build.return_value = mock_client
@@ -459,13 +459,13 @@ class TestPlankaCardRevisionsView:
         user = UserFactory()
         client = Client()
         client.force_login(user)
-        with patch("spanza_journal_watch.backend.views._build_planka_client"):
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client"):
             response = client.get(self._url(issue.pk, "card-1"))
         assert response.status_code == 403
 
     def test_nonexistent_issue_returns_404(self):
         client = make_staff_client()
-        with patch("spanza_journal_watch.backend.views._build_planka_client"):
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client"):
             response = client.get(self._url(9999, "card-1"))
         assert response.status_code == 404
 
@@ -473,7 +473,7 @@ class TestPlankaCardRevisionsView:
         issue = make_issue()
         # No binding created
         client = make_staff_client()
-        with patch("spanza_journal_watch.backend.views._build_planka_client"):
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client"):
             response = client.get(self._url(issue.pk, "card-1"))
         assert response.status_code == 404
 
@@ -482,7 +482,7 @@ class TestPlankaCardRevisionsView:
         make_binding(issue)
         make_credential()
 
-        with patch("spanza_journal_watch.backend.views._build_planka_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client") as mock_build:
             mock_client = MagicMock()
             mock_client.get_card.return_value = {"id": "card-1", "description": ""}
             mock_build.return_value = mock_client
@@ -522,7 +522,7 @@ class TestPlankaCardRevisionRestoreView:
         rev = self._make_revision(binding)
         make_credential()
 
-        with patch("spanza_journal_watch.backend.views._build_planka_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client") as mock_build:
             mock_client = MagicMock()
             mock_build.return_value = mock_client
 
@@ -553,7 +553,7 @@ class TestPlankaCardRevisionRestoreView:
         rev = self._make_revision(binding)
         make_credential()
 
-        with patch("spanza_journal_watch.backend.views._build_planka_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client") as mock_build:
             mock_client = MagicMock()
             mock_client._request.side_effect = PlankaAPIError("Planka API 500: internal error")
             mock_build.return_value = mock_client
@@ -576,7 +576,7 @@ class TestPlankaCardRevisionRestoreView:
 
         client = make_staff_client()
         # Attempt to restore revision belonging to binding_a via issue_b's URL
-        with patch("spanza_journal_watch.backend.views._build_planka_client"):
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client"):
             response = client.post(self._url(issue_b.pk, rev.pk))
 
         assert response.status_code == 404
@@ -589,7 +589,7 @@ class TestPlankaCardRevisionRestoreView:
         user = UserFactory()
         client = Client()
         client.force_login(user)
-        with patch("spanza_journal_watch.backend.views._build_planka_client"):
+        with patch("spanza_journal_watch.backend.views.shared._build_planka_client"):
             response = client.post(self._url(issue.pk, rev.pk))
 
         assert response.status_code == 403
@@ -611,7 +611,7 @@ class TestRegisterPlankaWebhook:
         mock_client = MagicMock()
         mock_client.list_webhooks.return_value = [{"id": "wh-existing", "url": expected_url}]
 
-        with patch("spanza_journal_watch.backend.views._take_board_description_snapshot") as mock_snap:
+        with patch("spanza_journal_watch.backend.views.planka_boards._take_board_description_snapshot") as mock_snap:
             _register_planka_webhook(mock_client, binding)
 
         binding.refresh_from_db()
@@ -629,7 +629,7 @@ class TestRegisterPlankaWebhook:
         mock_client.list_webhooks.return_value = []
         mock_client.create_webhook.return_value = {"id": "wh-new"}
 
-        with patch("spanza_journal_watch.backend.views._take_board_description_snapshot") as mock_snap:
+        with patch("spanza_journal_watch.backend.views.planka_boards._take_board_description_snapshot") as mock_snap:
             _register_planka_webhook(mock_client, binding)
 
         binding.refresh_from_db()
@@ -676,7 +676,7 @@ class TestRegisterPlankaWebhook:
         mock_client.create_webhook.return_value = {"id": "wh-fallback"}
 
         # Should not raise; proceeds to create
-        with patch("spanza_journal_watch.backend.views._take_board_description_snapshot"):
+        with patch("spanza_journal_watch.backend.views.planka_boards._take_board_description_snapshot"):
             _register_planka_webhook(mock_client, binding)
 
         # create_webhook is called as the list path failed

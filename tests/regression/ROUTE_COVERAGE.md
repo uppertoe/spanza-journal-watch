@@ -55,4 +55,12 @@ This map links project-owned routes to regression tests.
 
 | Check       | Purpose                                 | Covered by                                                             |
 | ----------- | --------------------------------------- | ---------------------------------------------------------------------- |
-| MailHog API | Validate test runtime can reach MailHog | `TestNewsletterFlows.test_mailhog_api_is_reachable` (`mailhog` marker) |
+| Mailpit API | Validate test runtime can reach Mailpit | `TestNewsletterFlows.test_mailhog_api_is_reachable` (`mailhog` marker (Mailpit runs on :8025)) |
+
+## Editorial snapshot routes
+
+Every route in `EDITORIAL_SNAPSHOT_ROUTES` (`tests/regression/helpers.py`) is
+covered by `TestEditorialSnapshots.test_editorial_page_matches_snapshot`: the
+dashboard, each issue workflow page, article intake, watched journals,
+subscribers, newsletter release, the analytics panels, the inbox, settings,
+tags, collections, authors, affiliations and the account update page.

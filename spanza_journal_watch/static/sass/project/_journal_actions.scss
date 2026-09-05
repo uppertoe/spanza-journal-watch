@@ -1,0 +1,131 @@
+/* ── Back to top floating button (desktop) ───────────── */
+.back-to-top-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1040;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--bs-body-color) 15%, transparent);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.5rem);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+  cursor: pointer;
+}
+
+.back-to-top-fab--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.back-to-top-fab:hover {
+  background: var(--bs-primary);
+  color: #fff;
+  border-color: var(--bs-primary);
+}
+
+.jw-modal-open .back-to-top-fab {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── Stable-width action buttons ─────────────────────── */
+
+.jw-action-btn--star {
+  min-width: 5.5rem;
+}
+
+.jw-action-btn--recommend,
+.jw-action-btn--fulltext {
+  display: inline-grid;
+  justify-items: center;
+
+  // Both visible and sizer spans occupy the same grid cell
+  > span {
+    grid-area: 1 / 1;
+  }
+
+  // Invisible sizer always shows the longest label to prevent reflow
+  .jw-action-btn__sizer {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+  }
+}
+
+/* ── Review link with glow ────────────────────────────── */
+
+.jw-review-link {
+  color: var(--bs-primary);
+  font-weight: 600;
+  filter: drop-shadow(0 0 4px rgba(var(--bs-primary-rgb), 0.45));
+  transition: filter 0.2s ease;
+
+  &:hover,
+  &:focus {
+    filter: drop-shadow(0 0 6px rgba(var(--bs-primary-rgb), 0.7));
+  }
+}
+
+/* ── Journal browser sticky nav ──────────────────────── */
+
+.jw-journal-nav {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+/* On mobile the dock panel is transparent — journal nav buttons must be opaque */
+.sticky-mobile-toolbar .jw-journal-nav {
+  justify-content: center;
+}
+
+.jw-journal-nav__btn {
+  --bs-btn-bg: var(--bs-body-bg, #fff);
+  white-space: nowrap;
+}
+
+.jw-journal-nav__icon {
+  margin-right: 0.25rem;
+}
+
+/* Small mobile: icon-only journal nav buttons in bottom toolbar */
+@media (max-width: 479px) {
+  .sticky-mobile-toolbar .jw-journal-nav__label {
+    display: none;
+  }
+
+  .sticky-mobile-toolbar .jw-journal-nav__icon {
+    margin-right: 0;
+  }
+
+  .sticky-mobile-toolbar .jw-journal-nav__btn {
+    padding-inline: 0.6rem;
+  }
+}
+
+/* Very small screens: tighten further */
+@media (max-width: 374px) {
+  .sticky-mobile-toolbar__inner {
+    gap: 0.35rem;
+    padding-inline: 0.5rem;
+  }
+
+  .sticky-mobile-toolbar .btn-bd-primary .small {
+    font-size: 0.72rem;
+  }
+}
+

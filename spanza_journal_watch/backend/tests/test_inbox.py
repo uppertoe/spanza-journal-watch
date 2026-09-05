@@ -19,7 +19,7 @@ import pytest
 from django.contrib.auth.models import AnonymousUser, Permission
 from django.core import mail
 from django.test import Client, RequestFactory
-from django.urls import reverse
+from django.urls import resolve, reverse
 from django.utils import timezone
 
 from spanza_journal_watch.backend.context_processors import selected_issue
@@ -523,7 +523,7 @@ class TestInboxContextProcessorUnreadCount:
         request = factory.get("/editorial/")
         request.user = user
         request.session = {}
-        request.resolver_match = None
+        request.resolver_match = resolve(request.path)
         return request
 
     def test_chief_editor_sees_unread_count(self):

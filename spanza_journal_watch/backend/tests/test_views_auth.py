@@ -349,7 +349,7 @@ class TestDocsAuthGuards:
     @pytest.fixture(autouse=True)
     def _fake_static_serve(self, monkeypatch):
         monkeypatch.setattr(
-            "spanza_journal_watch.backend.views.static_serve", lambda *args, **kwargs: HttpResponse("ok")
+            "spanza_journal_watch.backend.views.docs.static_serve", lambda *args, **kwargs: HttpResponse("ok")
         )
 
     @staticmethod

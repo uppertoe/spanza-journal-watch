@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from django.core.management import call_command
+from django.db import connection
 
 from spanza_journal_watch.layout.models import Homepage
 from spanza_journal_watch.submissions.models import Issue, MeshTagMapping, Tag
@@ -36,6 +37,12 @@ def regression_baseline(django_db_setup, django_db_blocker):
     # issues, etc.) into the next session, where they would break tests that
     # assume empty tables.
     with django_db_blocker.unblock():
+        # Never flush anything but the test database: if the connection is not
+        # pointing at pytest-django's test_* database here, something has gone
+        # wrong upstream and wiping the development database would be far worse.
+        db_name = connection.settings_dict.get("NAME") or ""
+        if not db_name.startswith("test_"):
+            raise RuntimeError(f"Refusing to flush non-test database {db_name!r}")
         call_command("flush", "--no-input", verbosity=0)
         Homepage.CURRENT_HOMEPAGE = None
 

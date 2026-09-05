@@ -20,7 +20,7 @@ services:
       - .:/app:z
     env_file: .env.local
     ports:
-      - '8000:8000'
+      - '8033:8000'
     command: /start
 
   postgres:

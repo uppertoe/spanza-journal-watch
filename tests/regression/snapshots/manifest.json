@@ -7,7 +7,7 @@
   },
   "review_list_redirect": {
     "path": "/reviews",
-    "status_code": 302,
+    "status_code": 301,
     "content_type": "text/html; charset=utf-8",
     "snapshot_file": "tests/regression/snapshots/review_list_redirect.html"
   },
@@ -78,9 +78,147 @@
     "snapshot_file": "tests/regression/snapshots/newsletter_success.html"
   },
   "newsletter_unsubscribe": {
-    "path": "/newsletter/unsubscribe/OZjFzy3kQ-KgFiFQFXcwIA",
+    "path": "/newsletter/unsubscribe/newsletter-subscriber-unsubscribe_token-17",
     "status_code": 200,
     "content_type": "text/html; charset=utf-8",
     "snapshot_file": "tests/regression/snapshots/newsletter_unsubscribe.html"
+  },
+  "editorial_dashboard": {
+    "path": "/editorial/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_dashboard.html"
+  },
+  "editorial_issue_builder": {
+    "path": "/editorial/issues/builder",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_issue_builder.html"
+  },
+  "editorial_issue_reviewers": {
+    "path": "/editorial/issues/reviewers",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_issue_reviewers.html"
+  },
+  "editorial_issue_reviews": {
+    "path": "/editorial/issues/reviews",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_issue_reviews.html"
+  },
+  "editorial_issue_publish": {
+    "path": "/editorial/issues/publish",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_issue_publish.html"
+  },
+  "editorial_issue_planka": {
+    "path": "/editorial/issues/planka",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_issue_planka.html"
+  },
+  "editorial_article_intake": {
+    "path": "/editorial/articles/intake",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_article_intake.html"
+  },
+  "editorial_watched_journals": {
+    "path": "/editorial/articles/watched-journals",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_watched_journals.html"
+  },
+  "editorial_subscribers": {
+    "path": "/editorial/subscribers/list",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_subscribers.html"
+  },
+  "editorial_newsletter_release": {
+    "path": "/editorial/newsletter/release",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_newsletter_release.html"
+  },
+  "editorial_analytics_overview": {
+    "path": "/editorial/analytics/overview/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_analytics_overview.html"
+  },
+  "editorial_analytics_editorial": {
+    "path": "/editorial/analytics/editorial/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_analytics_editorial.html"
+  },
+  "editorial_analytics_traffic": {
+    "path": "/editorial/analytics/traffic/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_analytics_traffic.html"
+  },
+  "editorial_analytics_email": {
+    "path": "/editorial/analytics/email/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_analytics_email.html"
+  },
+  "editorial_analytics_journals": {
+    "path": "/editorial/analytics/journals/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_analytics_journals.html"
+  },
+  "editorial_analytics_issues": {
+    "path": "/editorial/analytics/issues/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_analytics_issues.html"
+  },
+  "editorial_inbox": {
+    "path": "/editorial/inbox/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_inbox.html"
+  },
+  "editorial_settings": {
+    "path": "/editorial/settings",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_settings.html"
+  },
+  "editorial_tags": {
+    "path": "/editorial/settings/tags",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_tags.html"
+  },
+  "editorial_collections": {
+    "path": "/editorial/settings/collections",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_collections.html"
+  },
+  "editorial_authors": {
+    "path": "/editorial/authors",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_authors.html"
+  },
+  "editorial_affiliations": {
+    "path": "/editorial/affiliations",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/editorial_affiliations.html"
+  },
+  "user_update": {
+    "path": "/users/~update/",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "snapshot_file": "tests/regression/snapshots/user_update.html"
   }
 }

@@ -263,8 +263,8 @@ class TestHeadlineQueue:
         review.draft_headline = "Draft to approve"
         review.draft_bottom_line = "Draft line."
         review.save()
-        with patch("spanza_journal_watch.backend.views.queue_indexnow_submission") as queue:
-            with patch("spanza_journal_watch.backend.views.transaction.on_commit", side_effect=lambda fn: fn()):
+        with patch("spanza_journal_watch.backend.views.shared.queue_indexnow_submission") as queue:
+            with patch("django.db.transaction.on_commit", side_effect=lambda fn: fn()):
                 response = client.post(
                     reverse("backend:headline_save", kwargs={"review_id": review.pk}),
                     {"headline": "  Edited   headline ", "bottom_line": "Edited line."},

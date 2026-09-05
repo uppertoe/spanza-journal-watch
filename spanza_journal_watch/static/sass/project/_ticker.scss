@@ -1,0 +1,112 @@
+.frontend-ticker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 2.75rem;
+  margin-top: -0.15rem;
+  margin-bottom: 1rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--jw-outline);
+  border-radius: 1rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #7eaedc 8%, var(--jw-surface)),
+    color-mix(in srgb, #e28964 6%, var(--jw-surface))
+  );
+  box-shadow: var(--jw-shadow-soft);
+  overflow: hidden;
+}
+
+.frontend-ticker--linked {
+  color: inherit;
+}
+
+.frontend-ticker::before,
+.frontend-ticker::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.frontend-ticker::before {
+  inset: auto auto -2.5rem -1.8rem;
+  width: 9.2rem;
+  height: 5rem;
+  background: color-mix(in srgb, #7eaedc 24%, transparent);
+}
+
+.frontend-ticker::after {
+  inset: -2.7rem -1.4rem auto auto;
+  width: 7.6rem;
+  height: 5rem;
+  background: color-mix(in srgb, #e28964 20%, transparent);
+}
+
+[data-bs-theme='dark'] .frontend-ticker {
+  border-color: var(--jw-outline);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #5c88b0 18%, var(--jw-surface)),
+    color-mix(in srgb, #c87452 14%, var(--jw-surface))
+  );
+  box-shadow: var(--jw-shadow-soft);
+}
+
+.frontend-ticker__eyebrow {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #7eaedc 18%, transparent);
+  color: var(--jw-primary-strong);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: none;
+
+  @media (min-width: 576px) {
+    display: block;
+  }
+}
+
+.frontend-ticker__content {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.frontend-ticker__title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.frontend-ticker__text {
+  font-size: 0.88rem;
+  line-height: 1.2;
+  color: var(--jw-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frontend-ticker__link {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  font-size: 0.87rem;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+
+.frontend-ticker__link:hover,
+.frontend-ticker__link:focus-visible {
+  text-decoration: underline;
+}
+

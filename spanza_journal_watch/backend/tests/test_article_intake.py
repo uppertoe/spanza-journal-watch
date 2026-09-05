@@ -106,7 +106,7 @@ class TestArticleIntakeAddArticle:
             publication_month=batch.from_month,
         )
 
-        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.intake._build_pubmed_client") as mock_build:
             from spanza_journal_watch.backend.views import _import_pubmed_batch
 
             _import_pubmed_batch(batch, [watched])
@@ -119,7 +119,7 @@ class TestArticleIntakeAddArticle:
         batch = _make_batch(user)
         pmid = "12345678"
 
-        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.intake._build_pubmed_client") as mock_build:
             mock_client = MagicMock()
             mock_client.fetch_articles.return_value = _sample_payload(pmid)
             mock_build.return_value = mock_client
@@ -137,7 +137,7 @@ class TestArticleIntakeAddArticle:
         batch = _make_batch(user)
         pmid = "99999999"
 
-        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.intake._build_pubmed_client") as mock_build:
             mock_client = MagicMock()
             mock_client.fetch_articles.return_value = _sample_payload(pmid)
             mock_build.return_value = mock_client
@@ -154,7 +154,7 @@ class TestArticleIntakeAddArticle:
         batch = _make_batch(user)
         pmid = "11111111"
 
-        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.intake._build_pubmed_client") as mock_build:
             mock_client = MagicMock()
             mock_client.fetch_articles.return_value = _sample_payload(pmid)
             mock_build.return_value = mock_client
@@ -173,7 +173,7 @@ class TestArticleIntakeAddArticle:
         pmid = "22222222"
 
         # First add
-        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.intake._build_pubmed_client") as mock_build:
             mock_client = MagicMock()
             mock_client.fetch_articles.return_value = _sample_payload(pmid)
             mock_build.return_value = mock_client
@@ -203,7 +203,7 @@ class TestArticleIntakeAddArticle:
         batch = _make_batch(user)
         pmid = "33333333"
 
-        with patch("spanza_journal_watch.backend.views._build_pubmed_client") as mock_build:
+        with patch("spanza_journal_watch.backend.views.intake._build_pubmed_client") as mock_build:
             mock_client = MagicMock()
             mock_client.fetch_articles.side_effect = PubmedAPIError("Network timeout")
             mock_build.return_value = mock_client
@@ -418,16 +418,16 @@ class TestArticleIntakePushToPlanka:
 
         with (
             patch(
-                "spanza_journal_watch.backend.views._build_planka_client",
+                "spanza_journal_watch.backend.views.shared._build_planka_client",
                 return_value=mock_client,
             ),
-            patch("spanza_journal_watch.backend.views._ensure_planka_board_mappings"),
+            patch("spanza_journal_watch.backend.views.planka_cards._ensure_planka_board_mappings"),
             patch(
-                "spanza_journal_watch.backend.views._get_board_label_map",
+                "spanza_journal_watch.backend.views.planka_cards._get_board_label_map",
                 return_value={},
             ),
             patch(
-                "spanza_journal_watch.backend.views._get_board_list_type_map",
+                "spanza_journal_watch.backend.views.planka_cards._get_board_list_type_map",
                 return_value={"list-candidates": "candidates"},
             ),
         ):
@@ -450,16 +450,16 @@ class TestArticleIntakePushToPlanka:
 
         with (
             patch(
-                "spanza_journal_watch.backend.views._build_planka_client",
+                "spanza_journal_watch.backend.views.shared._build_planka_client",
                 return_value=mock_client,
             ),
-            patch("spanza_journal_watch.backend.views._ensure_planka_board_mappings"),
+            patch("spanza_journal_watch.backend.views.planka_cards._ensure_planka_board_mappings"),
             patch(
-                "spanza_journal_watch.backend.views._get_board_label_map",
+                "spanza_journal_watch.backend.views.planka_cards._get_board_label_map",
                 return_value={},
             ),
             patch(
-                "spanza_journal_watch.backend.views._get_board_list_type_map",
+                "spanza_journal_watch.backend.views.planka_cards._get_board_list_type_map",
                 return_value={},
             ),
         ):
@@ -497,7 +497,7 @@ class TestArticleIntakeCheckForNew:
 
         client, user = _make_manager()
         batch, _ = _make_batch_with_watched(user)
-        with patch("spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay") as mock_delay:
+        with patch("spanza_journal_watch.backend.views.intake.check_batch_for_new_articles_task.delay") as mock_delay:
             mock_delay.return_value = MagicMock(id="task-1")
             resp = client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
         assert resp.status_code in (200, 302)
@@ -513,7 +513,7 @@ class TestArticleIntakeCheckForNew:
         batch.last_pubmed_fetched_at = timezone.now()
         batch.save(update_fields=["last_pubmed_fetched_at", "modified"])
 
-        with patch("spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay") as mock_delay:
+        with patch("spanza_journal_watch.backend.views.intake.check_batch_for_new_articles_task.delay") as mock_delay:
             resp = client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
         assert resp.status_code in (200, 302)
         mock_delay.assert_not_called()
@@ -526,7 +526,7 @@ class TestArticleIntakeCheckForNew:
         batch.last_pubmed_fetched_at = timezone.now() - datetime.timedelta(minutes=20)
         batch.save(update_fields=["last_pubmed_fetched_at", "modified"])
 
-        with patch("spanza_journal_watch.backend.views.check_batch_for_new_articles_task.delay") as mock_delay:
+        with patch("spanza_journal_watch.backend.views.intake.check_batch_for_new_articles_task.delay") as mock_delay:
             mock_delay.return_value = MagicMock(id="task-2")
             client.post(reverse("backend:article_intake_check_for_new", kwargs={"batch_id": batch.pk}))
         mock_delay.assert_called_once_with(batch.pk)

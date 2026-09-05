@@ -120,8 +120,8 @@ class TestIndexNowOnReviewEdit:
         author = Author.objects.create(name="Dr Ping")
         review = _review("Pinged paper", author=author)
 
-        with patch("spanza_journal_watch.backend.views.queue_indexnow_submission") as queue:
-            with patch("spanza_journal_watch.backend.views.transaction.on_commit", side_effect=lambda fn: fn()):
+        with patch("spanza_journal_watch.backend.views.shared.queue_indexnow_submission") as queue:
+            with patch("django.db.transaction.on_commit", side_effect=lambda fn: fn()):
                 from spanza_journal_watch.submissions.models import Issue
 
                 issue = Issue.objects.create(name="Edit issue", body="b", active=True)
@@ -142,8 +142,8 @@ class TestIndexNowOnReviewEdit:
         from spanza_journal_watch.backend.views import _queue_indexnow_for_review
 
         draft = _review("Draft paper", active=False)
-        with patch("spanza_journal_watch.backend.views.queue_indexnow_submission") as queue:
-            with patch("spanza_journal_watch.backend.views.transaction.on_commit", side_effect=lambda fn: fn()):
+        with patch("spanza_journal_watch.backend.views.shared.queue_indexnow_submission") as queue:
+            with patch("django.db.transaction.on_commit", side_effect=lambda fn: fn()):
                 _queue_indexnow_for_review(draft)
         queue.assert_not_called()
 
@@ -152,7 +152,7 @@ class TestIndexNowOnReviewEdit:
 
         author = Author.objects.create(name="Dr Named")
         live = _review("Live paper", author=author)
-        with patch("spanza_journal_watch.backend.views.queue_indexnow_submission") as queue:
-            with patch("spanza_journal_watch.backend.views.transaction.on_commit", side_effect=lambda fn: fn()):
+        with patch("spanza_journal_watch.backend.views.shared.queue_indexnow_submission") as queue:
+            with patch("django.db.transaction.on_commit", side_effect=lambda fn: fn()):
                 _queue_indexnow_for_review(live)
         assert queue.call_args[0][0] == [live.get_absolute_url(), author.get_absolute_url()]

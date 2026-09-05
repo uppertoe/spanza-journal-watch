@@ -1,0 +1,75 @@
+.article-post {
+  margin-bottom: 4rem;
+}
+
+/* Prevent layout shift when star button swaps (avoids scrollspy flicker) */
+[id^='review-star-actions'] {
+  min-height: 2rem;
+}
+
+/* long-form content readability */
+
+.article-post .text-break,
+.journal-article-card__abstract {
+  font-size: 1.05rem;
+  line-height: 1.72;
+  letter-spacing: 0.005em;
+}
+
+@supports (content-visibility: auto) {
+  .deferred-card,
+  .deferred-article,
+  .deferred-search-result {
+    content-visibility: auto;
+    contain: layout style paint;
+  }
+
+  .deferred-card {
+    contain-intrinsic-size: 420px;
+  }
+
+  .deferred-article {
+    contain-intrinsic-size: 1400px;
+  }
+
+  .deferred-search-result {
+    contain-intrinsic-size: 320px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sticky-desktop-toolbar {
+    inset: auto 0 1rem;
+    padding-inline: 1rem;
+  }
+
+  .sticky-desktop-toolbar__inner {
+    width: 100%;
+    padding-right: 0;
+  }
+
+  .sticky-mobile-toolbar .sticky-pager-actions .btn,
+  .sticky-mobile-toolbar .sticky-pager-actions .badge {
+    min-height: 2.35rem;
+    font-size: 0.84rem;
+  }
+
+  .sticky-mobile-toolbar .sticky-pager-actions .btn {
+    padding-inline: 0.7rem;
+  }
+
+  .sticky-mobile-toolbar .sticky-pager-actions .badge {
+    padding-inline: 0.55rem;
+    font-size: 0.76rem;
+    letter-spacing: 0.01em;
+  }
+
+  .footer-logo-link {
+    padding: 1rem;
+  }
+
+  .site-brand-mark {
+    width: clamp(64px, 20vw, 96px);
+  }
+}
+

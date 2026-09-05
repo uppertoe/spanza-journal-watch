@@ -130,8 +130,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"  {self.style.SUCCESS('OK')}: Aggregate reporting enabled")
             else:
                 self.stdout.write(
-                    f"  {self.style.WARNING('TIP')}: Add rua= for aggregate reports "
-                    f"(e.g., rua=mailto:dmarc@{domain})"
+                    f"  {self.style.WARNING('TIP')}: Add rua= for aggregate reports (e.g., rua=mailto:dmarc@{domain})"
                 )
         else:
             self.stdout.write(f"  {self.style.ERROR('MISSING')}: No DMARC record found at {dmarc_domain}")

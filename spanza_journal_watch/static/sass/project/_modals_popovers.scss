@@ -1,0 +1,146 @@
+.modal {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.modal-dialog {
+  margin: 1rem auto;
+  height: calc(100dvh - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+
+@media (max-width: 767.98px) {
+  .modal-dialog {
+    --toolbar-h: calc(3.7rem + env(safe-area-inset-bottom));
+    margin-bottom: calc(var(--toolbar-h) + 0.5rem);
+    height: calc(100dvh - 1rem - var(--toolbar-h) - 0.5rem);
+    max-height: calc(100dvh - 1rem - var(--toolbar-h) - 0.5rem);
+  }
+}
+
+.modal-content {
+  position: relative;
+  max-height: 100%;
+  border: 1px solid var(--jw-outline);
+  border-radius: 1.4rem;
+  background: var(--jw-surface);
+  box-shadow: var(--jw-shadow-medium);
+  overflow: hidden;
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--jw-outline);
+}
+
+.modal-header {
+  background: var(--jw-surface-cool);
+  padding: 1rem 1.25rem;
+  border-top-left-radius: calc(1.4rem - 1px);
+  border-top-right-radius: calc(1.4rem - 1px);
+}
+
+.modal-header .modal-title {
+  font-weight: 700;
+  color: var(--jw-primary-strong);
+}
+
+.modal-body {
+  flex: 1 1 auto;
+  background: var(--jw-surface);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 5.75rem;
+}
+
+html.jw-modal-open,
+body.jw-modal-open {
+  overflow: hidden;
+}
+
+@media (max-width: 767.98px) {
+  .modal-body {
+    padding-bottom: 1.5rem;
+  }
+}
+
+.issue-review-separator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.6rem 0;
+}
+
+.issue-review-separator > span {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--jw-secondary) 58%, var(--jw-outline));
+  box-shadow:
+    -1.2rem 0 0 color-mix(in srgb, var(--jw-secondary) 18%, transparent),
+    1.2rem 0 0 color-mix(in srgb, var(--jw-secondary) 18%, transparent);
+}
+
+[data-bs-theme='dark'] .issue-review-separator > span {
+  background: color-mix(in srgb, var(--jw-secondary) 46%, var(--jw-outline));
+  box-shadow:
+    -1.2rem 0 0 color-mix(in srgb, var(--jw-secondary) 14%, transparent),
+    1.2rem 0 0 color-mix(in srgb, var(--jw-secondary) 14%, transparent);
+}
+
+.journalwatch-popover {
+  --bs-popover-bg: color-mix(
+    in srgb,
+    var(--jw-surface) 94%,
+    var(--jw-surface-cool)
+  );
+  --bs-popover-border-color: var(--jw-outline);
+  --bs-popover-header-bg: color-mix(in srgb, var(--jw-surface-cool) 82%, white);
+  --bs-popover-header-color: var(--jw-primary-strong);
+  --bs-popover-body-color: var(--jw-text);
+  --bs-popover-box-shadow: var(--jw-shadow-soft);
+}
+
+[data-bs-theme='dark'] .journalwatch-popover {
+  --bs-popover-bg: color-mix(in srgb, var(--jw-surface) 96%, #11161c);
+  --bs-popover-border-color: var(--jw-outline);
+  --bs-popover-header-bg: color-mix(
+    in srgb,
+    var(--jw-surface-cool) 68%,
+    #1a222b
+  );
+  --bs-popover-header-color: #eef4fb;
+  --bs-popover-body-color: #d6e2ee;
+}
+
+[data-bs-theme='dark'] .modal-content {
+  border-color: var(--jw-outline);
+  background: var(--jw-surface);
+  box-shadow: var(--jw-shadow-medium);
+}
+
+.public-site #contents-list-group .list-group {
+  overflow: hidden;
+  border: 1px solid var(--jw-outline);
+  border-radius: 1.05rem;
+  background: var(--jw-surface-cool);
+  box-shadow: var(--jw-shadow-soft);
+}
+
+.public-site #contents-list-group .list-group-item {
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.public-site #contents-list-group .list-group-item:first-child {
+  border-top: 0;
+}
+
+.public-site #contents-list-group .list-group-item.active {
+  background: color-mix(in srgb, var(--jw-primary) 12%, var(--jw-surface-cool));
+  color: var(--bs-body-color);
+  border-color: var(--jw-outline);
+}
+

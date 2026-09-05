@@ -26,6 +26,21 @@ Generated files:
 - `tests/regression/snapshots/*.html`
 - `tests/regression/snapshots/manifest.json`
 
+## Editorial page snapshots
+
+`TestEditorialSnapshots` renders twenty-three editorial pages as the fixture's
+first superuser and compares the `<main>` element, byte for byte after
+normalisation, with `tests/regression/snapshots/editorial_*.html`. The
+normaliser (`spanza_journal_watch/utils/regression_snapshots.py`) replaces CSRF
+tokens, bundle hashes, timestamps, relative times and calendar dates, so a
+failure means the markup changed. On a mismatch the rendered page is written
+beside the snapshot as `<name>.actual.html` for diffing.
+
+After an intended change, regenerate the editorial snapshots from the test
+database:
+
+`JW_UPDATE_SNAPSHOTS=1 pytest tests/regression -k editorial_page_matches_snapshot`
+
 ## Running regression tests
 
 `pytest tests/regression -q`
@@ -34,7 +49,7 @@ Equivalent docker command from project root:
 
 `docker compose -f local.yml exec -T django pytest tests/regression -q`
 
-Current baseline suite: 26 passing tests.
+Current baseline suite: 87 passing tests.
 
 Route-to-test mapping:
 
@@ -53,5 +68,4 @@ Details and environment variables:
 ## Notes
 
 - Only project-owned routes are covered in this phase.
-- Backend/auth routes are intentionally deferred.
 - Fixtures are anonymized (`@example.test`) and token fields are stabilized.

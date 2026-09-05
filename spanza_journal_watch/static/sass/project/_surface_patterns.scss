@@ -1,0 +1,251 @@
+.image-fallback-frame {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+      180deg,
+      rgba(236, 241, 247, 0.96),
+      rgba(223, 231, 240, 0.92)
+    ),
+    var(--jw-surface-cool);
+}
+
+.image-fallback-frame::before,
+.image-fallback-frame::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.image-fallback-frame::before {
+  inset: auto auto -18% -8%;
+  width: 68%;
+  height: 48%;
+  background: color-mix(in srgb, var(--jw-primary) 12%, transparent);
+}
+
+.image-fallback-frame::after {
+  inset: -20% -10% auto auto;
+  width: 54%;
+  height: 44%;
+  background: color-mix(in srgb, var(--jw-secondary) 9%, transparent);
+}
+
+.image-fallback-frame__image {
+  position: relative;
+  z-index: 1;
+  transition: opacity 0.18s ease;
+}
+
+.image-fallback-frame__image--hidden {
+  opacity: 0;
+}
+
+.surface-pattern::before,
+.surface-pattern::after,
+.image-fallback-frame::before,
+.image-fallback-frame::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.surface-pattern--a::before,
+.image-fallback-frame--a::before {
+  inset: auto auto -3rem -2rem;
+  width: 10rem;
+  height: 7rem;
+  background: color-mix(in srgb, var(--jw-primary) 10%, transparent);
+}
+
+.surface-pattern--a::after,
+.image-fallback-frame--a::after {
+  inset: -2rem -1.5rem auto auto;
+  width: 8rem;
+  height: 6rem;
+  background: color-mix(in srgb, var(--jw-secondary) 7%, transparent);
+}
+
+.surface-pattern--b::before,
+.image-fallback-frame--b::before {
+  inset: auto 12% -18% auto;
+  width: 9rem;
+  height: 9rem;
+  background: color-mix(in srgb, var(--jw-secondary) 9%, transparent);
+}
+
+.surface-pattern--b::after,
+.image-fallback-frame--b::after {
+  inset: -18% auto auto -10%;
+  width: 7rem;
+  height: 4.5rem;
+  background: color-mix(in srgb, var(--jw-primary) 11%, transparent);
+}
+
+.surface-pattern--c::before,
+.image-fallback-frame--c::before {
+  inset: 18% auto auto -12%;
+  width: 7rem;
+  height: 7rem;
+  background: color-mix(in srgb, var(--jw-primary) 9%, transparent);
+}
+
+.surface-pattern--c::after,
+.image-fallback-frame--c::after {
+  inset: auto -8% -16% auto;
+  width: 9rem;
+  height: 5rem;
+  background: color-mix(in srgb, var(--jw-secondary) 8%, transparent);
+}
+
+.surface-pattern--d::before,
+.image-fallback-frame--d::before {
+  inset: auto auto -22% 10%;
+  width: 12rem;
+  height: 4rem;
+  background: color-mix(in srgb, var(--jw-primary) 10%, transparent);
+}
+
+.surface-pattern--d::after,
+.image-fallback-frame--d::after {
+  inset: -16% 8% auto auto;
+  width: 5.5rem;
+  height: 5.5rem;
+  background: color-mix(in srgb, var(--jw-secondary) 7%, transparent);
+}
+
+.surface-pattern--e::before,
+.image-fallback-frame--e::before {
+  inset: -12% auto auto 12%;
+  width: 10rem;
+  height: 2.8rem;
+  border-radius: 999px;
+  transform: rotate(18deg);
+  background: color-mix(in srgb, var(--jw-primary) 11%, transparent);
+}
+
+.surface-pattern--e::after,
+.image-fallback-frame--e::after {
+  inset: auto 10% -14% auto;
+  width: 4.8rem;
+  height: 4.8rem;
+  border-radius: 1.35rem;
+  transform: rotate(-14deg);
+  background: color-mix(in srgb, var(--jw-secondary) 9%, transparent);
+}
+
+.surface-pattern--f::before,
+.image-fallback-frame--f::before {
+  inset: auto auto -18% 6%;
+  width: 13rem;
+  height: 3.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--jw-secondary) 10%, transparent);
+}
+
+.surface-pattern--f::after,
+.image-fallback-frame--f::after {
+  inset: 12% 12% auto auto;
+  width: 3.8rem;
+  height: 7.5rem;
+  border-radius: 999px;
+  transform: rotate(22deg);
+  background: color-mix(in srgb, var(--jw-primary) 11%, transparent);
+}
+
+.surface-pattern--g::before,
+.image-fallback-frame--g::before {
+  inset: 20% auto auto -8%;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 1.2rem;
+  transform: rotate(14deg);
+  background: color-mix(in srgb, var(--jw-primary) 10%, transparent);
+}
+
+.surface-pattern--g::after,
+.image-fallback-frame--g::after {
+  inset: auto -10% -8% auto;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--jw-secondary) 8%, transparent);
+}
+
+.surface-pattern--h::before,
+.image-fallback-frame--h::before {
+  inset: -10% -8% auto auto;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--jw-secondary) 10%, transparent);
+}
+
+.surface-pattern--h::after,
+.image-fallback-frame--h::after {
+  inset: auto auto -10% 12%;
+  width: 11rem;
+  height: 4.2rem;
+  border-radius: 1.4rem;
+  transform: rotate(-10deg);
+  background: color-mix(in srgb, var(--jw-primary) 10%, transparent);
+}
+
+[data-bs-theme='dark'] .image-fallback-frame {
+  background: linear-gradient(
+      180deg,
+      rgba(40, 49, 59, 0.94),
+      rgba(31, 39, 48, 0.96)
+    ),
+    var(--jw-surface-cool);
+}
+
+[data-bs-theme='dark'] .surface-pattern--a::before,
+[data-bs-theme='dark'] .surface-pattern--c::before,
+[data-bs-theme='dark'] .image-fallback-frame--a::before,
+[data-bs-theme='dark'] .image-fallback-frame--c::before {
+  background: color-mix(in srgb, var(--jw-primary) 18%, transparent);
+}
+
+[data-bs-theme='dark'] .surface-pattern--a::after,
+[data-bs-theme='dark'] .surface-pattern--b::before,
+[data-bs-theme='dark'] .surface-pattern--c::after,
+[data-bs-theme='dark'] .surface-pattern--d::after,
+[data-bs-theme='dark'] .image-fallback-frame--a::after,
+[data-bs-theme='dark'] .image-fallback-frame--b::before,
+[data-bs-theme='dark'] .image-fallback-frame--c::after,
+[data-bs-theme='dark'] .image-fallback-frame--d::after {
+  background: color-mix(in srgb, var(--jw-secondary) 14%, transparent);
+}
+
+[data-bs-theme='dark'] .surface-pattern--b::after,
+[data-bs-theme='dark'] .surface-pattern--d::before,
+[data-bs-theme='dark'] .image-fallback-frame--b::after,
+[data-bs-theme='dark'] .image-fallback-frame--d::before {
+  background: color-mix(in srgb, var(--jw-primary) 15%, transparent);
+}
+
+[data-bs-theme='dark'] .surface-pattern--e::before,
+[data-bs-theme='dark'] .surface-pattern--f::after,
+[data-bs-theme='dark'] .surface-pattern--g::before,
+[data-bs-theme='dark'] .surface-pattern--h::after,
+[data-bs-theme='dark'] .image-fallback-frame--e::before,
+[data-bs-theme='dark'] .image-fallback-frame--f::after,
+[data-bs-theme='dark'] .image-fallback-frame--g::before,
+[data-bs-theme='dark'] .image-fallback-frame--h::after {
+  background: color-mix(in srgb, var(--jw-primary) 15%, transparent);
+}
+
+[data-bs-theme='dark'] .surface-pattern--e::after,
+[data-bs-theme='dark'] .surface-pattern--f::before,
+[data-bs-theme='dark'] .surface-pattern--g::after,
+[data-bs-theme='dark'] .surface-pattern--h::before,
+[data-bs-theme='dark'] .image-fallback-frame--e::after,
+[data-bs-theme='dark'] .image-fallback-frame--f::before,
+[data-bs-theme='dark'] .image-fallback-frame--g::after,
+[data-bs-theme='dark'] .image-fallback-frame--h::before {
+  background: color-mix(in srgb, var(--jw-secondary) 14%, transparent);
+}
+

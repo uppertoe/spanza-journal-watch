@@ -197,8 +197,7 @@ class Command(BaseCommand):
             samples = ", ".join(sorted(sample_names))
             self.stdout.write(
                 self.style.WARNING(
-                    f"  {wj.name}: {prefix} {len(mismatched_pks)}/{links.count()} mismatched links"
-                    f" (e.g. {samples})"
+                    f"  {wj.name}: {prefix} {len(mismatched_pks)}/{links.count()} mismatched links (e.g. {samples})"
                 )
             )
             total_removed += len(mismatched_pks)

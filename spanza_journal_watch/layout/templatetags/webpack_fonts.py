@@ -12,5 +12,5 @@ def webpack_font_preloads():
     for name, info in assets.items():
         if name.endswith(".woff2"):
             url = info.get("publicPath", "")
-            tags.append(f'<link rel="preload" href="{url}" as="font"' f' type="font/woff2" crossorigin>')
+            tags.append(f'<link rel="preload" href="{url}" as="font" type="font/woff2" crossorigin>')
     return mark_safe("\n    ".join(tags))

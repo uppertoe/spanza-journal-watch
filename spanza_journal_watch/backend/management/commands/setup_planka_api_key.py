@@ -56,9 +56,7 @@ class Command(BaseCommand):
 
         email = (options["email"] or getattr(settings, "PLANKA_ADMIN_EMAIL", "") or "").strip()
         if not email:
-            raise CommandError(
-                "Admin email is required. Set PLANKA_ADMIN_EMAIL in your environment " "or pass --email."
-            )
+            raise CommandError("Admin email is required. Set PLANKA_ADMIN_EMAIL in your environment or pass --email.")
 
         db_url = (getattr(settings, "PLANKA_DB_URL", "") or "").strip()
         if not db_url:
