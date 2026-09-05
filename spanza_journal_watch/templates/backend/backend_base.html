@@ -248,7 +248,7 @@
             <div class="d-flex gap-2 ms-auto">
               <a class="btn btn-outline-primary btn-sm" href="{% url 'home' %}">Main site</a>
               {% if planka_url and request.user.is_staff %}
-              <a class="btn btn-outline-secondary btn-sm" href="{{ planka_url }}" rel="noopener noreferrer">Open Planka</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ planka_url }}" target="_blank" rel="noopener noreferrer">Open Planka</a>
               {% endif %}
             </div>
           </div>

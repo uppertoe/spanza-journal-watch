@@ -24,7 +24,7 @@
                             <a class="btn btn-primary" href="{% url 'backend:backend_go' %}">Open backend</a>
                         {% endif %}
                         {% if planka_base_url %}
-                            <a class="btn {% if is_coordinator %}btn-outline-secondary{% else %}btn-primary{% endif %}" href="{{ planka_base_url }}" rel="noopener noreferrer">Open Planka</a>
+                            <a class="btn {% if is_coordinator %}btn-outline-secondary{% else %}btn-primary{% endif %}" href="{{ planka_base_url }}" target="_blank" rel="noopener noreferrer">Open Planka</a>
                         {% elif not is_coordinator %}
                             <a class="btn btn-primary" href="/">Go to home</a>
                         {% endif %}
