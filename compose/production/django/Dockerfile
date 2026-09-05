@@ -1,7 +1,7 @@
 # Base images are pinned by digest so every build of a given commit uses the
 # same layers. Bump the digest deliberately (Dependabot opens PRs for these):
 #   docker buildx imagetools inspect python:3.13-alpine3.21 | grep Digest
-FROM python:3.13-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS docs-builder
+FROM python:3.14-slim-bookworm@sha256:9ab8d9c8514b44f90cf0029dd42fdd7e9e211e639c8b995304cc04568dee900f AS docs-builder
 
 # Sphinx and friends at the versions locked in requirements/docs.txt, without
 # installing the Django stack that file also carries. pip constraints may not
@@ -29,7 +29,7 @@ COPY ./webpack ${APP_HOME}/webpack
 COPY ./spanza_journal_watch/static ${APP_HOME}/spanza_journal_watch/static
 RUN npm run build
 # define an alias for the specific python version used in this file.
-FROM python:3.13-alpine3.21@sha256:e77011e08668411a8db356ec6bae7d39cdb0ff531db49bf1de9d5a64d8f75a6a AS python
+FROM python:3.14-alpine3.21@sha256:fd8407cacb1028c803566276ae25eb7c2a00fbaa210a0a5670994f6866e29278 AS python
 
 # Python build stage
 FROM python AS python-build-stage
