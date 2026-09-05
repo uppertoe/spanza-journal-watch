@@ -10,12 +10,18 @@ alabaster==1.0.0
     # via sphinx
 amqp==5.3.1
     # via kombu
+annotated-types==0.8.0
+    # via pydantic
+anthropic==1.4.0
+    # via -r base.in
 anyio==4.12.1
     # via
+    #   anthropic
+    #   httpx2
     #   starlette
     #   watchfiles
 argon2-cffi==25.1.0
-    # via -r requirements/base.in
+    # via -r base.in
 argon2-cffi-bindings==25.1.0
     # via argon2-cffi
 asgiref==3.11.1
@@ -29,10 +35,10 @@ beautifulsoup4==4.14.3
 billiard==4.2.4
     # via celery
 bleach==6.3.0
-    # via -r requirements/base.in
+    # via -r base.in
 celery==5.6.2
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   django-celery-beat
     #   flower
 certifi==2026.2.25
@@ -59,18 +65,18 @@ click-repl==0.3.0
 colorama==0.4.6
     # via sphinx-autobuild
 crispy-bootstrap5==2026.3
-    # via -r requirements/base.in
+    # via -r base.in
 cron-descriptor==1.4.5
     # via django-celery-beat
 cryptography==46.0.7
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   jwcrypto
 defusedxml==0.7.1
     # via fpdf2
 django==6.0.3
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   crispy-bootstrap5
     #   django-allauth
     #   django-celery-beat
@@ -85,35 +91,37 @@ django==6.0.3
     #   django-tinymce
     #   django-view-breadcrumbs
 django-allauth==65.15.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-celery-beat==2.9.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-crispy-forms==2.6
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   crispy-bootstrap5
 django-environ==0.13.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-markdownx==4.0.9
-    # via -r requirements/base.in
+    # via -r base.in
 django-mjml==1.5
-    # via -r requirements/base.in
+    # via -r base.in
 django-model-utils==5.0.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-oauth-toolkit[oidc]==3.2.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-redis==6.0.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-request-logging==0.7.5
-    # via -r requirements/base.in
+    # via -r base.in
 django-timezone-field==7.2.1
     # via django-celery-beat
 django-tinymce==5.0.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-view-breadcrumbs==2.5.1
-    # via -r requirements/base.in
+    # via -r base.in
 django-webpack-loader==3.2.3
-    # via -r requirements/base.in
+    # via -r base.in
+docstring-parser==0.18.0
+    # via anthropic
 docutils==0.22.4
     # via
     #   myst-parser
@@ -121,22 +129,29 @@ docutils==0.22.4
 et-xmlfile==2.0.0
     # via openpyxl
 flower==2.0.1
-    # via -r requirements/base.in
+    # via -r base.in
 fonttools==4.62.1
     # via fpdf2
 fpdf2==2.8.7
-    # via -r requirements/base.in
+    # via -r base.in
 furo==2025.12.19
-    # via -r requirements/docs.in
+    # via -r docs.in
 h11==0.16.0
-    # via uvicorn
+    # via
+    #   httpcore2
+    #   uvicorn
 hiredis==3.3.0
-    # via -r requirements/base.in
+    # via -r base.in
+httpcore2==2.3.0
+    # via httpx2
+httpx2==2.3.0
+    # via anthropic
 humanize==4.15.0
     # via flower
 idna==3.11
     # via
     #   anyio
+    #   httpx2
     #   requests
 imagesize==2.0.0
     # via sphinx
@@ -144,6 +159,8 @@ jinja2==3.1.6
     # via
     #   myst-parser
     #   sphinx
+jiter==0.16.0
+    # via anthropic
 jwcrypto==1.5.7
     # via django-oauth-toolkit
 kombu==5.6.2
@@ -161,18 +178,18 @@ mdit-py-plugins==0.5.0
 mdurl==0.1.2
     # via markdown-it-py
 myst-parser==5.0.0
-    # via -r requirements/docs.in
+    # via -r docs.in
 oauthlib==3.3.1
     # via django-oauth-toolkit
 openpyxl==3.1.5
-    # via -r requirements/base.in
+    # via -r base.in
 packaging==26.0
     # via
     #   kombu
     #   sphinx
 pillow==12.1.1
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   django-markdownx
     #   fpdf2
 prometheus-client==0.24.1
@@ -181,26 +198,30 @@ prompt-toolkit==3.0.52
     # via click-repl
 pycparser==3.0
     # via cffi
+pydantic==2.13.5
+    # via anthropic
+pydantic-core==2.46.5
+    # via pydantic
 pygments==2.19.2
     # via
     #   accessible-pygments
     #   furo
     #   sphinx
 pyjwt==2.12.1
-    # via -r requirements/base.in
+    # via -r base.in
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0
     # via celery
 python-slugify==8.0.4
-    # via -r requirements/base.in
+    # via -r base.in
 pytz==2026.1.post1
     # via flower
 pyyaml==6.0.3
     # via myst-parser
 redis==7.3.0
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   django-redis
 requests==2.32.5
     # via
@@ -210,19 +231,21 @@ roman-numerals==4.1.0
     # via sphinx
 six==1.17.0
     # via python-dateutil
+sniffio==1.3.1
+    # via anthropic
 snowballstemmer==3.0.1
     # via sphinx
 soupsieve==2.8.3
     # via beautifulsoup4
 sphinx==9.1.0
     # via
-    #   -r requirements/docs.in
+    #   -r docs.in
     #   furo
     #   myst-parser
     #   sphinx-autobuild
     #   sphinx-basic-ng
 sphinx-autobuild==2025.8.25
-    # via -r requirements/docs.in
+    # via -r docs.in
 sphinx-basic-ng==1.0.0b2
     # via furo
 sphinxcontrib-applehelp==2.0.0
@@ -245,10 +268,20 @@ text-unidecode==1.3
     # via python-slugify
 tornado==6.5.5
     # via flower
+truststore==0.10.4
+    # via
+    #   httpcore2
+    #   httpx2
 typing-extensions==4.15.0
     # via
+    #   anthropic
     #   beautifulsoup4
     #   jwcrypto
+    #   pydantic
+    #   pydantic-core
+    #   typing-inspection
+typing-inspection==0.4.4
+    # via pydantic
 tzdata==2025.3
     # via
     #   django-celery-beat
@@ -264,7 +297,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-watchfiles==1.1.1
+watchfiles==1.2.0
     # via sphinx-autobuild
 wcwidth==0.6.0
     # via prompt-toolkit
@@ -273,4 +306,4 @@ webencodings==0.5.1
 websockets==16.0
     # via sphinx-autobuild
 whitenoise==6.12.0
-    # via -r requirements/base.in
+    # via -r base.in
