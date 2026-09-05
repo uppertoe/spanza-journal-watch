@@ -1,13 +1,9 @@
-{# Applies the stored or system colour scheme before first paint, so pages never flash the wrong theme. #}
+{# Applies the chosen colour scheme before first paint, so pages never flash the wrong theme. No choice yet means Auto: follow the system. #}
 <script>
       (() => {
-        const storedTheme = localStorage.getItem('theme');
-        const preferredTheme = storedTheme || (
-          window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        );
-        const resolvedTheme = preferredTheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : preferredTheme;
+        const storedTheme = localStorage.getItem('theme') || 'auto';
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolvedTheme = storedTheme === 'auto' ? (systemDark ? 'dark' : 'light') : storedTheme;
         document.documentElement.setAttribute('data-bs-theme', resolvedTheme);
       })();
     </script>

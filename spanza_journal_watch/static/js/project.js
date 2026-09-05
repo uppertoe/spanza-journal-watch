@@ -1977,3 +1977,42 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js', { scope: '/' });
   });
 }
+
+/* ── Top loading bar ────────────────────────────────────────
+   On for every htmx request except background polls, and while a normal
+   same-origin link navigation is in flight. */
+const loadingBar = () => document.getElementById('htmx-bar');
+const setLoadingBar = (on) => loadingBar()?.classList.toggle('is-on', on);
+const isBackgroundPoll = (element) => {
+  const trigger = element?.getAttribute?.('hx-trigger') || '';
+  return /\bevery\b/.test(trigger) || element?.classList?.contains('hx-quiet');
+};
+document.body.addEventListener('htmx:beforeRequest', (event) => {
+  if (!isBackgroundPoll(event.detail?.elt)) setLoadingBar(true);
+});
+[
+  'htmx:afterRequest',
+  'htmx:responseError',
+  'htmx:sendError',
+  'htmx:timeout',
+].forEach((name) =>
+  document.body.addEventListener(name, () => setLoadingBar(false)),
+);
+document.addEventListener('click', (event) => {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest('a[href]');
+  if (!link || link.target || link.hasAttribute('download')) return;
+  if (link.hasAttribute('hx-get') || link.hasAttribute('data-bs-toggle'))
+    return;
+  const url = new URL(link.href, window.location.href);
+  if (url.origin !== window.location.origin) return;
+  if (
+    url.pathname === window.location.pathname &&
+    url.search === window.location.search &&
+    url.hash
+  )
+    return;
+  setLoadingBar(true);
+});
+window.addEventListener('pageshow', () => setLoadingBar(false));

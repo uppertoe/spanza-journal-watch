@@ -19,31 +19,6 @@
         top: 0;
         z-index: 1030;
       }
-      .backend-htmx-spinner {
-        position: fixed;
-        bottom: 0.75rem;
-        right: 0.75rem;
-        z-index: 1080;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.35rem 0.55rem;
-        border-radius: 999px;
-        border: 1px solid var(--bs-border-color);
-        background: rgba(var(--bs-body-bg-rgb), 0.95);
-        color: var(--bs-body-color);
-        box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.12);
-        pointer-events: none;
-      }
-      .backend-htmx-spinner.htmx-indicator {
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 120ms ease-in-out;
-      }
-      .backend-htmx-spinner.htmx-request {
-        opacity: 1;
-        visibility: visible;
-      }
       .issue-context-bar {
         background: color-mix(in srgb, var(--bs-primary) 5%, var(--bs-body-bg));
         border-top: 2px solid var(--bs-primary);
@@ -141,10 +116,7 @@
         });
       });
     </script>
-    <div id="backend-htmx-spinner" class="backend-htmx-spinner htmx-indicator" aria-live="polite" aria-atomic="true">
-      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span class="small">Loading</span>
-    </div>
+    <div id="htmx-bar" aria-hidden="true"></div>
 
     <!-- Sticky header: navbar + issue context bar travel together -->
     <div class="backend-sticky-header">
@@ -252,7 +224,7 @@
     </div>{# /backend-sticky-header #}
 
     <!-- Main container -->
-    <main id="backend-main-content" class="container p-3 col-xl-10 offset-xl-1 col-12" hx-indicator="#backend-htmx-spinner">
+    <main id="backend-main-content" class="container p-3 col-xl-10 offset-xl-1 col-12">
         {% block content %}{% endblock content %}
         {% if is_htmx and is_issue_page %}
         <div id="issue-context-bar" hx-swap-oob="outerHTML">{% include "backend/_issue_context_bar.html" %}</div>

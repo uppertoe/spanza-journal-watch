@@ -10,26 +10,15 @@
   const getStoredTheme = () => localStorage.getItem('theme');
   const setStoredTheme = (theme) => localStorage.setItem('theme', theme);
 
-  const getPreferredTheme = () => {
-    const storedTheme = getStoredTheme();
-    if (storedTheme) {
-      return storedTheme;
-    }
-
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-  };
+  // No stored choice means Auto: follow the system and show Auto as selected.
+  const getPreferredTheme = () => getStoredTheme() || 'auto';
 
   const setTheme = (theme) => {
-    if (
-      theme === 'auto' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-    ) {
-      document.documentElement.setAttribute('data-bs-theme', 'dark');
-    } else {
-      document.documentElement.setAttribute('data-bs-theme', theme);
-    }
+    const systemDark = window.matchMedia(
+      '(prefers-color-scheme: dark)',
+    ).matches;
+    const resolved = theme === 'auto' ? (systemDark ? 'dark' : 'light') : theme;
+    document.documentElement.setAttribute('data-bs-theme', resolved);
   };
 
   setTheme(getPreferredTheme());

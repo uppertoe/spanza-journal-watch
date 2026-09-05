@@ -107,6 +107,7 @@
   {# htmx:configRequest in project.js) — a token baked into the markup would go #}
   {# stale once pages are CDN-cached. #}
   <body class="public-site"{% if user.is_authenticated and user.cpd_tracking_enabled %} data-cpd-tracking-enabled{% endif %}>
+    <div id="htmx-bar" aria-hidden="true"></div>
     <a href="#main-content" class="visually-hidden-focusable position-absolute top-0 start-0 p-2 bg-primary text-white z-3">Skip to main content</a>
     {% include "fragments/icon_sprite.html" %}
 
