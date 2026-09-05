@@ -32,11 +32,16 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      # Newsletter and account emails render through MJML; the tests need the renderer.
+      mjml:
+        image: ${{ vars.DOCKERHUB_NAMESPACE || 'uppertoe' }}/journalwatch-mjml:latest
+        ports: ['28101:28101']
     env:
       DJANGO_SETTINGS_MODULE: config.settings.test
       DATABASE_URL: postgres://jw:jw@localhost:5432/spanza_journal_watch
       REDIS_URL: redis://localhost:6379/0
       CELERY_BROKER_URL: redis://localhost:6379/0
+      MJML_HOST: localhost
       USE_DOCKER: 'no'
     steps:
       - name: Checkout

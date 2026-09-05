@@ -54,7 +54,12 @@ class TestSubmitUrls:
 
     @override_settings(INDEXNOW_KEY=KEY, DEBUG=False, INDEXNOW_ENDPOINT="https://api.indexnow.org/indexnow")
     def test_posts_expected_payload(self):
-        with mock.patch.object(indexnow.requests, "post") as post:
+        # The site domain comes from the sites table, which the data migration sets to
+        # the production domain on a fresh database; pin it so the assertions hold anywhere.
+        with (
+            mock.patch.object(indexnow, "get_domain_url", return_value="https://example.com"),
+            mock.patch.object(indexnow.requests, "post") as post,
+        ):
             post.return_value = mock.Mock(status_code=200, text="")
             submitted = indexnow.submit_urls(["/", "/reviews/foo", "/reviews/foo", "https://example.com/issues/bar"])
 

@@ -9,7 +9,10 @@ from spanza_journal_watch.layout.models import Homepage
 from spanza_journal_watch.submissions.models import Issue, MeshTagMapping, Tag
 
 
-@pytest.fixture(scope="session")
+# Package scope, not session: the fixture data is flushed as soon as the regression
+# package finishes, so tests collected after it (the order differs between
+# machines) never see baseline rows such as the curated tags.
+@pytest.fixture(scope="package")
 def regression_baseline(django_db_setup, django_db_blocker):
     fixture_name = "regression_baseline.json"
     fixture_path = Path(settings.BASE_DIR) / "spanza_journal_watch" / "fixtures" / fixture_name

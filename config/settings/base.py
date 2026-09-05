@@ -290,8 +290,10 @@ NEWSLETTER_REPLY_TO = env("NEWSLETTER_REPLY_TO", default=CONTACT_EMAIL)
 # MJML
 # ------------------------------------------------------------------------------
 MJML_BACKEND_MODE = "tcpserver"
+# Host and port of the MJML TCP server: the `mjml` compose service locally and in
+# production; CI runs it as a job service reachable on localhost.
 MJML_TCPSERVERS = [
-    ("mjml", 28101),  # the host and port of MJML TCP-Server
+    (env("MJML_HOST", default="mjml"), env.int("MJML_PORT", default=28101)),
 ]
 
 # FILE UPLOAD
