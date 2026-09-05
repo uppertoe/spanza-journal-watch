@@ -9,13 +9,13 @@ amqp==5.3.1
 annotated-types==0.8.0
     # via pydantic
 anthropic==1.3.0
-    # via -r requirements/base.in
+    # via -r base.in
 anyio==4.14.2
     # via
     #   anthropic
     #   httpx2
 argon2-cffi==25.1.0
-    # via -r requirements/base.in
+    # via -r base.in
 argon2-cffi-bindings==25.1.0
     # via argon2-cffi
 asgiref==3.11.1
@@ -25,10 +25,10 @@ asgiref==3.11.1
 billiard==4.2.4
     # via celery
 bleach==6.3.0
-    # via -r requirements/base.in
+    # via -r base.in
 celery==5.6.3
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   django-celery-beat
     #   flower
 certifi==2026.2.25
@@ -52,18 +52,18 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
     # via celery
 crispy-bootstrap5==2026.3
-    # via -r requirements/base.in
+    # via -r base.in
 cron-descriptor==1.4.5
     # via django-celery-beat
 cryptography==46.0.7
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   jwcrypto
 defusedxml==0.7.1
     # via fpdf2
 django==6.0.4
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   crispy-bootstrap5
     #   django-allauth
     #   django-celery-beat
@@ -78,49 +78,49 @@ django==6.0.4
     #   django-tinymce
     #   django-view-breadcrumbs
 django-allauth==65.15.1
-    # via -r requirements/base.in
+    # via -r base.in
 django-celery-beat==2.9.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-crispy-forms==2.6
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   crispy-bootstrap5
 django-environ==0.13.0
-    # via -r requirements/base.in
-django-markdownx==4.0.9
-    # via -r requirements/base.in
+    # via -r base.in
+django-markdownx==4.0.11
+    # via -r base.in
 django-mjml==1.5
-    # via -r requirements/base.in
+    # via -r base.in
 django-model-utils==5.0.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-oauth-toolkit[oidc]==3.2.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-redis==6.0.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-request-logging==0.7.5
-    # via -r requirements/base.in
+    # via -r base.in
 django-timezone-field==7.2.1
     # via django-celery-beat
 django-tinymce==5.0.0
-    # via -r requirements/base.in
+    # via -r base.in
 django-view-breadcrumbs==2.5.1
-    # via -r requirements/base.in
+    # via -r base.in
 django-webpack-loader==3.2.3
-    # via -r requirements/base.in
+    # via -r base.in
 docstring-parser==0.18.0
     # via anthropic
 et-xmlfile==2.0.0
     # via openpyxl
 flower==2.0.1
-    # via -r requirements/base.in
+    # via -r base.in
 fonttools==4.62.1
     # via fpdf2
 fpdf2==2.8.7
-    # via -r requirements/base.in
+    # via -r base.in
 h11==0.16.0
     # via httpcore2
 hiredis==3.3.1
-    # via -r requirements/base.in
+    # via -r base.in
 httpcore2==2.3.0
     # via httpx2
 httpx2==2.3.0
@@ -143,12 +143,12 @@ markdown==3.10.2
 oauthlib==3.3.1
     # via django-oauth-toolkit
 openpyxl==3.1.5
-    # via -r requirements/base.in
+    # via -r base.in
 packaging==26.0
     # via kombu
 pillow==12.2.0
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   django-markdownx
     #   fpdf2
 prometheus-client==0.25.0
@@ -162,18 +162,18 @@ pydantic==2.13.5
 pydantic-core==2.46.5
     # via pydantic
 pyjwt==2.12.1
-    # via -r requirements/base.in
+    # via -r base.in
 python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0
     # via celery
 python-slugify==8.0.4
-    # via -r requirements/base.in
+    # via -r base.in
 pytz==2026.1.post1
     # via flower
 redis==7.4.0
     # via
-    #   -r requirements/base.in
+    #   -r base.in
     #   django-redis
 requests==2.33.1
     # via django-oauth-toolkit
@@ -218,4 +218,4 @@ wcwidth==0.6.0
 webencodings==0.5.1
     # via bleach
 whitenoise==6.12.0
-    # via -r requirements/base.in
+    # via -r base.in
