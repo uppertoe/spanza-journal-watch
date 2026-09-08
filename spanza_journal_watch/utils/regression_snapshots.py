@@ -62,6 +62,13 @@ def normalize_html(html: str) -> str:
     # would otherwise change every day.
     normalized = re.sub(r"\b\d{4}-\d{2}-\d{2}\b", "__DATE__", normalized)
     normalized = re.sub(r"\b\d{1,2} [A-Z][a-z]{2} \d{4}\b", "__DATE__", normalized)
+    # Day-and-month labels without a year (weekly chart ticks, comparison ranges)
+    # roll forward with the calendar too.
+    normalized = re.sub(
+        r"\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b(?! \d{4})",
+        "__DATE__",
+        normalized,
+    )
     main_match = re.search(r"<main[^>]*>.*?</main>", normalized, flags=re.IGNORECASE | re.DOTALL)
     if main_match:
         normalized = main_match.group(0)
