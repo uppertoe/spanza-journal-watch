@@ -481,6 +481,13 @@ PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
 INDEXNOW_KEY = env("INDEXNOW_KEY", default="")
 INDEXNOW_ENDPOINT = env("INDEXNOW_ENDPOINT", default="https://api.indexnow.org/indexnow")
 
+# Analytics bot classification
+# ------------------------------------------------------------------------------
+# Chromium user agents whose client hints are missing or disagree with the UA
+# are counted under observe_* reasons and kept while this is False. Set it True
+# to drop those rows at write time once the counters show only the crawler fleet.
+ANALYTICS_ENFORCE_CLIENT_HINTS = env.bool("ANALYTICS_ENFORCE_CLIENT_HINTS", default=False)
+
 
 # django-webpack-loader
 # ------------------------------------------------------------------------------
