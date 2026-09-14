@@ -1,23 +1,34 @@
-{# Body of the "Keep the list up to date" card. Swapped in again (oob) whenever a PubMed check finishes. #}
+{# Head of the source strip: what was loaded, where the window sits, and the re-check button. Swapped in again (oob) whenever a PubMed check finishes. #}
 <div id="intake-recheck-body">
-  <p class="mb-2">
+  <div class="intake-source-head">
+    <span class="fw-semibold">{{ batch.from_month|date:"F Y" }} to {{ batch.to_month|date:"F Y" }}</span>
+    <span class="text-body-secondary small">{% with n=batch.watched_journals.count %}{{ n }} journal{{ n|pluralize }}{% endwith %} · {{ batch_total }} article{{ batch_total|pluralize }}</span>
+    {% if recheck.due %}<span class="badge rounded-pill text-bg-warning">Check due</span>{% endif %}
     {% if recheck.phase == "open" %}
-      The window runs to <strong>{{ recheck.window_end|date:"j F Y" }}</strong>. Check again at the end of
-      {{ recheck.next_check|date:"F" }}, and once more a fortnight after the window closes (around {{ recheck.settle_date|date:"j F" }}).
+      <span class="badge rounded-pill text-bg-primary">Window open until {{ recheck.window_end|date:"j M Y" }}</span>
     {% elif recheck.phase == "closing" %}
-      The window closed on <strong>{{ recheck.window_end|date:"j F Y" }}</strong> and late articles are still arriving in PubMed.
-      Check again around <strong>{{ recheck.settle_date|date:"j F" }}</strong>, before you settle the shortlist.
+      <span class="badge rounded-pill text-bg-warning">Window closed · late articles still arriving</span>
     {% else %}
-      The window closed on <strong>{{ recheck.window_end|date:"j F Y" }}</strong>. Run a final check before you push.
+      <span class="badge rounded-pill text-bg-secondary">Window closed {{ recheck.window_end|date:"j M Y" }}</span>
     {% endif %}
-    Staged and pushed articles are not affected.
+  </div>
+  <p class="small text-body-secondary mb-2">
+    {% if recheck.phase == "open" %}
+      Check again at the end of {{ recheck.next_check|date:"F" }}, and once more a fortnight after the window closes (around {{ recheck.settle_date|date:"j F" }}).
+    {% elif recheck.phase == "closing" %}
+      Late articles are still arriving in PubMed. Check again around <strong>{{ recheck.settle_date|date:"j F" }}</strong>, before you settle the shortlist.
+    {% else %}
+      Run a final check before you send the shortlist.
+    {% endif %}
+    Shortlisted and sent articles are not affected.
   </p>
   <div class="d-flex flex-wrap align-items-center gap-2">
-    <form method="post" action="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-post="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context">
+    <form method="post" action="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-post="{% url "backend:article_intake_check_for_new" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-filter-form">
       {% csrf_token %}
-      <button type="submit" class="btn {% if recheck.due %}btn-warning{% else %}btn-primary{% endif %}" title="Check PubMed for any new articles published in this date range">Check for new articles</button>
+      <button type="submit" class="btn btn-sm {% if recheck.due %}btn-warning{% else %}btn-primary{% endif %}" title="Check PubMed for any new articles published in this date range">Check for new articles</button>
     </form>
-    <span class="small {% if recheck.due %}fw-semibold{% else %}text-muted{% endif %}">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#intake-setup" aria-expanded="false" aria-controls="intake-setup">Change range or journals</button>
+    <span class="small {% if recheck.due %}fw-semibold{% else %}text-body-secondary{% endif %}">
       {% if recheck.last_checked_at %}
         Last checked {{ recheck.last_checked_at|timesince }} ago
       {% else %}

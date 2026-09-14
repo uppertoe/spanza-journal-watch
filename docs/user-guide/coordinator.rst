@@ -49,12 +49,12 @@ Logging in
 Shortlisting articles
 ---------------------
 
-Open **Articles** for the issue. The page runs from top to bottom: load the
-articles, keep the list up to date, stage your shortlist, and push it to the
-board.
+Open **Articles** for the issue. Load the articles once, then work down the
+list: shortlist what is worth reviewing, and send the shortlist to the board
+from the bar at the bottom of the page.
 
-Step 1: Load the articles
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Load the articles
+~~~~~~~~~~~~~~~~~
 
 .. container:: feature
 
@@ -62,11 +62,11 @@ Step 1: Load the articles
 
       1. Set **From month** and **To month** to the issue's window.
       2. Tick the journals you want, or use **Select all**.
-      3. Click **Start intake**. The list appears within a few seconds, and
-         PubMed is checked for anything newer in the background.
+      3. Click **Load the articles**. The list appears within a few seconds,
+         and PubMed is checked for anything newer in the background.
 
-      When you come back to an issue, the months and journals are already
-      set, so you can go straight to the **Keep the list up to date** card.
+      Once the list is loaded, the months and journals fold into the strip
+      at the top of the page. **Change range or journals** opens them again.
 
    .. raw:: html
       :file: _demos/load.html
@@ -84,50 +84,65 @@ Keep the list up to date
       so the list is not complete until a fortnight or so after the window
       closes.
 
-      1. Click **Check for new articles** on the card at the end of each
+      1. Click **Check for new articles** on the strip at the end of each
          month in the window, and once more a fortnight after it closes.
-         The card turns amber when a check is overdue.
-      2. New arrivals are marked with a blue dot. Tick **New only** to see
-         just those, and **Mark all seen** once you have looked through
-         them.
+         The strip turns amber when a check is overdue.
+      2. New arrivals are marked with a blue dot. Under **Filters**, tick
+         **New only** to see just those, and choose **Mark all seen** from
+         the **More** menu once you have looked through them.
 
-      Anything you have already staged or pushed is left exactly as it was.
+      Anything you have already shortlisted or sent is left exactly as it
+      was.
 
    .. raw:: html
       :file: _demos/recheck.html
 
-Step 2: Stage the shortlist
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Shortlist the articles
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. container:: feature
 
    .. container:: feature-text
 
-      The **Paediatric (MeSH)** filter is on when the page opens. Switch it
-      off if you want to see everything.
+      The **Paediatric** filter is on when the page opens. Switch it off if
+      you want to see everything. The first lines of each abstract sit under
+      the title, and **More** opens the rest.
 
-      1. Click the toggle on each article you want reviewed. It turns green
-         and reads *Staged*.
-      2. **Stage all (filtered)** takes everything currently showing.
+      1. Click **Shortlist** on each article you want reviewed. The button
+         turns green and reads *Shortlisted*. Click it again to take the
+         article off.
+      2. More articles load as you scroll. The search box, the journal menu
+         and **Filters** narrow the list.
+      3. For an article that is not in the list, click **Add an article**
+         and paste a DOI or PMID, or type part of the title.
 
-      Staging changes nothing on the public website or on the board.
+      **Shortlist**, at the top of the list, shows only what you have
+      picked. Shortlisting changes nothing on the public website or on the
+      board.
 
    .. raw:: html
       :file: _demos/stage.html
 
-Step 3: Push to the review board
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Send the shortlist to the review board
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. container:: feature flip
 
    .. container:: feature-text
 
-      1. Click **Push staged articles to Planka candidates**.
-      2. Each staged article becomes a card in the *Candidates* list on the
-         board.
+      The bar at the bottom of the page counts the shortlisted articles that
+      are not on the board yet, and stays amber until they are sent.
 
-      You can stage more and push again whenever you like. Cards already on
-      the board are left alone.
+      1. Click **Send to Planka**.
+      2. Each shortlisted article becomes a card in the *Candidates* list on
+         the board, and the bar turns green.
+
+      You can shortlist more and send again whenever you like. Once the
+      board is up to date the button reads **Send again**: it makes no
+      duplicates, and only replaces a card that has gone missing. If the
+      issue has no board yet, the bar says so and links to the Planka
+      setup. **Re-check the board**, on the Shortlist view, shows which
+      cards the reviewers have moved or removed.
 
    .. raw:: html
       :file: _demos/push.html

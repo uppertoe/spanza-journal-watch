@@ -1,0 +1,7 @@
+{# All articles / Shortlist switch with live counts. Rendered in the page, and again out of band after every change. #}
+<div id="intake-segments" class="intake-segments" role="tablist" aria-label="Which articles to show"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <a href="#" role="tab" class="intake-segment{% if mode != "shortlist" %} is-active{% endif %}" aria-selected="{% if mode != "shortlist" %}true{% else %}false{% endif %}"
+     hx-get="{% url "backend:article_intake_results" batch.pk %}?mode=all" hx-target="#article-intake-results" hx-swap="innerHTML"><b>{{ batch_total }}</b><span>All articles</span></a>
+  <a href="#" role="tab" class="intake-segment{% if mode == "shortlist" %} is-active{% endif %}" aria-selected="{% if mode == "shortlist" %}true{% else %}false{% endif %}"
+     hx-get="{% url "backend:article_intake_results" batch.pk %}?mode=shortlist" hx-target="#article-intake-results" hx-swap="innerHTML"><b>{{ selected_total }}</b><span>Shortlist</span></a>
+</div>

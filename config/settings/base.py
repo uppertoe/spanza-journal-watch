@@ -442,7 +442,10 @@ ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_ADAPTER = "spanza_journal_watch.users.adapters.AccountAdapter"
 # https://django-allauth.readthedocs.io/en/latest/forms.html
-ACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSignupForm"}
+ACCOUNT_FORMS = {
+    "login": "spanza_journal_watch.users.forms.UserLoginForm",
+    "signup": "spanza_journal_watch.users.forms.UserSignupForm",
+}
 # No social providers are installed, so allauth's default social adapter applies.
 # https://django-allauth.readthedocs.io/en/latest/forms.html
 SOCIALACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSocialSignupForm"}

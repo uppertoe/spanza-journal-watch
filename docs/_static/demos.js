@@ -68,86 +68,108 @@
   function flash(el) { if (!el) return; el.classList.remove("dm-flash"); void el.offsetWidth; el.classList.add("dm-flash"); }
   function moveCard(card, col) { var add = col.querySelector(".dm-addcard"); col.insertBefore(card, add || null); card.classList.remove("lift"); pop(card); }
 
-  /* ---------------- coordinator: staging ---------------- */
+  /* ---------------- coordinator: shortlisting ---------------- */
+  // The send bar under the list: amber while anything shortlisted is not on the board.
+  function barState(parts, picked, board) {
+    var unsent = picked - board;
+    parts.bar.classList.toggle("attention", unsent > 0);
+    parts.bar.classList.toggle("calm", unsent === 0 && picked > 0);
+    parts.send.classList.toggle("dim", unsent === 0);
+    parts.send.textContent = unsent ? "Send " + unsent + " to Planka" : "Send to Planka";
+    if (unsent) {
+      parts.head.textContent = unsent + " shortlisted article" + (unsent === 1 ? "" : "s") + " not on the Planka board yet";
+      parts.sub.textContent = picked + " shortlisted · " + board + " already on the board";
+    } else if (picked) {
+      parts.head.textContent = "All " + picked + " shortlisted articles are on the Planka board";
+      parts.sub.textContent = "Shortlist more and send again whenever you like.";
+    } else {
+      parts.head.textContent = "Nothing shortlisted yet";
+      parts.sub.textContent = "Shortlisted articles are sent to the Planka board from here.";
+    }
+  }
+  function setShortlist(row, on) {
+    var b = row.querySelector(".dm-sl");
+    b.classList.toggle("on", on);
+    b.textContent = on ? "Shortlisted \u2713" : "Shortlist";
+  }
+  function isShortlisted(row) { return row.querySelector(".dm-sl").classList.contains("on"); }
+
   function initStage(d) {
     var rows = d.qa(".dm-row"), chip = d.q("[data-chip='paed']"), count = d.q("[data-count]");
-    function counts() {
+    var parts = { bar: d.q("[data-bar]"), head: d.q("[data-bar-head]"), sub: d.q("[data-bar-sub]"), send: d.q("[data-send]") };
+    function refresh() {
       var shown = rows.filter(function (r) { return !r.classList.contains("gone"); }).length;
-      var staged = rows.filter(function (r) { return r.querySelector(".dm-tog").classList.contains("on"); }).length;
-      count.textContent = shown + " shown · " + staged + " staged · 0 pushed";
+      count.textContent = shown + " match";
+      barState(parts, rows.filter(isShortlisted).length, 0);
     }
-    function setRow(r, on) { r.querySelector(".dm-tog").classList.toggle("on", on); setBadge(r.querySelector(".dm-badge"), on ? "ok" : "muted", on ? "Staged" : "Not staged"); }
-    function filter(on) { chip.classList.toggle("on", on); rows.forEach(function (r) { r.classList.toggle("gone", on && r.getAttribute("data-paed") !== "1"); }); counts(); }
-    // The paediatric MeSH filter is on when the page opens, as it is in the real intake page.
-    function reset() { rows.forEach(function (r) { setRow(r, false); }); filter(true); d.hideCursor(); }
+    function filter(on) { chip.classList.toggle("on", on); rows.forEach(function (r) { r.classList.toggle("gone", on && r.getAttribute("data-paed") !== "1"); }); refresh(); }
+    // The paediatric filter is on when the page opens, as it is on the real page.
+    function reset() { rows.forEach(function (r) { setShortlist(r, false); }); filter(true); d.hideCursor(); }
     var paed = rows.filter(function (r) { return r.getAttribute("data-paed") === "1"; });
-    var tog = function (i) { return paed[i].querySelector(".dm-tog"); };
+    var btn = function (i) { return paed[i].querySelector(".dm-sl"); };
     if (reduced) {
-      reset(); setRow(paed[0], true); setRow(paed[2], true); counts();
-      d.sayNow("Staged means shortlisted. Nothing is sent anywhere until you push.");
+      reset(); setShortlist(paed[0], true); setShortlist(paed[2], true); refresh();
+      d.sayNow("Shortlisted means picked for review. Nothing is sent until you click Send to Planka.");
       return null;
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("The <b>paediatric MeSH filter</b> is already on."); }],
-        [3800, function () { d.say("Switch it off if you want to see everything."); d.moveTo(chip); }],
-        [4700, function () { d.click(); filter(false); }],
-        [6500, function () { d.click(); filter(true); }],
-        [7500, function () { d.say("Click the toggle to stage an article. <b>Staged means shortlisted.</b> Nothing is sent yet."); d.moveTo(tog(0)); }],
-        [8400, function () { d.click(); setRow(paed[0], true); counts(); }],
-        [9200, function () { d.moveTo(tog(2)); }],
-        [9900, function () { d.click(); setRow(paed[2], true); counts(); }],
-        [11000, function () { d.hideCursor(); }],
-        [12000, function () { d.say("Click the toggle again to take an article off the shortlist."); d.moveTo(tog(2)); }],
-        [12900, function () { d.click(); setRow(paed[2], false); counts(); }],
-        [13900, function () { d.hideCursor(); }]
+        [100, function () { reset(); d.say("The <b>Paediatric</b> filter is already on, and the first lines of each abstract sit under the title."); }],
+        [4200, function () { d.say("Switch the filter off if you want to see everything."); d.moveTo(chip); }],
+        [5100, function () { d.click(); filter(false); }],
+        [6900, function () { d.click(); filter(true); }],
+        [7900, function () { d.say("Click <b>Shortlist</b> on each article worth reviewing. Nothing is sent yet."); d.moveTo(btn(0)); }],
+        [8800, function () { d.click(); setShortlist(paed[0], true); refresh(); }],
+        [9600, function () { d.moveTo(btn(2)); }],
+        [10300, function () { d.click(); setShortlist(paed[2], true); refresh(); }],
+        [11300, function () { d.hideCursor(); d.say("The bar at the bottom counts what has not reached the board, and stays amber until it is sent."); }],
+        [14600, function () { d.say("Click <b>Shortlisted</b> again to take an article off."); d.moveTo(btn(2)); }],
+        [15500, function () { d.click(); setShortlist(paed[2], false); refresh(); }],
+        [16500, function () { d.hideCursor(); }]
       ];
-    }, 15600);
+    }, 18400);
   }
 
-  /* ---------------- coordinator: push to Planka ---------------- */
+  /* ---------------- coordinator: send the shortlist to Planka ---------------- */
   function initPush(d) {
-    var rows = d.qa(".dm-row"), cards = d.qa(".dm-card[data-for]"), btn = d.q("[data-push]");
-    var count = d.q("[data-count]"), cand = d.q("[data-list='candidates']");
+    var rows = d.qa(".dm-row"), cards = d.qa(".dm-card[data-for]"), cand = d.q("[data-list='candidates']");
+    var parts = { bar: d.q("[data-bar]"), head: d.q("[data-bar-head]"), sub: d.q("[data-bar-sub]"), send: d.q("[data-send]") };
     var pushed = {};
-    function counts() {
-      var staged = rows.filter(function (r) { return r.querySelector(".dm-tog").classList.contains("on"); }).length;
-      var n = Object.keys(pushed).length;
-      count.textContent = staged + " staged · " + n + " pushed";
+    function refresh() {
+      var picked = rows.filter(isShortlisted).length;
+      var board = rows.filter(function (r, i) { return isShortlisted(r) && pushed[i]; }).length;
+      barState(parts, picked, board);
     }
-    function stage(i, on) { rows[i].querySelector(".dm-tog").classList.toggle("on", on); setBadge(rows[i].querySelector(".dm-badge"), on ? "ok" : "muted", on ? "Staged" : "Not staged"); }
     function push() {
       var delay = 0;
       rows.forEach(function (r, i) {
-        if (!r.querySelector(".dm-tog").classList.contains("on") || pushed[i]) return;
+        if (!isShortlisted(r) || pushed[i]) return;
         pushed[i] = true;
-        setTimeout(function () {
-          cards[i].hidden = false; pop(cards[i]);
-          setBadge(r.querySelector(".dm-badge"), "info", "Pushed"); counts();
-        }, delay); delay += 300;
+        setTimeout(function () { cards[i].hidden = false; pop(cards[i]); refresh(); }, delay);
+        delay += 300;
       });
     }
-    function reset() { pushed = {}; cards.forEach(function (c) { c.hidden = true; }); stage(0, true); stage(1, true); stage(2, false); cand.classList.remove("hot"); counts(); d.hideCursor(); }
+    function reset() { pushed = {}; cards.forEach(function (c) { c.hidden = true; }); setShortlist(rows[0], true); setShortlist(rows[1], true); setShortlist(rows[2], false); cand.classList.remove("hot"); refresh(); d.hideCursor(); }
     if (reduced) {
-      reset(); stage(2, true); push();
-      d.sayNow("Pushing creates a card in the Candidates list of the Planka board for each staged article.");
+      reset(); setShortlist(rows[2], true); push();
+      d.sayNow("Sending makes a card in the Candidates list of the Planka board for each shortlisted article.");
       return null;
     }
     return makeRunner(function () {
       return [
-        [100, function () { reset(); d.say("Staged articles stay here until you push them."); }],
-        [2500, function () { d.moveTo(btn); }],
-        [3200, function () { d.click(); d.press(btn); }],
-        [3500, function () { push(); d.say("Pushing creates a card on the board for each staged article."); }],
-        [6000, function () { d.hideCursor(); cand.classList.add("hot"); d.say("Cards arrive in <b>Candidates</b> for reviewers to pick from."); }],
-        [8600, function () { cand.classList.remove("hot"); d.say("You can stage more and push again whenever you like. Nothing is duplicated."); d.moveTo(rows[2].querySelector(".dm-tog")); }],
-        [9500, function () { d.click(); stage(2, true); counts(); }],
-        [10300, function () { d.moveTo(btn); }],
-        [11000, function () { d.click(); d.press(btn); }],
-        [11300, function () { push(); }],
-        [12300, function () { d.hideCursor(); }]
+        [100, function () { reset(); d.say("The bar stays amber while shortlisted articles are not on the board."); }],
+        [2800, function () { d.moveTo(parts.send); }],
+        [3500, function () { d.click(); d.press(parts.send); }],
+        [3800, function () { push(); d.say("Sending makes a card on the board for each shortlisted article."); }],
+        [6300, function () { d.hideCursor(); cand.classList.add("hot"); d.say("Cards arrive in <b>Candidates</b> for reviewers to pick from, and the bar turns green."); }],
+        [9200, function () { cand.classList.remove("hot"); d.say("Shortlist more and send again whenever you like. Nothing is duplicated."); d.moveTo(rows[2].querySelector(".dm-sl")); }],
+        [10100, function () { d.click(); setShortlist(rows[2], true); refresh(); }],
+        [11000, function () { d.moveTo(parts.send); }],
+        [11700, function () { d.click(); d.press(parts.send); }],
+        [12000, function () { push(); }],
+        [13000, function () { d.hideCursor(); }]
       ];
-    }, 14200);
+    }, 15000);
   }
 
   /* ---------------- coordinator: invite reviewers ---------------- */
@@ -374,12 +396,12 @@
     function reset() {
       to.textContent = "September 2026"; from.classList.remove("lit"); to.classList.remove("lit");
       untick.classList.remove("on"); status.hidden = true; results.hidden = true;
-      count.textContent = "112 shown · 0 staged · 0 pushed"; d.hideCursor();
+      count.textContent = "112 articles · 0 shortlisted"; d.hideCursor();
     }
     if (reduced) {
       reset(); to.textContent = "October 2026"; untick.classList.add("on"); results.hidden = false;
-      statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed";
-      d.sayNow("Set the months and the journals, then click Start intake.");
+      statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 articles · 0 shortlisted";
+      d.sayNow("Set the months and the journals, then click Load the articles.");
       return null;
     }
     return makeRunner(function () {
@@ -401,7 +423,7 @@
           statusLine(status, "", "Checking PubMed (" + (i + 1) + "/" + JOURNALS.length + ") · finished " + name, true);
         }]);
       });
-      s.push([14400, function () { statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 shown · 0 staged · 0 pushed"; flash(results); d.say("New arrivals are added to the list. You can start shortlisting while the check runs."); }]);
+      s.push([14400, function () { statusLine(status, "ok", "Found 6 new article(s) since last check."); count.textContent = "118 articles · 0 shortlisted"; flash(results); d.say("New arrivals are added to the list. You can start shortlisting while the check runs."); }]);
       return s;
     }, 18400);
   }
@@ -431,7 +453,7 @@
       rows.forEach(function (r) {
         if (r.getAttribute("data-wave") !== String(wave)) return;
         n += 1;
-        setTimeout(function () { r.classList.remove("gone"); r.querySelector(".dm-dot").classList.add("on"); count.textContent = (36 + shown()) + " shown"; }, delay);
+        setTimeout(function () { r.classList.remove("gone"); r.querySelector(".dm-dot").classList.add("on"); count.textContent = (36 + shown()) + " match"; }, delay);
         delay += 350;
       });
       return n;
@@ -439,24 +461,24 @@
     function clearDots() { rows.forEach(function (r) { r.querySelector(".dm-dot").classList.remove("on"); }); setNew(0); }
     function reset() {
       place(POS.earlySep); rows.forEach(function (r) { if (r.hasAttribute("data-wave")) r.classList.add("gone"); });
-      clearDots(); count.textContent = "38 shown"; last.textContent = "Last checked 3 weeks ago"; status.hidden = true; setPhase(true, true); d.hideCursor();
+      clearDots(); count.textContent = "38 match"; last.textContent = "Last checked 3 weeks ago"; status.hidden = true; setPhase(true, true); d.hideCursor();
     }
     if (reduced) {
       reset(); place(POS.midNov); rows.forEach(function (r) { r.classList.remove("gone"); });
       rows.filter(function (r) { return r.getAttribute("data-wave") === "2"; }).forEach(function (r) { r.querySelector(".dm-dot").classList.add("on"); });
-      setNew(1); count.textContent = "41 shown"; last.textContent = "Last checked just now"; setPhase(false, false);
+      setNew(1); count.textContent = "41 match"; last.textContent = "Last checked just now"; setPhase(false, false);
       d.sayNow("Check for new articles at the end of each month, and once more a fortnight after the window closes.");
       return null;
     }
     return makeRunner(function () {
       return [
         [100, function () { reset(); d.say("An issue for <b>September and October</b>, set up in early September, holds only what PubMed has indexed so far."); }],
-        [4600, function () { d.say("Come back at the <b>end of each month</b>. The card turns amber when a check is overdue."); place(POS.lateSep); }],
+        [4600, function () { d.say("Come back at the <b>end of each month</b>. The strip turns amber when a check is overdue."); place(POS.lateSep); }],
         [7800, function () { d.moveTo(check); }],
         [8500, function () { d.click(); d.press(check); }],
         [8800, function () { d.hideCursor(); statusLine(status, "", "Checking PubMed for new articles…", true); }],
         [10600, function () { statusLine(status, "ok", "Found 2 new article(s) since last check."); last.textContent = "Last checked just now"; reveal(1); setNew(2); setPhase(true, false); }],
-        [11200, function () { d.say("New arrivals are marked with a <b>blue dot</b>. Anything already staged or pushed is left as it was."); }],
+        [11200, function () { d.say("New arrivals are marked with a <b>blue dot</b>. Anything already shortlisted or sent is left as it was."); }],
         [15200, function () { d.say("Check once more a <b>fortnight after the window closes</b>."); place(POS.midNov); status.hidden = true; last.textContent = "Last checked 4 weeks ago"; setPhase(false, true); }],
         [18600, function () { d.moveTo(check); }],
         [19300, function () { d.click(); d.press(check); }],

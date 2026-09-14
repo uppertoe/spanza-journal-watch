@@ -1,0 +1,44 @@
+{# Bar pinned to the bottom of the page. Amber while anything shortlisted has not reached the board. #}
+<div id="intake-push-bar" class="intake-push-bar{% if not planka_linked %} is-attention{% elif push_in_progress %} is-sending{% elif unsent_total %} is-attention{% elif selected_total %} is-calm{% endif %}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <div class="intake-push-status">
+    {% if not planka_linked %}
+      <b>This issue has no Planka board yet</b>
+      <span>{{ selected_total }} shortlisted · set up the board before sending.</span>
+    {% elif push_in_progress %}
+      <b><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{% if unsent_total %}Sending {{ unsent_total }} to Planka&hellip;{% else %}Checking the board&hellip;{% endif %}</b>
+      <span>{{ selected_total }} shortlisted · {{ on_board_total }} already on the board</span>
+    {% elif unsent_total %}
+      <b>{{ unsent_total }} shortlisted article{{ unsent_total|pluralize }} not on the Planka board yet</b>
+      <span>{{ selected_total }} shortlisted · {{ on_board_total }} already on the board</span>
+    {% elif selected_total %}
+      <b>All {{ selected_total }} shortlisted article{{ selected_total|pluralize }} {{ selected_total|pluralize:"is,are" }} on the Planka board</b>
+      <span>Sending again makes no duplicates; cards already on the board are left alone.</span>
+    {% else %}
+      <b>Nothing shortlisted yet</b>
+      <span>Shortlisted articles are sent to the Planka board from here.</span>
+    {% endif %}
+  </div>
+  <div class="intake-push-actions">
+    {% if not planka_linked %}
+      <a class="btn btn-sm btn-primary" href="{% url "backend:issue_planka_import" %}?issue={{ batch.issue_id }}">Set up Planka</a>
+    {% else %}
+      {% if selected_total %}
+        <a href="#" class="btn btn-sm btn-outline-secondary" hx-get="{% url "backend:article_intake_results" batch.pk %}?mode=shortlist" hx-target="#article-intake-results" hx-swap="innerHTML show:#intake-segments:top">Shortlist</a>
+      {% endif %}
+      <form method="post" action="{% url "backend:article_intake_push_to_planka" batch.pk %}" hx-post="{% url "backend:article_intake_push_to_planka" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-filter-form" hx-sync="#article-intake-results:queue all">
+        {% csrf_token %}
+        <input type="hidden" name="async" value="1">
+        <input type="hidden" name="push_scope" value="selected">
+        {% if push_in_progress %}
+          <button type="submit" class="btn btn-sm btn-primary" disabled>Sending&hellip;</button>
+        {% elif unsent_total %}
+          <button type="submit" class="btn btn-sm btn-primary">Send {{ unsent_total }} to Planka</button>
+        {% elif selected_total %}
+          <button type="submit" class="btn btn-sm btn-outline-primary" title="Checks every shortlisted article is on the board. Nothing is duplicated.">Send again</button>
+        {% else %}
+          <button type="submit" class="btn btn-sm btn-primary" disabled>Send to Planka</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  </div>
+</div>

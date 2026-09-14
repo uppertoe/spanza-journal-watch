@@ -98,7 +98,7 @@ class TestVisitorRecommendations:
         assert PubmedArticleVisitorRecommendation.objects.filter(article=article).count() == 1
         # A different browser (new session) counts once more. Real browsers always send a UA;
         # an empty one is treated as automated and ignored.
-        Client(HTTP_USER_AGENT="Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Safari/605.1.15").post(
+        Client(headers={"user-agent": "Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Safari/605.1.15"}).post(
             reverse("submissions:journal_article_toggle_recommend", kwargs={"article_id": article.pk}),
             {"next": "/journals/"},
         )
@@ -245,6 +245,32 @@ class TestSignInByCode:
         assert request_user.is_authenticated
         assert request_user.email == "new.member@example.org"
         assert not request_user.has_usable_password()
+
+    def test_login_page_keeps_the_password_field(self, client):
+        # Allauth drops the field when sign-up has no password; UserLoginForm puts it back.
+        body = client.get(reverse("account_login")).content.decode()
+        assert 'name="password"' in body
+
+    def test_password_sign_in_checks_the_password(self, client):
+        from allauth.account.models import EmailAddress
+
+        user = UserFactory(email="keeper@example.org")
+        user.set_password("Correct-Horse-9")
+        user.save()
+        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+        mail.outbox.clear()
+
+        response = client.post(reverse("account_login"), {"login": user.email, "password": "wrong"})
+        assert response.status_code == 200
+        assert "password" in response.content.decode().lower()
+        assert not mail.outbox
+        assert not client.get("/").context["request"].user.is_authenticated
+
+        response = client.post(reverse("account_login"), {"login": user.email, "password": "Correct-Horse-9"})
+        assert response.status_code == 302
+        assert response.url != reverse("account_confirm_login_code")
+        assert not mail.outbox
+        assert client.get("/").context["request"].user.is_authenticated
 
     def test_start_sends_sign_in_code_to_existing_account(self, client):
         from allauth.account.models import EmailAddress

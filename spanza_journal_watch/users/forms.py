@@ -1,4 +1,4 @@
-from allauth.account.forms import SignupForm
+from allauth.account.forms import LoginForm, SignupForm
 from allauth.socialaccount.forms import SignupForm as SocialSignupForm
 from django import forms
 from django.contrib.auth import forms as admin_forms
@@ -30,6 +30,20 @@ class UserAdminCreationForm(admin_forms.UserCreationForm):
         error_messages = {
             "email": {"unique": _("This email has already been taken.")},
         }
+
+
+class UserLoginForm(LoginForm):
+    """Allauth's login form with the password field kept.
+
+    Sign-up is email-only (ACCOUNT_SIGNUP_FIELDS has no password), and allauth
+    takes that to mean nobody has a password, so it drops the field from the
+    login form and every submission falls through to the sign-in-code flow.
+    People who set a password from "Forgot password?" still need to use it.
+    """
+
+    def _setup_password_field(self):
+        # The sign-in page carries its own "Forgot password?" link.
+        self.fields["password"].help_text = ""
 
 
 class UserSignupForm(SignupForm):

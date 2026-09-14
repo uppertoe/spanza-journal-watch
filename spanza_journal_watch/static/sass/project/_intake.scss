@@ -1,0 +1,343 @@
+// Editorial article intake: the source strip, the All / Shortlist switch, the
+// article rows and the send-to-Planka bar pinned to the bottom of the page.
+
+.intake-source.is-due {
+  border-left: 4px solid var(--bs-warning);
+}
+
+.intake-source-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.intake-journal-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bs-body-bg);
+}
+
+.intake-rec {
+  margin-bottom: 0.75rem;
+}
+
+.intake-rec-details summary {
+  cursor: pointer;
+  color: var(--bs-primary);
+}
+
+.intake-lists-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.intake-segments {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1 1 16rem;
+  max-width: 24rem;
+  overflow: hidden;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-tertiary-bg);
+}
+
+.intake-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+  text-decoration: none;
+  white-space: nowrap;
+
+  b {
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-body-color);
+  }
+
+  + .intake-segment {
+    border-left: 1px solid var(--bs-border-color);
+  }
+
+  &:hover {
+    color: var(--bs-body-color);
+  }
+
+  &.is-active {
+    background: var(--bs-body-bg);
+    color: var(--bs-primary);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--bs-primary);
+
+    b {
+      color: var(--bs-primary);
+    }
+  }
+}
+
+.intake-filter-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.intake-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.intake-journal {
+  flex: 1 1 12rem;
+  width: auto;
+  min-width: 0;
+}
+
+.intake-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.25rem;
+}
+
+.intake-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--bs-secondary-color);
+}
+
+.intake-list {
+  border-top: 1px solid var(--bs-border-color);
+}
+
+.intake-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem 0.75rem;
+  padding: 0.8rem 0.25rem;
+  border-bottom: 1px solid var(--bs-border-color);
+
+  &.is-new {
+    background: color-mix(in srgb, var(--bs-primary) 4%, var(--bs-body-bg));
+  }
+}
+
+.intake-title {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.intake-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.25rem;
+  border-radius: 50%;
+  background: var(--bs-primary);
+  vertical-align: middle;
+}
+
+.intake-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.1rem 0.45rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.intake-journal-name {
+  color: var(--bs-body-color);
+}
+
+.intake-planka {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.8125rem;
+}
+
+.intake-snippet {
+  display: -webkit-box;
+  margin: 0.2rem 0 0;
+  overflow: hidden;
+  color: var(--bs-secondary-color);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-line;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+
+  &.is-open {
+    display: block;
+    -webkit-line-clamp: unset;
+  }
+}
+
+.intake-snippet-none {
+  font-style: italic;
+}
+
+.intake-doi {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.intake-more-btn {
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.intake-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+
+  .intake-spacer {
+    flex: 1;
+  }
+}
+
+.intake-shortlist-btn {
+  min-width: 8.5rem;
+  font-weight: 600;
+}
+
+.intake-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem 0 0.5rem;
+}
+
+.intake-empty {
+  padding: 0.9rem;
+  border: 1px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  color: var(--bs-secondary-color);
+  font-size: 0.9rem;
+}
+
+// The send bar sits at the bottom of the viewport while the page is in view,
+// bleeding into the main container's padding so it spans the content column.
+.intake-push-wrap {
+  position: sticky;
+  bottom: 0;
+  z-index: 1020;
+  margin: 1rem -1rem -1rem;
+}
+
+.intake-push-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+
+  &.is-attention {
+    background: var(--bs-warning-bg-subtle);
+    border-top-color: var(--bs-warning-border-subtle);
+  }
+
+  &.is-calm .intake-push-status b {
+    color: var(--bs-success-text-emphasis);
+  }
+
+  &.is-sending {
+    background: var(--bs-primary-bg-subtle);
+    border-top-color: var(--bs-primary-border-subtle);
+  }
+}
+
+.intake-push-status {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+
+  b {
+    font-size: 0.95rem;
+  }
+
+  span {
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+}
+
+.intake-push-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.4rem;
+}
+
+@keyframes intake-highlight-fade {
+  from {
+    background-color: var(--bs-success-bg-subtle);
+  }
+
+  to {
+    background-color: transparent;
+  }
+}
+
+.article-intake-highlight {
+  animation: intake-highlight-fade 2.5s ease-out forwards;
+}
+
+@include media-breakpoint-up(md) {
+  .intake-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-inline: 0.5rem;
+  }
+
+  .intake-row-actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+
+    .intake-spacer {
+      display: none;
+    }
+  }
+
+  .intake-filter-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .intake-filters {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-intake-highlight {
+    animation: none;
+  }
+}

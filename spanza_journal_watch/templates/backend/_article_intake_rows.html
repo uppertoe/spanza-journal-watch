@@ -1,0 +1,18 @@
+{# A page of rows, ending in a sentinel that fetches the next page as it scrolls into view. #}
+{% for row in result_rows %}
+  {% include "backend/_article_intake_row.html" %}
+{% endfor %}
+{% if page_obj.has_next %}
+  <div class="intake-more"
+       hx-get="{% url "backend:article_intake_results" batch.pk %}"
+       hx-include="#intake-filter-form"
+       hx-vals='{"page": "{{ page_obj.next_page_number }}", "rows_only": "1"}'
+       hx-trigger="revealed, click from:find button"
+       hx-swap="outerHTML"
+       hx-sync="this:drop">
+    <span class="text-body-secondary small">{{ page_obj.end_index }} of {{ result_total }} shown</span>
+    <button type="button" class="btn btn-sm btn-outline-secondary">Show more</button>
+  </div>
+{% elif result_total %}
+  <div class="intake-more"><span class="text-body-secondary small">All {{ result_total }} shown</span></div>
+{% endif %}

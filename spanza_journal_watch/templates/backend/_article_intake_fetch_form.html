@@ -1,0 +1,70 @@
+{# Range and watched journals. Shown on its own before the first load, then folded under "Change range or journals". #}
+<form method="post" class="row g-3" hx-post="{% url "backend:article_intake" %}" hx-target="#article-intake-page" hx-select="#article-intake-page" hx-swap="outerHTML" hx-push-url="true">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="fetch">
+  <input type="hidden" name="async" value="1">
+  <input type="hidden" name="issue" value="{{ selected_issue.pk }}">
+  <div class="col-12 col-md-6">
+    <label class="form-label">From month (earliest)</label>
+    <div class="row g-2">
+      <div class="col-7">
+        <select class="form-select" name="from_month_month" required>
+          {% for month_number, month_label in month_options %}
+            <option value="{{ month_number }}" {% if month_number == from_month_month %}selected{% endif %}>{{ month_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-5">
+        <select class="form-select" name="from_month_year" required>
+          {% for year in year_options %}
+            <option value="{{ year }}" {% if year == from_month_year %}selected{% endif %}>{{ year }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% if fetch_form.from_month.errors %}<div class="text-danger small mt-1">{{ fetch_form.from_month.errors|join:", " }}</div>{% endif %}
+  </div>
+  <div class="col-12 col-md-6">
+    <label class="form-label">To month (latest)</label>
+    <div class="row g-2">
+      <div class="col-7">
+        <select class="form-select" name="to_month_month" required>
+          {% for month_number, month_label in month_options %}
+            <option value="{{ month_number }}" {% if month_number == to_month_month %}selected{% endif %}>{{ month_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-5">
+        <select class="form-select" name="to_month_year" required>
+          {% for year in year_options %}
+            <option value="{{ year }}" {% if year == to_month_year %}selected{% endif %}>{{ year }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% if fetch_form.to_month.errors %}<div class="text-danger small mt-1">{{ fetch_form.to_month.errors|join:", " }}</div>{% endif %}
+  </div>
+  <div class="col-12">
+    <label class="form-label fw-semibold">Watched journals</label>
+    <input type="text" id="journal-filter" class="form-control form-control-sm mb-1" placeholder="Filter journals&hellip;" autocomplete="off">
+    <div class="border rounded p-2 intake-journal-list">
+      {% for checkbox in fetch_form.watched_journals %}
+        <div class="form-check journal-check-item mb-1">
+          {{ checkbox.tag }}
+          <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+        </div>
+      {% endfor %}
+    </div>
+    {% if fetch_form.watched_journals.errors %}
+      <div class="text-danger small mt-1">{{ fetch_form.watched_journals.errors|join:", " }}</div>
+    {% endif %}
+    <div class="d-flex gap-2 mt-2">
+      <button type="button" id="watched-select-all" class="btn btn-sm btn-outline-secondary">Select all</button>
+      <button type="button" id="watched-select-none" class="btn btn-sm btn-outline-secondary">Clear</button>
+    </div>
+  </div>
+  <div class="col-12">
+    <button type="submit" class="btn btn-primary">{% if batch %}Reload the list{% else %}Load the articles{% endif %}</button>
+    <p class="text-body-secondary small mt-2 mb-0">The list appears straight away; PubMed is then checked for anything newer.{% if batch %} Anything already shortlisted or sent to Planka is kept.{% endif %}</p>
+  </div>
+</form>

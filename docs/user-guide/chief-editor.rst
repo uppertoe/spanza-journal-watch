@@ -64,15 +64,15 @@ Step 2: Articles
 The coordinator normally does this step. The
 :ref:`coordinator guide <coordinator>` has the detail. In short:
 
-1. Set the months, tick the journals and click **Start intake**.
-2. Click **Check for new articles** on the **Keep the list up to date** card
-   at the end of each month in the window, and again a fortnight after it
+1. Set the months, tick the journals and click **Load the articles**.
+2. Click **Check for new articles** on the strip at the top of the page at
+   the end of each month in the window, and again a fortnight after it
    closes.
-3. Toggle the articles you want to **Staged**, then click **Push staged
-   articles to Planka candidates**.
+3. Click **Shortlist** on the articles you want reviewed, then **Send to
+   Planka** on the bar at the bottom of the page.
 
-**Reconcile Planka status** shows which of the pushed cards the reviewers
-have moved or removed.
+**Re-check the board**, on the Shortlist view, shows which of the cards the
+reviewers have moved or removed.
 
 
 Step 3: Reviewers

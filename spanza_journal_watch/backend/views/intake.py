@@ -1,4 +1,4 @@
-"""Article intake: PubMed fetches, staging and pushing to Planka."""
+"""Article intake: PubMed fetches, the shortlist and sending it to Planka."""
 
 import datetime
 import logging
@@ -28,6 +28,7 @@ from ..forms import (
 )
 from ..models import (
     BackendPreference,
+    PlankaIssueBinding,
     PubmedArticle,
     PubmedArticleUserState,
     PubmedBatchArticle,
@@ -171,6 +172,36 @@ def _import_pubmed_batch(batch, watched_journals):
     populate_pubmed_batch_from_cache(batch, watched_journals)
 
 
+INTAKE_PAGE_SIZE = 25
+
+
+def _annotated_batch_articles(batch):
+    """Batch rows with the article, journal and recommendation counts attached."""
+    return batch.batch_articles.select_related("article", "watched_journal", "issue").annotate(
+        recommendation_count=Count(
+            "article__user_states",
+            filter=Q(article__user_states__recommended_at__isnull=False),
+            distinct=True,
+        ),
+        visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
+    )
+
+
+def _intake_counts(batch):
+    """Totals and state for the segment buttons and the send-to-Planka bar."""
+    shortlisted = batch.batch_articles.filter(is_selected=True)
+    running = batch.task_state in {PubmedImportBatch.TASK_STATE_PENDING, PubmedImportBatch.TASK_STATE_RUNNING}
+    return {
+        "batch_total": batch.batch_articles.count(),
+        "selected_total": shortlisted.count(),
+        "on_board_total": shortlisted.exclude(planka_card_id="").count(),
+        "unsent_total": shortlisted.filter(planka_card_id="").count(),
+        "pushed_total": batch.batch_articles.exclude(planka_card_id="").count(),
+        "planka_linked": bool(batch.issue_id) and PlankaIssueBinding.objects.filter(issue_id=batch.issue_id).exists(),
+        "push_in_progress": running and batch.task_action == "push",
+    }
+
+
 def _build_article_intake_queryset(batch, params):
     """Return (rows, tab_rows, flags) where tab_rows ignores the journal filter.
 
@@ -190,19 +221,9 @@ def _build_article_intake_queryset(batch, params):
     icu_only = _param_enabled(params, "icu_only", default=False)
     cardiac_only = _param_enabled(params, "cardiac_only", default=False)
     neonatal_only = _param_enabled(params, "neonatal_only", default=False)
+    abstract_only = _param_enabled(params, "abstract_only", default=False)
 
-    base = (
-        batch.batch_articles.select_related("article", "watched_journal", "issue")
-        .annotate(
-            recommendation_count=Count(
-                "article__user_states",
-                filter=Q(article__user_states__recommended_at__isnull=False),
-                distinct=True,
-            ),
-            visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
-        )
-        .order_by("-article__publication_date", "article__title")
-    )
+    base = _annotated_batch_articles(batch).order_by("-article__publication_date", "article__title")
 
     if query:
         base = base.filter(
@@ -213,6 +234,8 @@ def _build_article_intake_queryset(batch, params):
         )
     if selected in {"true", "false"}:
         base = base.filter(is_selected=(selected == "true"))
+    if abstract_only:
+        base = base.exclude(article__abstract="")
 
     has_python_filter = any(
         [paediatric_only, humans_only, review_only, trial_only, pain_only, icu_only, cardiac_only, neonatal_only]
@@ -300,6 +323,7 @@ def _build_article_intake_queryset(batch, params):
         "icu_only": icu_only,
         "cardiac_only": cardiac_only,
         "neonatal_only": neonatal_only,
+        "abstract_only": abstract_only,
     }
     return rows, tab_rows, flags
 
@@ -309,6 +333,7 @@ def _article_intake_results_context(batch, params, user=None):
 
     rows, tab_rows, flags = _build_article_intake_queryset(batch, params)
     new_only = _param_enabled(params, "new_only", default=False)
+    mode = "shortlist" if (params.get("mode") or "").strip().lower() == "shortlist" else "all"
 
     user_view = _get_or_create_user_view(batch, user) if user is not None else None
     seen_baseline = user_view.last_seen_at if user_view else None
@@ -353,36 +378,43 @@ def _article_intake_results_context(batch, params, user=None):
         {"journal": watched, "count": journal_counts.get(watched.pk, 0)} for watched in watched_options
     ]
 
-    paginator = Paginator(rows, 25)
+    paginator = Paginator(rows, INTAKE_PAGE_SIZE)
     page_obj = paginator.get_page(params.get("page") or 1)
     visible_rows = list(page_obj.object_list)
     for row in visible_rows:
         row.is_new = _row_is_new(row)
     all_visible_selected = bool(visible_rows) and all(row.is_selected for row in visible_rows)
     result_total = len(rows) if isinstance(rows, list) else rows.count()
-    staged_rows = list(
-        batch.batch_articles.select_related("article", "watched_journal", "issue")
-        .annotate(
-            recommendation_count=Count(
-                "article__user_states",
-                filter=Q(article__user_states__recommended_at__isnull=False),
-                distinct=True,
-            ),
-            visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
-        )
-        .filter(is_selected=True)
-        .order_by("-modified")[:200]
-    )
+    staged_rows = []
+    if mode == "shortlist":
+        staged_rows = list(_annotated_batch_articles(batch).filter(is_selected=True).order_by("-modified")[:200])
+        for row in staged_rows:
+            row.is_new = False
+    # Filters other than the paediatric default; when any is on, the filter row starts open.
+    active_filters = [
+        flags["review_only"],
+        flags["trial_only"],
+        flags["pain_only"],
+        flags["icu_only"],
+        flags["cardiac_only"],
+        flags["neonatal_only"],
+        flags["abstract_only"],
+        new_only,
+        flags["selected"] in {"true", "false"},
+    ]
+    active_filter_count = sum(1 for flag in active_filters if flag) + (0 if flags["paediatric_only"] else 1)
     return {
         "batch": batch,
+        "mode": mode,
         "page_obj": page_obj,
         "result_rows": visible_rows,
         "all_visible_selected": all_visible_selected,
         "all_journals_count": all_journals_count,
         "staged_rows": staged_rows,
         "result_total": result_total,
-        "selected_total": batch.batch_articles.filter(is_selected=True).count(),
-        "pushed_total": batch.batch_articles.exclude(planka_card_id="").count(),
+        **_intake_counts(batch),
+        "active_filter_count": active_filter_count,
+        "filters_open": any(active_filters),
         "filter_query": flags["query"],
         "filter_journal": flags["watched_journal_id"],
         "filter_selected": flags["selected"],
@@ -394,6 +426,7 @@ def _article_intake_results_context(batch, params, user=None):
         "filter_icu_only": flags["icu_only"],
         "filter_cardiac_only": flags["cardiac_only"],
         "filter_neonatal_only": flags["neonatal_only"],
+        "filter_abstract_only": flags["abstract_only"],
         "watched_journal_options": watched_options,
         "watched_journal_tabs": watched_journal_tabs,
         "new_count": new_count,
@@ -691,6 +724,12 @@ def pubmed_save_api_key(request):
 def article_intake_results(request, batch_id):
     batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
     context = _article_intake_results_context(batch, request.GET, user=request.user)
+    if _param_enabled(request.GET, "rows_only", default=False):
+        # The next page of rows, appended below the ones already on screen.
+        return render(request, "backend/_article_intake_rows.html", context)
+    if request.headers.get("HX-Request") == "true":
+        # Switching segment or filtering also refreshes the segment highlight and the send bar.
+        return render(request, "backend/_article_intake_results_htmx.html", context)
     return render(request, "backend/_article_intake_results.html", context)
 
 
@@ -755,9 +794,9 @@ def article_intake_add_article(request, batch_id):
         existing_link.is_selected = new_selected
         existing_link.save(update_fields=["is_selected", "modified"])
         if new_selected:
-            messages.success(request, f"\u201c{article.title}\u201d added to staging.")
+            messages.success(request, f"\u201c{article.title}\u201d added to the shortlist.")
         else:
-            messages.info(request, f"\u201c{article.title}\u201d removed from staging.")
+            messages.info(request, f"\u201c{article.title}\u201d taken off the shortlist.")
     else:
         try:
             payloads = _build_pubmed_client().fetch_articles([pmid])
@@ -775,7 +814,7 @@ def article_intake_add_article(request, batch_id):
             return _render_article_intake_results_response(request, batch, request.POST)
 
         PubmedBatchArticle.objects.create(batch=batch, article=article, issue=batch.issue, is_selected=True)
-        messages.success(request, f"\u201c{article.title}\u201d added to staging.")
+        messages.success(request, f"\u201c{article.title}\u201d added to the shortlist.")
         new_selected = True
 
     batch.result_count = batch.batch_articles.count()
@@ -847,6 +886,15 @@ def article_intake_toggle_selection(request, batch_id, item_id):
             seen.append(item.pk)
             user_view.seen_batch_article_ids = seen
             user_view.save(update_fields=["seen_batch_article_ids", "modified"])
+
+    if request.headers.get("HX-Request") == "true":
+        # Only the row changes on screen; the segment counts and the send bar
+        # ride along out of band so the list never re-renders under the reader.
+        row = _annotated_batch_articles(batch).get(pk=item.pk)
+        row.is_new = False
+        mode = "shortlist" if (request.POST.get("mode") or "").strip().lower() == "shortlist" else "all"
+        context = {"batch": batch, "row": row, "mode": mode, **_intake_counts(batch)}
+        return render(request, "backend/_article_intake_row_response.html", context)
 
     return _render_article_intake_results_response(request, batch, request.POST)
 
@@ -983,9 +1031,9 @@ def article_intake_bulk_selection(request, batch_id):
                 messages.info(
                     request,
                     (
-                        f"Planka card cleanup: {removed_count} removed from Candidates, "
-                        f"{skipped_count} moved, {missing_count} deleted/archived, {failed_count} failed, "
-                        f"{kept_staged_count} kept staged."
+                        f"Planka cards: {removed_count} removed from Candidates, "
+                        f"{skipped_count} already moved on, {missing_count} missing, {failed_count} failed, "
+                        f"{kept_staged_count} kept on the shortlist."
                     ),
                 )
 
@@ -1115,7 +1163,7 @@ def article_intake_push_to_planka(request, batch_id):
         _queue_batch_task(
             batch,
             action="push",
-            note="Queued push to Planka.",
+            note="Queued: sending the shortlist to Planka.",
             task_callable=run_pubmed_batch_push_task,
             task_args=[batch.pk, push_scope],
         )
@@ -1133,7 +1181,7 @@ def article_intake_push_to_planka(request, batch_id):
         target_rows = list(batch.batch_articles.select_related("article", "issue").filter(is_selected=True))
 
     if not target_rows:
-        messages.info(request, "No staged articles available to push.")
+        messages.info(request, "Nothing on the shortlist to send.")
         if request.headers.get("HX-Request") == "true":
             return _render_article_intake_results_response(request, batch, request.POST, message_target="push")
         return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
@@ -1283,16 +1331,16 @@ def article_intake_push_to_planka(request, batch_id):
         messages.warning(
             request,
             (
-                f"Push finished with issues: {created} created, "
-                f"{already_pushed} already pushed, {recreated_missing} recreated missing, {failed} failed."
+                f"Sent to Planka with problems: {created} new card(s), "
+                f"{already_pushed} already on the board, {recreated_missing} recreated, {failed} failed."
             ),
         )
     else:
         messages.success(
             request,
             (
-                f"Push complete: {created} created, "
-                f"{already_pushed} already pushed, {recreated_missing} recreated missing, {failed} failed."
+                f"Sent to Planka: {created} new card(s), "
+                f"{already_pushed} already on the board, {recreated_missing} recreated."
             ),
         )
 
@@ -1311,7 +1359,7 @@ def article_intake_reconcile_planka_status(request, batch_id):
     batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
     staged_rows = list(batch.batch_articles.select_related("article", "issue").filter(is_selected=True))
     if not staged_rows:
-        messages.info(request, "No staged articles to reconcile.")
+        messages.info(request, "Nothing on the shortlist to check.")
         if request.headers.get("HX-Request") == "true":
             return _render_article_intake_results_response(request, batch, request.POST, message_target="push")
         return redirect(f"{reverse('backend:article_intake')}?batch={batch.pk}")
@@ -1421,12 +1469,12 @@ def article_intake_reconcile_planka_status(request, batch_id):
     messages.info(
         request,
         (
-            f"Reconcile complete: {candidates_count} in Candidates, {moved_count} moved, "
-            f"{missing_count} deleted/archived, {unlinked_count} unlinked, {error_count} errors."
+            f"Board checked: {candidates_count} in Candidates, {moved_count} moved on, "
+            f"{missing_count} missing, {unlinked_count} not yet sent, {error_count} errors."
         ),
     )
     if missing_count:
-        messages.success(request, f"{missing_count} staged article(s) are ready to re-push.")
+        messages.success(request, f"{missing_count} shortlisted article(s) will get a new card next time you send.")
 
     if request.headers.get("HX-Request") == "true":
         return _render_article_intake_results_response(request, batch, request.POST, message_target="push")

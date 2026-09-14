@@ -1,0 +1,66 @@
+{# One article. Swapped on its own when the shortlist button is pressed. `mode` is "all" or "shortlist". #}
+<div class="intake-row{% if row.is_new %} is-new{% endif %}{% if highlighted_pmid and row.article.pmid == highlighted_pmid %} article-intake-highlight{% endif %}" id="intake-row-{{ row.pk }}">
+  <div class="intake-row-main">
+    <p class="intake-title">{% if row.is_new %}<span class="intake-dot" title="New since your last look"></span>{% endif %}{{ row.article.title|default:"(Untitled)" }}</p>
+    <div class="intake-meta">
+      <span class="intake-journal-name">{{ row.watched_journal.name|default:row.article.source_journal_name|default:"Journal not recorded" }}</span>
+      {% if row.article.publication_date %}<span>·</span><span>{{ row.article.publication_date|date:"j M Y" }}</span>{% endif %}
+      <span>·</span><span>PMID {{ row.article.pmid }}</span>
+      {% if row.recommendation_count %}<span>·</span><span class="badge rounded-pill text-bg-warning" title="Recommended by signed-in members">{{ row.recommendation_count }} recommend{{ row.recommendation_count|pluralize:"s," }}</span>{% endif %}
+      {% if row.visitor_recommendation_count %}<span>·</span><span class="badge rounded-pill text-bg-light text-dark border" title="Recommended by visitors who were not signed in">{{ row.visitor_recommendation_count }} visitor{{ row.visitor_recommendation_count|pluralize }}</span>{% endif %}
+    </div>
+    {% if mode == "shortlist" %}
+      <div class="intake-planka">
+        {% with status_text=row.planka_push_error|default:''|lower %}
+          {% if row.planka_card_id %}
+            {% if "moved from candidates" in status_text %}
+              <span class="badge rounded-pill text-bg-info">Moved on by a reviewer</span>
+            {% else %}
+              <span class="badge rounded-pill text-bg-success">On the board</span>
+            {% endif %}
+            {% if row.planka_card_url %}<a href="{{ row.planka_card_url }}" target="_blank" rel="noopener noreferrer">Open card</a>{% else %}<span>Card {{ row.planka_card_id }}</span>{% endif %}
+          {% elif row.planka_push_error %}
+            {% if "missing in planka" in status_text or "previous card missing" in status_text or "deleted/archived" in status_text %}
+              <span class="badge rounded-pill text-bg-warning">Card missing on the board</span><span>A new card is made next time you send.</span>
+            {% else %}
+              <span class="badge rounded-pill text-bg-warning">Could not send</span><span>{{ row.planka_push_error|truncatechars:120 }}</span>
+            {% endif %}
+          {% else %}
+            <span class="badge rounded-pill text-bg-warning">Not yet sent</span>
+          {% endif %}
+        {% endwith %}
+      </div>
+    {% endif %}
+    {% if row.article.abstract %}
+      <p class="intake-snippet" id="abstract-{{ row.pk }}">{{ row.article.abstract|truncatechars:1200 }}{% if row.article.doi %}<span class="intake-doi">DOI {{ row.article.doi }}</span>{% endif %}</p>
+      <button type="button" class="btn btn-link btn-sm p-0 intake-more-btn" data-abstract-toggle="1" data-target="#abstract-{{ row.pk }}" aria-expanded="false" aria-controls="abstract-{{ row.pk }}"
+        {% if row.is_new %}hx-post="{% url "backend:article_intake_mark_row_seen" batch.pk row.pk %}" hx-trigger="click once" hx-swap="none"{% endif %}>More</button>
+    {% else %}
+      <p class="intake-snippet intake-snippet-none">No abstract in PubMed.{% if row.article.doi %} <span class="intake-doi d-inline">DOI {{ row.article.doi }}</span>{% endif %}</p>
+    {% endif %}
+  </div>
+  <div class="intake-row-actions">
+    {% if row.article.article_url %}
+      <a class="btn btn-link btn-sm" href="{{ row.article.article_url }}" target="_blank" rel="noopener noreferrer">Open <span aria-hidden="true">&#8599;</span></a>
+    {% endif %}
+    <span class="intake-spacer"></span>
+    {% if mode == "shortlist" and row.planka_card_id %}
+      <form method="post" action="{% url "backend:article_intake_bulk_selection" batch.pk %}" hx-post="{% url "backend:article_intake_bulk_selection" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-filter-form" hx-sync="#article-intake-results:queue all" hx-confirm="Delete this article's card from the Candidates list and take it off the shortlist?">
+        {% csrf_token %}
+        <input type="hidden" name="bulk_action" value="unstage_checked">
+        <input type="hidden" name="row_ids" value="{{ row.pk }}">
+        <input type="hidden" name="remove_from_planka" value="1">
+        <button type="submit" class="btn btn-link btn-sm text-danger">Remove from board</button>
+      </form>
+    {% endif %}
+    <button type="button"
+            class="btn btn-sm intake-shortlist-btn {% if row.is_selected %}btn-success{% else %}btn-outline-primary{% endif %}"
+            aria-pressed="{% if row.is_selected %}true{% else %}false{% endif %}"
+            hx-post="{% url "backend:article_intake_toggle_selection" batch.pk row.pk %}"
+            hx-vals='{"selected": "{% if row.is_selected %}0{% else %}1{% endif %}", "mode": "{{ mode|default:"all" }}"}'
+            hx-target="closest .intake-row"
+            hx-swap="outerHTML"
+            hx-sync="closest .intake-row:replace"
+            hx-disabled-elt="this">{% if row.is_selected %}Shortlisted <span aria-hidden="true">&#10003;</span>{% else %}Shortlist{% endif %}</button>
+  </div>
+</div>

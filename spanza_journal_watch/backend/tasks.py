@@ -565,7 +565,7 @@ def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
     batch = PubmedImportBatch.objects.get(pk=batch_id)
     batch.task_state = PubmedImportBatch.TASK_STATE_RUNNING
     batch.task_id = self.request.id or batch.task_id
-    batch.task_note = "Pushing staged articles to Planka..."
+    batch.task_note = "Sending the shortlist to Planka..."
     batch.save(update_fields=["task_state", "task_id", "task_note", "modified"])
 
     issue, binding, list_error = _get_issue_planka_candidates_list(batch, require_candidates_list=False)
@@ -582,7 +582,7 @@ def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
 
     if not target_rows:
         batch.task_state = PubmedImportBatch.TASK_STATE_SUCCESS
-        batch.task_note = "No staged articles available to push."
+        batch.task_note = "Nothing on the shortlist to send."
         batch.save(update_fields=["task_state", "task_note", "modified"])
         return {"status": "success", "note": batch.task_note}
 
@@ -722,8 +722,8 @@ def run_pubmed_batch_push_task(self, batch_id, push_scope="selected"):
 
     batch.task_state = PubmedImportBatch.TASK_STATE_ERROR if failed else PubmedImportBatch.TASK_STATE_SUCCESS
     batch.task_note = (
-        f"Push complete: {created} created, {already_pushed} already pushed, "
-        f"{recreated_missing} recreated missing, {failed} failed."
+        f"Sent to Planka: {created} new card(s), {already_pushed} already on the board, "
+        f"{recreated_missing} recreated, {failed} failed."
     )
     batch.save(update_fields=["task_state", "task_note", "modified"])
     return {"status": "error" if failed else "success", "created": created, "failed": failed}

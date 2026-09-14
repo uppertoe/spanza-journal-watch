@@ -5,7 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Articles</h1>
 </div>
-<p class="text-muted">Load the issue's articles, stage the ones worth reviewing, and push the shortlist to the Planka board.</p>
+<p class="text-body-secondary">Shortlist the articles worth reviewing, then send the shortlist to the Planka board.</p>
 
 <div id="article-intake-page">
 
@@ -20,258 +20,125 @@
 {% endif %}
 {% if not planka_credential %}
   <div class="alert alert-warning d-flex justify-content-between align-items-center mb-3">
-    <span>No Planka connection configured, so the shortlist cannot be pushed yet.{% if not perms.submissions.chief_editor %} Ask the chief editor.{% endif %}</span>
+    <span>No Planka connection configured, so the shortlist cannot be sent yet.{% if not perms.submissions.chief_editor %} Ask the chief editor.{% endif %}</span>
     {% if perms.submissions.chief_editor %}<a class="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2" href="{% url "backend:backend_settings" %}">Configure in Settings</a>{% endif %}
   </div>
 {% endif %}
 
 {% if selected_issue %}
-<div class="card mb-3">
-  <div class="card-header">Step 1 · Load articles</div>
-  <div class="card-body">
-    <form method="post" class="row g-3" hx-post="{% url "backend:article_intake" %}" hx-target="#article-intake-page" hx-select="#article-intake-page" hx-swap="outerHTML" hx-push-url="true">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="fetch">
-      <input type="hidden" name="async" value="1">
-      <input type="hidden" name="issue" value="{{ selected_issue.pk }}">
-      <div class="col-12 col-md-6">
-        <label class="form-label">From month (earliest)</label>
-        <div class="row g-2">
-          <div class="col-7">
-            <select class="form-select" name="from_month_month" required>
-              {% for month_number, month_label in month_options %}
-                <option value="{{ month_number }}" {% if month_number == from_month_month %}selected{% endif %}>{{ month_label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-5">
-            <select class="form-select" name="from_month_year" required>
-              {% for year in year_options %}
-                <option value="{{ year }}" {% if year == from_month_year %}selected{% endif %}>{{ year }}</option>
-              {% endfor %}
-            </select>
+  {% if batch %}
+    <section class="card mb-3 intake-source{% if recheck.due %} is-due{% endif %}" id="intake-recheck-card" aria-label="Loaded articles">
+      <div class="card-body">
+        {% include "backend/_article_intake_recheck.html" %}
+        <div id="article-intake-task-status" {% if show_stage2_task_status %}class="mt-3" hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
+        <div class="collapse" id="intake-setup">
+          <div class="pt-3 mt-3 border-top">
+            {% include "backend/_article_intake_fetch_form.html" %}
           </div>
         </div>
-        {% if fetch_form.from_month.errors %}<div class="text-danger small mt-1">{{ fetch_form.from_month.errors|join:", " }}</div>{% endif %}
       </div>
-      <div class="col-12 col-md-6">
-        <label class="form-label">To month (latest)</label>
-        <div class="row g-2">
-          <div class="col-7">
-            <select class="form-select" name="to_month_month" required>
-              {% for month_number, month_label in month_options %}
-                <option value="{{ month_number }}" {% if month_number == to_month_month %}selected{% endif %}>{{ month_label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-5">
-            <select class="form-select" name="to_month_year" required>
-              {% for year in year_options %}
-                <option value="{{ year }}" {% if year == to_month_year %}selected{% endif %}>{{ year }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        {% if fetch_form.to_month.errors %}<div class="text-danger small mt-1">{{ fetch_form.to_month.errors|join:", " }}</div>{% endif %}
-      </div>
-      <div class="col-12">
-        <label class="form-label fw-semibold">Watched journals</label>
-        <input type="text" id="journal-filter" class="form-control form-control-sm mb-1" placeholder="Filter journals&hellip;" autocomplete="off">
-        <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto; background: var(--bs-body-bg);">
-          {% for checkbox in fetch_form.watched_journals %}
-            <div class="form-check journal-check-item mb-1">
-              {{ checkbox.tag }}
-              <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
-            </div>
-          {% endfor %}
-        </div>
-        {% if fetch_form.watched_journals.errors %}
-          <div class="text-danger small mt-1">{{ fetch_form.watched_journals.errors|join:", " }}</div>
-        {% endif %}
-        <div class="d-flex gap-2 mt-2">
-          <button type="button" id="watched-select-all" class="btn btn-sm btn-outline-secondary">Select all</button>
-          <button type="button" id="watched-select-none" class="btn btn-sm btn-outline-secondary">Clear</button>
-        </div>
-      </div>
-      <div class="col-12">
-        <button type="submit" class="btn btn-primary">Start intake</button>
-        <p class="text-muted small mt-2 mb-0">The list appears straight away; PubMed is then checked for anything newer.</p>
-      </div>
-    </form>
-  </div>
-</div>
+    </section>
 
-{% if batch %}
-  <div id="intake-recheck-card" class="card mb-3 {% if recheck.due %}border-warning{% else %}border-primary{% endif %}">
-    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 {% if recheck.due %}bg-warning-subtle{% else %}bg-primary-subtle{% endif %}">
-      <span class="fw-semibold">Keep the list up to date</span>
-      <span>
-        {% if recheck.due %}<span class="badge text-bg-warning">Check due</span>{% endif %}
-        {% if recheck.phase == "open" %}
-          <span class="badge text-bg-primary">Window open until {{ recheck.window_end|date:"j M Y" }}</span>
-        {% elif recheck.phase == "closing" %}
-          <span class="badge text-bg-warning">Window closed · final articles still arriving</span>
+    <div id="article-intake-recommended" class="intake-rec"
+      hx-get="{% url 'backend:article_intake_recommended' %}?from_month={{ batch.from_month|date:'Y-m' }}&to_month={{ batch.to_month|date:'Y-m' }}&batch_id={{ batch.pk }}"
+      hx-trigger="load"
+      hx-swap="innerHTML">
+      <span class="text-body-secondary small">Checking for recommendations&hellip;</span>
+    </div>
+
+    <div class="intake-lists-row">
+      {% include "backend/_article_intake_segments.html" %}
+      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#intake-add-panel" aria-expanded="false" aria-controls="intake-add-panel">+ Add an article</button>
+    </div>
+
+    <div class="collapse" id="intake-add-panel">
+      <div class="intake-add card card-body mb-3">
+        <label class="fw-semibold small mb-1" for="find-article-q">Add an article that is not in the list</label>
+        <div class="position-relative">
+          <input type="search"
+                 name="q"
+                 id="find-article-q"
+                 class="form-control pe-4"
+                 placeholder="DOI, PMID or part of the title"
+                 autocomplete="off"
+                 hx-get="{% url "backend:article_intake_find_article" batch.pk %}"
+                 hx-trigger="input changed delay:600ms, search"
+                 hx-target="#find-article-results"
+                 hx-swap="innerHTML"
+                 hx-indicator="#find-article-spinner">
+          <span id="find-article-spinner" class="htmx-indicator position-absolute top-50 end-0 translate-middle-y me-2" style="pointer-events: none;">
+            <span class="spinner-border spinner-border-sm text-secondary" aria-hidden="true"></span>
+          </span>
+        </div>
+        <p class="text-body-secondary small mt-1 mb-0">Any journal, any date. The article is shortlisted straight away.</p>
+        <div id="find-article-results" class="mt-2"></div>
+      </div>
+    </div>
+
+    <div id="article-intake-results" data-batch-id="{{ batch.pk }}">
+      {% include "backend/_article_intake_results.html" %}
+    </div>
+
+    {% if planka_push_hint %}
+      <div class="alert alert-warning d-flex justify-content-between align-items-center mt-3">
+        <span>{{ planka_push_hint }}</span>
+        {% if planka_issue %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_planka_import" %}?issue={{ planka_issue.pk }}">Open Planka page</a>
         {% else %}
-          <span class="badge text-bg-secondary">Window closed {{ recheck.window_end|date:"j M Y" }}</span>
+          <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_builder" %}">Open Issue Builder</a>
         {% endif %}
-      </span>
-    </div>
-    <div class="card-body">
-      {% include "backend/_article_intake_recheck.html" %}
-      <div id="article-intake-task-status" {% if show_stage2_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
-    </div>
-  </div>
-
-  <div class="card mb-3">
-    <div class="card-header">Step 2 · Stage the shortlist</div>
-    <div class="card-body">
-      <div class="mb-2">
-        <strong>Range:</strong> {{ batch.from_month|date:"F Y" }} to {{ batch.to_month|date:"F Y" }}
       </div>
-      <div class="text-muted small mb-3">
-        {{ batch.result_count }} article{{ batch.result_count|pluralize }} · {{ batch.selected_count }} staged
-      </div>
+    {% endif %}
 
-      <div class="card mb-3 border-0 bg-body-secondary">
-        <div class="card-body py-3">
-          <div class="fw-semibold small mb-1">Add a specific article</div>
-          <p class="text-muted small mb-2">Search by title, DOI, or PMID to add an article directly to staging.</p>
-          <div class="position-relative">
-            <input type="text"
-                   name="q"
-                   id="find-article-q"
-                   class="form-control pe-4"
-                   placeholder="e.g. &ldquo;10.1001/jama.2024.1234&rdquo; or &ldquo;38505643&rdquo; or a title fragment&hellip;"
-                   autocomplete="off"
-                   hx-get="{% url "backend:article_intake_find_article" batch.pk %}"
-                   hx-trigger="input changed delay:600ms, search"
-                   hx-target="#find-article-results"
-                   hx-swap="innerHTML"
-                   hx-indicator="#find-article-spinner">
-            <span id="find-article-spinner"
-                  class="htmx-indicator position-absolute top-50 end-0 translate-middle-y me-2"
-                  style="pointer-events: none;">
-              <span class="spinner-border spinner-border-sm text-secondary" aria-hidden="true"></span>
-            </span>
-          </div>
-          <div id="find-article-results" class="mt-2"></div>
-        </div>
-      </div>
-
-      <div id="article-intake-results" class="mt-3" data-batch-id="{{ batch.pk }}">
-        {% include "backend/_article_intake_results.html" %}
-      </div>
-    </div>
-  </div>
-
-  <div class="card mb-3">
-    <div class="card-header">Step 3 · Push staged articles to Planka</div>
-    <div class="card-body">
+    <div class="intake-push-wrap">
       <div id="article-intake-push-task-status" {% if show_push_task_status %}hx-get="{% url "backend:article_intake_task_status" batch.pk %}?channel=push" hx-trigger="load" hx-target="this" hx-swap="outerHTML"{% else %}class="d-none"{% endif %}></div>
-      {% if planka_push_hint %}
-        <div class="alert alert-warning d-flex justify-content-between align-items-center">
-          <span>{{ planka_push_hint }}</span>
-          {% if planka_issue %}
-            <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_planka_import" %}?issue={{ planka_issue.pk }}">Open Planka page</a>
-          {% else %}
-            <a class="btn btn-sm btn-outline-primary" href="{% url "backend:issue_builder" %}">Open Issue Builder</a>
-          {% endif %}
-        </div>
-      {% endif %}
-      <div class="d-flex flex-wrap gap-2">
-        <form method="post" action="{% url "backend:article_intake_push_to_planka" batch.pk %}" hx-post="{% url "backend:article_intake_push_to_planka" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context" hx-sync="#article-intake-results:queue all">
-          {% csrf_token %}
-          <input type="hidden" name="async" value="1">
-          <input type="hidden" name="push_scope" value="selected">
-          <button type="submit" class="btn btn-primary">Push staged articles to Planka candidates</button>
-        </form>
-        <form method="post" action="{% url "backend:article_intake_reconcile_planka_status" batch.pk %}" hx-post="{% url "backend:article_intake_reconcile_planka_status" batch.pk %}" hx-target="#article-intake-results" hx-swap="innerHTML" hx-include="#intake-toggle-context" hx-sync="#article-intake-results:queue all">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-outline-secondary">Reconcile Planka status</button>
-        </form>
+      {% include "backend/_article_intake_push_bar.html" %}
+    </div>
+  {% else %}
+    <div class="card mb-3">
+      <div class="card-header">Load the articles</div>
+      <div class="card-body">
+        {% include "backend/_article_intake_fetch_form.html" %}
       </div>
     </div>
-  </div>
+  {% endif %}
 {% else %}
-  <div class="alert alert-info">No articles loaded for this issue yet. Use Step 1.</div>
-{% endif %}
-{% else %}
-  <div class="alert alert-info">Select an issue to start article intake.</div>
+  <div class="alert alert-info">Select an issue to start on its articles.</div>
 {% endif %}
 </div>
 {% endblock content %}
 
 {% block inline_javascript %}
   {{ block.super }}
-  <style>
-    @keyframes intake-highlight-fade {
-      0%   { background-color: #d1e7dd; }
-      100% { background-color: transparent; }
-    }
-    .article-intake-highlight {
-      animation: intake-highlight-fade 2.5s ease-out forwards;
-    }
-  </style>
   <script>
     (() => {
-      // Watched journals checkbox list — filter + select all/none
-      const journalFilter = document.getElementById("journal-filter");
-      const selectAllButton = document.getElementById("watched-select-all");
-      const selectNoneButton = document.getElementById("watched-select-none");
-
-      if (journalFilter) {
-        journalFilter.addEventListener("input", () => {
-          const query = journalFilter.value.toLowerCase();
-          document.querySelectorAll(".journal-check-item").forEach((item) => {
-            const label = item.querySelector("label");
-            item.style.display = (!query || (label && label.textContent.toLowerCase().includes(query))) ? "" : "none";
-          });
-        });
-      }
-
-      if (selectAllButton) {
-        selectAllButton.addEventListener("click", () => {
-          document.querySelectorAll(".journal-check-item input[type=checkbox]").forEach((cb) => { cb.checked = true; });
-        });
-      }
-
-      if (selectNoneButton) {
-        selectNoneButton.addEventListener("click", () => {
-          document.querySelectorAll(".journal-check-item input[type=checkbox]").forEach((cb) => { cb.checked = false; });
-        });
-      }
-
-      document.addEventListener("click", (event) => {
-        const resultsContainer = document.getElementById("article-intake-results");
-        if (!resultsContainer) return;
-
-        const clickedToggle = event.target.closest("[data-abstract-toggle='1']");
-        const clickedAbstractBody = event.target.closest("[id^='abstract-']");
-        if (clickedToggle || clickedAbstractBody) return;
-
-        resultsContainer.querySelectorAll("[id^='abstract-'].collapse.show").forEach((element) => {
-          if (window.bootstrap && window.bootstrap.Collapse) {
-            window.bootstrap.Collapse.getOrCreateInstance(element, { toggle: false }).hide();
-          }
+      // Watched journals list in the range form: filter box and select all / clear.
+      // Delegated, because the whole page region is swapped after a reload.
+      document.addEventListener("input", (event) => {
+        if (event.target.id !== "journal-filter") return;
+        const query = event.target.value.toLowerCase();
+        document.querySelectorAll(".journal-check-item").forEach((item) => {
+          const label = item.querySelector("label");
+          item.style.display = (!query || (label && label.textContent.toLowerCase().includes(query))) ? "" : "none";
         });
       });
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("#watched-select-all, #watched-select-none");
+        if (!button) return;
+        const checked = button.id === "watched-select-all";
+        document.querySelectorAll(".journal-check-item input[type=checkbox]").forEach((cb) => { cb.checked = checked; });
+      });
 
+      // Abstract snippets: two lines by default, More opens the rest.
       document.addEventListener("click", (event) => {
         const toggle = event.target.closest("[data-abstract-toggle='1']");
         if (!toggle) return;
-
-        event.preventDefault();
-        const targetSelector = toggle.getAttribute("data-bs-target");
-        if (!targetSelector) return;
-        const target = document.querySelector(targetSelector);
+        const target = document.querySelector(toggle.getAttribute("data-target") || "");
         if (!target) return;
-
-        if (window.bootstrap && window.bootstrap.Collapse) {
-          window.bootstrap.Collapse.getOrCreateInstance(target, { toggle: false }).toggle();
-          return;
-        }
-
-        target.classList.toggle("show");
+        const open = !target.classList.contains("is-open");
+        target.classList.toggle("is-open", open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        toggle.textContent = open ? "Less" : "More";
       });
     })();
   </script>
