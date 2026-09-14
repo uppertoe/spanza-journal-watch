@@ -99,6 +99,28 @@
   flex: 1 1 12rem;
   width: auto;
   min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+// Phones: WebKit will not shrink a <select> below its widest option inside a
+// flex row, which pushed the toolbar past the viewport. Give it a line of its own.
+@include media-breakpoint-down(sm) {
+  .intake-journal {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .intake-filter-form > *,
+  .intake-toolbar-row > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .intake-source-head .badge {
+    white-space: normal;
+    text-align: left;
+  }
 }
 
 .intake-chips {
