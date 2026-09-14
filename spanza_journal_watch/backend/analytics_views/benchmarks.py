@@ -3,7 +3,7 @@
 import datetime
 
 from django.core.cache import cache
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
@@ -146,8 +146,13 @@ def _is_one_step_visit(visit):
 
 
 def _confidence_summary(events_qs):
-    """Return confidence metrics for a queryset of AnalyticsEvent."""
-    total = events_qs.count()
+    """Return confidence metrics for a queryset of AnalyticsEvent (one aggregate query)."""
+    totals = events_qs.aggregate(
+        total=Count("id"),
+        js=Count("id", filter=Q(js_verified=True)),
+        subs=Count("id", filter=Q(human_confidence="known_subscriber_human")),
+    )
+    total = totals["total"]
     if not total:
         return {
             "conf_total": 0,
@@ -155,11 +160,9 @@ def _confidence_summary(events_qs):
             "conf_subscriber_rate": "—",
             "conf_engaged_humans": 0,
         }
-    js = events_qs.filter(js_verified=True).count()
-    subs = events_qs.filter(human_confidence="known_subscriber_human").count()
     return {
         "conf_total": total,
-        "conf_js_rate": _safe_percentage(js, total),
-        "conf_subscriber_rate": _safe_percentage(subs, total),
+        "conf_js_rate": _safe_percentage(totals["js"], total),
+        "conf_subscriber_rate": _safe_percentage(totals["subs"], total),
         "conf_engaged_humans": _engaged_human_count(events_qs),
     }

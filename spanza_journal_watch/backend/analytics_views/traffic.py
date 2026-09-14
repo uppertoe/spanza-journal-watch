@@ -109,6 +109,7 @@ def analytics_traffic(request):
         start_date=start_date,
         rollout_date=rollout_date,
         visits_per_visitor=visits_per_visitor,
+        period_qs=human_events,
     )
 
     page_counts = Counter()

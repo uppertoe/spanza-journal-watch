@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -40,6 +41,33 @@ from .visits import (
     _normalise_search_query,
     _rank_rows,
 )
+
+
+def _newsletter_lift_counts(newsletter):
+    """Engaged views in the week before and after a send, as one query.
+
+    Both windows are fixed once the after-week has elapsed, so the pair is
+    cached for a day; a send still inside its after-week is recounted hourly.
+    """
+    send_dt = newsletter.send_date
+    before_start = send_dt - datetime.timedelta(days=7)
+    after_end = send_dt + datetime.timedelta(days=7)
+    cache_key = f"analytics:newsletter_lift:{newsletter.pk}:{send_dt.isoformat()}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    counts = AnalyticsEvent.objects.filter(
+        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        automated=False,
+        timestamp__gte=before_start,
+        timestamp__lte=after_end,
+    ).aggregate(
+        before=Count("id", filter=Q(timestamp__lt=send_dt)),
+        after=Count("id", filter=Q(timestamp__gte=send_dt)),
+    )
+    result = (counts["before"], counts["after"])
+    cache.set(cache_key, result, 86400 if after_end < timezone.now() else 3600)
+    return result
 
 
 @login_required
@@ -146,12 +174,7 @@ def analytics_overview(request):
                 }
             )
             continue
-        send_dt = nl.send_date
-        before_start = send_dt - datetime.timedelta(days=7)
-        after_end = send_dt + datetime.timedelta(days=7)
-        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
-        before_count = lift_qs.filter(timestamp__gte=before_start, timestamp__lt=send_dt).count()
-        after_count = lift_qs.filter(timestamp__gte=send_dt, timestamp__lte=after_end).count()
+        before_count, after_count = _newsletter_lift_counts(nl)
         lift_pct = None
         if before_count:
             lift_pct = round((after_count - before_count) / before_count * 100)

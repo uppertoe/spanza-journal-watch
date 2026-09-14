@@ -73,7 +73,9 @@ _VISIT_PROGRESSION_EVENT_TYPES = frozenset(
 )
 
 
-def _split_new_returning(visitor_ids_in_period, *, start_ts, start_date, rollout_date, visits_per_visitor):
+def _split_new_returning(
+    visitor_ids_in_period, *, start_ts, start_date, rollout_date, visits_per_visitor, period_qs=None
+):
     """Split the period's visitors into (new_count, returning_count, basis).
 
     Returning is defined by whether a visitor was already seen *before* the
@@ -90,11 +92,17 @@ def _split_new_returning(visitor_ids_in_period, *, start_ts, start_date, rollout
     total = len(visitor_ids_in_period)
     history_reliable = rollout_date is not None and start_date > rollout_date
     if history_reliable and visitor_ids_in_period:
+        # A subquery keeps thousands of visitor ids out of the SQL text.
+        seen_in_period = (
+            period_qs.filter(visitor_id__isnull=False).values("visitor_id")
+            if period_qs is not None
+            else visitor_ids_in_period
+        )
         returning_count = (
             AnalyticsEvent.objects.filter(
                 automated=False,
                 timestamp__lt=start_ts,
-                visitor_id__in=visitor_ids_in_period,
+                visitor_id__in=seen_in_period,
             )
             .values("visitor_id")
             .distinct()

@@ -100,6 +100,7 @@ urlpatterns = [
     path("headlines/<int:review_id>/save", views.headline_save, name="headline_save"),
     path("headlines/<int:review_id>/text", views.headline_review_text, name="headline_review_text"),
     path("settings", views.backend_settings, name="backend_settings"),
+    path("settings/planka-status", views.backend_settings_planka_status, name="backend_settings_planka_status"),
     path("settings/fetch-monitoring", views.fetch_monitoring, name="fetch_monitoring"),
     path("settings/refresh-mesh", views.trigger_mesh_refresh, name="trigger_mesh_refresh"),
     path("settings/collections", views.collection_management, name="collection_management"),
