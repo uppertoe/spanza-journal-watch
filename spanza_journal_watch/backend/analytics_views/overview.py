@@ -23,12 +23,11 @@ from spanza_journal_watch.backend.views.analytics_page import (
 from spanza_journal_watch.newsletter.models import Newsletter
 from spanza_journal_watch.submissions.models import Review
 
-from .benchmarks import _confidence_summary, _is_one_step_visit
+from .benchmarks import _is_one_step_visit
 from .common import (
     VIEW_SITE_ANALYTICS,
     _base_event_qs,
     _date_range_from_request,
-    _engaged_human_count,
     _newsletter_send_weeks,
     _pct_change,
     _render_analytics,
@@ -89,28 +88,6 @@ def analytics_overview(request):
     ]
 
     E = AnalyticsEvent.EventType
-    period_agg = review_events.aggregate(
-        total_opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
-        total_engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
-        total_full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
-        total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
-        avg_dwell=Avg("duration_ms", filter=Q(event_type=E.REVIEW_ENGAGED)),
-        avg_scroll=Avg("scroll_depth", filter=Q(event_type=E.REVIEW_ENGAGED, scroll_depth__isnull=False)),
-    )
-    total_opens = period_agg["total_opens"]
-    total_engaged = period_agg["total_engaged"]
-    total_full_text = period_agg["total_full_text"]
-    total_shares = period_agg["total_shares"]
-    avg_dwell_ms = period_agg["avg_dwell"] or 0
-    avg_scroll = period_agg["avg_scroll"]
-    avg_scroll_depth = round(avg_scroll) if avg_scroll is not None else None
-
-    search_count = (
-        human_events.filter(event_type=E.SEARCH)
-        .exclude(metadata__query="")
-        .exclude(metadata__query__isnull=True)
-        .count()
-    )
 
     # Previous period for comparison
     period_days = (end_date - start_date).days
@@ -118,6 +95,44 @@ def analytics_overview(request):
     prev_start = prev_end - datetime.timedelta(days=period_days)
     prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
     prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+
+    # One pass over both periods: every review KPI, its previous-period twin,
+    # the search counts and the per-method share counts as filtered aggregates.
+    in_period = Q(timestamp__gte=start_ts, timestamp__lte=end_ts)
+    in_prev = Q(timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts)
+    is_review = Q(content_type=review_ct)
+    is_search = Q(event_type=E.SEARCH) & ~Q(metadata__query="") & Q(metadata__query__isnull=False)
+    engaged_scroll = Q(event_type=E.REVIEW_ENGAGED, scroll_depth__isnull=False)
+    both_periods = AnalyticsEvent.objects.filter(
+        automated=False, timestamp__gte=prev_start_ts, timestamp__lte=end_ts
+    ).aggregate(
+        total_opens=Count("id", filter=in_period & is_review & Q(event_type=E.REVIEW_OPEN)),
+        total_engaged=Count("id", filter=in_period & is_review & Q(event_type=E.REVIEW_ENGAGED)),
+        total_full_text=Count("id", filter=in_period & is_review & Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+        total_shares=Count("id", filter=in_period & is_review & Q(event_type__in=share_event_types)),
+        avg_dwell=Avg("duration_ms", filter=in_period & is_review & Q(event_type=E.REVIEW_ENGAGED)),
+        avg_scroll=Avg("scroll_depth", filter=in_period & is_review & engaged_scroll),
+        search_count=Count("id", filter=in_period & is_search),
+        prev_opens=Count("id", filter=in_prev & is_review & Q(event_type=E.REVIEW_OPEN)),
+        prev_engaged=Count("id", filter=in_prev & is_review & Q(event_type=E.REVIEW_ENGAGED)),
+        prev_full_text=Count("id", filter=in_prev & is_review & Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
+        prev_shares=Count("id", filter=in_prev & is_review & Q(event_type__in=share_event_types)),
+        prev_dwell=Avg("duration_ms", filter=in_prev & is_review & Q(event_type=E.REVIEW_ENGAGED)),
+        prev_scroll=Avg("scroll_depth", filter=in_prev & is_review & engaged_scroll),
+        prev_searches=Count("id", filter=in_prev & is_search),
+        **{
+            f"share_{share_type}": Count("id", filter=in_period & is_review & Q(event_type=share_type))
+            for share_type in share_event_types
+        },
+    )
+    total_opens = both_periods["total_opens"]
+    total_engaged = both_periods["total_engaged"]
+    total_full_text = both_periods["total_full_text"]
+    total_shares = both_periods["total_shares"]
+    avg_dwell_ms = both_periods["avg_dwell"] or 0
+    avg_scroll = both_periods["avg_scroll"]
+    avg_scroll_depth = round(avg_scroll) if avg_scroll is not None else None
+    search_count = both_periods["search_count"]
 
     # The comparison is only meaningful if the previous period sits wholly within
     # the analytics era; otherwise it baselines against near-zero data and every
@@ -128,31 +143,14 @@ def analytics_overview(request):
     def _delta(current, previous):
         return _pct_change(current, previous) if comparison_reliable else None
 
-    prev_human = AnalyticsEvent.objects.filter(
-        timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
-    )
-    prev_review = prev_human.filter(content_type=review_ct)
-    prev_agg = prev_review.aggregate(
-        total_opens=Count("id", filter=Q(event_type=E.REVIEW_OPEN)),
-        total_engaged=Count("id", filter=Q(event_type=E.REVIEW_ENGAGED)),
-        total_full_text=Count("id", filter=Q(event_type=E.REVIEW_FULL_TEXT_CLICK)),
-        total_shares=Count("id", filter=Q(event_type__in=share_event_types)),
-        avg_dwell=Avg("duration_ms", filter=Q(event_type=E.REVIEW_ENGAGED)),
-        avg_scroll=Avg("scroll_depth", filter=Q(event_type=E.REVIEW_ENGAGED, scroll_depth__isnull=False)),
-    )
-    prev_opens = prev_agg["total_opens"]
-    prev_engaged = prev_agg["total_engaged"]
-    prev_full_text = prev_agg["total_full_text"]
-    prev_shares = prev_agg["total_shares"]
-    prev_dwell_ms = prev_agg["avg_dwell"] or 0
-    prev_scroll = prev_agg["avg_scroll"]
+    prev_opens = both_periods["prev_opens"]
+    prev_engaged = both_periods["prev_engaged"]
+    prev_full_text = both_periods["prev_full_text"]
+    prev_shares = both_periods["prev_shares"]
+    prev_dwell_ms = both_periods["prev_dwell"] or 0
+    prev_scroll = both_periods["prev_scroll"]
     prev_scroll_depth = round(prev_scroll) if prev_scroll is not None else None
-    prev_searches = (
-        prev_human.filter(event_type=E.SEARCH)
-        .exclude(metadata__query="")
-        .exclude(metadata__query__isnull=True)
-        .count()
-    )
+    prev_searches = both_periods["prev_searches"]
 
     engaged_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
     weekly_trend = _weekly_buckets(engaged_qs)
@@ -192,29 +190,39 @@ def analytics_overview(request):
 
     # Unique visitors and visits
     unique_visitors = len({v["visitor_id"] for v in visits if v["visitor_id"]})
-    engaged_humans = _engaged_human_count(human_events)
     unique_sessions = len(visits)
-    # Distinct Django session_keys (only written when a request mutates the
-    # session, e.g. a JS beacon fires). Used as the bot-signal denominator:
-    # cookie-only crawlers rarely trigger session writes, so visitor_id /
-    # session_key climbs when they slip through the UA filter.
-    unique_session_keys = human_events.exclude(session_key="").values("session_key").distinct().count()
-
-    human_agg = human_events.aggregate(
-        human_event_count=Count("id"),
-        subscriber_events=Count(
-            "id", filter=Q(human_confidence=AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN)
-        ),
+    # One pass over every event in the period (automated rows included, for the
+    # data-quality figures): human totals, the engaged-human and share-attributed
+    # visitor counts, the distinct Django session keys and the confidence mix.
+    is_human = Q(automated=False)
+    deliberate = Q(visitor_id__isnull=False) & (
+        Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES)
     )
-    human_event_count = human_agg["human_event_count"]
-    subscriber_events = human_agg["subscriber_events"]
-
-    # Data quality — always across ALL events regardless of filter toggle
     all_period = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts)
     all_agg = all_period.aggregate(
         total_all_events=Count("id"),
         js_verified_count=Count("id", filter=Q(js_verified=True)),
+        human_event_count=Count("id", filter=is_human),
+        human_js_verified=Count("id", filter=is_human & Q(js_verified=True)),
+        subscriber_events=Count(
+            "id", filter=is_human & Q(human_confidence=AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN)
+        ),
+        engaged_humans=Count("visitor_id", distinct=True, filter=is_human & deliberate),
+        share_attributed_visits=Count("visitor_id", distinct=True, filter=is_human & deliberate & ~Q(share_token="")),
+        # Distinct Django session_keys (only written when a request mutates the
+        # session, e.g. a JS beacon fires). Used as the bot-signal denominator:
+        # cookie-only crawlers rarely trigger session writes, so visitor_id /
+        # session_key climbs when they slip through the UA filter.
+        unique_session_keys=Count("session_key", distinct=True, filter=is_human & ~Q(session_key="")),
+        **{
+            f"confidence_{value}": Count("id", filter=Q(human_confidence=value))
+            for value in AnalyticsEvent.HumanConfidence.values
+        },
     )
+    engaged_humans = all_agg["engaged_humans"]
+    unique_session_keys = all_agg["unique_session_keys"]
+    human_event_count = all_agg["human_event_count"]
+    subscriber_events = all_agg["subscriber_events"]
     total_all_events = all_agg["total_all_events"]
     # Automated requests are no longer persisted per-row; read from the daily
     # aggregate counter bumped by record_event's bot short-circuit.
@@ -232,7 +240,14 @@ def analytics_overview(request):
     )
     total_attempted_events = total_all_events + automated_count
     js_verified_count = all_agg["js_verified_count"]
-    confidence_breakdown = list(all_period.values("human_confidence").annotate(count=Count("id")).order_by("-count"))
+    confidence_breakdown = sorted(
+        (
+            {"human_confidence": value, "count": all_agg[f"confidence_{value}"]}
+            for value in AnalyticsEvent.HumanConfidence.values
+            if all_agg[f"confidence_{value}"]
+        ),
+        key=lambda row: -row["count"],
+    )
 
     review_summary_rows = list(
         review_events.values("object_id")
@@ -277,12 +292,7 @@ def analytics_overview(request):
     best_full_text_review = _rank_rows(review_rows, ("full_text_clicks", "full_text_ctr_value", "opens"), limit=1)
     most_shared_review = _rank_rows(review_rows, ("total_shares", "share_rate_value", "opens"), limit=1)
 
-    share_count_map = dict(
-        review_events.filter(event_type__in=share_event_types)
-        .values_list("event_type")
-        .annotate(count=Count("id"))
-        .values_list("event_type", "count")
-    )
+    share_count_map = {share_type: both_periods[f"share_{share_type}"] for share_type in share_event_types}
     share_counts = {
         "Copy link": share_count_map.get(E.REVIEW_SHARE_COPY_LINK, 0),
         "Email": share_count_map.get(E.REVIEW_SHARE_EMAIL, 0),
@@ -299,14 +309,7 @@ def analytics_overview(request):
     # Visitors who arrived via a share link (carry a ref token) AND actually
     # engaged. Excludes link-preview/unfurl fetchers, which land a single
     # tokened page_visit with no interaction and would otherwise inflate this.
-    share_attributed_visits = (
-        human_events.exclude(share_token="")
-        .filter(visitor_id__isnull=False)
-        .filter(Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES))
-        .values("visitor_id")
-        .distinct()
-        .count()
-    )
+    share_attributed_visits = all_agg["share_attributed_visits"]
 
     search_query_counter = Counter()
     zero_result_counter = Counter()
@@ -628,7 +631,18 @@ def analytics_overview(request):
         "overview_confidence_items": overview_confidence_items,
         "active_tab": "overview",
     }
-    context.update(_confidence_summary(human_events))
+    context.update(
+        {
+            "conf_total": human_event_count,
+            "conf_js_rate": _safe_percentage(all_agg["human_js_verified"], human_event_count)
+            if human_event_count
+            else "—",
+            "conf_subscriber_rate": _safe_percentage(subscriber_events, human_event_count)
+            if human_event_count
+            else "—",
+            "conf_engaged_humans": engaged_humans if human_event_count else 0,
+        }
+    )
     return _render_analytics(
         request, "backend/analytics/overview.html", context, "backend/analytics/_overview_panel.html"
     )
