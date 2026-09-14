@@ -1017,6 +1017,7 @@ class PubmedArticle(TimeStampedModel):
         indexes = [
             models.Index(fields=["pmid"], name="backend_pa_pmid_idx"),
             GinIndex(fields=["title"], name="backend_pa_title_trgm", opclasses=["gin_trgm_ops"]),
+            GinIndex(fields=["abstract"], name="backend_pa_abstract_trgm", opclasses=["gin_trgm_ops"]),
         ]
 
     def save(self, *args, **kwargs):

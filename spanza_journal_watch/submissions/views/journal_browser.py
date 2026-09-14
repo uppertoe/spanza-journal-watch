@@ -5,7 +5,8 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db import connection
+from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -23,6 +24,7 @@ from spanza_journal_watch.backend.models import (
     can_recommend_pubmed_articles,
 )
 from spanza_journal_watch.backend.pubmed_cache import article_matches_topic, article_metadata_list, shift_month
+from spanza_journal_watch.utils.lookups import article_text_query
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin
 from spanza_journal_watch.utils.seo import noindex_response
 
@@ -343,110 +345,67 @@ def _journal_browser_context(request):
     }
 
 
-def _attach_related_reviews(rows):
-    """Batch-attach related reviews to all journal browser articles based on shared curated tags.
+def _related_reviews_by_article(article_ids, limit):
+    """Top ``limit`` related reviews for each article, keyed by article id.
 
-    Uses two queries total (tag links + candidate reviews) instead of one per row.
+    Related means sharing curated tags. Postgres counts the shared tags and
+    ranks the candidates per article with a window function, so only the
+    winning review ids come back; the reviews themselves are fetched once.
+    The page's own articles are never offered as related to one another.
     """
-    if not rows:
-        return
-
-    article_ids = [r.article_id for r in rows]
-
-    # 1) Fetch curated tag IDs per article in one query
-    tag_links = Tag.objects.filter(curated=True, active=True, articles__id__in=article_ids).values_list(
-        "articles__id", "id"
-    )
-    article_tag_map: dict[int, set[int]] = {}
-    all_tag_ids: set[int] = set()
-    for article_id, tag_id in tag_links:
-        article_tag_map.setdefault(article_id, set()).add(tag_id)
-        all_tag_ids.add(tag_id)
-
-    if not all_tag_ids:
-        for row in rows:
-            row.related_reviews = []
-        return
-
-    # 2) Fetch all candidate related reviews in one query, excluding current page articles
-    article_id_set = set(article_ids)
-    TagArticle = Tag.articles.through
-    candidate_reviews = list(
-        Review.objects.filter(active=True)
-        .filter(Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=all_tag_ids)))
-        .exclude(article_id__in=article_id_set)
+    article_ids = [int(pk) for pk in article_ids]
+    if not article_ids:
+        return {}
+    tag_articles = Tag.articles.through._meta.db_table
+    sql = f"""
+        WITH page_tags AS (
+            SELECT ta.pubmedarticle_id AS page_article_id, ta.tag_id
+            FROM {tag_articles} ta
+            JOIN {Tag._meta.db_table} t ON t.id = ta.tag_id
+            WHERE t.curated AND t.active AND ta.pubmedarticle_id = ANY(%s)
+        ),
+        scored AS (
+            SELECT pt.page_article_id, r.id AS review_id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY pt.page_article_id
+                       ORDER BY COUNT(*) DESC, r.publish_date DESC NULLS LAST, r.id DESC
+                   ) AS rank
+            FROM page_tags pt
+            JOIN {tag_articles} tc ON tc.tag_id = pt.tag_id AND tc.pubmedarticle_id <> ALL(%s)
+            JOIN {Review._meta.db_table} r ON r.article_id = tc.pubmedarticle_id AND r.active
+            GROUP BY pt.page_article_id, r.id, r.publish_date
+        )
+        SELECT page_article_id, review_id FROM scored WHERE rank <= %s ORDER BY page_article_id, rank
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [article_ids, article_ids, int(limit)])
+        pairs = cursor.fetchall()
+    review_ids = {review_id for _, review_id in pairs}
+    reviews = {
+        review.pk: review
+        for review in Review.objects.filter(pk__in=review_ids)
         .select_related("article__journal", "author")
         .prefetch_related("article__tags")
-    )
+    }
+    related: dict[int, list] = {}
+    for article_id, review_id in pairs:
+        if review_id in reviews:
+            related.setdefault(article_id, []).append(reviews[review_id])
+    return related
 
-    # Build review → tag_id set lookup from prefetched tags
-    review_tag_map: dict[int, set[int]] = {}
-    for review in candidate_reviews:
-        review_tag_map[review.pk] = {t.pk for t in review.article.tags.all()}
 
-    # 3) Distribute reviews to rows based on shared tag overlap
+def _attach_related_reviews(rows):
+    """Attach up to two related reviews to each journal-browser row."""
+    related = _related_reviews_by_article([row.article_id for row in rows], limit=2)
     for row in rows:
-        row_tag_ids = article_tag_map.get(row.article_id, set())
-        if not row_tag_ids:
-            row.related_reviews = []
-            continue
-
-        scored = []
-        for review in candidate_reviews:
-            shared = len(review_tag_map.get(review.pk, set()) & row_tag_ids)
-            if shared:
-                scored.append((shared, review))
-        scored.sort(key=lambda x: (-x[0], -(x[1].publish_date or datetime.date.min).toordinal()))
-        row.related_reviews = [review for _, review in scored[:2]]
+        row.related_reviews = related.get(row.article_id, [])
 
 
 def _attach_related_reviews_to_issue_page(reviews):
-    """Batch-attach related reviews to issue detail page reviews (same pattern as journal browser)."""
-    if not reviews:
-        return
-
-    article_ids = [r.article_id for r in reviews]
-
-    tag_links = Tag.objects.filter(curated=True, active=True, articles__id__in=article_ids).values_list(
-        "articles__id", "id"
-    )
-    article_tag_map: dict[int, set[int]] = {}
-    all_tag_ids: set[int] = set()
-    for article_id, tag_id in tag_links:
-        article_tag_map.setdefault(article_id, set()).add(tag_id)
-        all_tag_ids.add(tag_id)
-
-    if not all_tag_ids:
-        for review in reviews:
-            review.related_reviews = []
-        return
-
-    article_id_set = set(article_ids)
-    TagArticle = Tag.articles.through
-    candidate_reviews = list(
-        Review.objects.filter(active=True)
-        .filter(Exists(TagArticle.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag_id__in=all_tag_ids)))
-        .exclude(article_id__in=article_id_set)
-        .select_related("article__journal", "author")
-        .prefetch_related("article__tags")
-    )
-
-    review_tag_map: dict[int, set[int]] = {}
-    for candidate in candidate_reviews:
-        review_tag_map[candidate.pk] = {t.pk for t in candidate.article.tags.all()}
-
+    """Attach up to four related reviews to each review on an issue page."""
+    related = _related_reviews_by_article([review.article_id for review in reviews], limit=4)
     for review in reviews:
-        row_tag_ids = article_tag_map.get(review.article_id, set())
-        if not row_tag_ids:
-            review.related_reviews = []
-            continue
-        scored = []
-        for candidate in candidate_reviews:
-            shared = len(review_tag_map.get(candidate.pk, set()) & row_tag_ids)
-            if shared:
-                scored.append((shared, candidate))
-        scored.sort(key=lambda x: (-x[0], -(x[1].publish_date or datetime.date.min).toordinal()))
-        review.related_reviews = [r for _, r in scored[:4]]
+        review.related_reviews = related.get(review.article_id, [])
 
 
 def _journal_article_actions_context(request, article):
@@ -695,8 +654,17 @@ def journal_search(request):
 
     results = []
     if len(query) >= 2:
-        qs = (
-            WatchedJournalArticle.objects.select_related("article", "watched_journal")
+        matches = WatchedJournalArticle.objects.filter(article_text_query(query)).order_by(
+            "-article__publication_date", "-article__publication_month", "article__title", "pk"
+        )
+        if journal_filter and str(journal_filter).isdigit():
+            matches = matches.filter(watched_journal_id=int(journal_filter))
+        # Pick the 80 newest matches first; the recommendation counts join only those.
+        match_ids = list(matches.values_list("pk", flat=True)[:80])
+        annotated = {
+            link.pk: link
+            for link in WatchedJournalArticle.objects.filter(pk__in=match_ids)
+            .select_related("article", "watched_journal")
             .annotate(
                 recommendation_count=Count(
                     "article__user_states",
@@ -705,19 +673,10 @@ def journal_search(request):
                 ),
                 visitor_recommendation_count=Count("article__visitor_recommendations", distinct=True),
             )
-            .filter(
-                Q(article__title__icontains=query)
-                | Q(article__abstract__icontains=query)
-                | Q(article__doi__icontains=query)
-                | Q(article__pmid__icontains=query)
-            )
-            .order_by("-article__publication_date", "-article__publication_month", "article__title")
-        )
-        if journal_filter and str(journal_filter).isdigit():
-            qs = qs.filter(watched_journal_id=int(journal_filter))
+        }
 
         seen = set()
-        for link in qs[:80]:
+        for link in (annotated[pk] for pk in match_ids if pk in annotated):
             if link.article_id in seen:
                 continue
             seen.add(link.article_id)
@@ -762,7 +721,7 @@ def journal_reading_list(request):
             qs = base_qs.filter(read_at__isnull=True).order_by("-starred_at")
 
         if query:
-            qs = qs.filter(Q(article__title__icontains=query) | Q(article__abstract__icontains=query))
+            qs = qs.filter(Q(article__title__ilike_contains=query) | Q(article__abstract__ilike_contains=query))
         if journal_filter:
             qs = qs.filter(article__source_journal_name=journal_filter)
 
@@ -786,7 +745,7 @@ def journal_reading_list(request):
         if starred_ids and tab != "archived":
             articles_qs = PubmedArticle.objects.filter(pk__in=starred_ids)
             if query:
-                articles_qs = articles_qs.filter(Q(title__icontains=query) | Q(abstract__icontains=query))
+                articles_qs = articles_qs.filter(Q(title__ilike_contains=query) | Q(abstract__ilike_contains=query))
             if journal_filter:
                 articles_qs = articles_qs.filter(source_journal_name=journal_filter)
 

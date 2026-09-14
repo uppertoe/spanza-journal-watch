@@ -21,6 +21,7 @@ from spanza_journal_watch.submissions.models import (
     Issue,
     Review,
 )
+from spanza_journal_watch.utils.lookups import article_text_query
 
 from ..forms import (
     ArticleIntakeAssignIssueForm,
@@ -285,12 +286,7 @@ def _build_article_intake_queryset(batch, params, *, empty=False):
 
     plain = batch.batch_articles.all()
     if query:
-        plain = plain.filter(
-            Q(article__title__icontains=query)
-            | Q(article__abstract__icontains=query)
-            | Q(article__doi__icontains=query)
-            | Q(article__pmid__icontains=query)
-        )
+        plain = plain.filter(article_text_query(query))
     if selected in {"true", "false"}:
         plain = plain.filter(is_selected=(selected == "true"))
     if flags["abstract_only"]:

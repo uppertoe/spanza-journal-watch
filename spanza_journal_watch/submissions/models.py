@@ -18,7 +18,7 @@ from django.contrib.postgres.search import (
 )
 from django.core.cache import cache
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -432,17 +432,10 @@ class Review(TimeStampedModel):
         """
         search_query = SearchQuery(query)
 
-        # Collect review IDs that match via tags (separate query avoids row multiplication)
-        tag_match_ids = set(
-            cls.objects.filter(active=True, article__tags__text__icontains=query).values_list("id", flat=True)
-        )
-
-        # Collect review IDs whose author name contains the query. Whole-string
-        # trigram similarity is diluted by extra words in multi-part names (e.g.
-        # "barney" vs "Barney Rathnayaka Mudiyanselage" scores below threshold),
-        # so a substring match guarantees name lookups resolve.
-        author_match_ids = set(
-            cls.objects.filter(active=True, author__name__icontains=query).values_list("id", flat=True)
+        # Tag matches as a correlated EXISTS: no join (which multiplies rows) and
+        # no id list round-tripped through Python.
+        tag_match = Exists(
+            Tag.articles.through.objects.filter(pubmedarticle_id=OuterRef("article_id"), tag__text__icontains=query)
         )
 
         # Main query: trigram + full-text on the base review table (no tag join)
@@ -463,8 +456,10 @@ class Review(TimeStampedModel):
                 | Q(search_vector=search_query)
                 | Q(author_similarity__gte=cls.AUTHOR_TRIGRAM_THRESHOLD)
                 | Q(journal_similarity__gte=cls.JOURNAL_TRIGRAM_THRESHOLD)
-                | Q(pk__in=tag_match_ids)
-                | Q(pk__in=author_match_ids)
+                | Q(tag_match)
+                # Whole-string trigram similarity is diluted by extra words in
+                # multi-part names, so a substring match guarantees name lookups.
+                | Q(author__name__icontains=query)
             )
             .annotate(
                 headline=SearchHeadline(

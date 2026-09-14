@@ -3,7 +3,7 @@
 import json
 
 from django.core.cache import cache
-from django.db.models import Count, Exists, F, IntegerField, OuterRef, Prefetch, Subquery, Value, Window
+from django.db.models import Count, Exists, F, IntegerField, OuterRef, Subquery, Value, Window
 from django.db.models.functions import Coalesce, RowNumber
 from django.http import JsonResponse
 from django.urls import reverse
@@ -12,9 +12,6 @@ from django.views.decorators.cache import cache_page
 from django.views.generic import DetailView, ListView
 from view_breadcrumbs import BaseBreadcrumbMixin, ListBreadcrumbMixin
 
-from spanza_journal_watch.backend.models import (
-    PubmedArticle,
-)
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HtmxMixin, SidebarMixin
 
@@ -217,22 +214,7 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
     model = Tag
     context_object_name = "tag"
     template_name = "submissions/tag_detail.html"
-    queryset = Tag.objects.exclude(active=False).prefetch_related(
-        Prefetch(
-            "articles",
-            queryset=(
-                PubmedArticle.objects.select_related("journal").prefetch_related(
-                    Prefetch(
-                        "reviews",
-                        queryset=Review.objects.filter(active=True)
-                        .select_related("author", "article__journal")
-                        .prefetch_related("article__tags", "issues")
-                        .order_by("-created"),
-                    )
-                )
-            ),
-        )
-    )
+    queryset = Tag.objects.exclude(active=False)
 
     # Breadcrumb
     @cached_property
@@ -256,11 +238,15 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
 
         context["article_cols"] = self.article_cols
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
-        tag_reviews = []
-        for article in self.object.articles.all():
-            latest_review = next(iter(article.reviews.all()), None)
-            if latest_review is not None:
-                tag_reviews.append(latest_review)
+        # The latest active review of each article on the tag, in one query.
+        tag_reviews = list(
+            Review.objects.filter(active=True, article__tags=self.object)
+            .order_by("article_id", "-created")
+            .distinct("article_id")
+            .select_related("author", "article__journal")
+            .prefetch_related("article__tags", "issues")
+        )
+        tag_reviews.sort(key=lambda review: review.created, reverse=True)
         attach_review_display_fields(tag_reviews)
         context["tag_reviews"] = tag_reviews
 
