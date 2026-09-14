@@ -769,6 +769,52 @@ class TestArticleIntakeFilterDefaults:
         assert hidden < checkbox
 
 
+class TestTopicFilterCache:
+    """The paediatric pass runs once per batch membership, then comes from the cache."""
+
+    @staticmethod
+    def _paediatric_article(pmid):
+        return PubmedArticle.objects.create(
+            pmid=pmid,
+            title=f"Sevoflurane in children {pmid}",
+            metadata_json={"mesh_terms": ["Child"]},
+        )
+
+    def test_ids_refresh_when_the_batch_gains_a_row(self):
+        from django.core.cache import cache
+        from django.test import override_settings
+
+        from spanza_journal_watch.backend.views.intake import _build_article_intake_queryset, _topic_filter_ids
+
+        _, user = _make_manager()
+        batch = _make_batch(user)
+        first = PubmedBatchArticle.objects.create(batch=batch, article=self._paediatric_article("30000001"))
+        PubmedBatchArticle.objects.create(
+            batch=batch,
+            article=PubmedArticle.objects.create(pmid="30000002", title="Frailty in older adults"),
+        )
+        locmem = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+        with override_settings(CACHES=locmem):
+            cache.clear()
+            _, _, flags = _build_article_intake_queryset(batch, {}, empty=True)
+            assert set(_topic_filter_ids(batch, flags)) == {first.pk}
+            second = PubmedBatchArticle.objects.create(batch=batch, article=self._paediatric_article("30000003"))
+            assert set(_topic_filter_ids(batch, flags)) == {first.pk, second.pk}
+            # Same membership: the cached list is reused, so a metadata edit is not seen yet.
+            PubmedArticle.objects.filter(pk=first.article_id).update(metadata_json={}, title="")
+            assert set(_topic_filter_ids(batch, flags)) == {first.pk, second.pk}
+
+    def test_rows_are_querysets_with_the_page_annotated(self):
+        client, user = _make_manager()
+        batch = _make_batch(user)
+        PubmedBatchArticle.objects.create(batch=batch, article=self._paediatric_article("30000011"))
+        resp = client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+        assert resp.status_code == 200
+        assert resp.context["result_total"] == 1
+        (row,) = resp.context["result_rows"]
+        assert row.recommendation_count == 0
+
+
 # ---------------------------------------------------------------------------
 # Re-check card: where the batch's window sits relative to today
 # ---------------------------------------------------------------------------

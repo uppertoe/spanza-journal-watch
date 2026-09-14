@@ -2,13 +2,14 @@
 
 import datetime
 import logging
-from collections import Counter
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -202,189 +203,140 @@ def _intake_counts(batch):
     }
 
 
-def _build_article_intake_queryset(batch, params):
-    """Return (rows, tab_rows, flags) where tab_rows ignores the journal filter.
+TOPIC_FILTER_CACHE_SECONDS = 60 * 60
 
-    `rows` and `tab_rows` are either lists (when Python-side topic filters force
-    materialization) or QuerySets (the fast path, letting Paginator use SQL COUNT).
+# Filters whose terms live in Python rather than SQL: flag name -> matcher.
+_TOPIC_MATCHERS = {
+    "paediatric_only": lambda a: _article_matches_topic(
+        a, mesh_terms=PAEDIATRIC_MESH_TERMS, text_terms=PAEDIATRIC_TEXT_TERMS
+    ),
+    "humans_only": lambda a: _article_matches_metadata(a, "mesh_terms", {HUMANS_MESH_TERM}),
+    "review_only": lambda a: _article_matches_metadata(a, "publication_types", REVIEW_PUBLICATION_TYPES),
+    "trial_only": lambda a: _article_matches_metadata(a, "publication_types", TRIAL_PUBLICATION_TYPES),
+    "pain_only": lambda a: _article_matches_topic(a, mesh_terms=PAIN_MESH_TERMS, text_terms=PAIN_TEXT_TERMS),
+    "icu_only": lambda a: _article_matches_topic(a, mesh_terms=ICU_MESH_TERMS, text_terms=ICU_TEXT_TERMS),
+    "cardiac_only": lambda a: _article_matches_topic(a, mesh_terms=CARDIAC_MESH_TERMS, text_terms=CARDIAC_TEXT_TERMS),
+    "neonatal_only": lambda a: _article_matches_topic(
+        a, mesh_terms=NEONATAL_MESH_TERMS, text_terms=NEONATAL_TEXT_TERMS
+    ),
+}
+
+
+def _topic_filter_ids(batch, flags):
+    """Ids of the batch's rows that pass every enabled topic filter.
+
+    The terms are matched in Python, so the whole batch has to be read once, but
+    only as plain values: no model instances, no recommendation joins. The ids
+    are cached against the batch's membership, so paging, journal switches and
+    the next filter change do not repeat the pass. Anything that adds rows to
+    the batch changes the key; edits to an article's metadata show up within
+    the hour.
+    """
+    enabled = [name for name in _TOPIC_MATCHERS if flags[name]]
+    membership = batch.batch_articles.aggregate(n=Count("id"), last=Max("id"))
+    cache_key = f"intake-topic:{batch.pk}:{membership['n']}:{membership['last']}:{'+'.join(enabled)}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    matchers = [_TOPIC_MATCHERS[name] for name in enabled]
+    matching = []
+    values = batch.batch_articles.values_list("id", "article__title", "article__abstract", "article__metadata_json")
+    for pk, title, abstract, metadata in values.iterator(chunk_size=500):
+        article = SimpleNamespace(title=title, abstract=abstract, metadata_json=metadata)
+        if all(matcher(article) for matcher in matchers):
+            matching.append(pk)
+    cache.set(cache_key, matching, TOPIC_FILTER_CACHE_SECONDS)
+    return matching
+
+
+def _build_article_intake_queryset(batch, params, *, empty=False):
+    """Return (rows, tab_rows, flags): plain QuerySets, `tab_rows` ignoring the journal filter.
+
+    Neither carries the recommendation annotations; those are attached to the one
+    page of rows that is displayed. With `empty` the flags are parsed but no rows
+    are selected (the Shortlist view needs neither).
     """
     query = (params.get("q") or "").strip()
     watched_journal_id = (params.get("journal") or "").strip()
     selected = (params.get("filter_selected") or params.get("selected") or "").strip().lower()
     # Paediatric-only is on by default: the results form carries an explicit 0/1
     # so a coordinator can still switch it off.
-    paediatric_only = _param_enabled(params, "paediatric_only", default=True)
-    humans_only = _param_enabled(params, "humans_only", default=False)
-    review_only = _param_enabled(params, "review_only", default=False)
-    trial_only = _param_enabled(params, "trial_only", default=False)
-    pain_only = _param_enabled(params, "pain_only", default=False)
-    icu_only = _param_enabled(params, "icu_only", default=False)
-    cardiac_only = _param_enabled(params, "cardiac_only", default=False)
-    neonatal_only = _param_enabled(params, "neonatal_only", default=False)
-    abstract_only = _param_enabled(params, "abstract_only", default=False)
+    flags = {
+        "query": query,
+        "watched_journal_id": watched_journal_id,
+        "selected": selected,
+        "paediatric_only": _param_enabled(params, "paediatric_only", default=True),
+        "humans_only": _param_enabled(params, "humans_only", default=False),
+        "review_only": _param_enabled(params, "review_only", default=False),
+        "trial_only": _param_enabled(params, "trial_only", default=False),
+        "pain_only": _param_enabled(params, "pain_only", default=False),
+        "icu_only": _param_enabled(params, "icu_only", default=False),
+        "cardiac_only": _param_enabled(params, "cardiac_only", default=False),
+        "neonatal_only": _param_enabled(params, "neonatal_only", default=False),
+        "abstract_only": _param_enabled(params, "abstract_only", default=False),
+    }
+    if empty:
+        none = batch.batch_articles.none()
+        return none, none, flags
 
-    base = _annotated_batch_articles(batch).order_by("-article__publication_date", "article__title")
-
+    plain = batch.batch_articles.all()
     if query:
-        base = base.filter(
+        plain = plain.filter(
             Q(article__title__icontains=query)
             | Q(article__abstract__icontains=query)
             | Q(article__doi__icontains=query)
             | Q(article__pmid__icontains=query)
         )
     if selected in {"true", "false"}:
-        base = base.filter(is_selected=(selected == "true"))
-    if abstract_only:
-        base = base.exclude(article__abstract="")
+        plain = plain.filter(is_selected=(selected == "true"))
+    if flags["abstract_only"]:
+        plain = plain.exclude(article__abstract="")
+    if any(flags[name] for name in _TOPIC_MATCHERS):
+        plain = plain.filter(pk__in=_topic_filter_ids(batch, flags))
 
-    has_python_filter = any(
-        [paediatric_only, humans_only, review_only, trial_only, pain_only, icu_only, cardiac_only, neonatal_only]
-    )
-
-    if has_python_filter:
-        # Materialize once (without journal filter) so rows and tab_rows share a pass.
-        materialized = list(base)
-
-        def _apply_python_filters(rows_list):
-            if paediatric_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_topic(
-                        r.article, mesh_terms=PAEDIATRIC_MESH_TERMS, text_terms=PAEDIATRIC_TEXT_TERMS
-                    )
-                ]
-            if humans_only:
-                rows_list = [
-                    r for r in rows_list if _article_matches_metadata(r.article, "mesh_terms", {HUMANS_MESH_TERM})
-                ]
-            if review_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_metadata(r.article, "publication_types", REVIEW_PUBLICATION_TYPES)
-                ]
-            if trial_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_metadata(r.article, "publication_types", TRIAL_PUBLICATION_TYPES)
-                ]
-            if pain_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_topic(r.article, mesh_terms=PAIN_MESH_TERMS, text_terms=PAIN_TEXT_TERMS)
-                ]
-            if icu_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_topic(r.article, mesh_terms=ICU_MESH_TERMS, text_terms=ICU_TEXT_TERMS)
-                ]
-            if cardiac_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_topic(r.article, mesh_terms=CARDIAC_MESH_TERMS, text_terms=CARDIAC_TEXT_TERMS)
-                ]
-            if neonatal_only:
-                rows_list = [
-                    r
-                    for r in rows_list
-                    if _article_matches_topic(
-                        r.article, mesh_terms=NEONATAL_MESH_TERMS, text_terms=NEONATAL_TEXT_TERMS
-                    )
-                ]
-            return rows_list
-
-        tab_rows = _apply_python_filters(materialized)
-        if watched_journal_id.isdigit():
-            wj = int(watched_journal_id)
-            rows = [r for r in tab_rows if r.watched_journal_id == wj]
-        else:
-            rows = tab_rows
-    else:
-        tab_rows = base
-        if watched_journal_id.isdigit():
-            rows = base.filter(watched_journal_id=int(watched_journal_id))
-        else:
-            rows = base
-
-    flags = {
-        "query": query,
-        "watched_journal_id": watched_journal_id,
-        "selected": selected,
-        "paediatric_only": paediatric_only,
-        "humans_only": humans_only,
-        "review_only": review_only,
-        "trial_only": trial_only,
-        "pain_only": pain_only,
-        "icu_only": icu_only,
-        "cardiac_only": cardiac_only,
-        "neonatal_only": neonatal_only,
-        "abstract_only": abstract_only,
-    }
+    tab_rows = plain
+    rows = plain.filter(watched_journal_id=int(watched_journal_id)) if watched_journal_id.isdigit() else plain
+    rows = rows.order_by("-article__publication_date", "article__title", "pk")
     return rows, tab_rows, flags
 
 
 def _article_intake_results_context(batch, params, user=None):
     watched_options = list(batch.watched_journals.order_by("name"))
 
-    rows, tab_rows, flags = _build_article_intake_queryset(batch, params)
-    new_only = _param_enabled(params, "new_only", default=False)
     mode = "shortlist" if (params.get("mode") or "").strip().lower() == "shortlist" else "all"
+    rows, tab_rows, flags = _build_article_intake_queryset(batch, params, empty=(mode == "shortlist"))
+    new_only = _param_enabled(params, "new_only", default=False)
 
     user_view = _get_or_create_user_view(batch, user) if user is not None else None
     seen_baseline = user_view.last_seen_at if user_view else None
     seen_ids = set(user_view.seen_batch_article_ids or []) if user_view else set()
 
-    def _row_is_new(row):
-        if seen_baseline is None:
-            return False
-        return row.created > seen_baseline and row.pk not in seen_ids
-
-    if isinstance(tab_rows, list):
-        journal_counts = Counter(r.watched_journal_id for r in tab_rows)
-        all_journals_count = len(tab_rows)
-    else:
-        journal_counts = dict(
-            tab_rows.order_by()
-            .values("watched_journal_id")
-            .annotate(c=Count("id"))
-            .values_list("watched_journal_id", "c")
-        )
-        all_journals_count = tab_rows.count()
+    journal_counts = dict(
+        tab_rows.order_by().values("watched_journal_id").annotate(c=Count("id")).values_list("watched_journal_id", "c")
+    )
+    all_journals_count = tab_rows.count()
 
     new_count = 0
     if seen_baseline is not None:
-        if isinstance(tab_rows, list):
-            new_count = sum(1 for r in tab_rows if _row_is_new(r))
-        else:
-            new_count = sum(
-                1
-                for pk, created in tab_rows.values_list("id", "created").iterator()
-                if created > seen_baseline and pk not in seen_ids
-            )
-
-    if new_only and seen_baseline is not None:
-        if isinstance(rows, list):
-            rows = [r for r in rows if _row_is_new(r)]
-        else:
-            rows = list(rows)
-            rows = [r for r in rows if _row_is_new(r)]
+        new_count = tab_rows.filter(created__gt=seen_baseline).exclude(pk__in=seen_ids).count()
+        if new_only:
+            rows = rows.filter(created__gt=seen_baseline).exclude(pk__in=seen_ids)
 
     watched_journal_tabs = [
         {"journal": watched, "count": journal_counts.get(watched.pk, 0)} for watched in watched_options
     ]
 
-    paginator = Paginator(rows, INTAKE_PAGE_SIZE)
+    # Page over ids, then attach the recommendation counts to just that page.
+    paginator = Paginator(rows.values_list("pk", flat=True), INTAKE_PAGE_SIZE)
     page_obj = paginator.get_page(params.get("page") or 1)
-    visible_rows = list(page_obj.object_list)
+    page_ids = list(page_obj.object_list)
+    annotated = {row.pk: row for row in _annotated_batch_articles(batch).filter(pk__in=page_ids)}
+    visible_rows = [annotated[pk] for pk in page_ids if pk in annotated]
     for row in visible_rows:
-        row.is_new = _row_is_new(row)
+        row.is_new = seen_baseline is not None and row.created > seen_baseline and row.pk not in seen_ids
     all_visible_selected = bool(visible_rows) and all(row.is_selected for row in visible_rows)
-    result_total = len(rows) if isinstance(rows, list) else rows.count()
+    result_total = paginator.count
     staged_rows = []
     if mode == "shortlist":
         staged_rows = list(_annotated_batch_articles(batch).filter(is_selected=True).order_by("-modified")[:200])
@@ -908,7 +860,7 @@ def article_intake_bulk_selection(request, batch_id):
     batch = get_object_or_404(PubmedImportBatch, pk=batch_id)
     action = (request.POST.get("bulk_action") or "").strip().lower()
     rows, *_ = _build_article_intake_queryset(batch, request.POST)
-    row_ids = [item.pk for item in rows]
+    row_ids = list(rows.values_list("pk", flat=True))
     if action == "select_all":
         PubmedBatchArticle.objects.filter(pk__in=row_ids).update(is_selected=True)
     elif action == "select_none":
@@ -1173,7 +1125,7 @@ def article_intake_push_to_planka(request, batch_id):
 
     if push_scope == "filtered":
         rows, *_ = _build_article_intake_queryset(batch, request.POST)
-        row_ids = [row.pk for row in rows]
+        row_ids = list(rows.values_list("pk", flat=True))
         target_rows = list(
             PubmedBatchArticle.objects.select_related("article", "issue").filter(batch=batch, pk__in=row_ids)
         )
