@@ -1,6 +1,9 @@
+{% load cache %}
 <div id="articles" class="scrollspy-focus-target" data-bs-spy="scroll" data-bs-target="#list-reviews" tabindex="0">
     {% for review in articles %}
     <article class="article-post deferred-article" id="list-item-{{ review.slug }}" data-analytics-review-id="{{ review.pk }}" data-analytics-source="issue_detail">
+    {# Everything but the reading-list button is the same for every reader, so each card is cached in two pieces around it. #}
+    {% cache 1800 "review_card_head" review.pk review.modified review.display_review_date content_cache_version request.get_host %}
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2>
     <h5 class="mb-1">{{ review.article.get_subtitle|capfirst }}</h5></a>
     <p class="mb-1 fst-italic">{{ review.article.journal }}</p>
@@ -13,15 +16,18 @@
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-custom-class="journalwatch-popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</button>
             <a href="{{ review.article.url }}" type="button" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer" data-analytics-full-text data-cpd-article-id="{{ review.article.pk }}">View full text article</a>
         </div>
+    {% endcache %}
         <div id="review-star-actions-{{ review.pk }}">
             {% include "submissions/fragments/review_star_button.html" with pubmed_article=review.article pubmed_user_state=review.pubmed_user_state pubmed_session_starred=review.pubmed_session_starred star_target_id=review.star_target_id star_count=review.star_count %}
         </div>
+    {% cache 1800 "review_card_body" review.pk review.modified content_cache_version %}
     </div>
     <p class="text-break">{{ review.get_markdown_body|safe }}</p>
     {% include 'fragments/review_tags_inline.html' %}
     {% with related_reviews=review.related_reviews %}
     {% include 'fragments/related_reviews.html' with related_source_context='issue' %}
     {% endwith %}
+    {% endcache %}
     </article>
     {% if not forloop.last %}
     <div class="issue-review-separator" aria-hidden="true"><span></span></div>

@@ -1,7 +1,10 @@
+{# Reversed once per row: this fragment renders for every article in a month, and each URL tag costs as much as the rest of the row. #}
+{% url 'submissions:journal_article_toggle_star' article.pk as star_url %}
+{% url 'submissions:journal_article_toggle_recommend' article.pk as recommend_url %}
 <div id="journal-article-actions-{{ article.pk }}" class="d-flex flex-wrap gap-2 align-items-center" data-star-count="{{ star_count|default:0 }}" data-article-id="{{ article.pk }}">
   {% if request.user.is_authenticated %}
     {% if not hide_star %}
-      <form method="post" action="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+      <form method="post" action="{{ star_url }}" hx-post="{{ star_url }}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next_url }}">
         <button type="submit" class="btn btn-sm {% if user_state and user_state.starred_at %}btn-warning{% else %}btn-outline-primary{% endif %} jw-action-btn--star">
@@ -16,7 +19,7 @@
         <span><svg class="bi me-1" width="0.85em" height="0.85em" aria-hidden="true"><use href="#icon-check"></use></svg>Reviewed</span>
       </span>
     {% elif can_recommend %}
-      <form method="post" action="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+      <form method="post" action="{{ recommend_url }}" hx-post="{{ recommend_url }}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next_url }}">
         <button type="submit" class="btn btn-sm {% if user_state and user_state.recommended_at %}btn-success{% else %}btn-outline-success{% endif %} jw-action-btn--recommend">
@@ -27,7 +30,7 @@
     {% endif %}
   {% else %}
     {% if not hide_star %}
-      <form method="post" action="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_star' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+      <form method="post" action="{{ star_url }}" hx-post="{{ star_url }}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next_url }}">
         <button type="submit" class="btn btn-sm {% if session_starred %}btn-warning{% else %}btn-outline-primary{% endif %} jw-action-btn--star">
@@ -43,7 +46,7 @@
       </span>
     {% else %}
       {# Visitors can recommend too; it is recorded against this browser session and counted separately for coordinators. #}
-      <form method="post" action="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-post="{% url 'submissions:journal_article_toggle_recommend' article.pk %}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
+      <form method="post" action="{{ recommend_url }}" hx-post="{{ recommend_url }}" hx-target="#journal-article-actions-{{ article.pk }}" hx-swap="outerHTML">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next_url }}">
         <button type="submit" class="btn btn-sm {% if session_recommended %}btn-success{% else %}btn-outline-success{% endif %} jw-action-btn--recommend">
