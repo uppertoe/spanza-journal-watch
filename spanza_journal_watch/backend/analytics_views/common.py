@@ -51,21 +51,39 @@ def _engaged_human_count(events_qs):
     )
 
 
-def _date_range_from_request(request, default_days=90):
+DEFAULT_ANALYTICS_DAYS = 90
+
+
+def _window_timestamps(start_date, end_date):
+    start_ts = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min))
+    end_ts = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max))
+    return start_ts, end_ts
+
+
+def default_analytics_window(default_days=DEFAULT_ANALYTICS_DAYS):
+    """The window every analytics page opens on: (start_date, end_date, start_ts, end_ts)."""
     today = timezone.localdate()
-    default_start = today - datetime.timedelta(days=default_days)
+    start_date = today - datetime.timedelta(days=default_days)
+    return start_date, today, *_window_timestamps(start_date, today)
+
+
+def _date_range_from_request(request, default_days=DEFAULT_ANALYTICS_DAYS):
+    default_start, today, *_ = default_analytics_window(default_days)
     start_date = _parse_iso_date(request.GET.get("start")) or default_start
     end_date = _parse_iso_date(request.GET.get("end")) or today
     if end_date < start_date:
         start_date, end_date = end_date, start_date
-    start_ts = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min))
-    end_ts = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max))
-    return start_date, end_date, start_ts, end_ts
+    return start_date, end_date, *_window_timestamps(start_date, end_date)
+
+
+def human_events_between(start_ts, end_ts):
+    """Human (non-automated) events in a window. The warming task builds the same queryset."""
+    return AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
 
 
 def _base_event_qs(request, start_ts, end_ts):
     """Return AnalyticsEvent queryset filtered by date, always excluding automated rows."""
-    return AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts, automated=False)
+    return human_events_between(start_ts, end_ts)
 
 
 def _render_analytics(request, template, context, panel_template=None):

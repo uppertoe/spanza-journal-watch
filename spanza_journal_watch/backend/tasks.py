@@ -795,3 +795,13 @@ def provision_planka_project_task(self, job_id):
     job.state = PlankaProjectSetupJob.STATE_SUCCESS
     job.note = "Planka project linked to this issue."
     job.save(update_fields=["state", "note", "modified"])
+
+
+@celery_app.task()
+def warm_analytics_visits_task():
+    """Keep the analytics dashboards' derived visits warm in the cache (every 8 minutes)."""
+    from .analytics_views.visits import warm_derived_visits
+
+    counts = warm_derived_visits()
+    logger.info("Warmed analytics visits: %s", counts)
+    return counts

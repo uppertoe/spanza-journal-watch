@@ -24,11 +24,13 @@ from .common import (
     _pct_change,
     _render_analytics,
     _weekly_buckets,
+    human_events_between,
 )
 from .visits import (
     _JOURNAL_EVENT_TYPES,
     _VISIT_INACTIVITY_GAP,
     _build_derived_visits_cached,
+    _journal_event_type_list,
     _weekly_visit_buckets,
 )
 
@@ -42,7 +44,7 @@ def analytics_journals(request):
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request)
 
     human_events = _base_event_qs(request, start_ts, end_ts)
-    journal_events = human_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)
+    journal_events = human_events.filter(event_type__in=_journal_event_type_list())
     journal_visits = _build_derived_visits_cached(journal_events)
 
     # ── Headline metrics ────────────────────────────────────────────
@@ -144,9 +146,7 @@ def analytics_journals(request):
     prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
     prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
 
-    prev_events = AnalyticsEvent.objects.filter(
-        timestamp__gte=prev_start_ts, timestamp__lte=prev_end_ts, automated=False
-    )
+    prev_events = human_events_between(prev_start_ts, prev_end_ts)
 
     # Suppress deltas when the comparison period predates the analytics era.
     _rollout_date = _site_analytics_rollout_date()
@@ -155,7 +155,7 @@ def analytics_journals(request):
     def _delta(current, previous):
         return _pct_change(current, previous) if comparison_reliable else None
 
-    prev_visits = len(_build_derived_visits_cached(prev_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)))
+    prev_visits = len(_build_derived_visits_cached(prev_events.filter(event_type__in=_journal_event_type_list())))
     prev_stars = states_in_range.filter(starred_at__gte=prev_start_ts, starred_at__lte=prev_end_ts).count()
     prev_searches = (
         prev_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)

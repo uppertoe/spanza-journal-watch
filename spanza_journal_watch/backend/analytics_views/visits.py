@@ -333,16 +333,21 @@ _DERIVED_VISITS_CACHE_PREFIX = "analytics:derived_visits:"
 _CACHE_MISS = object()
 
 
+# Longer than the warming task's interval (8 min), so a warmed window never expires between runs.
+_DERIVED_VISITS_DEFAULT_TTL = 900
+
+
 def _derived_visits_ttl():
-    return int(getattr(settings, "ANALYTICS_DERIVED_VISITS_CACHE_TTL", 600))
+    return int(getattr(settings, "ANALYTICS_DERIVED_VISITS_CACHE_TTL", _DERIVED_VISITS_DEFAULT_TTL))
 
 
-def _build_derived_visits_cached(events_qs):
+def _build_derived_visits_cached(events_qs, *, force=False):
     """Cached wrapper around :func:`_build_derived_visits`.
 
     Keyed on the queryset's SQL, so identical scope + date-range across panels
     (and repeat navigations) reuse one build. Falls back to an uncached build if
-    the query can't be rendered to a stable key.
+    the query can't be rendered to a stable key. ``force`` rebuilds and
+    overwrites the cached copy (the warming task).
     """
     ttl = _derived_visits_ttl()
     if ttl <= 0:
@@ -352,12 +357,44 @@ def _build_derived_visits_cached(events_qs):
     except Exception:  # noqa: BLE001 — never let key derivation break the view
         return _build_derived_visits(events_qs)
     key = _DERIVED_VISITS_CACHE_PREFIX + hashlib.md5(signature.encode("utf-8")).hexdigest()  # noqa: S324
-    cached = cache.get(key, _CACHE_MISS)
-    if cached is not _CACHE_MISS:
-        return cached
+    if not force:
+        cached = cache.get(key, _CACHE_MISS)
+        if cached is not _CACHE_MISS:
+            return cached
     visits = _build_derived_visits(events_qs)
     cache.set(key, visits, ttl)
     return visits
+
+
+def warm_derived_visits():
+    """Rebuild the derived visits every analytics page opens on, ahead of any request.
+
+    Covers the default window for all human events and for journal-browser
+    events, plus the journals panel's previous period, so the first editor of
+    the day never waits for the sessionising pass. Returns the visit counts.
+    """
+    from .common import default_analytics_window, human_events_between
+
+    start_date, end_date, start_ts, end_ts = default_analytics_window()
+    human_events = human_events_between(start_ts, end_ts)
+    journal_types = _journal_event_type_list()
+    counts = {
+        "all": len(_build_derived_visits_cached(human_events, force=True)),
+        "journals": len(_build_derived_visits_cached(human_events.filter(event_type__in=journal_types), force=True)),
+    }
+    period_days = (end_date - start_date).days
+    prev_end = start_date - datetime.timedelta(days=1)
+    prev_start = prev_end - datetime.timedelta(days=period_days)
+    prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
+    prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+    prev_events = human_events_between(prev_start_ts, prev_end_ts).filter(event_type__in=journal_types)
+    counts["journals_previous"] = len(_build_derived_visits_cached(prev_events, force=True))
+    return counts
+
+
+def _journal_event_type_list():
+    """Sorted, so the query (and its cache key) is identical in every process."""
+    return sorted(_JOURNAL_EVENT_TYPES)
 
 
 def _weekly_visits_by_referrer(visits, categories, weeks=26):
