@@ -385,7 +385,7 @@ def _related_reviews_by_article(article_ids, limit):
         review.pk: review
         for review in Review.objects.filter(pk__in=review_ids)
         .select_related("article__journal", "author")
-        .prefetch_related("article__tags")
+        .defer("body", "search_vector", "article__abstract", "article__metadata_json")
     }
     related: dict[int, list] = {}
     for article_id, review_id in pairs:

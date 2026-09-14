@@ -55,7 +55,7 @@ class SearchView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMix
             return Review.objects.none()
 
         if query:
-            reviews = Review.search(query)
+            reviews = Review.search(query, headline=False)
         else:
             reviews = (
                 Review.objects.exclude(active=False)
@@ -89,6 +89,7 @@ class SearchView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMix
         # Post-process search headlines and attach display fields
         page_reviews = list(context["result_reviews"])
         if query:
+            Review.attach_headlines(page_reviews, query)
             Review.post_process_headlines(page_reviews)
         attach_review_display_fields(page_reviews)
         context["result_reviews"] = page_reviews

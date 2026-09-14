@@ -311,9 +311,17 @@ class Review(TimeStampedModel):
         ]
 
     def _render_markdown_body_html(self):
-        if not hasattr(self, "_markdown_html_cache"):
-            self._markdown_html_cache = render_review_markdown_html(self.body)
-        return self._markdown_html_cache
+        """Rendered body HTML, memoised on the instance for the life of the request.
+
+        A list page asks for it three times per review (card body, share text,
+        share summary); one shared-cache fetch per review is enough.
+        """
+        cached = getattr(self, "_body_html_memo", None)
+        if cached is not None and cached[0] == self.body:
+            return cached[1]
+        html = render_review_markdown_html(self.body)
+        self._body_html_memo = (self.body, html)
+        return html
 
     def get_markdown_body(self, strip=False):
         html = self._render_markdown_body_html()
@@ -424,7 +432,32 @@ class Review(TimeStampedModel):
     HEADLINE_DELIMITER = "JWFRAGDELIM"
 
     @classmethod
-    def search(cls, query):
+    def attach_headlines(cls, reviews, query):
+        """Compute the highlighted excerpt for just these reviews (one query).
+
+        ``ts_headline`` over a body costs milliseconds per row, so the search
+        query no longer computes it for every match; the page of results asks
+        for its own.
+        """
+        reviews = list(reviews)
+        if not reviews:
+            return reviews
+        search_query = SearchQuery(query)
+        headlines = dict(
+            cls.objects.filter(pk__in=[r.pk for r in reviews])
+            .annotate(
+                headline=SearchHeadline(
+                    "body", search_query, max_fragments=3, fragment_delimiter=cls.HEADLINE_DELIMITER
+                )
+            )
+            .values_list("pk", "headline")
+        )
+        for review in reviews:
+            review.headline = headlines.get(review.pk, "")
+        return reviews
+
+    @classmethod
+    def search(cls, query, *, headline=True):
         """Search reviews using trigram similarity for names and full-text search for body content.
 
         Tag matching is done as a separate ID lookup to avoid a join that
@@ -461,15 +494,16 @@ class Review(TimeStampedModel):
                 # multi-part names, so a substring match guarantees name lookups.
                 | Q(author__name__icontains=query)
             )
-            .annotate(
-                headline=SearchHeadline(
-                    "body", search_query, max_fragments=3, fragment_delimiter=cls.HEADLINE_DELIMITER
-                ),
-            )
             .order_by("-title_similarity", "-body_rank", "-author_similarity", "-created")
             .select_related("article__journal", "author")
             .prefetch_related("article__tags", "issues")
         )
+        if headline:
+            results = results.annotate(
+                headline=SearchHeadline(
+                    "body", search_query, max_fragments=3, fragment_delimiter=cls.HEADLINE_DELIMITER
+                ),
+            )
 
         return results
 
