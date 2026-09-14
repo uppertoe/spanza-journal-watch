@@ -43,6 +43,17 @@
         <span>This issue has no Planka board yet.</span>
         <a class="btn btn-sm btn-primary" href="{% url "backend:issue_builder" %}?issue={{ selected_issue.pk }}#planka-panel">Create it on the Setup tab</a>
       </div>
+    {% elif planka_panel_loading %}
+      <div
+        class="text-body-secondary"
+        hx-get="{% url "backend:planka_refresh_publish_cards" selected_issue.pk %}?scope={{ planka_card_scope|default:'publish' }}&quiet=1"
+        hx-trigger="load"
+        hx-target="#planka-sync-panel"
+        hx-swap="outerHTML"
+        hx-request='{"timeout": 60000}'
+      >
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading the cards from Planka&hellip;
+      </div>
     {% else %}
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>

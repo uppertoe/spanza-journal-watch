@@ -670,14 +670,20 @@ def planka_refresh_publish_cards(request, issue_id):
         )
 
     summary = _build_planka_publish_summary(scoped_cards)
+    # The page's first load asks quietly; only a deliberate Refresh reports back.
+    quiet = request.GET.get("quiet") == "1"
     return _render_planka_panel(
         request,
         issue,
         publish_cards=scoped_cards,
         panel_status=(
-            f"Refresh complete. {summary['total']} cards loaded in this view "
-            f"({summary['valid']} ready, {summary['missing']} with missing fields, "
-            f"{summary['already_imported']} already imported/protected)."
+            None
+            if quiet
+            else (
+                f"Refresh complete. {summary['total']} cards loaded in this view "
+                f"({summary['valid']} ready, {summary['missing']} with missing fields, "
+                f"{summary['already_imported']} already imported/protected)."
+            )
         ),
         panel_status_level="success",
         planka_card_scope=card_scope,

@@ -27,17 +27,11 @@ from ..models import (
     PubmedBatchArticle,
     PubmedImportBatch,
 )
-from ..planka import PlankaAPIError
-from . import planka_boards
 from .issue_context import _build_planka_publish_summary, _issue_builder_base_context
-from .planka_boards import _build_planka_scope_counts, _filter_board_cards_by_scope
 from .shared import (
     _check_coordinator_issue_access,
     _is_coordinator_only,
-    _is_planka_board_not_found_error,
-    _is_planka_connection_error,
     _resolve_and_persist_issue,
-    _safe_planka_error,
 )
 
 logger = logging.getLogger(__name__)
@@ -229,41 +223,17 @@ def issue_planka_import(request):
     context = _issue_builder_base_context(issue=issue)
     binding = context.get("planka_binding")
     if issue and binding:
+        # The board is fetched by htmx once the page has rendered (see
+        # planka_refresh_publish_cards), so a slow or absent Planka never holds
+        # the page up.
         card_scope = (request.GET.get("scope") or "publish").strip().lower()
         if card_scope not in {"publish", "all"}:
             card_scope = "publish"
-        try:
-            board_cards = planka_boards._extract_board_cards(binding)
-            scoped_cards = _filter_board_cards_by_scope(board_cards, card_scope)
-            context["planka_publish_cards"] = scoped_cards
-            context["planka_scope_counts"] = _build_planka_scope_counts(board_cards)
-            context["planka_card_scope"] = card_scope
-            context["planka_publish_summary"] = _build_planka_publish_summary(scoped_cards)
-            if request.GET.get("refresh") == "1":
-                summary = context["planka_publish_summary"]
-                context["planka_panel_status"] = (
-                    f"Refresh complete. {summary['total']} cards loaded in this view "
-                    f"({summary['valid']} ready, {summary['missing']} with missing fields, "
-                    f"{summary['already_imported']} already imported/protected)."
-                )
-                context["planka_panel_status_level"] = "success"
-        except PlankaAPIError as error:
-            safe_error = _safe_planka_error(error)
-            context["planka_publish_cards"] = []
-            context["planka_publish_summary"] = _build_planka_publish_summary([])
-            context["planka_scope_counts"] = {"publish": 0, "all": 0}
-            context["planka_card_scope"] = card_scope
-            if _is_planka_connection_error(error):
-                context["planka_panel_status"] = "Not connected to Planka. Retrying in background…"
-                context["planka_disconnected"] = True
-            elif _is_planka_board_not_found_error(error):
-                context["planka_panel_status"] = (
-                    "Linked Reviews board was not found in Planka. You can recreate the board for this issue."
-                )
-                context["planka_board_missing"] = True
-            else:
-                context["planka_panel_status"] = f"Could not refresh Planka cards: {safe_error}"
-            context["planka_panel_status_level"] = "danger"
+        context["planka_panel_loading"] = True
+        context["planka_card_scope"] = card_scope
+        context["planka_publish_cards"] = []
+        context["planka_publish_summary"] = _build_planka_publish_summary([])
+        context["planka_scope_counts"] = {"publish": 0, "all": 0}
 
     if issue:
         staged_total = PubmedBatchArticle.objects.filter(issue=issue, is_selected=True).count()

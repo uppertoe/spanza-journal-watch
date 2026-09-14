@@ -509,7 +509,7 @@ class TestIssueBuilderPlankaIntegration:
         assert "Pull Reviews" in body
         assert "Select an issue to use Planka sync." not in body
 
-    def test_planka_import_page_preloads_publish_cards(self, route_client, regression_baseline, monkeypatch):
+    def test_planka_import_page_loads_cards_after_render(self, route_client, regression_baseline, monkeypatch):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
@@ -554,8 +554,18 @@ class TestIssueBuilderPlankaIntegration:
 
         assert response.status_code == 200
         body = response.content.decode("utf-8", errors="ignore")
-        assert "Preloaded card" in body
-        assert "card-42" in body
+        # The page renders without touching Planka; the panel fetches the cards once loaded.
+        refresh_url = reverse("backend:planka_refresh_publish_cards", kwargs={"issue_id": issue.pk})
+        assert f'hx-get="{refresh_url}?scope=publish&quiet=1"' in body
+        assert 'hx-trigger="load"' in body
+        assert "Preloaded card" not in body
+
+        panel = route_client.get(f"{refresh_url}?scope=publish&quiet=1", HTTP_HX_REQUEST="true")
+        assert panel.status_code == 200
+        panel_body = panel.content.decode("utf-8", errors="ignore")
+        assert "Preloaded card" in panel_body
+        assert "card-42" in panel_body
+        assert "Refresh complete" not in panel_body
 
     def test_planka_setup_issue_project_creates_binding(self, route_client, regression_baseline, monkeypatch):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
