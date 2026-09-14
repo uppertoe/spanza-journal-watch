@@ -21,7 +21,8 @@
         hx-get="{% url "backend:article_intake_results" batch.pk %}"
         hx-target="#article-intake-results"
         hx-swap="innerHTML"
-        hx-trigger="keyup changed delay:300ms from:find input[name='q'], search from:find input[name='q'], change from:find select, change from:find .intake-filter-checkbox"
+        {# "change" on the form catches every chip and the journal menu; htmx's find: modifier would bind only the first. #}
+        hx-trigger="change, keyup changed delay:300ms from:find input[name='q'], search from:find input[name='q']"
         hx-sync="this:replace">
     <input type="hidden" name="mode" value="all">
     <input type="search" name="q" value="{{ filter_query }}" class="form-control" placeholder="Search these articles by keyword, title, DOI or PMID" aria-label="Search these articles" autocomplete="off">
