@@ -7,6 +7,28 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def _set_article_topics(sender, instance, raw=False, **kwargs):
+    """Keep PubmedArticle.topics in step with the fields it is derived from.
+
+    A pre_save receiver rather than a save() override so fixture loads (raw
+    saves) and every other path through save() are covered alike.
+    """
+    from .topics import article_topics
+
+    instance.topics = article_topics(instance)
+
+
+def _connect_topic_signal():
+    from django.db.models.signals import pre_save
+
+    from .models import PubmedArticle
+
+    pre_save.connect(_set_article_topics, sender=PubmedArticle, dispatch_uid="backend.article_topics")
+
+
+_connect_topic_signal()
+
+
 def _normalize_subject(subject):
     """Strip Re:/Fwd: prefixes for thread grouping."""
     return re.sub(r"^(re|fwd?)\s*:\s*", "", subject or "", flags=re.IGNORECASE).strip()

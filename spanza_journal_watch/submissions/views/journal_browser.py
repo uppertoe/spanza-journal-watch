@@ -23,7 +23,7 @@ from spanza_journal_watch.backend.models import (
     WatchedJournalArticle,
     can_recommend_pubmed_articles,
 )
-from spanza_journal_watch.backend.pubmed_cache import article_matches_topic, article_metadata_list, shift_month
+from spanza_journal_watch.backend.pubmed_cache import article_metadata_list, shift_month
 from spanza_journal_watch.utils.lookups import article_text_query
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin
 from spanza_journal_watch.utils.seo import noindex_response
@@ -65,24 +65,6 @@ JOURNAL_SECTIONS = [
     ("Letters", "letters", {"Letter"}),
 ]
 
-_PAEDIATRIC_MESH_TERMS = {
-    "Pediatrics",
-    "Infant",
-    "Infant, Newborn",
-    "Child",
-    "Child, Preschool",
-    "Adolescent",
-}
-_PAEDIATRIC_TEXT_TERMS = {
-    "pediatric",
-    "paediatric",
-    "child",
-    "children",
-    "infant",
-    "newborn",
-    "neonat",
-    "adolescent",
-}
 
 IGNORED_PUBLICATION_TYPES = {
     "Journal Article",
@@ -256,6 +238,20 @@ def _journal_browser_context(request):
         .order_by("-article__publication_date", "-article__publication_month", "article__title")
     )
 
+    # --- Parse filter state from query params, falling back to session, then default on ---
+    filter_paediatric = request.GET.get("paediatric", request.session.get("jw_filter_paediatric", "1")) == "1"
+    filter_has_abstract = request.GET.get("has_abstract", request.session.get("jw_filter_has_abstract", "1")) == "1"
+    request.session["jw_filter_paediatric"] = "1" if filter_paediatric else "0"
+    request.session["jw_filter_has_abstract"] = "1" if filter_has_abstract else "0"
+
+    # The filters run in SQL on the stored topic flags and the abstract column;
+    # the unfiltered count only tells the template whether the filters hid everything.
+    total_unfiltered = article_links.order_by().values("article_id").distinct().count()
+    if filter_paediatric:
+        article_links = article_links.filter(article__topics__contains=["paediatric"])
+    if filter_has_abstract:
+        article_links = article_links.exclude(article__abstract="")
+
     article_links = list(article_links)
     user_state_map = {}
     if request.user.is_authenticated:
@@ -282,43 +278,25 @@ def _journal_browser_context(request):
         for rev in reviewed:
             review_map.setdefault(rev.article_id, rev)
 
-    # --- Parse filter state from query params, falling back to session, then default on ---
-    filter_paediatric = request.GET.get("paediatric", request.session.get("jw_filter_paediatric", "1")) == "1"
-    filter_has_abstract = request.GET.get("has_abstract", request.session.get("jw_filter_has_abstract", "1")) == "1"
-    request.session["jw_filter_paediatric"] = "1" if filter_paediatric else "0"
-    request.session["jw_filter_has_abstract"] = "1" if filter_has_abstract else "0"
-
     rows = []
-    total_unfiltered = 0
     seen_article_ids = set()
     for link in article_links:
         if link.article_id in seen_article_ids:
             continue
         seen_article_ids.add(link.article_id)
-        total_unfiltered += 1
         link.user_state = user_state_map.get(link.article_id)
         link.session_starred = link.article_id in session_starred_ids
         link.session_recommended = link.article_id in session_recommended_ids
         link.publication_types = article_metadata_list(link.article, "publication_types")
         link.mesh_terms = article_metadata_list(link.article, "mesh_terms")
         link.keywords = article_metadata_list(link.article, "keywords")
-        link.is_paediatric = article_matches_topic(
-            link.article,
-            mesh_terms=_PAEDIATRIC_MESH_TERMS,
-            text_terms=_PAEDIATRIC_TEXT_TERMS,
-        )
+        link.is_paediatric = "paediatric" in (link.article.topics or [])
         link.review = review_map.get(link.article_id)
         if request.user.is_authenticated:
             state = user_state_map.get(link.article_id)
             link.full_text_read = bool(state and state.full_text_clicked_at)
         else:
             link.full_text_read = link.article_id in session_fulltext_ids
-
-        # Apply server-side filters
-        if filter_paediatric and not link.is_paediatric:
-            continue
-        if filter_has_abstract and not link.article.abstract:
-            continue
 
         rows.append(link)
 

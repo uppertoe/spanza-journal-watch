@@ -7,6 +7,7 @@ from email.utils import formataddr
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils import timezone
@@ -1002,6 +1003,8 @@ class PubmedArticle(TimeStampedModel):
     article_url = models.URLField(max_length=500, blank=True)
     pubmed_url = models.URLField(max_length=500, blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
+    # Derived from title, abstract and metadata on save (backend.topics); filtered in SQL.
+    topics = ArrayField(models.CharField(max_length=32), default=list, blank=True)
 
     # Editorial fields (merged from submissions.Article)
     tags_string = models.TextField(blank=True, default="")
@@ -1018,6 +1021,7 @@ class PubmedArticle(TimeStampedModel):
             models.Index(fields=["pmid"], name="backend_pa_pmid_idx"),
             GinIndex(fields=["title"], name="backend_pa_title_trgm", opclasses=["gin_trgm_ops"]),
             GinIndex(fields=["abstract"], name="backend_pa_abstract_trgm", opclasses=["gin_trgm_ops"]),
+            GinIndex(fields=["topics"], name="backend_pa_topics_gin"),
         ]
 
     def save(self, *args, **kwargs):

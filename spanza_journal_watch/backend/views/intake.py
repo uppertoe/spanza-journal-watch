@@ -2,14 +2,12 @@
 
 import datetime
 import logging
-from types import SimpleNamespace
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -42,12 +40,6 @@ from ..models import (
 from ..planka import PlankaAPIError
 from ..pubmed import PubmedAPIError
 from ..pubmed_cache import (
-    article_matches_metadata as _article_matches_metadata,
-)
-from ..pubmed_cache import (
-    article_matches_topic as _article_matches_topic,
-)
-from ..pubmed_cache import (
     build_pubmed_client as _build_pubmed_client,
 )
 from ..pubmed_cache import (
@@ -76,19 +68,6 @@ from .shared import (
     _safe_planka_error,
 )
 from .site_settings import (
-    CARDIAC_MESH_TERMS,
-    CARDIAC_TEXT_TERMS,
-    HUMANS_MESH_TERM,
-    ICU_MESH_TERMS,
-    ICU_TEXT_TERMS,
-    NEONATAL_MESH_TERMS,
-    NEONATAL_TEXT_TERMS,
-    PAEDIATRIC_MESH_TERMS,
-    PAEDIATRIC_TEXT_TERMS,
-    PAIN_MESH_TERMS,
-    PAIN_TEXT_TERMS,
-    REVIEW_PUBLICATION_TYPES,
-    TRIAL_PUBLICATION_TYPES,
     _get_backend_preference,
     _get_pubmed_integration_credential,
 )
@@ -207,51 +186,17 @@ def _intake_counts(batch):
     }
 
 
-TOPIC_FILTER_CACHE_SECONDS = 60 * 60
-
-# Filters whose terms live in Python rather than SQL: flag name -> matcher.
-_TOPIC_MATCHERS = {
-    "paediatric_only": lambda a: _article_matches_topic(
-        a, mesh_terms=PAEDIATRIC_MESH_TERMS, text_terms=PAEDIATRIC_TEXT_TERMS
-    ),
-    "humans_only": lambda a: _article_matches_metadata(a, "mesh_terms", {HUMANS_MESH_TERM}),
-    "review_only": lambda a: _article_matches_metadata(a, "publication_types", REVIEW_PUBLICATION_TYPES),
-    "trial_only": lambda a: _article_matches_metadata(a, "publication_types", TRIAL_PUBLICATION_TYPES),
-    "pain_only": lambda a: _article_matches_topic(a, mesh_terms=PAIN_MESH_TERMS, text_terms=PAIN_TEXT_TERMS),
-    "icu_only": lambda a: _article_matches_topic(a, mesh_terms=ICU_MESH_TERMS, text_terms=ICU_TEXT_TERMS),
-    "cardiac_only": lambda a: _article_matches_topic(a, mesh_terms=CARDIAC_MESH_TERMS, text_terms=CARDIAC_TEXT_TERMS),
-    "neonatal_only": lambda a: _article_matches_topic(
-        a, mesh_terms=NEONATAL_MESH_TERMS, text_terms=NEONATAL_TEXT_TERMS
-    ),
+# Query flag -> stored topic name (PubmedArticle.topics, derived on save).
+_TOPIC_FLAGS = {
+    "paediatric_only": "paediatric",
+    "humans_only": "humans",
+    "review_only": "review",
+    "trial_only": "trial",
+    "pain_only": "pain",
+    "icu_only": "icu",
+    "cardiac_only": "cardiac",
+    "neonatal_only": "neonatal",
 }
-
-
-def _topic_filter_ids(batch, flags):
-    """Ids of the batch's rows that pass every enabled topic filter.
-
-    The terms are matched in Python, so the whole batch has to be read once, but
-    only as plain values: no model instances, no recommendation joins. The ids
-    are cached against the batch's membership, so paging, journal switches and
-    the next filter change do not repeat the pass. Anything that adds rows to
-    the batch changes the key; edits to an article's metadata show up within
-    the hour.
-    """
-    enabled = [name for name in _TOPIC_MATCHERS if flags[name]]
-    membership = batch.batch_articles.aggregate(n=Count("id"), last=Max("id"))
-    cache_key = f"intake-topic:{batch.pk}:{membership['n']}:{membership['last']}:{'+'.join(enabled)}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    matchers = [_TOPIC_MATCHERS[name] for name in enabled]
-    matching = []
-    values = batch.batch_articles.values_list("id", "article__title", "article__abstract", "article__metadata_json")
-    for pk, title, abstract, metadata in values.iterator(chunk_size=500):
-        article = SimpleNamespace(title=title, abstract=abstract, metadata_json=metadata)
-        if all(matcher(article) for matcher in matchers):
-            matching.append(pk)
-    cache.set(cache_key, matching, TOPIC_FILTER_CACHE_SECONDS)
-    return matching
 
 
 def _build_article_intake_queryset(batch, params, *, empty=False):
@@ -291,8 +236,10 @@ def _build_article_intake_queryset(batch, params, *, empty=False):
         plain = plain.filter(is_selected=(selected == "true"))
     if flags["abstract_only"]:
         plain = plain.exclude(article__abstract="")
-    if any(flags[name] for name in _TOPIC_MATCHERS):
-        plain = plain.filter(pk__in=_topic_filter_ids(batch, flags))
+    wanted = [topic for flag, topic in _TOPIC_FLAGS.items() if flags[flag]]
+    if wanted:
+        # Every enabled topic must apply; the GIN index answers the containment test.
+        plain = plain.filter(article__topics__contains=wanted)
 
     tab_rows = plain
     rows = plain.filter(watched_journal_id=int(watched_journal_id)) if watched_journal_id.isdigit() else plain

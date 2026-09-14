@@ -5,6 +5,9 @@ apps keep importing from ``spanza_journal_watch.submissions.views``; new code sh
 import from the specific module and add new views to the import block for their
 module below (and to ``__all__``)."""
 
+from spanza_journal_watch.backend.topics import PAEDIATRIC_MESH_TERMS as _PAEDIATRIC_MESH_TERMS  # noqa: E402
+from spanza_journal_watch.backend.topics import PAEDIATRIC_TEXT_TERMS as _PAEDIATRIC_TEXT_TERMS  # noqa: E402
+
 from .authors import (
     AuthorDetailView,
     HealthServiceListView,
@@ -15,8 +18,6 @@ from .issues import (
     LatestIssueView,
 )
 from .journal_browser import (
-    _PAEDIATRIC_MESH_TERMS,
-    _PAEDIATRIC_TEXT_TERMS,
     IGNORED_PUBLICATION_TYPES,
     JOURNAL_SECTIONS,
     JournalListView,

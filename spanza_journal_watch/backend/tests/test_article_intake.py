@@ -769,50 +769,52 @@ class TestArticleIntakeFilterDefaults:
         assert hidden < checkbox
 
 
-class TestTopicFilterCache:
-    """The paediatric pass runs once per batch membership, then comes from the cache."""
+class TestTopicFilters:
+    """Topic flags are stored on the article when it is saved and filtered in SQL."""
 
     @staticmethod
-    def _paediatric_article(pmid):
-        return PubmedArticle.objects.create(
-            pmid=pmid,
-            title=f"Sevoflurane in children {pmid}",
-            metadata_json={"mesh_terms": ["Child"]},
+    def _article(pmid, **fields):
+        return PubmedArticle.objects.create(pmid=pmid, **fields)
+
+    def test_topics_are_derived_on_save(self):
+        article = self._article("30000001", title="Sevoflurane in children", metadata_json={"mesh_terms": ["Child"]})
+        assert "paediatric" in article.topics
+        adult = self._article("30000002", title="Frailty in older adults", abstract="Cohort of adults over 70.")
+        assert adult.topics == []
+        trial = self._article(
+            "30000003",
+            title="Caudal block for hypospadias repair",
+            abstract="A randomised trial of analgesia in infants.",
+            metadata_json={"publication_types": ["Randomized Controlled Trial"]},
         )
+        assert {"paediatric", "trial", "pain"} <= set(trial.topics)
 
-    def test_ids_refresh_when_the_batch_gains_a_row(self):
-        from django.core.cache import cache
-        from django.test import override_settings
+    def test_topics_follow_metadata_changes(self):
+        article = self._article("30000004", title="Airway management")
+        assert "paediatric" not in article.topics
+        article.metadata_json = {"mesh_terms": ["Infant"]}
+        article.save()
+        article.refresh_from_db()
+        assert "paediatric" in article.topics
 
-        from spanza_journal_watch.backend.views.intake import _build_article_intake_queryset, _topic_filter_ids
-
-        _, user = _make_manager()
-        batch = _make_batch(user)
-        first = PubmedBatchArticle.objects.create(batch=batch, article=self._paediatric_article("30000001"))
-        PubmedBatchArticle.objects.create(
-            batch=batch,
-            article=PubmedArticle.objects.create(pmid="30000002", title="Frailty in older adults"),
-        )
-        locmem = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-        with override_settings(CACHES=locmem):
-            cache.clear()
-            _, _, flags = _build_article_intake_queryset(batch, {}, empty=True)
-            assert set(_topic_filter_ids(batch, flags)) == {first.pk}
-            second = PubmedBatchArticle.objects.create(batch=batch, article=self._paediatric_article("30000003"))
-            assert set(_topic_filter_ids(batch, flags)) == {first.pk, second.pk}
-            # Same membership: the cached list is reused, so a metadata edit is not seen yet.
-            PubmedArticle.objects.filter(pk=first.article_id).update(metadata_json={}, title="")
-            assert set(_topic_filter_ids(batch, flags)) == {first.pk, second.pk}
-
-    def test_rows_are_querysets_with_the_page_annotated(self):
+    def test_paediatric_filter_uses_stored_topics(self):
         client, user = _make_manager()
         batch = _make_batch(user)
-        PubmedBatchArticle.objects.create(batch=batch, article=self._paediatric_article("30000011"))
-        resp = client.get(reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk}))
+        child = PubmedBatchArticle.objects.create(
+            batch=batch, article=self._article("30000011", title="Sevoflurane in children")
+        )
+        PubmedBatchArticle.objects.create(
+            batch=batch, article=self._article("30000012", title="Frailty in older adults")
+        )
+        url = reverse("backend:article_intake_results", kwargs={"batch_id": batch.pk})
+        resp = client.get(url)
         assert resp.status_code == 200
+        assert [row.pk for row in resp.context["result_rows"]] == [child.pk]
         assert resp.context["result_total"] == 1
         (row,) = resp.context["result_rows"]
         assert row.recommendation_count == 0
+        resp = client.get(url, {"paediatric_only": "0"})
+        assert resp.context["result_total"] == 2
 
 
 # ---------------------------------------------------------------------------

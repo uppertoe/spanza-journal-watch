@@ -30,6 +30,21 @@ from ..models import (
     PubmedIntegrationCredential,
 )
 from ..planka import PlankaAPIError, PlankaClient
+from ..topics import (  # noqa: F401 — re-exported for existing importers
+    CARDIAC_MESH_TERMS,
+    CARDIAC_TEXT_TERMS,
+    HUMANS_MESH_TERM,
+    ICU_MESH_TERMS,
+    ICU_TEXT_TERMS,
+    NEONATAL_MESH_TERMS,
+    NEONATAL_TEXT_TERMS,
+    PAEDIATRIC_MESH_TERMS,
+    PAEDIATRIC_TEXT_TERMS,
+    PAIN_MESH_TERMS,
+    PAIN_TEXT_TERMS,
+    REVIEW_PUBLICATION_TYPES,
+    TRIAL_PUBLICATION_TYPES,
+)
 from . import shared
 from .planka_boards import _build_planka_webhook_url
 from .shared import _get_planka_integration_credential, _safe_planka_error
@@ -85,56 +100,6 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
         "inbox_settings_preview": inbox_settings_form.get_preview_value(),
         "frontend_banner_form": frontend_banner_form,
     }
-
-
-PAEDIATRIC_MESH_TERMS = {
-    "Pediatrics",
-    "Infant",
-    "Infant, Newborn",
-    "Child",
-    "Child, Preschool",
-    "Adolescent",
-}
-PAEDIATRIC_TEXT_TERMS = {
-    "pediatric",
-    "paediatric",
-    "child",
-    "children",
-    "infant",
-    "newborn",
-    "neonat",
-    "adolescent",
-}
-HUMANS_MESH_TERM = "Humans"
-REVIEW_PUBLICATION_TYPES = {"Review", "Systematic Review", "Meta-Analysis"}
-TRIAL_PUBLICATION_TYPES = {"Clinical Trial", "Randomized Controlled Trial"}
-
-PAIN_TEXT_TERMS = {
-    "pain",
-    "analgesia",
-    "analgesic",
-    "opioid",
-    "nocicept",
-    "regional anaesthesia",
-    "regional anesthesia",
-}
-PAIN_MESH_TERMS = {"Pain", "Pain Management", "Analgesia"}
-
-ICU_TEXT_TERMS = {"intensive care", "critical care", "icu", "ventilat", "sepsis"}
-ICU_MESH_TERMS = {"Critical Care", "Intensive Care Units", "Respiration, Artificial", "Sepsis"}
-
-CARDIAC_TEXT_TERMS = {
-    "cardiac anaesthesia",
-    "cardiac anesthesia",
-    "cardiothoracic",
-    "cardiac surgery",
-    "cardiopulmonary bypass",
-    "heart surgery",
-}
-CARDIAC_MESH_TERMS = {"Anesthesia, Cardiovascular", "Cardiac Surgical Procedures", "Cardiopulmonary Bypass"}
-
-NEONATAL_TEXT_TERMS = {"neonat", "newborn", "preterm", "premature"}
-NEONATAL_MESH_TERMS = {"Infant, Newborn", "Premature Birth", "Infant, Premature"}
 
 
 @login_required
