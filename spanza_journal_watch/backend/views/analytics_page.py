@@ -34,6 +34,13 @@ def _safe_percentage(numerator, denominator):
 
 
 def _site_analytics_rollout_date():
+    """Date of the first JS-verified event. Fixed once it exists, so cached for an hour."""
+    from django.core.cache import cache
+
+    cache_key = "analytics:rollout_date"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached or None
     first_js_event = (
         AnalyticsEvent.objects.filter(js_verified=True)
         .order_by("timestamp")
@@ -43,8 +50,11 @@ def _site_analytics_rollout_date():
     if not first_js_event:
         return None
     if timezone.is_aware(first_js_event):
-        return timezone.localtime(first_js_event).date()
-    return first_js_event.date()
+        rollout = timezone.localtime(first_js_event).date()
+    else:
+        rollout = first_js_event.date()
+    cache.set(cache_key, rollout, 3600)
+    return rollout
 
 
 def _newsletter_predates_site_analytics(newsletter):

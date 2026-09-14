@@ -44,7 +44,7 @@ def analytics_visitor(request, visitor_id):
 
     visit_rows = []
     for visit in visits:
-        if len(visit["events"]) > 1:
+        if visit["event_count"] > 1:
             duration_s = max(0.0, (visit["last_event"] - visit["first_event"]).total_seconds())
             duration_label = f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m"
         else:
@@ -54,7 +54,7 @@ def analytics_visitor(request, visitor_id):
                 "first_event": visit["first_event"],
                 "last_event": visit["last_event"],
                 "duration": duration_label,
-                "event_count": len(visit["events"]),
+                "event_count": visit["event_count"],
                 "referrer": referrer_labels.get(visit["referrer_category"], visit["referrer_category"] or "Unknown"),
                 "referrer_domain": visit["referrer_domain"] or "",
                 "landing_page": visit["landing_page"] or "—",

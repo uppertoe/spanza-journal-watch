@@ -38,9 +38,7 @@
                 <input type="hidden" name="mesh_term" value="{{ term }}">
                 <select name="tag_id" class="form-select form-select-sm" style="max-width: 200px;">
                   <option value="">Select tag...</option>
-                  {% for tag in curated_tags %}
-                  <option value="{{ tag.pk }}">#{{ tag.text }}</option>
-                  {% endfor %}
+                  {{ tag_options_html }}
                 </select>
                 <button type="submit" class="btn btn-sm btn-outline-primary">Map</button>
               </form>
@@ -80,9 +78,7 @@
                 <input type="hidden" name="mesh_term" value="{{ term }}">
                 <select name="tag_id" class="form-select form-select-sm" style="max-width: 200px;">
                   <option value="">Select tag...</option>
-                  {% for tag in curated_tags %}
-                  <option value="{{ tag.pk }}">#{{ tag.text }}</option>
-                  {% endfor %}
+                  {{ tag_options_html }}
                 </select>
                 <button type="submit" class="btn btn-sm btn-outline-primary">Map</button>
               </form>

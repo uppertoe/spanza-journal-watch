@@ -15,7 +15,6 @@ from spanza_journal_watch.backend.views.analytics_page import (
 from spanza_journal_watch.submissions.models import Review
 
 from .common import _engaged_human_count
-from .visits import _VISIT_PROGRESSION_EVENT_TYPES, _derive_page_section
 
 # ── Recency / freshness helpers ────────────────────────────────────
 # Absolute-count leaderboards structurally favour older reviews: a review live
@@ -143,9 +142,7 @@ def _benchmark_verdict(first_week_opens, median):
 
 
 def _is_one_step_visit(visit):
-    sections_seen = {section for section in (_derive_page_section(row) for row in visit["events"]) if section}
-    progressed = any(row["event_type"] in _VISIT_PROGRESSION_EVENT_TYPES for row in visit["events"])
-    return len(sections_seen) <= 1 and not progressed
+    return len(visit["sections"]) <= 1 and not visit["progressed"]
 
 
 def _confidence_summary(events_qs):

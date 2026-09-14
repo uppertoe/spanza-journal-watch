@@ -37,7 +37,6 @@ from .visits import (
     _LOW_SAMPLE_THRESHOLD,
     _PAGE_SECTION_LABELS,
     _build_derived_visits_cached,
-    _derive_page_section,
     _normalise_search_query,
     _rank_rows,
 )
@@ -335,7 +334,7 @@ def analytics_overview(request):
     section_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "one_step_visits": 0})
     source_summary = defaultdict(int)
     for visit in visits:
-        engaged_visit = any(row["event_type"] == AnalyticsEvent.EventType.REVIEW_ENGAGED for row in visit["events"])
+        engaged_visit = visit["engaged"]
         one_step_visit = _is_one_step_visit(visit)
         source_summary[visit["referrer_category"] or ""] += 1
         if visit["landing_page"]:
@@ -345,8 +344,7 @@ def analytics_overview(request):
                 landing["engaged_visits"] += 1
             if one_step_visit:
                 landing["one_step_visits"] += 1
-        sections_seen = {section for section in (_derive_page_section(row) for row in visit["events"]) if section}
-        for section in sections_seen:
+        for section in visit["sections"]:
             summary = section_summary[section]
             summary["visits"] += 1
             if engaged_visit:

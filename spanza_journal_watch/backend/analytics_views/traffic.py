@@ -18,12 +18,10 @@ from .benchmarks import _confidence_summary, _is_one_step_visit
 from .common import VIEW_SITE_ANALYTICS, _base_event_qs, _date_range_from_request, _render_analytics
 from .flows import _compute_top_flows, _visit_is_engaged
 from .visits import (
-    _JOURNAL_EVENT_TYPES,
     _LOW_SAMPLE_THRESHOLD,
     _PAGE_SECTION_LABELS,
     _VISIT_INACTIVITY_GAP,
     _build_derived_visits_cached,
-    _derive_page_section,
     _normalise_search_query,
     _split_new_returning,
     _weekly_visits_by_referrer,
@@ -60,7 +58,7 @@ def analytics_traffic(request):
         summary["visits"] += 1
         if visit["visitor_id"]:
             summary["visitor_ids"].add(visit["visitor_id"])
-        if any(row["event_type"] == AnalyticsEvent.EventType.REVIEW_ENGAGED for row in visit["events"]):
+        if visit["engaged"]:
             summary["engaged_visits"] += 1
         if visit["js_verified"]:
             summary["js_verified_visits"] += 1
@@ -117,9 +115,9 @@ def analytics_traffic(request):
     section_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "single_event_visits": 0})
     landing_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "single_event_visits": 0})
     for visit in visits:
-        engaged_visit = any(row["event_type"] == AnalyticsEvent.EventType.REVIEW_ENGAGED for row in visit["events"])
+        engaged_visit = visit["engaged"]
         single_event_visit = _is_one_step_visit(visit)
-        sections_seen = {section for section in (_derive_page_section(row) for row in visit["events"]) if section}
+        sections_seen = visit["sections"]
         for section in sections_seen:
             page_counts[section] += 1
             summary = section_summary[section]
@@ -148,9 +146,7 @@ def analytics_traffic(request):
         for page, _count in page_counts.most_common()
     ]
 
-    journal_visits = sum(
-        1 for visit in visits if any(row["event_type"] in _JOURNAL_EVENT_TYPES for row in visit["events"])
-    )
+    journal_visits = sum(1 for visit in visits if visit["journal"])
 
     traffic_categories = ["newsletter", "search", "social", "direct", "other"]
     traffic_chart_labels, traffic_chart_series = _weekly_visits_by_referrer(visits, categories=traffic_categories)
@@ -246,8 +242,7 @@ def analytics_traffic(request):
 
     recent_sessions = []
     for visit in recent_visit_rows:
-        events = visit["events"]
-        if len(events) > 1:
+        if visit["event_count"] > 1:
             duration_s = max(0.0, (visit["last_event"] - visit["first_event"]).total_seconds())
             duration_label = f"{int(duration_s)}s" if duration_s < 120 else f"{int(duration_s / 60)}m"
         else:
@@ -263,7 +258,7 @@ def analytics_traffic(request):
                 "referrer": referrer_labels.get(visit["referrer_category"], visit["referrer_category"] or "Unknown"),
                 "referrer_domain": visit["referrer_domain"] or "",
                 "landing_page": visit["landing_page"] or "—",
-                "event_count": len(events),
+                "event_count": visit["event_count"],
                 "first_event": visit["first_event"],
                 "last_event": visit["last_event"],
                 "duration": duration_label,

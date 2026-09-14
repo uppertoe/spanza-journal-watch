@@ -5,7 +5,6 @@ from collections import Counter, defaultdict
 from django.contrib.contenttypes.models import ContentType
 
 from spanza_journal_watch.analytics.models import (
-    DELIBERATE_INTERACTION_EVENT_TYPES,
     AnalyticsEvent,
 )
 from spanza_journal_watch.backend.views.analytics_page import (
@@ -51,11 +50,7 @@ def _visit_is_engaged(visit):
     session duration — the June 2026 bot audit found JS-executing bots game both,
     so counting them here would let the Audience explorer contradict the KPI.
     """
-    return any(
-        row["event_type"] in DELIBERATE_INTERACTION_EVENT_TYPES
-        or row.get("human_confidence") == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
-        for row in visit["events"]
-    )
+    return visit["deliberate"]
 
 
 def _resolve_content_titles(event_ids):
@@ -180,7 +175,7 @@ def _compute_top_flows(visits):
     transition_counter = Counter()
     total_visits_with_transition = 0
     for visit in visits:
-        event_types = [row["event_type"] for row in visit["events"][:10]]
+        event_types = visit["event_types"]
         seen = set()
         had_transition = False
         for i in range(len(event_types) - 1):

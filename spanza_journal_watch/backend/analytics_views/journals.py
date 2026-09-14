@@ -28,7 +28,6 @@ from .common import (
 from .visits import (
     _JOURNAL_EVENT_TYPES,
     _VISIT_INACTIVITY_GAP,
-    _build_derived_visits,
     _build_derived_visits_cached,
     _weekly_visit_buckets,
 )
@@ -156,7 +155,7 @@ def analytics_journals(request):
     def _delta(current, previous):
         return _pct_change(current, previous) if comparison_reliable else None
 
-    prev_visits = len(_build_derived_visits(prev_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)))
+    prev_visits = len(_build_derived_visits_cached(prev_events.filter(event_type__in=_JOURNAL_EVENT_TYPES)))
     prev_stars = states_in_range.filter(starred_at__gte=prev_start_ts, starred_at__lte=prev_end_ts).count()
     prev_searches = (
         prev_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)

@@ -78,7 +78,7 @@ def analytics_editorial(request):
         r.id: r
         for r in Review.objects.filter(id__in=review_ids)
         .select_related("article__journal", "author")
-        .prefetch_related("article__tags")
+        .prefetch_related("article__tags", "issues")
         .defer("body", "search_vector", "article__abstract", "article__metadata_json", "article__tags_string")
     }
 

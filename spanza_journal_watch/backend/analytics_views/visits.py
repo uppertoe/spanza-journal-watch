@@ -6,9 +6,11 @@ from collections import Counter
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models.fields.json import KeyTextTransform
 from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
+    DELIBERATE_INTERACTION_EVENT_TYPES,
     AnalyticsEvent,
 )
 
@@ -130,8 +132,7 @@ def _derive_visit_landing_page(row):
     if _is_reportable_landing_page(landing_page):
         return landing_page
 
-    metadata = row.get("metadata") or {}
-    page = (metadata.get("page") or "").strip()
+    page = (row.get("page") or "").strip()
     if page in _VISIT_PAGE_PATHS:
         return _VISIT_PAGE_PATHS[page]
 
@@ -157,8 +158,7 @@ def _derive_visit_landing_page(row):
 
 
 def _derive_page_section(row):
-    metadata = row.get("metadata") or {}
-    page = (metadata.get("page") or "").strip()
+    page = (row.get("page") or "").strip()
     if page in _PAGE_SECTION_LABELS:
         return page
 
@@ -196,11 +196,47 @@ def _visit_partition_key(row):
 
 
 def _utm_field_from_metadata(row, key):
-    metadata = row.get("metadata") or {}
-    return (metadata.get(key) or "").strip()
+    return (row.get(key) or "").strip()
+
+
+# Event types the flows panel follows through a visit; only the first few matter.
+_FLOW_EVENT_LIMIT = 10
+
+
+def _note_event(visit, row):
+    """Fold one event into its visit's precomputed facts.
+
+    The panels used to keep every event row on the visit and re-derive these on
+    each request (and every cached copy carried 17k metadata blobs). Deriving
+    once here keeps the cached visits small and the per-request loops trivial.
+    """
+    event_type = row.get("event_type")
+    visit["event_count"] += 1
+    section = _derive_page_section(row)
+    if section:
+        visit["sections"].add(section)
+    if event_type in _VISIT_PROGRESSION_EVENT_TYPES:
+        visit["progressed"] = True
+    if event_type == AnalyticsEvent.EventType.REVIEW_ENGAGED:
+        visit["engaged"] = True
+    if event_type in _JOURNAL_EVENT_TYPES:
+        visit["journal"] = True
+    if (
+        event_type in DELIBERATE_INTERACTION_EVENT_TYPES
+        or row.get("human_confidence") == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
+    ):
+        visit["deliberate"] = True
+    if len(visit["event_types"]) < _FLOW_EVENT_LIMIT:
+        visit["event_types"].append(event_type)
 
 
 def _build_derived_visits(events_qs):
+    """Sessionise events into visits.
+
+    Each visit carries the facts the panels need (event_count, sections,
+    progressed, engaged, journal, deliberate, event_types) rather than the raw
+    event rows. Only the metadata keys used here are read from the JSON column.
+    """
     rows = list(
         events_qs.values(
             "id",
@@ -210,10 +246,13 @@ def _build_derived_visits(events_qs):
             "referrer_category",
             "referrer_domain",
             "landing_page",
-            "metadata",
             "session_key",
             "js_verified",
             "human_confidence",
+            page=KeyTextTransform("page", "metadata"),
+            utm_source=KeyTextTransform("utm_source", "metadata"),
+            utm_medium=KeyTextTransform("utm_medium", "metadata"),
+            utm_campaign=KeyTextTransform("utm_campaign", "metadata"),
         )
     )
     # Group by visit_key then timestamp. A single visitor_id can span multiple
@@ -245,13 +284,20 @@ def _build_derived_visits(events_qs):
                 "utm_source": _utm_field_from_metadata(row, "utm_source"),
                 "utm_medium": _utm_field_from_metadata(row, "utm_medium"),
                 "utm_campaign": _utm_field_from_metadata(row, "utm_campaign"),
-                "events": [row],
+                "event_count": 0,
+                "sections": set(),
+                "progressed": False,
+                "engaged": False,
+                "journal": False,
+                "deliberate": False,
+                "event_types": [],
             }
+            _note_event(current_visit, row)
             visits.append(current_visit)
             continue
 
         current_visit["last_event"] = timestamp
-        current_visit["events"].append(row)
+        _note_event(current_visit, row)
         current_visit["js_verified"] = current_visit["js_verified"] or bool(row.get("js_verified"))
         if not current_visit["landing_page"]:
             current_visit["landing_page"] = _derive_visit_landing_page(row)

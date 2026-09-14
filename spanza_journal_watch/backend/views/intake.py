@@ -190,14 +190,17 @@ def _annotated_batch_articles(batch):
 
 def _intake_counts(batch):
     """Totals and state for the segment buttons and the send-to-Planka bar."""
-    shortlisted = batch.batch_articles.filter(is_selected=True)
     running = batch.task_state in {PubmedImportBatch.TASK_STATE_PENDING, PubmedImportBatch.TASK_STATE_RUNNING}
+    on_board = Q(is_selected=True) & ~Q(planka_card_id="")
+    totals = batch.batch_articles.aggregate(
+        batch_total=Count("id"),
+        selected_total=Count("id", filter=Q(is_selected=True)),
+        on_board_total=Count("id", filter=on_board),
+        unsent_total=Count("id", filter=Q(is_selected=True, planka_card_id="")),
+        pushed_total=Count("id", filter=~Q(planka_card_id="")),
+    )
     return {
-        "batch_total": batch.batch_articles.count(),
-        "selected_total": shortlisted.count(),
-        "on_board_total": shortlisted.exclude(planka_card_id="").count(),
-        "unsent_total": shortlisted.filter(planka_card_id="").count(),
-        "pushed_total": batch.batch_articles.exclude(planka_card_id="").count(),
+        **totals,
         "planka_linked": bool(batch.issue_id) and PlankaIssueBinding.objects.filter(issue_id=batch.issue_id).exists(),
         "push_in_progress": running and batch.task_action == "push",
     }

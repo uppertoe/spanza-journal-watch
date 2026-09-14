@@ -2,13 +2,15 @@
 
 import datetime
 import logging
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.db import connection
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.html import format_html_join
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
@@ -17,10 +19,6 @@ from spanza_journal_watch.submissions.models import (
     MeshTagMapping,
     Review,
     Tag,
-)
-
-from ..models import (
-    PubmedArticle,
 )
 
 logger = logging.getLogger(__name__)
@@ -283,34 +281,45 @@ def unmapped_mesh_report(request):
         "Case-Control Studies",
     }
 
-    unmapped_counter = Counter()
-    reviewed_articles = PubmedArticle.objects.filter(active=True)
-    for article in reviewed_articles.iterator():
-        for term in (article.metadata_json or {}).get("mesh_terms", []):
-            if term not in mapped_terms and term not in skip_terms:
-                unmapped_counter[term] += 1
-
-    # Also check recent pipeline articles (last 3 months)
-    pipeline_counter = Counter()
+    excluded = mapped_terms | skip_terms
     three_months_ago = timezone.now().date() - datetime.timedelta(days=90)
-    pipeline_articles = PubmedArticle.objects.filter(
-        active=False,
-        publication_date__gte=three_months_ago,
-        pmid__isnull=False,
+    unmapped_reviewed = _mesh_term_counts("a.active = true", [], excluded)
+    # Also check recent pipeline articles (last 3 months)
+    unmapped_pipeline = _mesh_term_counts(
+        "a.active = false AND a.publication_date >= %s AND a.pmid IS NOT NULL", [three_months_ago], excluded
     )
-    for article in pipeline_articles.iterator():
-        for term in (article.metadata_json or {}).get("mesh_terms", []):
-            if term not in mapped_terms and term not in skip_terms:
-                pipeline_counter[term] += 1
 
+    # One rendered <option> list shared by every row: the report used to render
+    # the curated tags again for each of its hundred rows.
     curated_tags = Tag.objects.filter(curated=True).order_by("display_order", "text")
+    tag_options_html = format_html_join(
+        "", '<option value="{}">#{}</option>', ((tag.pk, tag.text) for tag in curated_tags)
+    )
 
     return render(
         request,
         "backend/unmapped_mesh_report.html",
         {
-            "unmapped_reviewed": unmapped_counter.most_common(50),
-            "unmapped_pipeline": pipeline_counter.most_common(50),
-            "curated_tags": curated_tags,
+            "unmapped_reviewed": unmapped_reviewed,
+            "unmapped_pipeline": unmapped_pipeline,
+            "tag_options_html": tag_options_html,
         },
     )
+
+
+def _mesh_term_counts(where_sql, params, excluded, limit=50):
+    """(term, count) pairs for MeSH terms on matching articles, counted in the database.
+
+    Postgres unnests the JSON array, so the articles are never loaded; the
+    exclusions are applied afterwards because they are a short Python set.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT term, COUNT(*) FROM backend_pubmedarticle a, "
+            "jsonb_array_elements_text(a.metadata_json -> 'mesh_terms') AS term "
+            f"WHERE jsonb_typeof(a.metadata_json -> 'mesh_terms') = 'array' AND {where_sql} "
+            "GROUP BY term ORDER BY COUNT(*) DESC, term",
+            params,
+        )
+        rows = cursor.fetchall()
+    return [(term, count) for term, count in rows if term not in excluded][:limit]
