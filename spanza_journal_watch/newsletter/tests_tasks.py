@@ -102,6 +102,39 @@ class TestSendNewsletterBatch:
         newsletter.refresh_from_db()
         assert newsletter.emails_sent == original_count
 
+    def test_records_a_delivery_per_recipient(self, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.models import NewsletterDelivery
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
+
+        send_newsletter_batch(newsletter.pk, [subscriber.pk], test_email=False)
+        assert NewsletterDelivery.objects.filter(newsletter=newsletter, subscriber=subscriber).exists()
+
+    def test_rerun_skips_recipients_already_delivered(self, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.models import NewsletterDelivery
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
+
+        NewsletterDelivery.objects.create(newsletter=newsletter, subscriber=subscriber)
+        send_newsletter_batch(newsletter.pk, [subscriber.pk], test_email=False)
+        assert len(mail.outbox) == 0
+        newsletter.refresh_from_db()
+        assert newsletter.emails_sent == 0
+
+    def test_test_sends_do_not_touch_the_ledger(self, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.models import NewsletterDelivery
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
+
+        send_newsletter_batch(newsletter.pk, [subscriber.pk], test_email=True)
+        assert not NewsletterDelivery.objects.filter(newsletter=newsletter).exists()
+
+    def test_rendered_links_carry_no_email_address(self, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
+
+        send_newsletter_batch(newsletter.pk, [subscriber.pk], test_email=False)
+        html = mail.outbox[0].alternatives[0][0]
+        assert f"email={subscriber.email}" not in html
+        assert subscriber.tracking_token in html
+        assert "&s=" in html or "&amp;s=" in html
+
     @patch("spanza_journal_watch.newsletter.tasks.mail.get_connection")
     def test_reraises_send_failure(self, mock_conn, newsletter, subscriber):
         from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
@@ -193,6 +226,26 @@ class TestSendNewsletter:
 
         with pytest.raises(NewsletterNotReadyToSendError):
             send_newsletter(newsletter.pk)
+
+    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
+    @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
+    def test_resend_reaches_only_undelivered_subscribers(self, mock_stats, mock_batch, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.models import NewsletterDelivery, Subscriber
+        from spanza_journal_watch.newsletter.tasks import send_newsletter
+
+        missed = Subscriber.objects.create(email="missed@example.com", subscribed=True)
+        NewsletterDelivery.objects.create(newsletter=newsletter, subscriber=subscriber)
+        newsletter.is_test_sent = True
+        newsletter.ready_to_send = True
+        newsletter.is_sent = True
+        newsletter.resend_enabled = True
+        newsletter.save(update_fields=["is_test_sent", "ready_to_send", "is_sent", "resend_enabled"])
+
+        send_newsletter(newsletter.pk)
+
+        ((args, _kwargs),) = mock_batch.delay.call_args_list
+        assert args[1] == [missed.pk]
+        assert mock_stats.delay.call_args.kwargs["already_delivered"] == 1
 
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")

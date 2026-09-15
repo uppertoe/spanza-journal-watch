@@ -1,4 +1,4 @@
-{% load mjml %}
+{% load mjml email_tracking %}
 {% mjml %}
 <mjml>
   <mj-head>
@@ -30,7 +30,7 @@
           You will receive updates with each new issue, published every few months. Each issue features editorial reviews of notable articles from the paediatric anaesthesia literature.
         </mj-text>
         <mj-text font-size="15px" color="#444444" line-height="1.65" padding-bottom="20px">
-          In the meantime, you can browse previous issues and the journal shelf at <a href="{{ tracker }}/" style="color:#2f5a80;">journalwatch.org.au</a>
+          In the meantime, you can browse previous issues and the journal shelf at <a href="{% track "/" %}" style="color:#2f5a80;">journalwatch.org.au</a>
         </mj-text>
         {% if not subscriber.user %}
         <mj-divider border-color="#e3e8ef" border-width="1px" padding="0 0 20px" />
@@ -52,7 +52,7 @@
 
     <mj-section padding="20px 20px 8px">
       <mj-column>
-        <mj-image width="140px" src="{{ spanza_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" padding-bottom="8px" />
+        <mj-image width="140px" src="{{ spanza_logo_url }}" href="{% track "https://www.spanza.org.au/" %}" alt="SPANZA logo" padding-bottom="8px" />
       </mj-column>
     </mj-section>
     <mj-section padding="0 20px 28px">

@@ -129,7 +129,9 @@ Step 7: Newsletter
 1. Click **Save newsletter**. It is built from the reviews that are live.
 2. Click **Send test email** and check the result in a mail client.
 3. Click **Send newsletter**. A newsletter can only be sent after a test,
-   and only once, unless you click **Enable one resend**.
+   and only once, unless you click **Enable one resend**. A resend goes only
+   to subscribers who have not already received that newsletter, so it is
+   safe to use after an interrupted send.
 
 Open and click statistics appear on the same tab once the send is complete.
 

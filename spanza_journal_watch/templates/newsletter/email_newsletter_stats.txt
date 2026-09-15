@@ -6,7 +6,8 @@ Details below:
 
 Newsletter: {{ newsletter }}
 Subscribers: {{ subscriber_count }}
-Successful emails sent: {{ newsletter.emails_sent }}
+{% if already_delivered %}Already sent to earlier and skipped: {{ already_delivered }}
+{% endif %}Successful emails sent: {{ newsletter.emails_sent }}
 Number of send batches: {{ batch_count }}
 
 Regards,

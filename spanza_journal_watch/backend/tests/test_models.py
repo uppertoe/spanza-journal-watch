@@ -77,6 +77,23 @@ class TestPlankaIntegrationCredential:
         # And we can still retrieve the original value
         assert cred.get_api_key() == "plain-value"
 
+    def test_key_encrypted_under_another_secret_reads_as_absent(self, settings):
+        cred = self._make_cred()
+        cred.set_api_key("my-secret-key")
+        cred.save()
+        ciphertext = cred.api_key
+
+        settings.PLANKA_CREDENTIAL_ENCRYPTION_KEY = "a-different-key"
+        cred.refresh_from_db()
+        assert cred.get_api_key() == ""
+        assert cred.has_undecryptable_api_key()
+
+        # Saving must not wrap the old ciphertext in a new layer of encryption.
+        cred.last_error = "probe"
+        cred.save()
+        cred.refresh_from_db()
+        assert cred.api_key == ciphertext
+
     def test_empty_api_key(self):
         cred = self._make_cred()
         cred.set_api_key("")

@@ -1,4 +1,4 @@
-{% load mjml %}
+{% load mjml email_tracking %}
 {% mjml %}
 <mjml>
   <mj-head>
@@ -66,7 +66,7 @@
         <mj-text color="#333333" font-size="15px" line-height="1.65" padding-bottom="16px">
           {{ newsletter.content|linebreaks }}
         </mj-text>
-        <mj-button href="{{ tracker }}{{ newsletter.issue.get_absolute_url }}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
+        <mj-button href="{% track newsletter.issue.get_absolute_url %}" background-color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="12px 28px">
           Read this issue
         </mj-button>
       </mj-column>
@@ -81,11 +81,11 @@
     </mj-section>
     <mj-section background-color="#ffffff" padding="20px 32px" css-class="featured-card">
       <mj-column width="28%">
-        <mj-image width="140px" src="{{ image_domain }}{{ review.feature_image.url }}" href="{{ tracker }}{{ review.get_absolute_url }}" alt="Article image" border-radius="8px" />
+        <mj-image width="140px" src="{{ image_domain }}{{ review.feature_image.url }}" href="{% track review.get_absolute_url %}" alt="Article image" border-radius="8px" />
       </mj-column>
       <mj-column width="72%">
         <mj-text font-size="17px" font-weight="700" color="#1e4468" padding-bottom="4px" line-height="1.35">
-          <a href="{{ tracker }}{{ review.get_absolute_url }}" class="link-nostyle">{{ review.article.get_title }}</a>
+          <a href="{% track review.get_absolute_url %}" class="link-nostyle">{{ review.article.get_title }}</a>
         </mj-text>
         <mj-text font-size="13px" color="#8a96a2" padding-bottom="8px">
           Reviewed by {{ review.author }} &middot; <span class="italics">{{ review.article.journal|default:review.article.source_journal_name }}</span>
@@ -94,9 +94,9 @@
           {{ review.get_truncated_body }}
         </mj-text>
         <mj-text font-size="13px" padding-bottom="0">
-          <a href="{{ tracker }}{{ review.get_absolute_url }}" style="color:#2f5a80; font-weight:600; text-decoration:none;">Read review &#8594;</a>
+          <a href="{% track review.get_absolute_url %}" style="color:#2f5a80; font-weight:600; text-decoration:none;">Read review &#8594;</a>
           &nbsp;&nbsp;
-          <a href="{{ tracker }}{{ review.article.url }}" style="color:#8a96a2; text-decoration:none;">Full text &#8599;</a>
+          <a href="{% track review.article.url %}" style="color:#8a96a2; text-decoration:none;">Full text &#8599;</a>
         </mj-text>
       </mj-column>
     </mj-section>
@@ -122,9 +122,9 @@
               <p style="margin:0 0 6px; color:#8a96a2; font-size:13px;">Reviewed by {{ review.author }} &middot; <em>{{ review.article.journal|default:review.article.source_journal_name }}</em></p>
               <p style="margin:0 0 10px; color:#555555; font-size:14px; line-height:1.6;">{{ review.get_truncated_body }}</p>
               <p style="margin:0;">
-                <a href="{{ tracker }}{{ review.get_absolute_url }}" style="color:#2f5a80; font-weight:600; text-decoration:none; font-size:13px;">Read review &#8594;</a>
+                <a href="{% track review.get_absolute_url %}" style="color:#2f5a80; font-weight:600; text-decoration:none; font-size:13px;">Read review &#8594;</a>
                 &nbsp;&nbsp;
-                <a href="{{ tracker }}{{ review.article.url }}" style="color:#8a96a2; text-decoration:none; font-size:13px;">Full text &#8599;</a>
+                <a href="{% track review.article.url %}" style="color:#8a96a2; text-decoration:none; font-size:13px;">Full text &#8599;</a>
               </p>
             </mj-accordion-text>
           </mj-accordion-element>
@@ -141,7 +141,7 @@
         <mj-text align="center" font-size="15px" color="#555555" padding-bottom="12px">
           View all {{ newsletter.issue.reviews.all|length }} review{{ newsletter.issue.reviews.all|pluralize }} in this issue
         </mj-text>
-        <mj-button href="{{ tracker }}{{ newsletter.issue.get_absolute_url }}" background-color="#ffffff" border="1px solid #2f5a80" color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="10px 24px">
+        <mj-button href="{% track newsletter.issue.get_absolute_url %}" background-color="#ffffff" border="1px solid #2f5a80" color="#2f5a80" border-radius="6px" font-size="14px" font-weight="600" inner-padding="10px 24px">
           Visit Journal Watch
         </mj-button>
       </mj-column>
@@ -150,16 +150,16 @@
     {# ── Footer ───────────────────────────────────── #}
     <mj-section padding="24px 20px 8px">
       <mj-column>
-        <mj-image width="140px" src="{{ spanza_logo_url }}" href="{{ tracker }}https://www.spanza.org.au/" alt="SPANZA logo" padding-bottom="12px" />
+        <mj-image width="140px" src="{{ spanza_logo_url }}" href="{% track "https://www.spanza.org.au/" %}" alt="SPANZA logo" padding-bottom="12px" />
       </mj-column>
     </mj-section>
     <mj-section padding="0 20px 28px">
       <mj-column>
         <mj-text align="center" font-size="12px" color="#8a96a2" line-height="1.55">
-          You are receiving this email because you are a member of SPANZA, or after subscribing at <a href="{{ tracker }}/" style="color:#8a96a2;">journalwatch.org.au</a>
+          You are receiving this email because you are a member of SPANZA, or after subscribing at <a href="{% track "/" %}" style="color:#8a96a2;">journalwatch.org.au</a>
         </mj-text>
         <mj-text align="center" font-size="12px" color="#8a96a2" line-height="1.55" padding-top="4px">
-          <a href="{{ tracker }}/accounts/login/" style="color:#8a96a2;">Sign in</a> with this email address to save articles to a reading list and recommend what we review next. We email you a code, so there is no password.
+          <a href="{% track "/accounts/login/" %}" style="color:#8a96a2;">Sign in</a> with this email address to save articles to a reading list and recommend what we review next. We email you a code, so there is no password.
         </mj-text>
         <mj-text align="center" font-size="12px" color="#8a96a2" padding-top="4px">
           <a href="{{ subscriber.get_unsubscribe_link }}" style="color:#8a96a2;">Unsubscribe</a> &nbsp;&middot;&nbsp; Reply to this email with questions or feedback

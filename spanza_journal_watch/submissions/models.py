@@ -104,6 +104,21 @@ def render_review_markdown_html(body):
     return html
 
 
+def image_changed(instance, field_name):
+    """True when ``field_name`` holds a freshly uploaded file or a different file from the stored one.
+
+    Call before ``super().save()``: Django commits the upload and rewrites the
+    stored name during save, after which the two can no longer be told apart.
+    """
+    field_file = getattr(instance, field_name)
+    if not field_file:
+        return False
+    if not getattr(field_file, "_committed", True) or instance._state.adding:
+        return True
+    stored = type(instance).objects.filter(pk=instance.pk).values_list(field_name, flat=True).first()
+    return (stored or "") != field_file.name
+
+
 class HealthService(models.Model):
     name = models.CharField(max_length=255, blank=False, null=False)
     url = models.URLField(max_length=255, blank=True, null=True)
@@ -118,9 +133,10 @@ class HealthService(models.Model):
         return self.logo and self.logo_authorised
 
     def save(self, *args, **kwargs):
+        resize_logo = image_changed(self, "logo")
         super().save(*args, **kwargs)
 
-        if self.logo:
+        if resize_logo:
             celery_resize_image.delay(
                 "submissions.HealthService",
                 self.pk,
@@ -152,11 +168,12 @@ class Author(TimeStampedModel):
     show_profile_image = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
+        resize_profile_image = image_changed(self, "profile_image")
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.name))
         super().save(*args, **kwargs)
 
-        if self.profile_image:
+        if resize_profile_image:
             celery_resize_image.delay(
                 "submissions.Author",
                 self.pk,
@@ -392,6 +409,7 @@ class Review(TimeStampedModel):
             return 0
 
     def save(self, *args, **kwargs):
+        resize_feature_image = image_changed(self, "feature_image")
         # Create the slug if it doesn't exist
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.article.name))
@@ -409,7 +427,7 @@ class Review(TimeStampedModel):
             self.publish_date = today
 
         # Delegate resizing to Celery
-        if self.feature_image:
+        if resize_feature_image:
             celery_resize_image.delay(
                 "submissions.Review",
                 self.pk,
@@ -683,6 +701,7 @@ class Issue(TimeStampedModel):
         return None
 
     def save(self, *args, **kwargs):
+        resize_image = image_changed(self, "image")
         retired_slug = None
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.name))
@@ -705,7 +724,7 @@ class Issue(TimeStampedModel):
             IssueSlugRedirect.objects.filter(old_slug=self.slug).delete()
             IssueSlugRedirect.objects.update_or_create(old_slug=retired_slug, defaults={"issue": self})
 
-        if self.image:
+        if resize_image:
             celery_resize_image.delay(
                 "submissions.Issue",
                 self.pk,

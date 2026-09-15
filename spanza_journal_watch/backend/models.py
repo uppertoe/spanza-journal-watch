@@ -1,6 +1,7 @@
 import base64
 import datetime
 import hashlib
+import logging
 import secrets
 import uuid
 from email.utils import formataddr
@@ -15,6 +16,8 @@ from django.utils.html import escape, strip_tags
 
 from spanza_journal_watch.utils.modelmethods import name_csv
 from spanza_journal_watch.utils.models import TimeStampedModel
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriberCSV(models.Model):
@@ -156,29 +159,19 @@ class SentEmail(models.Model):
         return f"Reply to {self.recipient} ({self.created:%Y-%m-%d})"
 
 
-class PlankaIntegrationCredential(TimeStampedModel):
-    class AuthMode(models.TextChoices):
-        API_KEY = "api_key", "Manual API key"
-        PASSWORD = "password", "Username/password"
-        OIDC = "oidc", "OIDC code exchange"
+# Every Fernet token begins with the version byte 0x80, which base64-encodes to this prefix.
+_FERNET_TOKEN_PREFIX = "gAAAAA"
 
-    singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
-    auth_mode = models.CharField(max_length=24, choices=AuthMode.choices)
-    api_key = models.TextField()
-    api_key_prefix = models.CharField(max_length=32, blank=True)
-    configured_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="configured_planka_credentials",
-    )
-    last_validated_at = models.DateTimeField(blank=True, null=True)
-    last_error = models.TextField(blank=True)
 
-    class Meta:
-        verbose_name = "Planka Integration Credential"
-        verbose_name_plural = "Planka Integration Credentials"
+class EncryptedApiKeyMixin:
+    """Fernet-encrypts ``api_key`` at rest under a per-integration key, falling back to SECRET_KEY.
+
+    A stored key that will not decrypt is treated as absent: the integration
+    reports itself as unconfigured until the key is entered again, rather than
+    handing ciphertext to an API client or re-encrypting it under the new key.
+    """
+
+    encryption_key_setting = ""
 
     @staticmethod
     def _derive_fernet_key(secret):
@@ -187,7 +180,7 @@ class PlankaIntegrationCredential(TimeStampedModel):
 
     @classmethod
     def _get_fernet(cls):
-        secret = (getattr(settings, "PLANKA_CREDENTIAL_ENCRYPTION_KEY", "") or "").strip() or getattr(
+        secret = (getattr(settings, cls.encryption_key_setting, "") or "").strip() or getattr(
             settings, "SECRET_KEY", ""
         )
         return Fernet(cls._derive_fernet_key(secret))
@@ -214,24 +207,59 @@ class PlankaIntegrationCredential(TimeStampedModel):
         plain_api_key = (plain_api_key or "").strip()
         self.api_key = self._encrypt(plain_api_key) if plain_api_key else ""
 
+    def has_undecryptable_api_key(self):
+        return bool(self.api_key) and self._decrypt_if_possible(self.api_key) is None
+
     def get_api_key(self):
         stored = self.api_key or ""
         if not stored:
             return ""
 
         decrypted = self._decrypt_if_possible(stored)
-        if decrypted is not None:
-            return decrypted
-
-        return stored
+        if decrypted is None:
+            logger.warning(
+                "%s: stored API key cannot be decrypted with the current encryption key; re-enter it",
+                type(self).__name__,
+            )
+            return ""
+        return decrypted
 
     def save(self, *args, **kwargs):
-        if self.api_key:
-            decrypted = self._decrypt_if_possible(self.api_key)
-            if decrypted is None:
-                self.api_key = self._encrypt(self.api_key)
+        # Keys stored before encryption was introduced are plain text and are
+        # encrypted on their next save. A value that already looks like a
+        # Fernet token but will not decrypt was encrypted under another key
+        # and is left as it is.
+        if self.api_key and not self.api_key.startswith(_FERNET_TOKEN_PREFIX):
+            self.api_key = self._encrypt(self.api_key)
 
         super().save(*args, **kwargs)
+
+
+class PlankaIntegrationCredential(EncryptedApiKeyMixin, TimeStampedModel):
+    class AuthMode(models.TextChoices):
+        API_KEY = "api_key", "Manual API key"
+        PASSWORD = "password", "Username/password"
+        OIDC = "oidc", "OIDC code exchange"
+
+    singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    auth_mode = models.CharField(max_length=24, choices=AuthMode.choices)
+    api_key = models.TextField()
+    api_key_prefix = models.CharField(max_length=32, blank=True)
+    configured_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="configured_planka_credentials",
+    )
+    last_validated_at = models.DateTimeField(blank=True, null=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Planka Integration Credential"
+        verbose_name_plural = "Planka Integration Credentials"
+
+    encryption_key_setting = "PLANKA_CREDENTIAL_ENCRYPTION_KEY"
 
     def get_masked_api_key(self):
         api_key = self.get_api_key()
@@ -665,7 +693,7 @@ class FetchLog(TimeStampedModel):
         return f"{self.get_task_type_display()} ({self.status}) — {self.started_at:%Y-%m-%d %H:%M}"
 
 
-class PubmedIntegrationCredential(TimeStampedModel):
+class PubmedIntegrationCredential(EncryptedApiKeyMixin, TimeStampedModel):
     singleton = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     api_key = models.TextField(blank=True)
     configured_by = models.ForeignKey(
@@ -682,58 +710,7 @@ class PubmedIntegrationCredential(TimeStampedModel):
         verbose_name = "PubMed Integration Credential"
         verbose_name_plural = "PubMed Integration Credentials"
 
-    @staticmethod
-    def _derive_fernet_key(secret):
-        digest = hashlib.sha256(secret.encode("utf-8")).digest()
-        return base64.urlsafe_b64encode(digest)
-
-    @classmethod
-    def _get_fernet(cls):
-        secret = (getattr(settings, "PUBMED_CREDENTIAL_ENCRYPTION_KEY", "") or "").strip() or getattr(
-            settings, "SECRET_KEY", ""
-        )
-        return Fernet(cls._derive_fernet_key(secret))
-
-    @classmethod
-    def _decrypt_if_possible(cls, value):
-        if not value:
-            return ""
-
-        try:
-            return cls._get_fernet().decrypt(value.encode("utf-8")).decode("utf-8")
-        except (InvalidToken, ValueError, TypeError):
-            return None
-
-    @classmethod
-    def _encrypt(cls, value):
-        return cls._get_fernet().encrypt(value.encode("utf-8")).decode("utf-8")
-
-    @classmethod
-    def get_solo(cls):
-        return cls.objects.order_by("pk").first()
-
-    def set_api_key(self, plain_api_key):
-        plain_api_key = (plain_api_key or "").strip()
-        self.api_key = self._encrypt(plain_api_key) if plain_api_key else ""
-
-    def get_api_key(self):
-        stored = self.api_key or ""
-        if not stored:
-            return ""
-
-        decrypted = self._decrypt_if_possible(stored)
-        if decrypted is not None:
-            return decrypted
-
-        return stored
-
-    def save(self, *args, **kwargs):
-        if self.api_key:
-            decrypted = self._decrypt_if_possible(self.api_key)
-            if decrypted is None:
-                self.api_key = self._encrypt(self.api_key)
-
-        super().save(*args, **kwargs)
+    encryption_key_setting = "PUBMED_CREDENTIAL_ENCRYPTION_KEY"
 
     def get_masked_api_key(self):
         api_key = self.get_api_key()

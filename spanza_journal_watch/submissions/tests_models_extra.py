@@ -75,3 +75,41 @@ class TestMeshTagMapping:
         MeshTagMapping.objects.create(mesh_term="MTM Dupe Term ZZZ", tag=tag)
         with pytest.raises(Exception):
             MeshTagMapping.objects.create(mesh_term="MTM Dupe Term ZZZ", tag=tag)
+
+
+# ---------------------------------------------------------------------------
+# 4. Image resizing is queued only when the image itself changes
+# ---------------------------------------------------------------------------
+
+
+class TestImageResizeOnSave:
+    def _png(self, name="logo.png"):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buffer = BytesIO()
+        Image.new("RGB", (4, 4), "white").save(buffer, format="PNG")
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+    def test_new_upload_queues_resize_and_unrelated_edit_does_not(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        from spanza_journal_watch.submissions import models as submissions_models
+        from spanza_journal_watch.submissions.models import HealthService
+
+        resize = MagicMock()
+        monkeypatch.setattr(submissions_models.celery_resize_image, "delay", resize)
+
+        service = HealthService.objects.create(name="Resize Hospital", logo=self._png())
+        assert resize.call_count == 1
+
+        service = HealthService.objects.get(pk=service.pk)
+        service.name = "Resize Hospital Renamed"
+        service.save()
+        assert resize.call_count == 1
+
+        service.logo = self._png("replacement.png")
+        service.save()
+        assert resize.call_count == 2

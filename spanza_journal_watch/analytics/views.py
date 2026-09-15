@@ -5,12 +5,14 @@ from urllib.parse import parse_qs, urlparse
 from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.core.exceptions import MultipleObjectsReturned
-from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.middleware.csrf import get_token
-from django.urls import resolve
+from django.urls import Resolver404, resolve
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from spanza_journal_watch.analytics.links import destination_is_signed, has_web_scheme
 from spanza_journal_watch.analytics.middleware import ensure_visitor_id, set_visitor_cookie
 from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
 from spanza_journal_watch.analytics.utils import (
@@ -19,11 +21,16 @@ from spanza_journal_watch.analytics.utils import (
     is_probable_automated_newsletter_event,
     set_newsletter_referrer_in_session,
 )
+from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.newsletter.cookies import set_subscribed_cookie
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Review
 
 logger = logging.getLogger(__name__)
+
+# Hosts that newsletters sent before destinations were signed linked to
+# directly. Unsigned links to anywhere else are refused.
+_LEGACY_EXTERNAL_HOSTS = frozenset({"spanza.org.au", "www.spanza.org.au"})
 
 
 def _get_newsletter(token):
@@ -35,42 +42,77 @@ def _get_newsletter(token):
     return newsletter
 
 
-def _get_subscriber(email):
-    subscriber = Subscriber.first_by_email(email)
-    if not subscriber:
-        logger.warning("No matching subscriber for email: %s", email)
-    return subscriber
+def _get_subscriber(request):
+    """Identify the subscriber from the tracking token in the link.
+
+    Newsletters sent before tracking tokens existed carry the address instead;
+    it is still honoured so opens and clicks on those issues keep attributing.
+    """
+    tracking_token = request.GET.get("t") or ""
+    if tracking_token:
+        return Subscriber.objects.filter(tracking_token=tracking_token).first()
+
+    email = request.GET.get("email") or ""
+    if email:
+        subscriber = Subscriber.first_by_email(email)
+        if not subscriber:
+            logger.warning("No matching subscriber for legacy email link")
+        return subscriber
+    return None
 
 
-def _is_external_url(parsed_url):
-    # External URLs should not be resolved before redirection
-    return bool(parsed_url.scheme and parsed_url.netloc)
-
-
-def _get_next_url(request, next):
-    parsed_next = urlparse(next)
-
-    # Redirect absolute (external) URLs
-    if _is_external_url(parsed_next):
-        return HttpResponseRedirect(next)
-
+def _is_local_path(request, url):
+    if not url_has_allowed_host_and_scheme(url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return False
     try:
-        # Catch malformed URLs
-        response = HttpResponseRedirect(next)
-        view, args, kwargs = resolve(parsed_next[2])
-        kwargs["request"] = request
-        view(*args, **kwargs)
-    except Http404:
-        return HttpResponseRedirect("/")
-    return response
+        resolve(urlparse(url).path)
+    except Resolver404:
+        return False
+    return True
+
+
+def _is_legacy_external_destination(url):
+    """Unsigned external links are followed only where an older newsletter could have contained them."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    if parsed.hostname in _LEGACY_EXTERNAL_HOSTS:
+        return True
+    return PubmedArticle.objects.filter(article_url=url).exists()
+
+
+def _resolve_email_link(request):
+    """Return ``(subscriber, destination)`` for an email tracking link.
+
+    Links built by ``EmailLinkBuilder`` carry the destination as ``u`` with a
+    signature over the subscriber's tracking token and the destination. A link
+    whose signature does not verify is not trusted at all: the reader lands on
+    the home page and nothing is attributed. Older links carry an unsigned
+    ``next``; those are followed only to this site or to a small set of
+    external destinations an earlier newsletter could have contained.
+    """
+    subscriber = _get_subscriber(request)
+
+    signed = request.GET.get("u")
+    if signed is not None:
+        tracking_token = subscriber.tracking_token if subscriber else ""
+        if has_web_scheme(signed) and destination_is_signed(tracking_token, signed, request.GET.get("s", "")):
+            return subscriber, signed
+        logger.warning("Refused email link with a missing or invalid signature")
+        return None, "/"
+
+    legacy = request.GET.get("next") or "/"
+    if _is_local_path(request, legacy) or _is_legacy_external_destination(legacy):
+        return subscriber, legacy
+    logger.warning("Refused unsigned email link to %s", legacy[:200])
+    return subscriber, "/"
 
 
 def track_email_open(request):
-    email = request.GET.get("email") or None
     token = request.GET.get("token") or None
 
     newsletter = _get_newsletter(token)
-    subscriber = _get_subscriber(email)
+    subscriber = _get_subscriber(request)
 
     if newsletter and subscriber:
         automated = is_probable_automated_newsletter_event(request, newsletter)
@@ -101,11 +143,8 @@ def _get_tracking_pixel():
 
 
 def track_newsletter_link(request, newsletter_token):
-    next = request.GET.get("next") or "/"  # is a hardcoded URL
-    email = request.GET.get("email") or None
-
     newsletter = _get_newsletter(newsletter_token)
-    subscriber = _get_subscriber(email)
+    subscriber, destination = _resolve_email_link(request)
 
     # This redirect is the first request of a newsletter visit, and the HTML
     # it lands on is CDN-cached (no Set-Cookie), so mint the visitor ID here.
@@ -119,7 +158,7 @@ def track_newsletter_link(request, newsletter_token):
             user_agent=request.headers.get("user-agent", ""),
             automated=automated,
             human_confidence=classify_event_confidence(automated=automated, subscriber=subscriber),
-            destination_url=(next or "")[:512],
+            destination_url=destination[:512],
         )
         tracker.save()
 
@@ -133,10 +172,10 @@ def track_newsletter_link(request, newsletter_token):
             request=request,
             subscriber_id=subscriber.pk,
             source="newsletter_click",
-            metadata={"newsletter_id": newsletter.pk, "destination_url": (next or "")[:512]},
+            metadata={"newsletter_id": newsletter.pk, "destination_url": destination[:512]},
         )
 
-    response = _get_next_url(request, next)
+    response = HttpResponseRedirect(destination)
     if subscriber:
         set_subscribed_cookie(response)
     if visitor_cookie_created:
@@ -164,12 +203,10 @@ def page_view(request, model=None, slug=None):
 
 def track_email_click(request):
     # Sets the session ID on following an email link
-    email = request.GET.get("email") or None
-    next = request.GET.get("next") or "/"
+    subscriber, destination = _resolve_email_link(request)
 
     visitor_id, visitor_cookie_created = ensure_visitor_id(request)
 
-    subscriber = Subscriber.first_by_email(email)
     if subscriber:
         request.session["subscriber_id"] = subscriber.pk
         request.session["subscriber_email"] = subscriber.email
@@ -179,13 +216,10 @@ def track_email_click(request):
             request=request,
             subscriber_id=subscriber.pk,
             source="newsletter_click",
-            metadata={"destination_url": (next or "")[:512]},
+            metadata={"destination_url": destination[:512]},
         )
-    else:
-        subscriber = None
-        logger.warning("No subscriber by this email: %s", email)
 
-    response = _get_next_url(request, next)
+    response = HttpResponseRedirect(destination)
     if subscriber:
         set_subscribed_cookie(response)
     if visitor_cookie_created:

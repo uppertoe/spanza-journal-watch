@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.urls import reverse
 
-from spanza_journal_watch.analytics.utils import click_tracker
+from spanza_journal_watch.analytics.links import EmailLinkBuilder
 from spanza_journal_watch.backend.models import SubscriberCSV
 from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
@@ -42,6 +42,8 @@ class Subscriber(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     unsubscribe_token = models.CharField(max_length=64, blank=True, null=True)
+    # Opaque identifier used in email tracking links in place of the address.
+    tracking_token = models.CharField(max_length=64, unique=True, blank=True, null=True, editable=False)
     from_csv = models.ForeignKey(
         SubscriberCSV, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Uploaded via CSV"
     )
@@ -86,7 +88,7 @@ class Subscriber(models.Model):
             "email_heading_url": f"{domain}{static('images/email/heading.png')}",
             "spanza_logo_url": f"{domain}{static('images/logo/spanza-logo-blue.png')}",
             "subscriber": self,
-            "tracker": click_tracker(self.email),
+            "tracker": EmailLinkBuilder(self, domain=domain),
         }
 
         return context
@@ -119,6 +121,16 @@ class Subscriber(models.Model):
         email.metadata = {"type": "subscription_confirmation"}
         email.tags = ["subscription-confirmation"]
         return email
+
+    @staticmethod
+    def generate_tracking_token():
+        return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8").replace("=", "")
+
+    def ensure_tracking_token(self):
+        """Return the tracking token, minting one in memory for unsaved subscribers."""
+        if not self.tracking_token:
+            self.tracking_token = self.generate_tracking_token()
+        return self.tracking_token
 
     def generate_unsubscribe_token(self):
         r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8")
@@ -162,6 +174,7 @@ class Subscriber(models.Model):
         self.email = self.normalize_email(self.email)
         if not self.unsubscribe_token:
             self.unsubscribe_token = self.generate_unsubscribe_token()
+        self.ensure_tracking_token()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -244,13 +257,13 @@ class Newsletter(models.Model):
     def generate_emails(self, subscribers):
         emails = []
         context = self.get_email_context()
-        token = self.email_token
-        from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
+        from spanza_journal_watch.analytics.models import NewsletterOpen
 
         for subscriber in subscribers:
+            tracker = EmailLinkBuilder(subscriber, newsletter_token=self.email_token, domain=context["domain"])
             context["subscriber"] = subscriber
-            context["pixel"] = NewsletterOpen.render_tracking_pixel(subscriber.email, token)
-            context["tracker"] = NewsletterClick.generate_tracking_link(subscriber.email, token)
+            context["pixel"] = NewsletterOpen.render_tracking_pixel(tracker)
+            context["tracker"] = tracker
             headers = subscriber.get_list_unsubscribe_headers()
             email = mail.EmailMultiAlternatives(
                 subject=self.subject,
@@ -324,3 +337,24 @@ class Newsletter(models.Model):
 
     def __str__(self):
         return self.subject
+
+
+class NewsletterDelivery(models.Model):
+    """One row per subscriber a newsletter has been handed to the mail transport for.
+
+    The send task consults this before emailing, so a send interrupted by a
+    lost queue can be resumed with "Enable one resend" without emailing anyone
+    twice.
+    """
+
+    newsletter = models.ForeignKey(Newsletter, on_delete=models.CASCADE, related_name="deliveries")
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE, related_name="newsletter_deliveries")
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["newsletter", "subscriber"], name="newsletter_delivery_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.newsletter} -> {self.subscriber.email}"

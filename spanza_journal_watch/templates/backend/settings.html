@@ -86,6 +86,9 @@
         NCBI API key is optional but recommended for higher request rate limits.
       {% endif %}
     </p>
+    {% if pubmed_credential and pubmed_credential.has_undecryptable_api_key %}
+      <div class="alert alert-warning py-2 mb-3">The stored PubMed key cannot be decrypted with the current encryption key. Enter the key again.</div>
+    {% endif %}
     {% if pubmed_credential and pubmed_credential.last_error %}
       <div class="alert alert-warning py-2 mb-3">Last PubMed error: {{ pubmed_credential.last_error }}</div>
     {% endif %}

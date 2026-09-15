@@ -248,7 +248,7 @@ sentry_sdk.init(
     dsn=SENTRY_DSN,
     integrations=integrations,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
-    send_default_pii=True,  # Attaches authenticated user (id, email) to Sentry events
+    send_default_pii=False,  # Events carry the user id only, never the address or IP
     attach_stacktrace=env.bool("SENTRY_ATTACH_STACKTRACE", default=True),
     max_breadcrumbs=env.int("SENTRY_MAX_BREADCRUMBS", default=100),
     traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),

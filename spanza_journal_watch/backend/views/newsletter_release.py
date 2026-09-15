@@ -235,7 +235,11 @@ def enable_newsletter_resend(request, pk):
     else:
         newsletter.resend_enabled = True
         newsletter.save(update_fields=["resend_enabled"])
-        messages.warning(request, "Resend enabled for this newsletter. It can now be sent once more.")
+        messages.warning(
+            request,
+            "Resend enabled for this newsletter. Sending it again reaches only subscribers "
+            "who have not already received it.",
+        )
 
     return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
 

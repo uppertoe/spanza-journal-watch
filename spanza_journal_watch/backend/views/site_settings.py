@@ -195,7 +195,11 @@ def _planka_status_context(request):
     planka_connection_error = None
     chief_editor_planka_user = None
     client = None
-    if planka_credential and planka_credential.get_api_key():
+    if planka_credential and planka_credential.has_undecryptable_api_key():
+        planka_connection_error = (
+            "The stored API key cannot be decrypted with the current encryption key. Enter the key again."
+        )
+    elif planka_credential and planka_credential.get_api_key():
         try:
             client = PlankaClient(api_key=planka_credential.get_api_key(), access_token="")
             planka_connection_user = client.get_current_user()

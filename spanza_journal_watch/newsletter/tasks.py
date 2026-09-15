@@ -19,7 +19,7 @@ class NewsletterNotReadyToSendError(Exception):
 
 
 @celery_app.task()
-def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipient_email=None):
+def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipient_email=None, already_delivered=0):
     from .models import Newsletter
 
     newsletter = Newsletter.objects.get(pk=newsletter_pk)
@@ -38,6 +38,7 @@ def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipien
         "newsletter": newsletter,
         "subscriber_count": subscriber_count,
         "batch_count": batch_count,
+        "already_delivered": already_delivered,
     }
     template = "newsletter/email_newsletter_stats.txt"
     subject = "Journal Watch - Newsletter send statistics"
@@ -65,30 +66,37 @@ def get_subscriber_batches(subscriber_pks, batch_size):
 
 @celery_app.task()
 def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
-    # Get newsletter object
-    from .models import Newsletter, Subscriber
+    from .models import Newsletter, NewsletterDelivery, Subscriber
 
     newsletter_queryset = Newsletter.objects.filter(pk=newsletter_pk)
     newsletter = newsletter_queryset.get()
 
-    # Get subscribers queryset
     subscribers = Subscriber.objects.filter(pk__in=subscriber_pks)
+    if not test_email:
+        # A batch re-run after a lost queue must not email anyone twice.
+        subscribers = subscribers.exclude(newsletter_deliveries__newsletter_id=newsletter_pk)
+    subscribers = list(subscribers)
 
-    # Send emails for this batch of subscribers
     connection = mail.get_connection()
     messages = newsletter.generate_emails(subscribers)
+    successful = 0
     try:
-        successful = connection.send_messages(messages)
+        for subscriber, message in zip(subscribers, messages, strict=True):
+            sent = connection.send_messages([message]) or 0
+            if sent and not test_email:
+                NewsletterDelivery.objects.get_or_create(newsletter_id=newsletter_pk, subscriber=subscriber)
+            successful += sent
     except Exception:
         logger.exception(
-            "Newsletter batch send failed for newsletter %s (%d recipients)",
+            "Newsletter batch send failed for newsletter %s after %d of %d recipients",
             newsletter_pk,
-            len(subscriber_pks),
+            successful,
+            len(subscribers),
         )
         raise
-
-    if not test_email:
-        newsletter_queryset.update(emails_sent=F("emails_sent") + successful)
+    finally:
+        if successful and not test_email:
+            newsletter_queryset.update(emails_sent=F("emails_sent") + successful)
 
 
 @celery_app.task()
@@ -117,14 +125,20 @@ def send_newsletter(newsletter_pk, sender_email=None):
         )
 
     subscribers = Subscriber.get_valid_subscribers(test_email=False)
-    subscriber_pks = list(subscribers.values_list("pk", flat=True))
+    # A resend reaches only subscribers the newsletter has not already gone to.
+    already_delivered = subscribers.filter(newsletter_deliveries__newsletter_id=newsletter_pk).count()
+    subscriber_pks = list(
+        subscribers.exclude(newsletter_deliveries__newsletter_id=newsletter_pk).values_list("pk", flat=True)
+    )
 
     batch_count = 0
     for batch_pks in get_subscriber_batches(subscriber_pks, BATCH_SIZE):
         send_newsletter_batch.delay(newsletter_pk, batch_pks, False)
         batch_count += 1
 
-    send_newsletter_stats.delay(newsletter_pk, len(subscriber_pks), batch_count, sender_email)
+    send_newsletter_stats.delay(
+        newsletter_pk, len(subscriber_pks), batch_count, sender_email, already_delivered=already_delivered
+    )
 
 
 @celery_app.task()

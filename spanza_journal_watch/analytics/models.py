@@ -18,7 +18,6 @@ from spanza_journal_watch.analytics.utils import (
     extract_referrer_domain,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.utils.functions import get_domain_url
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +61,9 @@ class NewsletterOpen(models.Model):
     )
 
     @staticmethod
-    def render_tracking_pixel(email, token):
-        context = {"email": email, "token": token, "domain": get_domain_url()}
-        template = "analytics/email_pixel.html"
-        return render_to_string(template, context)
+    def render_tracking_pixel(tracker):
+        """Return the pixel ``<img>`` for the subscriber and newsletter ``tracker`` is built for."""
+        return render_to_string("analytics/email_pixel.html", {"pixel_url": tracker.pixel_url()})
 
     @classmethod
     def get_between_timestamps(cls, newsletter, start_timestamp, end_timestamp):
@@ -87,13 +85,6 @@ class NewsletterClick(models.Model):
         default=HumanConfidence.PROBABLE_HUMAN,
     )
     destination_url = models.URLField(max_length=512, blank=True, default="")
-
-    @staticmethod
-    def generate_tracking_link(email, token):
-        """Redirects to the url immediately following this tag"""
-        context = {"email": email, "token": token, "domain": get_domain_url()}
-        template = "analytics/email_newsletter_link.txt"
-        return render_to_string(template, context)
 
     @classmethod
     def get_between_timestamps(cls, newsletter, start_timestamp, end_timestamp):
