@@ -27,14 +27,7 @@ EDITORIAL_SNAPSHOT_ROUTES = {
     "editorial_analytics_overview": "/editorial/analytics/overview/",
     "editorial_analytics_editorial": "/editorial/analytics/editorial/",
     "editorial_analytics_traffic": "/editorial/analytics/traffic/",
-    # Pinned window. The analytics panels count fixture rows inside a range
-    # ending today, and the fixture is a static JSON, so a rolling window walks
-    # off its own data: this snapshot was generated on 2026-09-08 with three
-    # subscribers in the last 180 days, and silently became two when the
-    # 2026-03-22 row aged out around 2026-09-18. Naming the window that was in
-    # effect at generation makes the counts deterministic. The dates themselves
-    # are masked by normalize_html, so pinning them costs the snapshot nothing.
-    "editorial_analytics_email": "/editorial/analytics/email/?start=2026-03-12&end=2026-09-08",
+    "editorial_analytics_email": "/editorial/analytics/email/",
     "editorial_analytics_journals": "/editorial/analytics/journals/",
     "editorial_analytics_issues": "/editorial/analytics/issues/",
     "editorial_inbox": "/editorial/inbox/",
