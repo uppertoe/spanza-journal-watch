@@ -1,3 +1,7 @@
+import datetime
+import json
+import re
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -7,6 +11,56 @@ from django.db import connection
 
 from spanza_journal_watch.layout.models import Homepage
 from spanza_journal_watch.submissions.models import Issue, MeshTagMapping, Tag
+
+# The date the committed fixture was generated. The analytics panels count rows
+# inside a window ending *today*, so a static fixture walks off its own data as
+# the calendar advances: the email snapshot was generated with three subscribers
+# inside 180 days and silently became two when the 2026-03-22 row aged out
+# around 2026-09-18, turning the suite red on unchanged code. Shifting the whole
+# fixture forward by (today - this date) restores the positions the snapshots
+# were recorded at, whatever today happens to be.
+#
+# UPDATE THIS when regenerating regression_baseline.json.
+BASELINE_GENERATED_ON = datetime.date(2026, 9, 8)
+
+_ISO_VALUE = re.compile(r"^(\d{4}-\d{2}-\d{2})([T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$")
+
+
+def _baseline_shift(today=None):
+    """Whole weeks between the fixture's generation date and today.
+
+    Whole weeks, not days: charts bucket by week and label weekdays, so an
+    arbitrary offset would move Monday and change the rendered HTML. Rounding to
+    the nearest week keeps the data within a few days of where it sat at
+    generation, which is far inside every window that matters.
+    """
+    delta = ((today or datetime.date.today()) - BASELINE_GENERATED_ON).days
+    return datetime.timedelta(days=round(delta / 7) * 7)
+
+
+def _shift_iso(value, shift):
+    match = _ISO_VALUE.match(value)
+    if not match:
+        return value
+    date_part, time_part = match.group(1), match.group(2) or ""
+    shifted = datetime.date.fromisoformat(date_part) + shift
+    return f"{shifted.isoformat()}{time_part}"
+
+
+def _shifted_fixture(fixture_path, shift):
+    """A copy of the fixture with every ISO date/datetime moved by `shift`."""
+    objects = json.loads(fixture_path.read_text(encoding="utf-8"))
+    for obj in objects:
+        fields = obj.get("fields") or {}
+        for key, value in fields.items():
+            if isinstance(value, str):
+                fields[key] = _shift_iso(value, shift)
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", prefix="regression_baseline_shifted_", delete=False, encoding="utf-8"
+    )
+    with handle as fh:
+        json.dump(objects, fh)
+    return Path(handle.name)
 
 
 # Package scope, not session: the fixture data is flushed as soon as the regression
@@ -29,7 +83,15 @@ def regression_baseline(django_db_setup, django_db_blocker):
             # fixture's hard-coded PKs. Clear them before loading.
             MeshTagMapping.objects.all().delete()
             Tag.objects.all().delete()
-            call_command("loaddata", fixture_name, verbosity=0)
+            shift = _baseline_shift()
+            if shift:
+                shifted = _shifted_fixture(fixture_path, shift)
+                try:
+                    call_command("loaddata", str(shifted), verbosity=0)
+                finally:
+                    shifted.unlink(missing_ok=True)
+            else:
+                call_command("loaddata", fixture_name, verbosity=0)
 
         latest_homepage = Homepage.objects.filter(publication_ready=True).order_by("-created").first()
         Homepage.CURRENT_HOMEPAGE = latest_homepage
