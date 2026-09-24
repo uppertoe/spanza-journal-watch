@@ -3,6 +3,7 @@ import json
 import re
 import tempfile
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
@@ -23,7 +24,8 @@ from spanza_journal_watch.submissions.models import Issue, MeshTagMapping, Tag
 # UPDATE THIS when regenerating regression_baseline.json.
 BASELINE_GENERATED_ON = datetime.date(2026, 9, 8)
 
-_ISO_VALUE = re.compile(r"^(\d{4}-\d{2}-\d{2})([T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$")
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$")
 
 
 def _baseline_shift(today=None):
@@ -38,23 +40,37 @@ def _baseline_shift(today=None):
     return datetime.timedelta(days=round(delta / 7) * 7)
 
 
-def _shift_iso(value, shift):
-    match = _ISO_VALUE.match(value)
-    if not match:
+def _shift_iso(value, shift, tz):
+    """Move an ISO date or UTC datetime by `shift`, preserving the local clock.
+
+    The fixture stores UTC instants and the app renders them in TIME_ZONE, so
+    shifting the UTC wall clock is not enough: moving a row across a daylight
+    saving boundary would render it an hour out and change the snapshot. Shift
+    the *local* wall clock instead and let the offset be recomputed for the new
+    date, which keeps both the displayed time and (because the shift is whole
+    weeks) the weekday exactly as recorded.
+    """
+    if _ISO_DATE.match(value):
+        return (datetime.date.fromisoformat(value) + shift).isoformat()
+    if not _ISO_DATETIME.match(value):
         return value
-    date_part, time_part = match.group(1), match.group(2) or ""
-    shifted = datetime.date.fromisoformat(date_part) + shift
-    return f"{shifted.isoformat()}{time_part}"
+    fractional = "." in value
+    moment = datetime.datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(tz)
+    moved = (moment.replace(tzinfo=None) + shift).replace(tzinfo=tz)
+    utc = moved.astimezone(datetime.UTC)
+    stamp = utc.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] if fractional else utc.strftime("%Y-%m-%dT%H:%M:%S")
+    return f"{stamp}Z"
 
 
 def _shifted_fixture(fixture_path, shift):
     """A copy of the fixture with every ISO date/datetime moved by `shift`."""
+    tz = ZoneInfo(settings.TIME_ZONE)
     objects = json.loads(fixture_path.read_text(encoding="utf-8"))
     for obj in objects:
         fields = obj.get("fields") or {}
         for key, value in fields.items():
             if isinstance(value, str):
-                fields[key] = _shift_iso(value, shift)
+                fields[key] = _shift_iso(value, shift, tz)
     handle = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="regression_baseline_shifted_", delete=False, encoding="utf-8"
     )
