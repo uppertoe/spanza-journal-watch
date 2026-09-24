@@ -55,4 +55,22 @@ def assert_matches_snapshot(name: str, html: str) -> None:
     expected = normalize_html(expected_path.read_text(encoding="utf-8"))
     if actual != expected:
         expected_path.with_suffix(".actual.html").write_text(actual, encoding="utf-8")
-    assert actual == expected, f"{name} differs from its snapshot (see {expected_path.stem}.actual.html)"
+    assert actual == expected, f"{name} differs from its snapshot{_first_difference(expected, actual)}"
+
+
+def _first_difference(expected: str, actual: str, window: int = 90) -> str:
+    """A readable excerpt around the first differing character.
+
+    Normalised snapshots are a single long line, so a unified diff is unreadable
+    and the .actual.html the caller is pointed at does not survive CI. Showing
+    the two sides around the first divergence is what actually identifies the
+    culprit - usually an unmasked date that has rolled over.
+    """
+    limit = min(len(expected), len(actual))
+    at = next((i for i in range(limit) if expected[i] != actual[i]), limit)
+    start = max(0, at - window)
+    return (
+        f" at character {at}:\n"
+        f"  expected: …{expected[start : at + window]}…\n"
+        f"  actual:   …{actual[start : at + window]}…"
+    )
