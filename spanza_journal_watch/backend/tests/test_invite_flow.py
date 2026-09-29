@@ -194,7 +194,25 @@ class TestInviteAcceptanceEmailVerification:
         # Visit again — should show "already accepted"
         response = client.get(invite_url(raw_token))
         assert response.status_code == 200
-        assert "accepted" in response.content.decode().lower()
+        assert "Access confirmed" in response.content.decode()
+
+    def test_already_accepted_invite_offers_planka(self, settings):
+        """A reviewer returning through their invite link still gets the Planka button, not just 'Go to home'."""
+        settings.PLANKA_EXTERNAL_URL = "https://planka.example.test"
+        issue = make_issue()
+        contributor = make_contributor(issue, email="reviewer@example.com")
+        invite, raw_token = make_invite(contributor)
+        user = UserFactory(email="reviewer@example.com")
+
+        client = Client()
+        client.force_login(user)
+        client.get(invite_url(raw_token))
+
+        content = client.get(invite_url(raw_token)).content.decode()
+        assert "Access confirmed" in content
+        assert 'href="https://planka.example.test"' in content
+        assert "Go to home" not in content
+        assert issue.name in content
 
 
 # ---------------------------------------------------------------------------

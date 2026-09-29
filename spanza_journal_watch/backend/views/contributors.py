@@ -487,7 +487,7 @@ def issue_invite_accept(request, token):
         and contributor.user_id == request.user.pk
         and contributor.status == IssueContributor.Status.ACTIVE
     ):
-        context["status"] = "accepted"
+        context.update(_accepted_invite_context(contributor))
         context["status_message"] = "Invite already accepted. You already have access."
         return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
 
@@ -575,10 +575,16 @@ def issue_invite_accept(request, token):
     except Exception:
         pass  # Welcome email is best-effort; don't block acceptance
 
-    planka_base_url = getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", "")
-    context["status"] = "accepted"
+    context.update(_accepted_invite_context(contributor))
     context["status_message"] = "Invite accepted. Your access is now active."
-    context["issue"] = contributor.issue
-    context["planka_base_url"] = planka_base_url
-    context["is_coordinator"] = contributor.role == IssueContributor.Role.COORDINATOR
     return render(request, "backend/invites/accept_issue_contributor_invite.html", context)
+
+
+def _accepted_invite_context(contributor):
+    # Shared by first acceptance and later visits, so both offer the way into Planka.
+    return {
+        "status": "accepted",
+        "issue": contributor.issue,
+        "planka_base_url": getattr(settings, "PLANKA_EXTERNAL_URL", "") or getattr(settings, "PLANKA_BASE_URL", ""),
+        "is_coordinator": contributor.role == IssueContributor.Role.COORDINATOR,
+    }
