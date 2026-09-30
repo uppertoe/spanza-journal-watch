@@ -129,3 +129,18 @@
   }
 }
 
+/* ── CPD hint under full-text links ───────────────────── */
+// Hidden unless tracking is on; the body attribute follows the profile toggle live.
+
+.jw-cpd-hint {
+  display: none;
+  flex-basis: 100%;
+  order: 99;
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}
+
+body[data-cpd-tracking-enabled] .jw-cpd-hint {
+  display: block;
+}

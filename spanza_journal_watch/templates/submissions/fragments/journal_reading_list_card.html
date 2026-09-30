@@ -87,6 +87,7 @@
       {% elif item.article.pubmed_url %}
         <a class="btn btn-sm btn-outline-primary" href="{{ item.article.pubmed_url }}" target="_blank" rel="noopener noreferrer">PubMed</a>
       {% endif %}
+      {% if item.article.article_url %}{% include "fragments/cpd_hint.html" %}{% endif %}
     </div>
 
     {% if item.review %}

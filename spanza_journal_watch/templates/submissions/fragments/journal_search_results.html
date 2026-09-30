@@ -16,7 +16,7 @@
           {% if link.article.abstract %}
             <p class="text-muted small mb-2" style="max-width: 60ch;">{{ link.article.abstract|truncatechars:200 }}</p>
           {% endif %}
-          <div class="d-flex gap-2">
+          <div class="d-flex flex-wrap gap-2">
             {% if link.article.article_url %}
               <a class="btn btn-sm btn-outline-primary jw-action-btn--fulltext" href="{{ link.article.article_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ link.article.pk }}">
                 <span class="jw-action-btn__sizer" aria-hidden="true"><svg class="bi me-1" width="0.85em" height="0.85em"><use href="#icon-check"></use></svg>Full text</span>
@@ -27,6 +27,7 @@
             {% elif link.article.pubmed_url %}
               <a class="btn btn-sm btn-outline-primary" href="{{ link.article.pubmed_url }}" target="_blank" rel="noopener noreferrer" data-cpd-article-id="{{ link.article.pk }}">PubMed</a>
             {% endif %}
+            {% if link.article.article_url %}{% include "fragments/cpd_hint.html" %}{% endif %}
           </div>
         </div>
       </div>
