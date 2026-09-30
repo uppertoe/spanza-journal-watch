@@ -1771,11 +1771,10 @@ document.body.addEventListener('htmx:afterSettle', (event) => {
     container.prepend(svg);
   }
 
-  // Record click + show checkmark immediately (before next server render)
+  // Record click + show checkmark immediately (before next server render).
+  // Any full-text link counts, including those on reviews, not only the journal browser's buttons.
   document.addEventListener('click', function (e) {
-    var link = e.target.closest(
-      '.jw-action-btn--fulltext[data-cpd-article-id]',
-    );
+    var link = e.target.closest('a[data-cpd-article-id]');
     if (!link) return;
 
     var articleId = Number(link.dataset.cpdArticleId);
