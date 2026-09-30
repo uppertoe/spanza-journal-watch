@@ -32,7 +32,13 @@ from .issue_context import _build_card_payload_hash
 from .planka_boards import _build_planka_scope_counts, _filter_board_cards_by_scope
 from .planka_cards import _build_pubmed_article_citation, _extract_planka_review_body
 from .planka_panels import _render_planka_panel
-from .shared import _bool_from_value, _is_planka_board_not_found_error, _is_planka_connection_error, _safe_planka_error
+from .shared import (
+    _bool_from_value,
+    _check_coordinator_issue_access,
+    _is_planka_board_not_found_error,
+    _is_planka_connection_error,
+    _safe_planka_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -523,6 +529,7 @@ def planka_card_update_webhook(request):
 def planka_card_revisions(request, issue_id, card_id):
     """Return an HTML partial listing revisions for a given card."""
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     revisions = list(PlankaCardRevision.objects.filter(binding=binding, card_id=card_id).order_by("-created")[:100])
 
@@ -561,6 +568,7 @@ def planka_card_revision_restore(request, issue_id, revision_id):
         return HttpResponseBadRequest("POST only")
 
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     revision = get_object_or_404(PlankaCardRevision, pk=revision_id, binding=binding)
 

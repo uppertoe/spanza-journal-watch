@@ -137,6 +137,43 @@ def _panel_role_from_request(request, contributor=None):
     return IssueContributor.Role.REVIEWER
 
 
+def _grant_contributor_permissions(user, contributor):
+    """Grant the global permissions a contributor's role needs; issue scoping comes from the contributor rows."""
+    from django.contrib.auth.models import Permission
+
+    # All accepted contributors get access to the editorial landing page.
+    # Recommending articles only needs a signed-in account.
+    perms_to_grant = [
+        ("submissions", "invited_contributor"),
+    ]
+    # Coordinators also get backend access
+    if contributor.role == IssueContributor.Role.COORDINATOR:
+        perms_to_grant += [
+            ("submissions", "regional_coordinator"),
+            ("submissions", "manage_issue_builder"),
+        ]
+
+    granted_count = 0
+    for app_label, codename in perms_to_grant:
+        try:
+            perm = Permission.objects.get(content_type__app_label=app_label, codename=codename)
+            user.user_permissions.add(perm)
+            granted_count += 1
+        except Permission.DoesNotExist:
+            logger.error(
+                "Permission %s.%s not found when granting contributor access — run migrations to create it.",
+                app_label,
+                codename,
+            )
+    # Clear Django's per-request permission cache so subsequent has_perm() calls
+    # in this same request see the newly granted permissions.
+    for attr in ("_perm_cache", "_user_perm_cache"):
+        user.__dict__.pop(attr, None)
+    if contributor.role == IssueContributor.Role.COORDINATOR and granted_count and not user.is_staff:
+        user.is_staff = True
+        user.save(update_fields=["is_staff"])
+
+
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
 def contributor_author_lookup(request):
@@ -170,11 +207,13 @@ def issue_add_contributor(request, issue_id):
 
     # Collect rows: name_0/email_0, name_1/email_1, ...
     role = request.POST.get("role", "")
+    if role not in IssueContributor.Role.values:
+        return HttpResponseBadRequest("Bad Request - unknown role")
     rows = []
     i = 0
     while True:
         name = request.POST.get(f"name_{i}", "").strip()
-        email = request.POST.get(f"email_{i}", "").strip()
+        email = request.POST.get(f"email_{i}", "").strip().lower()
         if not name and not email:
             break
         rows.append((i, name, email))
@@ -208,12 +247,26 @@ def issue_add_contributor(request, issue_id):
         )
 
         if not created:
+            # One row per person per issue: a coordinator already has everything a
+            # reviewer has, so the reviewers form must never demote them.
+            if contributor.role == IssueContributor.Role.COORDINATOR and role != IssueContributor.Role.COORDINATOR:
+                messages.info(
+                    request,
+                    f"{contributor.name or contributor.email} is already a coordinator for this issue with full "
+                    "reviewing rights; only users without existing access need be added here.",
+                )
+                continue
+
+            promoted = contributor.role != role
             contributor.name = name
             contributor.role = role
             if contributor.status not in (
                 IssueContributor.Status.ACTIVE,
                 IssueContributor.Status.INVITED,
             ):
+                contributor.status = IssueContributor.Status.PENDING
+            elif promoted and not (contributor.status == IssueContributor.Status.ACTIVE and contributor.user_id):
+                # An outstanding reviewer invite described the wrong role; queue a coordinator invite instead.
                 contributor.status = IssueContributor.Status.PENDING
             contributor.planka_sync_state = IssueContributor.PlankaSyncState.PENDING
             contributor.planka_last_error = ""
@@ -227,6 +280,9 @@ def issue_add_contributor(request, issue_id):
                     "modified",
                 ]
             )
+            if promoted and contributor.status == IssueContributor.Status.ACTIVE:
+                # Already signed in and accepted as a reviewer, so no invite is needed.
+                _grant_contributor_permissions(contributor.user, contributor)
 
         # Link to existing Author by email, or create one if affiliation is provided.
         if not contributor.author:
@@ -517,44 +573,7 @@ def issue_invite_accept(request, token):
             request.user.name = contributor_name
             request.user.save(update_fields=["name"])
 
-        # Grant permissions based on contributor role
-        import logging
-
-        from django.contrib.auth.models import Permission as DjangoPerm
-
-        logger = logging.getLogger(__name__)
-
-        # All accepted contributors get access to the editorial landing page.
-        # Recommending articles only needs a signed-in account.
-        perms_to_grant = [
-            ("submissions", "invited_contributor"),
-        ]
-        # Coordinators also get backend access
-        if contributor.role == IssueContributor.Role.COORDINATOR:
-            perms_to_grant += [
-                ("submissions", "regional_coordinator"),
-                ("submissions", "manage_issue_builder"),
-            ]
-
-        granted_count = 0
-        for app_label, codename in perms_to_grant:
-            try:
-                perm = DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename)
-                request.user.user_permissions.add(perm)
-                granted_count += 1
-            except DjangoPerm.DoesNotExist:
-                logger.error(
-                    "Permission %s.%s not found when accepting invite — run migrations to create it.",
-                    app_label,
-                    codename,
-                )
-        # Clear Django's per-request permission cache so subsequent has_perm() calls
-        # in this same request see the newly granted permissions.
-        for attr in ("_perm_cache", "_user_perm_cache"):
-            request.user.__dict__.pop(attr, None)
-        if contributor.role == IssueContributor.Role.COORDINATOR and granted_count and not request.user.is_staff:
-            request.user.is_staff = True
-            request.user.save(update_fields=["is_staff"])
+        _grant_contributor_permissions(request.user, contributor)
 
     # Mark the user's email as verified — the invite link is proof of email ownership.
     from allauth.account.models import EmailAddress

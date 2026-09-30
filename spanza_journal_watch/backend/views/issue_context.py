@@ -137,6 +137,7 @@ def _issue_builder_base_context(
         "issue_contributors": [],
         "issue_coordinators": [],
         "issue_reviewers": [],
+        "issue_reviewing_coordinators": [],
         "issue_contributor_invite_form": issue_contributor_invite_form or IssueContributorInviteForm(),
         "issue_invite_ttl_days": _issue_invite_ttl_days(),
         "all_health_services": list(HealthService.objects.order_by("name").values_list("name", flat=True)),
@@ -175,5 +176,9 @@ def _issue_builder_base_context(
         context["issue_contributors"] = all_contributors
         context["issue_coordinators"] = [c for c in all_contributors if c.role == IssueContributor.Role.COORDINATOR]
         context["issue_reviewers"] = [c for c in all_contributors if c.role == IssueContributor.Role.REVIEWER]
+        # Coordinators review too, so the reviewers panel names them rather than listing them twice.
+        context["issue_reviewing_coordinators"] = [
+            c for c in context["issue_coordinators"] if c.status != IssueContributor.Status.REVOKED
+        ]
 
     return context

@@ -429,6 +429,13 @@ class TestPlankaCardRevisionsView:
         assert response.context["current_description"] == "Current description"
         assert len(response.context["revisions"]) == 1
 
+    def test_coordinator_of_another_issue_is_refused(self):
+        issue = make_issue()
+        make_binding(issue)
+        client = make_staff_client(extra_permissions=["submissions.regional_coordinator"])
+        response = client.get(self._url(issue.pk, "card-1"))
+        assert response.status_code == 403
+
     def test_planka_fetch_error_shows_gracefully(self):
         issue = make_issue()
         make_binding(issue)

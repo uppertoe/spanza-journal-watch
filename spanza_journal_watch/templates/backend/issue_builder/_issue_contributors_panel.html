@@ -9,6 +9,12 @@
     <p class="text-muted small mb-3">
       Add each reviewer, then send the invites. Links stay valid for {{ issue_invite_ttl_days }} days.
     </p>
+    {% if issue_reviewing_coordinators %}
+      <p class="text-muted small mb-3">
+        The coordinators for this issue already have full reviewing rights and do not need to be added here:
+        {% for coordinator in issue_reviewing_coordinators %}{% if not forloop.first %}{% if forloop.last %} and {% else %}, {% endif %}{% endif %}{{ coordinator.name|default:coordinator.email }}{% endfor %}.
+      </p>
+    {% endif %}
 
     {% if not planka_binding %}
       {% if not is_coordinator_only %}

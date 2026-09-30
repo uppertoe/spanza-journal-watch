@@ -443,6 +443,108 @@ class TestIssueAddContributor:
         contributor = IssueContributor.objects.get(issue=issue, email="linked@example.com")
         assert contributor.author_id == author.pk
 
+    def test_reviewer_form_never_demotes_a_coordinator(self, issue):
+        coordinator = IssueContributor.objects.create(
+            issue=issue,
+            email="coord@example.com",
+            name="Dr Coord",
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.ACTIVE,
+        )
+        client, _ = manager_client()
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ) as sync:
+            url = reverse("backend:issue_add_contributor", kwargs={"issue_id": issue.pk})
+            response = client.post(
+                url,
+                data={"role": "reviewer", "name_0": "Dr Coord", "email_0": "Coord@Example.com"},
+                headers={"HX-Request": "true"},
+            )
+        coordinator.refresh_from_db()
+        assert coordinator.role == IssueContributor.Role.COORDINATOR
+        assert coordinator.status == IssueContributor.Status.ACTIVE
+        assert not sync.called
+        assert IssueContributor.objects.filter(issue=issue).count() == 1
+        assert "already a coordinator for this issue with full reviewing rights" in response.content.decode()
+
+    def test_promoting_an_active_reviewer_grants_coordinator_access(self, issue):
+        reviewer_user = UserFactory(email="rev@example.com")
+        reviewer = IssueContributor.objects.create(
+            issue=issue,
+            email="rev@example.com",
+            name="Dr Rev",
+            role=IssueContributor.Role.REVIEWER,
+            status=IssueContributor.Status.ACTIVE,
+            user=reviewer_user,
+        )
+        client, _ = manager_client()
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
+            self._post(
+                client,
+                issue,
+                role=IssueContributor.Role.COORDINATOR,
+                panel_role=IssueContributor.Role.COORDINATOR,
+                name_0="Dr Rev",
+                email_0="rev@example.com",
+            )
+        reviewer.refresh_from_db()
+        reviewer_user.refresh_from_db()
+        assert reviewer.role == IssueContributor.Role.COORDINATOR
+        assert reviewer.status == IssueContributor.Status.ACTIVE
+        assert reviewer_user.has_perm("submissions.regional_coordinator")
+        assert reviewer_user.has_perm("submissions.manage_issue_builder")
+        assert reviewer_user.is_staff
+
+    def test_promoting_an_invited_reviewer_queues_a_coordinator_invite(self, issue):
+        reviewer = IssueContributor.objects.create(
+            issue=issue,
+            email="rev@example.com",
+            name="Dr Rev",
+            role=IssueContributor.Role.REVIEWER,
+            status=IssueContributor.Status.INVITED,
+        )
+        client, _ = manager_client()
+        with patch(
+            "spanza_journal_watch.backend.views.planka_boards._sync_contributor_to_planka", return_value=(True, "")
+        ):
+            self._post(
+                client,
+                issue,
+                role=IssueContributor.Role.COORDINATOR,
+                panel_role=IssueContributor.Role.COORDINATOR,
+                name_0="Dr Rev",
+                email_0="rev@example.com",
+            )
+        reviewer.refresh_from_db()
+        assert reviewer.role == IssueContributor.Role.COORDINATOR
+        assert reviewer.status == IssueContributor.Status.PENDING
+
+    def test_unknown_role_returns_400(self, issue):
+        client, _ = manager_client()
+        response = self._post(client, issue, role="editor")
+        assert response.status_code == 400
+        assert not IssueContributor.objects.filter(issue=issue).exists()
+
+    def test_reviewers_panel_names_coordinators(self, issue):
+        from spanza_journal_watch.backend.models import PlankaIssueBinding
+
+        PlankaIssueBinding.objects.create(issue=issue, project_id="p", board_id="b")
+        IssueContributor.objects.create(
+            issue=issue,
+            email="coord@example.com",
+            name="Dr Coord",
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.ACTIVE,
+        )
+        client, _ = editor_client()
+        response = client.get(reverse("backend:issue_reviewers") + f"?issue={issue.pk}")
+        html = response.content.decode()
+        assert "already have full reviewing rights and do not need to be added here" in html
+        assert "Dr Coord." in html
+
     def test_get_returns_400(self, issue):
         client, _ = manager_client()
         url = reverse("backend:issue_add_contributor", kwargs={"issue_id": issue.pk})
