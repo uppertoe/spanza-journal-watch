@@ -29,7 +29,7 @@
             </td>
             <td class="text-end">
               {% if report.status == "ready" and report.file %}
-                <a href="{% url 'cpd:download' report.pk %}" class="btn btn-sm btn-outline-primary">Download</a>
+                <a href="{% url 'cpd:download' report.pk %}" class="btn btn-sm btn-outline-primary" download>Download</a>
               {% endif %}
             </td>
           </tr>
