@@ -1,0 +1,45 @@
+/* ── Invite status bar on the reviewers and coordinators panels ── */
+// Same language as the intake send bar: amber while anyone is still waiting for a first invite.
+
+.invite-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+
+  &.is-attention {
+    background: var(--bs-warning-bg-subtle);
+    border-color: var(--bs-warning-border-subtle);
+  }
+
+  &.is-calm .invite-bar__status b {
+    color: var(--bs-success-text-emphasis);
+  }
+}
+
+.invite-bar__status {
+  display: grid;
+  flex: 1 1 18rem;
+  min-width: 0;
+  line-height: 1.25;
+
+  b {
+    font-size: 0.95rem;
+  }
+
+  span {
+    color: var(--bs-secondary-color);
+    font-size: 0.78rem;
+  }
+}
+
+.invite-bar__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.4rem;
+}

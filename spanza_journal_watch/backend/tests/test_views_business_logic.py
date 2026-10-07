@@ -604,6 +604,61 @@ class TestIssueSendContributorInvites:
         # Status should still be REVOKED
         assert revoked.status == IssueContributor.Status.REVOKED
 
+    def test_resend_never_touches_an_accepted_contributor(self, issue):
+        accepted = IssueContributor.objects.create(
+            issue=issue,
+            email="accepted@example.com",
+            name="Dr Accepted",
+            status=IssueContributor.Status.ACTIVE,
+        )
+        client, _ = manager_client()
+        url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email") as send:
+            response = client.post(url, data={"contributor_ids": [accepted.pk]}, headers={"HX-Request": "true"})
+        accepted.refresh_from_db()
+        assert accepted.status == IssueContributor.Status.ACTIVE
+        assert not send.called
+        assert "Dr Accepted has already accepted and has access, so no invite was sent." in response.content.decode()
+
+    def test_send_all_pending_only_invites_the_not_yet_invited(self, issue, contributor):
+        pending = IssueContributor.objects.create(
+            issue=issue, email="new@example.com", status=IssueContributor.Status.PENDING
+        )
+        client, _ = manager_client()
+        url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})
+        with patch("spanza_journal_watch.backend.views.contributors._send_issue_invite_email") as send:
+            client.post(url, data={"send_all_pending": "1", "panel_role": "reviewer"})
+        pending.refresh_from_db()
+        assert pending.status == IssueContributor.Status.INVITED
+        assert send.call_count == 1
+
+    def test_panel_flags_reviewers_not_yet_invited(self, issue):
+        from spanza_journal_watch.backend.models import PlankaIssueBinding
+
+        PlankaIssueBinding.objects.create(issue=issue, project_id="p", board_id="b")
+        for email in ("a@example.com", "b@example.com"):
+            IssueContributor.objects.create(issue=issue, email=email, status=IssueContributor.Status.PENDING)
+        accepted = IssueContributor.objects.create(
+            issue=issue, email="c@example.com", status=IssueContributor.Status.ACTIVE
+        )
+        client, _ = editor_client()
+        html = client.get(reverse("backend:issue_reviewers") + f"?issue={issue.pk}").content.decode()
+        assert "2 reviewers have been added but not yet invited." in html
+        assert "Send 2 invites" in html
+        assert html.count(">Not invited</span>") == 2
+        # Nobody is waiting on an outstanding invite, so there is nothing to resend and no tick boxes.
+        assert "Resend to selected" not in html
+        assert f'value="{accepted.pk}"' not in html
+
+    def test_panel_offers_resend_only_for_outstanding_invites(self, issue, contributor):
+        IssueContributor.objects.create(issue=issue, email="c@example.com", status=IssueContributor.Status.ACTIVE)
+        client, _ = editor_client()
+        html = client.get(reverse("backend:issue_reviewers") + f"?issue={issue.pk}").content.decode()
+        assert "Every reviewer has been invited." in html
+        assert "1 has accepted and 1 has not yet responded." in html
+        assert "Resend to selected" in html
+        assert html.count('name="contributor_ids"') == 1
+
     def test_no_ids_selected_shows_error(self, issue):
         client, _ = manager_client()
         url = reverse("backend:issue_send_contributor_invites", kwargs={"issue_id": issue.pk})

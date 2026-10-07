@@ -91,6 +91,15 @@ def _get_planka_project_private(project_id):
     return value
 
 
+def _invite_summary(contributors):
+    """Counts behind the invite status bar on the reviewers and coordinators panels."""
+    statuses = [c.status for c in contributors]
+    pending = statuses.count(IssueContributor.Status.PENDING)
+    waiting = statuses.count(IssueContributor.Status.INVITED) + statuses.count(IssueContributor.Status.EXPIRED)
+    active = statuses.count(IssueContributor.Status.ACTIVE)
+    return {"pending": pending, "waiting": waiting, "active": active, "total": pending + waiting + active}
+
+
 def _issue_builder_base_context(
     issue=None,
     review_form=None,
@@ -138,6 +147,8 @@ def _issue_builder_base_context(
         "issue_coordinators": [],
         "issue_reviewers": [],
         "issue_reviewing_coordinators": [],
+        "reviewer_invite_summary": _invite_summary([]),
+        "coordinator_invite_summary": _invite_summary([]),
         "issue_contributor_invite_form": issue_contributor_invite_form or IssueContributorInviteForm(),
         "issue_invite_ttl_days": _issue_invite_ttl_days(),
         "all_health_services": list(HealthService.objects.order_by("name").values_list("name", flat=True)),
@@ -176,6 +187,8 @@ def _issue_builder_base_context(
         context["issue_contributors"] = all_contributors
         context["issue_coordinators"] = [c for c in all_contributors if c.role == IssueContributor.Role.COORDINATOR]
         context["issue_reviewers"] = [c for c in all_contributors if c.role == IssueContributor.Role.REVIEWER]
+        context["reviewer_invite_summary"] = _invite_summary(context["issue_reviewers"])
+        context["coordinator_invite_summary"] = _invite_summary(context["issue_coordinators"])
         # Coordinators review too, so the reviewers panel names them rather than listing them twice.
         context["issue_reviewing_coordinators"] = [
             c for c in context["issue_coordinators"] if c.status != IssueContributor.Status.REVOKED

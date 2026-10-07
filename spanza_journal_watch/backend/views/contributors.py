@@ -332,13 +332,22 @@ def issue_send_contributor_invites(request, issue_id):
             status=IssueContributor.Status.PENDING,
         )
         if not contributors.exists():
-            messages.info(request, "No pending reviewers to invite.")
+            messages.info(request, f"No {panel_role}s are waiting for a first invite.")
             return _render_issue_contributors_panel(request, issue, role=panel_role)
     elif contributor_ids:
-        contributors = IssueContributor.objects.filter(
-            issue=issue,
-            pk__in=contributor_ids,
-        ).exclude(status=IssueContributor.Status.REVOKED)
+        contributors = list(
+            IssueContributor.objects.filter(
+                issue=issue,
+                pk__in=contributor_ids,
+            ).exclude(status=IssueContributor.Status.REVOKED)
+        )
+        # A fresh invite would reset an accepted contributor to invited and cut off their access.
+        for contributor in [c for c in contributors if c.status == IssueContributor.Status.ACTIVE]:
+            messages.info(
+                request,
+                f"{contributor.name or contributor.email} has already accepted and has access, so no invite was sent.",
+            )
+        contributors = [c for c in contributors if c.status != IssueContributor.Status.ACTIVE]
     else:
         messages.error(request, "No contributors selected.")
         return _render_issue_contributors_panel(request, issue, role=panel_role)

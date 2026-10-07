@@ -69,6 +69,14 @@ def normalize_html(html: str) -> str:
         "__DATE__",
         normalized,
     )
+    # Month pickers (the intake range) default from fixture dates that are shifted
+    # forward in whole weeks, so the selected month rolls over at month boundaries.
+    normalized = re.sub(
+        r"<select[^>]*name=\"[^\"]*_month_month\"[^>]*>.*?</select>",
+        lambda m: re.sub(r"\s+selected\b|\s+(?=>)", "", m.group(0)),
+        normalized,
+        flags=re.DOTALL,
+    )
     main_match = re.search(r"<main[^>]*>.*?</main>", normalized, flags=re.IGNORECASE | re.DOTALL)
     if main_match:
         normalized = main_match.group(0)

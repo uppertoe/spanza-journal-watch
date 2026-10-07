@@ -1,0 +1,37 @@
+{# Invite status bar at the top of a contributor table. Sits inside the send-invites form. #}
+{# Expects: summary (from _invite_summary), noun ("reviewer" or "coordinator"), reach_text, resend_btn_id, panel_target. #}
+{% if summary.total %}
+<div class="invite-bar{% if summary.pending %} is-attention{% else %} is-calm{% endif %}">
+  <div class="invite-bar__status">
+    {% if summary.pending %}
+      <b>{{ summary.pending }} {{ noun }}{{ summary.pending|pluralize }} {{ summary.pending|pluralize:"has,have" }} been added but not yet invited.</b>
+      <span>{{ reach_text }}</span>
+    {% elif summary.waiting %}
+      <b>Every {{ noun }} has been invited.</b>
+      <span>{{ summary.active }} {{ summary.active|pluralize:"has,have" }} accepted and {{ summary.waiting }} {{ summary.waiting|pluralize:"has,have" }} not yet responded. To send a fresh link, tick the {{ noun }} and choose Resend to selected.</span>
+    {% else %}
+      <b>Every {{ noun }} has accepted their invite.</b>
+    {% endif %}
+  </div>
+  <div class="invite-bar__actions">
+    {% if summary.waiting %}
+      <button
+        type="button"
+        class="btn btn-outline-primary btn-sm"
+        id="{{ resend_btn_id }}"
+        hx-post="{% url "backend:issue_send_contributor_invites" selected_issue.pk %}"
+        hx-include="closest form"
+        hx-target="{{ panel_target }}"
+        hx-swap="outerHTML"
+        hx-confirm="Send a fresh invite to the selected {{ noun }}s? Their earlier invite links will stop working."
+        disabled
+      >Resend to selected</button>
+    {% endif %}
+    {% if summary.pending %}
+      <button type="submit" name="send_all_pending" value="1" class="btn btn-primary btn-sm">
+        {% if summary.pending == 1 %}Send invite{% else %}Send {{ summary.pending }} invites{% endif %}
+      </button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

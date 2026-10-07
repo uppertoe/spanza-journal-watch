@@ -98,12 +98,14 @@
       {% csrf_token %}
       <input type="hidden" name="panel_role" value="reviewer">
 
+      {% include "backend/issue_builder/_contributor_invite_bar.html" with summary=reviewer_invite_summary noun="reviewer" reach_text="Reviewers cannot reach the Planka board until they accept their invite." resend_btn_id="resend-selected-btn" panel_target="#issue-contributors-panel" %}
+
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
           <thead>
             <tr>
               <th style="width:2rem">
-                <input type="checkbox" id="contributor-select-all-table" class="form-check-input">
+                {% if reviewer_invite_summary.waiting %}<input type="checkbox" id="contributor-select-all-table" class="form-check-input" aria-label="Select everyone waiting on an invite">{% endif %}
               </th>
               <th>Name</th>
               <th>Email</th>
@@ -119,7 +121,7 @@
             {% for contributor in issue_reviewers %}
               <tr>
                 <td>
-                  {% if contributor.status != "revoked" %}
+                  {% if contributor.status == "invited" or contributor.status == "expired" %}
                     <input
                       type="checkbox"
                       name="contributor_ids"
@@ -141,7 +143,7 @@
                   {% elif contributor.status == "invited" %}
                     <span class="badge text-bg-info">Invited</span>
                   {% else %}
-                    <span class="badge text-bg-light text-dark border">Pending</span>
+                    <span class="badge text-bg-warning">Not invited</span>
                   {% endif %}
                 </td>
                 <td>
@@ -200,21 +202,6 @@
         </table>
       </div>
 
-      <div class="d-flex justify-content-end gap-2 mt-2">
-        <button
-          type="submit"
-          name="send_all_pending"
-          value="1"
-          class="btn btn-primary btn-sm"
-          id="send-initial-invites-btn"
-        >Send initial invites</button>
-        <button
-          type="submit"
-          class="btn btn-outline-primary btn-sm"
-          id="resend-selected-btn"
-          disabled
-        >Resend to selected</button>
-      </div>
     </form>
 
   </div>
