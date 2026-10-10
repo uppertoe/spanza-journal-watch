@@ -1,5 +1,6 @@
 from allauth.account.views import LoginView as AllauthLoginView
 from allauth.account.views import SignupView as AllauthSignupView
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -119,6 +120,31 @@ class InviteAwareSignupView(AllauthSignupView):
 invite_aware_signup_view = InviteAwareSignupView.as_view()
 
 
+# Field the sign-in form hides from people; form-filling bots complete it.
+HONEYPOT_FIELD = "jw_hp_extra"
+
+
+def _new_signup_allowed():
+    """Cap new accounts site-wide per clock hour.
+
+    A per-IP limit is not possible yet: behind Cloudflare and Caddy every request
+    reaches Django from the proxy's address. The cap stops a bot from creating
+    accounts (and sending verification emails) at volume.
+    """
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    limit = getattr(settings, "SIGNUP_HOURLY_LIMIT", 30)
+    key = f"users:new-signups:{timezone.now():%Y%m%d%H}"
+    cache.add(key, 0, timeout=2 * 60 * 60)
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        # The dummy cache used in local development keeps nothing.
+        return True
+    return count <= limit
+
+
 @require_POST
 def email_start(request):
     """One email field that covers both sign-in and sign-up.
@@ -134,6 +160,10 @@ def email_start(request):
     from django.core.validators import validate_email
     from django.shortcuts import redirect
 
+    if request.POST.get(HONEYPOT_FIELD):
+        # Only a bot fills the hidden field. Return to the form without saying why.
+        return redirect("account_login")
+
     email = (request.POST.get("email") or "").strip()
     try:
         validate_email(email)
@@ -146,5 +176,8 @@ def email_start(request):
 
     if not get_adapter(request).is_open_for_signup(request):
         messages.error(request, "There is no account for that address, and registration is closed.")
+        return redirect("account_login")
+    if not _new_signup_allowed():
+        messages.error(request, "We are not able to create new accounts at the moment. Please try again in an hour.")
         return redirect("account_login")
     return invite_aware_signup_view(request)

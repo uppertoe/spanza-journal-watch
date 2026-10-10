@@ -30,6 +30,11 @@
              value="{{ form.login.value|default:'' }}">
     </div>
   {% endif %}
+  {# Honeypot: hidden from people and screen readers; form-filling bots complete it. #}
+  <div class="jw-hp" aria-hidden="true">
+    <label for="id_jw_hp_extra">Leave this field empty</label>
+    <input type="text" name="jw_hp_extra" id="id_jw_hp_extra" tabindex="-1" autocomplete="off" value="">
+  </div>
   {% if redirect_field_value %}
     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
   {% endif %}

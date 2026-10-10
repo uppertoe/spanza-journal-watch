@@ -301,6 +301,48 @@ class TestSignInByCode:
         assert response.status_code == 302
         assert response.url == reverse("account_login")
 
+    def test_start_ignores_a_filled_honeypot(self, client):
+        from django.contrib.auth import get_user_model
+
+        mail.outbox.clear()
+        response = client.post(
+            reverse("users:start"), {"email": "bot@formtests.example", "jw_hp_extra": "http://spam.example"}
+        )
+        assert response.status_code == 302
+        assert response.url == reverse("account_login")
+        assert not get_user_model().objects.filter(email="bot@formtests.example").exists()
+        assert not mail.outbox
+
+    def test_login_page_carries_the_honeypot(self, client):
+        body = client.get(reverse("account_login")).content.decode()
+        assert 'name="jw_hp_extra"' in body
+
+    def test_start_caps_new_accounts_per_hour(self, client, settings):
+        from django.contrib.auth import get_user_model
+        from django.core.cache import cache
+
+        cache.clear()
+        settings.SIGNUP_HOURLY_LIMIT = 1
+        client.post(reverse("users:start"), {"email": "first@example.org"})
+        mail.outbox.clear()
+        response = client.post(reverse("users:start"), {"email": "second@example.org"}, follow=True)
+        assert not get_user_model().objects.filter(email="second@example.org").exists()
+        assert not mail.outbox
+        assert "We are not able to create new accounts at the moment." in response.content.decode()
+        cache.clear()
+
+    def test_cap_does_not_stop_existing_members_signing_in(self, client, settings):
+        from allauth.account.models import EmailAddress
+        from django.core.cache import cache
+
+        cache.clear()
+        settings.SIGNUP_HOURLY_LIMIT = 0
+        user = UserFactory(email="member@example.org")
+        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+        response = client.post(reverse("users:start"), {"email": "member@example.org"})
+        assert response.url == reverse("account_confirm_login_code")
+        cache.clear()
+
 
 def _extract_code(body):
     """allauth prints the code on its own line in the plain-text email."""

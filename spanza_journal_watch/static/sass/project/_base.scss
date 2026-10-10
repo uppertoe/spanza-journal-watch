@@ -112,3 +112,11 @@ p br {
   --bs-btn-active-border-color: #2f536f;
 }
 
+// Sign-in honeypot: off-screen rather than display:none, which some bots skip.
+.jw-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
