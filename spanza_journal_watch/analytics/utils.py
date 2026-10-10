@@ -134,9 +134,11 @@ _CHROMIUM_ANCHOR_MAJOR = 100
 _CHROMIUM_ANCHOR_DATE = datetime.date(2022, 3, 29)
 _CHROMIUM_RELEASE_CADENCE_DAYS = 28
 # Majors behind the estimated current release before a Chromium UA counts as
-# stale. Thirty majors is roughly two and a half years; real installs that old
-# are rare, and interactors are protected by the sweeper regardless.
-STALE_CHROMIUM_MAJORS_BEHIND = 30
+# stale. In 2026-10, visitors who had taken a deliberate action ran 4 to 12
+# majors behind the estimate (which leads the real release by about five), while
+# a fleet on Chrome 144 sat 15 behind. Fourteen leaves a margin above the
+# oldest real reader, and interactors are protected by the sweeper regardless.
+STALE_CHROMIUM_MAJORS_BEHIND = 14
 # iOS releases before this are no longer able to run a current Safari or Chrome.
 STALE_IOS_MAJOR_BEFORE = 15
 

@@ -9,7 +9,6 @@ from django.utils.functional import cached_property
 from django.views.generic import ListView
 from view_breadcrumbs import BaseBreadcrumbMixin
 
-from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.layout.models import PageHeader
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HtmxMixin, SidebarMixin
@@ -162,43 +161,19 @@ class SearchView(AnonymousCacheMixin, BaseBreadcrumbMixin, SidebarMixin, HtmxMix
         params.pop("page", None)
         context["filter_query_string"] = params.urlencode()
 
-        self._record_search_event(
-            query=query,
-            selected_year=selected_year,
-            selected_tags=selected_tags,
-            result_count=result_count,
-            is_browse_mode=context["is_browse_mode"],
-        )
-
-        return context
-
-    def _record_search_event(self, *, query, selected_year, selected_tags, result_count, is_browse_mode):
-        if not any([query, selected_year, selected_tags]):
-            return
-
-        signature = json.dumps(
+        # The page's script sends the search event, so crawlers that never run
+        # scripts are not counted, and searches served from the cache still are.
+        has_search = any([query, selected_year, selected_tags])
+        context["search_analytics"] = (
             {
-                "query": query,
-                "year": selected_year,
-                "tags": selected_tags,
-            },
-            sort_keys=True,
-        )
-        session_key = "analytics:last_search_signature"
-        if self.request.session.get(session_key) == signature:
-            return
-
-        self.request.session[session_key] = signature
-        AnalyticsEvent.record_event(
-            event_type=AnalyticsEvent.EventType.SEARCH,
-            request=self.request,
-            subscriber_id=self.request.session.get("subscriber_id"),
-            source="search_page",
-            metadata={
                 "query": query,
                 "selected_year": selected_year,
                 "selected_tags": selected_tags,
                 "result_count": result_count,
-                "is_browse_mode": is_browse_mode,
-            },
+                "is_browse_mode": context["is_browse_mode"],
+            }
+            if has_search
+            else None
         )
+
+        return context

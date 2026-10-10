@@ -299,6 +299,40 @@ const sendPageLoadEvent = () => {
 };
 sendPageLoadEvent();
 
+// Searches are sent from the page rather than recorded by the server, so a
+// crawler that fetches /search without running scripts is not counted, and a
+// search served from the cache still is. Paging through the same results is
+// not counted twice.
+(function () {
+  let lastSignature = null;
+  const sendSearchEvent = () => {
+    const el = document.getElementById('search-analytics');
+    if (!el) return;
+    let metadata;
+    try {
+      metadata = JSON.parse(el.textContent);
+    } catch (_e) {
+      return;
+    }
+    const signature = JSON.stringify([
+      metadata.query,
+      metadata.selected_year,
+      metadata.selected_tags,
+    ]);
+    if (signature === lastSignature) return;
+    lastSignature = signature;
+    sendAnalyticsEvent({
+      event_type: 'search',
+      source: 'search_page',
+      metadata,
+    });
+  };
+  sendSearchEvent();
+  document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (event.detail?.target?.id === 'search-results') sendSearchEvent();
+  });
+})();
+
 // CSRF for htmx: read the cookie at request time rather than baking a token
 // into the markup, which would go stale once pages are CDN-cached. The cookie
 // is minted/refreshed by the page-load beacon response above.

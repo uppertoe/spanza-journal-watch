@@ -138,7 +138,7 @@ def test_track_event_with_subscriber_session_records_known_subscriber_confidence
     assert event.human_confidence == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
 
 
-def test_search_page_records_search_analytics_event(client):
+def test_search_page_hands_the_search_to_the_page_script(client):
     if connection.vendor != "postgresql":
         pytest.skip("Search analytics route test requires PostgreSQL full-text search support.")
 
@@ -147,9 +147,17 @@ def test_search_page_records_search_analytics_event(client):
     response = client.get(reverse("submissions:search"), {"q": "analytics"})
 
     assert response.status_code == 200
-    event = AnalyticsEvent.objects.get(event_type=AnalyticsEvent.EventType.SEARCH)
-    assert event.metadata["query"] == "analytics"
-    assert event.source == "search_page"
+    # Rendering the page records nothing; the page's script sends the event.
+    assert not AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.SEARCH).exists()
+    assert response.context["search_analytics"]["query"] == "analytics"
+    assert 'id="search-analytics"' in response.content.decode()
+
+
+def test_search_page_without_a_search_embeds_nothing(client):
+    response = client.get(reverse("submissions:search"))
+
+    assert response.status_code == 200
+    assert 'id="search-analytics"' not in response.content.decode()
 
 
 def test_site_analytics_redirects_to_overview(client):
@@ -1978,10 +1986,10 @@ def test_expected_chromium_major_tracks_the_calendar():
 def test_stale_browser_reason():
     from spanza_journal_watch.analytics.utils import stale_browser_reason
 
-    today = datetime.date(2026, 9, 5)  # estimated current major 157, stale below 127
+    today = datetime.date(2026, 9, 5)  # estimated current major 157, stale below 143
     assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/108"), today) == "stale_chromium"
-    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/126"), today) == "stale_chromium"
-    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/127"), today) is None
+    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/142"), today) == "stale_chromium"
+    assert stale_browser_reason(_CHROME_UA.replace("Chrome/151", "Chrome/143"), today) is None
     assert stale_browser_reason(_CHROME_UA, today) is None
     old_iphone = (
         "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
