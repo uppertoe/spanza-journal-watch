@@ -77,6 +77,12 @@ def normalize_html(html: str) -> str:
         normalized,
         flags=re.DOTALL,
     )
+    # Issue dates printed as "(October 2025)" move with the same week shift.
+    normalized = re.sub(
+        r"\((?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\)",
+        "(__MONTH__)",
+        normalized,
+    )
     main_match = re.search(r"<main[^>]*>.*?</main>", normalized, flags=re.IGNORECASE | re.DOTALL)
     if main_match:
         normalized = main_match.group(0)
