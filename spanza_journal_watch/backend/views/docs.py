@@ -5,6 +5,7 @@ import posixpath
 
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
 from django.views.static import serve as static_serve
 
 from .inbox_page import _DOCS_ROOT, _PUBLIC_DOCS_FILES, _PUBLIC_DOCS_PREFIXES
@@ -25,6 +26,12 @@ def serve_docs(request, path=""):
     # cannot slip past it. django.views.static.serve does the same normalisation
     # again before touching the filesystem.
     path = posixpath.normpath(path or "index.html").lstrip("/")
+    if path != "." and (_DOCS_ROOT / path).is_dir():
+        # A directory such as user-guide/ is its index page. Sphinx links are
+        # relative, so the address must keep its trailing slash.
+        if not request.path.endswith("/"):
+            return redirect(request.path + "/")
+        path = posixpath.join(path, "index.html")
     if not _docs_path_is_public(path):
         if not request.user.is_authenticated:
             return redirect_to_login(request.get_full_path())

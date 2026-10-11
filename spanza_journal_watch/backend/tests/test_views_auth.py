@@ -384,6 +384,24 @@ class TestDocsAuthGuards:
     def test_operations_docs_allow_regional_coordinator(self):
         assert user_with_perm(REGIONAL_COORDINATOR).get(self._docs("operations/index.html")).status_code == 200
 
+    def test_guide_folder_serves_its_index_page(self, monkeypatch, tmp_path):
+        (tmp_path / "user-guide").mkdir()
+        monkeypatch.setattr("spanza_journal_watch.backend.views.docs._DOCS_ROOT", tmp_path)
+        served = []
+        monkeypatch.setattr(
+            "spanza_journal_watch.backend.views.docs.static_serve",
+            lambda request, path, **kwargs: served.append(path) or HttpResponse("ok"),
+        )
+        assert anon().get(self._docs("user-guide/")).status_code == 200
+        assert served == ["user-guide/index.html"]
+
+    def test_guide_folder_without_slash_redirects(self, monkeypatch, tmp_path):
+        (tmp_path / "user-guide").mkdir()
+        monkeypatch.setattr("spanza_journal_watch.backend.views.docs._DOCS_ROOT", tmp_path)
+        response = anon().get(self._docs("user-guide"))
+        assert response.status_code == 302
+        assert response["Location"] == self._docs("user-guide/")
+
 
 # ---------------------------------------------------------------------------
 # 7. Verify permissioned users ARE admitted (spot-check)
