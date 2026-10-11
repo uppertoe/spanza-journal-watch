@@ -286,14 +286,14 @@
     }, 17200);
   }
 
-  /* ---------------- reviewer: finish and move to Publish ready ---------------- */
+  /* ---------------- reviewer: finish and move to Ready to submit ---------------- */
   function initReady(d) {
     var under = d.q("[data-list='under']"), ready = d.q("[data-list='ready']");
     var card = d.q("[data-readycard]"), modal = d.q(".dm-modal"), close = d.q(".dm-close"), typed = d.q(".dm-typed");
     var home = card.nextSibling, homeParent = card.parentNode;
     var TEXT = "A well-run multicentre trial with a clear message for day-case practice.";
     function reset() { modal.classList.remove("show"); card.classList.remove("lift"); homeParent.insertBefore(card, home); typed.textContent = ""; typed.classList.remove("dm-caret"); ready.classList.remove("hot"); d.hideCursor(); }
-    if (reduced) { reset(); moveCard(card, ready); d.sayNow("Write your review below the marker line, then move the card to Publish ready when it is complete."); return null; }
+    if (reduced) { reset(); moveCard(card, ready); d.sayNow("Write your review below the marker line, then move the card to Ready to submit when it is complete."); return null; }
     return makeRunner(function () {
       var s = [
         [100, function () { reset(); }],
@@ -304,11 +304,11 @@
       s.push([t + 2900, function () { d.moveTo(close); }]);
       s.push([t + 3500, function () { d.click(); }]);
       s.push([t + 3700, function () { modal.classList.remove("show"); }]);
-      s.push([t + 4000, function () { d.say("When the review is complete, move the card to <b>Publish ready</b>."); d.moveTo(card); }]);
+      s.push([t + 4000, function () { d.say("When the review is complete, move the card to <b>Ready to submit</b>."); d.moveTo(card); }]);
       s.push([t + 4700, function () { card.classList.add("lift"); }]);
       s.push([t + 5000, function () { d.moveTo(ready, 0, 10); }]);
       s.push([t + 5600, function () { moveCard(card, ready); flash(ready); }]);
-      s.push([t + 6400, function () { d.hideCursor(); d.say("<b>Publish ready</b> tells the editors the review can be imported. The card can still be edited afterwards."); }]);
+      s.push([t + 6400, function () { d.hideCursor(); d.say("<b>Ready to submit</b> tells the editors the review can be imported. The card can still be edited until the editors pull it in."); }]);
       return s;
     }, 13600);
   }

@@ -311,6 +311,9 @@ class Review(TimeStampedModel):
     draft_generated_at = models.DateTimeField(blank=True, null=True)
     publish_date = models.DateField(blank=True, null=True)
     active = models.BooleanField(default=False)
+    # Set by an editor on Edit Reviews once the review needs no more work; the
+    # chief editor is warned, not stopped, when publishing reviews without it.
+    publish_ready = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     feature_image = models.ImageField(
         upload_to=name_image,  # Handle path/name and delete old file

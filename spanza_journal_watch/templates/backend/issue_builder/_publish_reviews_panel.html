@@ -17,12 +17,17 @@
         <form method="post" action="{% url "backend:publish_issue_bundle" selected_issue.pk %}">
           {% csrf_token %}
           <button type="submit" class="btn btn-success btn-sm" {% if publish_summary.errors %}disabled title="Fix the items listed below first"{% endif %}
-            onclick="return confirm('Make this issue and all {{ publish_summary.total|default:0 }} review{{ publish_summary.total|default:0|pluralize }} visible on the public site?')">
+            onclick="return confirm('{% if publish_summary.not_publish_ready %}{{ publish_summary.not_publish_ready }} of {{ publish_summary.total }} review{{ publish_summary.total|pluralize }} {{ publish_summary.not_publish_ready|pluralize:"has,have" }} not yet been marked publish ready. {% endif %}Make this issue and all {{ publish_summary.total|default:0 }} review{{ publish_summary.total|default:0|pluralize }} visible on the public site?')">
             Publish all
           </button>
         </form>
       </div>
     </div>
+    {% if publish_summary.not_publish_ready %}
+      <div class="alert alert-info rounded-0 border-0 border-bottom mb-0 py-2 small">
+        {{ publish_summary.not_publish_ready }} review{{ publish_summary.not_publish_ready|pluralize }} {{ publish_summary.not_publish_ready|pluralize:"has,have" }} not yet been marked publish ready on the Edit Reviews tab.
+      </div>
+    {% endif %}
     {% if publish_summary.errors %}
       <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 small">
         <div class="fw-semibold">Publish all is unavailable until these are fixed on the Edit Reviews tab:</div>
@@ -60,6 +65,8 @@
                       {% for ind in item.indicators %}
                         {% if ind.ok %}
                           <span class="badge text-bg-success">{{ ind.label }} ✓</span>
+                        {% elif not ind.required %}
+                          <span class="badge text-bg-warning">{{ ind.label }} ✗</span>
                         {% else %}
                           <span class="badge text-bg-danger">{{ ind.label }} ✗</span>
                         {% endif %}
@@ -79,6 +86,7 @@
                       hx-post="{% url "backend:toggle_review_active" item.review.pk %}"
                       hx-target="#publish-reviews-panel"
                       hx-swap="outerHTML"
+                      {% if not item.review.active and not item.review.publish_ready %}hx-confirm="This review has not yet been marked publish ready. Make this review visible on the public site?"{% endif %}
                     >
                       {% csrf_token %}
                       <button type="submit" class="btn btn-sm {% if item.review.active %}btn-outline-secondary{% else %}btn-outline-success{% endif %}">

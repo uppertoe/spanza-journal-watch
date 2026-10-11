@@ -1,12 +1,22 @@
 {% load crispy_forms_tags %}
 
 <div id="issue-reviews-panel">
-  {% if perms.submissions.chief_editor %}
+  {% if perms.submissions.manage_issue_builder %}
   <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
       <span>Reviews in this issue</span>
-      <div class="d-flex gap-2 align-items-center">
-        <span class="text-muted">Featured limit: {{ max_featured_reviews }}</span>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="text-muted small">Featured limit: {{ max_featured_reviews }}</span>
+        <button
+          type="button"
+          class="btn btn-outline-success btn-sm"
+          id="mark-ready-selected-btn"
+          hx-post="{% url "backend:mark_reviews_publish_ready" selected_issue.pk %}"
+          hx-include="#review-ready-form"
+          hx-target="#issue-reviews-panel"
+          hx-swap="outerHTML"
+          disabled
+        >Mark selected publish ready</button>
         <button
           class="btn btn-primary btn-sm"
           type="button"
@@ -14,73 +24,110 @@
           hx-get="{% url "backend:new_issue_review_form" selected_issue.pk %}"
           hx-target="#issue-reviews-panel"
           hx-swap="outerHTML"
-        >
-          Add review
-        </button>
+        >Add review</button>
       </div>
     </div>
     <div class="card-body">
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th style="min-width: 22rem;">Review</th>
-              <th>Author</th>
-              <th style="min-width: 18rem;">Article</th>
-              <th>Flags</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for review in selected_issue.reviews.all %}
+      <form id="review-ready-form">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
               <tr>
-                <td>
-                  <div class="fw-semibold">{{ review.article.get_title }}</div>
-                  {% if review.article.get_subtitle %}
-                    <div class="text-muted small">{{ review.article.get_subtitle }}</div>
-                  {% endif %}
-                </td>
-                <td>{{ review.author }}</td>
-                <td>{{ review.article.name|truncatechars:70 }}</td>
-                <td>
-                  {% if review.is_featured %}<span class="badge text-bg-warning">Featured</span>{% endif %}
-                  {% if review.active %}<span class="badge text-bg-success">Review live</span>{% endif %}
-                  {% if review.article.active %}<span class="badge text-bg-success">Article live</span>{% endif %}
-                  {% if review.feature_image %}<span class="badge text-bg-info">Has image</span>{% endif %}
-                </td>
-                <td class="text-end">
-                  <button
-                    class="btn btn-outline-secondary btn-sm"
-                    type="button"
-                    data-review-edit="1"
-                    hx-get="{% url "backend:edit_issue_review_form" selected_issue.pk review.pk %}"
-                    hx-target="#issue-reviews-panel"
-                    hx-swap="outerHTML"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline-danger btn-sm"
-                    hx-post="{% url "backend:remove_issue_review" selected_issue.pk review.pk %}"
-                    hx-target="#issue-reviews-panel"
-                    hx-swap="outerHTML"
-                    hx-confirm="Remove this review from the issue?"
-                  >
-                    Remove
-                  </button>
-                </td>
+                <th style="width:2rem">
+                  <input type="checkbox" id="review-ready-select-all" class="form-check-input" aria-label="Select every review not yet publish ready">
+                </th>
+                <th style="min-width:22rem">Review</th>
+                <th>Author</th>
+                <th>Status</th>
+                <th>Flags</th>
+                <th></th>
               </tr>
-            {% empty %}
-              <tr>
-                <td colspan="5" class="text-muted">No reviews added yet.</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
+            </thead>
+            <tbody>
+              {% for review in selected_issue.reviews.all %}
+                <tr>
+                  <td>
+                    {% if not review.publish_ready %}
+                      <input type="checkbox" name="review_ids" value="{{ review.pk }}" class="form-check-input review-ready-cb" aria-label="Select {{ review.article.get_title }}">
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="fw-semibold">{{ review.article.get_title }}</div>
+                    {% if review.article.get_subtitle %}<div class="text-muted small">{{ review.article.get_subtitle }}</div>{% endif %}
+                  </td>
+                  <td>{{ review.author|default:"—" }}</td>
+                  <td class="text-nowrap">
+                    {% if review.publish_ready %}
+                      <span class="badge text-bg-success">Publish ready</span>
+                    {% else %}
+                      <span class="badge text-bg-warning">Being edited</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if review.is_featured %}<span class="badge text-bg-warning">Featured</span>{% endif %}
+                    {% if review.active %}<span class="badge text-bg-success">Live</span>{% endif %}
+                    {% if review.feature_image %}<span class="badge text-bg-info">Has image</span>{% endif %}
+                  </td>
+                  <td class="text-end text-nowrap">
+                    <button
+                      type="button"
+                      class="btn btn-sm {% if review.publish_ready %}btn-outline-secondary{% else %}btn-outline-success{% endif %}"
+                      hx-post="{% url "backend:set_review_publish_ready" selected_issue.pk review.pk %}"
+                      hx-vals='{"ready": "{% if review.publish_ready %}0{% else %}1{% endif %}"}'
+                      hx-target="#issue-reviews-panel"
+                      hx-swap="outerHTML"
+                    >{% if review.publish_ready %}Unmark{% else %}Mark publish ready{% endif %}</button>
+                    <button
+                      class="btn btn-outline-secondary btn-sm"
+                      type="button"
+                      data-review-edit="1"
+                      hx-get="{% url "backend:edit_issue_review_form" selected_issue.pk review.pk %}"
+                      hx-target="#issue-reviews-panel"
+                      hx-swap="outerHTML"
+                    >Edit</button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-sm"
+                      hx-post="{% url "backend:remove_issue_review" selected_issue.pk review.pk %}"
+                      hx-target="#issue-reviews-panel"
+                      hx-swap="outerHTML"
+                      hx-confirm="Remove this review from the issue?"
+                    >Remove</button>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="text-muted">No reviews added yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
     </div>
   </div>
+  <script>
+  (function () {
+    const panel = document.getElementById('issue-reviews-panel');
+    const button = document.getElementById('mark-ready-selected-btn');
+    const selectAll = document.getElementById('review-ready-select-all');
+    const boxes = panel.querySelectorAll('.review-ready-cb');
+    if (selectAll && !boxes.length) selectAll.disabled = true;
+    function update() {
+      button.disabled = !panel.querySelector('.review-ready-cb:checked');
+    }
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        boxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+        update();
+      });
+    }
+    boxes.forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        if (!cb.checked && selectAll) selectAll.checked = false;
+        update();
+      });
+    });
+    update();
+  })();
+  </script>
   {% endif %}
 </div>

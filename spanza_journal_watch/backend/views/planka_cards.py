@@ -12,6 +12,7 @@ from .shared import (
     PLANKA_JOURNAL_LABEL_COLORS,
     PLANKA_LEGACY_REVIEW_DESCRIPTION_TEMPLATE,
     PLANKA_LIST_LABELS,
+    PLANKA_LIST_LEGACY_LABELS,
     PLANKA_REVIEW_INSTRUCTIONS,
     PLANKA_REVIEW_SCAFFOLD,
     PLANKA_REVIEW_SEPARATOR_MARKER,
@@ -306,7 +307,8 @@ def _refresh_binding_lists_from_board(*, client, binding):
     _, included = client.get_board(binding.board_id)
     lists = included.get("lists", []) or []
 
-    key_by_label = {label.lower(): key for key, label in PLANKA_LIST_LABELS.items()}
+    key_by_label = {label.lower(): key for key, label in PLANKA_LIST_LEGACY_LABELS.items()}
+    key_by_label.update({label.lower(): key for key, label in PLANKA_LIST_LABELS.items()})
     existing = dict(binding.lists or {})
     changed = False
     for list_item in lists:

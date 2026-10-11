@@ -21,9 +21,10 @@ Journal Watch has three editorial roles:
    system settings.
 
 **Regional coordinator**
-   Assigned to specific issues by the chief editor. Can manage article intake
-   and invite reviewers for their assigned issues. Accesses the backend
-   editorial interface for those issues only; can also work in the Planka board.
+   Assigned to specific issues by the chief editor. Can manage article intake,
+   invite reviewers, and pull and edit the reviews for their assigned issues.
+   Accesses the backend editorial interface for those issues only; can also
+   work in the Planka board.
 
 **Reviewer (contributor)**
    Invited by name to a specific issue. Works entirely within the Planka kanban

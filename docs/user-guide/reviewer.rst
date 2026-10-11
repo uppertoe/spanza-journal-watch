@@ -40,7 +40,7 @@ The **Reviews** board has three lists:
 
 - **Candidates**: the articles your coordinator has shortlisted.
 - **Under review**: articles someone is working on.
-- **Publish ready**: finished reviews, waiting for the editors.
+- **Ready to submit**: finished reviews, waiting for the editors.
 
 The **Labels** button filters the cards by journal. A second board,
 **Instructions**, holds the guidance cards.
@@ -77,7 +77,7 @@ Writing the review
       1. Open your card and click into the description.
       2. Write below the line that reads *Please write your review below
          this line*, and leave the article details above it as they are.
-      3. When you are finished, drag the card into *Publish ready*.
+      3. When you are finished, drag the card into *Ready to submit*.
 
       A suggested structure is already there: summary, key findings,
       strengths, limitations and bottom line. Adapt it as you see fit, and
@@ -86,8 +86,10 @@ Writing the review
    .. raw:: html
       :file: _demos/ready.html
 
-You can keep editing a card after it reaches *Publish ready*. If the editors
-have a question they will comment on the card, so reply in the comments
-rather than editing anyone else's card. If you prefer to write in Word, you
-can attach the document to the card instead, though the editor will need to
-rebuild its formatting.
+You can keep editing your card until the editors pull it into Journal Watch.
+The comments on a card are for discussion. Please do not edit another
+reviewer's card or post a rewritten version in the comments. If you have
+suggested edits, send them to your regional coordinator.
+
+If you prefer to write in Word, you can attach the document to the card
+instead, though the editor will need to rebuild its formatting.

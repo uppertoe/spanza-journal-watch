@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from spanza_journal_watch.submissions.models import (
     Author,
@@ -30,15 +31,16 @@ from ..pubmed_cache import (
     upsert_pubmed_article as _upsert_pubmed_article,
 )
 from .issue_pages import _build_article_mesh_context, _render_issue_panel
-from .shared import _queue_indexnow_for_review
+from .shared import _check_coordinator_issue_access, _queue_indexnow_for_review
 
 logger = logging.getLogger(__name__)
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def add_issue_review(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     form = IssueBuilderReviewForm(request.POST, request.FILES, issue=issue)
 
     if form.is_valid():
@@ -87,10 +89,10 @@ def _build_tag_grid_context(article):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def review_pubmed_search(request, issue_id):
     """HTMX GET: search PubMed and return results for the review form."""
-    get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, get_object_or_404(Issue, pk=issue_id))
     query = (request.GET.get("q") or "").strip()
     articles = []
     error = None
@@ -116,10 +118,10 @@ def review_pubmed_search(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def review_pubmed_select(request, issue_id):
     """HTMX POST: import/select a PubMed article and return citation card + tag grid OOB."""
-    get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, get_object_or_404(Issue, pk=issue_id))
     pmid = (request.POST.get("pmid") or "").strip()
     if not pmid:
         return HttpResponseBadRequest("No PMID provided.")
@@ -157,7 +159,7 @@ def review_pubmed_select(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def review_tag_suggestions(request, article_id):
     """HTMX GET: return annotated tag grid for an article."""
     article = get_object_or_404(PubmedArticle, pk=article_id)
@@ -170,7 +172,7 @@ def review_tag_suggestions(request, article_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def review_existing_article_search(request):
     """HTMX GET: return filtered PubmedArticle list for the existing-article picker."""
     query = (request.GET.get("q") or "").strip()
@@ -187,7 +189,7 @@ def review_existing_article_search(request):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def review_author_search(request):
     """HTMX GET: return filtered Author list for the author picker."""
     query = (request.GET.get("q") or "").strip()
@@ -203,9 +205,10 @@ def review_author_search(request):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def edit_issue_review_form(request, issue_id, review_id):
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     review = get_object_or_404(issue.reviews, pk=review_id)
     form = IssueBuilderReviewForm(issue=issue, review=review)
 
@@ -230,9 +233,10 @@ def edit_issue_review_form(request, issue_id, review_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def update_issue_review(request, issue_id, review_id):
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     review = get_object_or_404(issue.reviews, pk=review_id)
     form = IssueBuilderReviewForm(request.POST, request.FILES, issue=issue, review=review)
 
@@ -258,11 +262,36 @@ def update_issue_review(request, issue_id, review_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def remove_issue_review(request, issue_id, review_id):
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     review = get_object_or_404(issue.reviews, pk=review_id)
     issue.reviews.remove(review)
     messages.success(request, "Review removed from issue.")
 
+    return _render_issue_panel(request, issue)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@require_POST
+def set_review_publish_ready(request, issue_id, review_id):
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+    review = get_object_or_404(issue.reviews, pk=review_id)
+    review.publish_ready = request.POST.get("ready") == "1"
+    review.save(update_fields=["publish_ready", "modified"])
+    return _render_issue_panel(request, issue)
+
+
+@login_required
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
+@require_POST
+def mark_reviews_publish_ready(request, issue_id):
+    issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
+    review_ids = [value for value in request.POST.getlist("review_ids") if value.isdigit()]
+    if review_ids:
+        issue.reviews.filter(pk__in=review_ids).update(publish_ready=True)
     return _render_issue_panel(request, issue)

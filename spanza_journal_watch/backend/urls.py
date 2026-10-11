@@ -187,6 +187,16 @@ urlpatterns = [
         name="remove_issue_review",
     ),
     path(
+        "issues/builder/<int:issue_id>/reviews/<int:review_id>/publish-ready",
+        views.set_review_publish_ready,
+        name="set_review_publish_ready",
+    ),
+    path(
+        "issues/builder/<int:issue_id>/reviews/publish-ready",
+        views.mark_reviews_publish_ready,
+        name="mark_reviews_publish_ready",
+    ),
+    path(
         "issues/builder/<int:issue_id>/contributors/add",
         views.issue_add_contributor,
         name="issue_add_contributor",

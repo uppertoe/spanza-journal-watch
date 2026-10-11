@@ -457,7 +457,9 @@ class TestIssueBuilderWorkflow:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Featured limit issue", body="Body")
@@ -498,7 +500,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Page Issue", body="Issue body")
@@ -513,7 +517,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Preload Issue", body="Issue body")
@@ -571,7 +577,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Setup Issue", body="Issue body")
@@ -634,14 +642,16 @@ class TestIssueBuilderPlankaIntegration:
         assert binding.project_id == "project-1"
         assert binding.board_id == "board-1"
         assert binding.instructions_board_id == "board-2"
-        assert binding.get_list_id("publish_ready") == "list-publish-ready"
+        assert binding.get_list_id("publish_ready") == "list-ready-to-submit"
         assert binding.instructions_lists.get("reviewers") == "list-reviewers"
 
     def test_planka_update_project_name_via_htmx(self, route_client, regression_baseline, monkeypatch):
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Rename Issue", body="Issue body")
@@ -686,7 +696,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Import Issue", body="Issue body")
@@ -769,7 +781,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Missing Fields Issue", body="Issue body")
@@ -841,7 +855,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Sync Failure Message Issue", body="Issue body")
@@ -879,7 +895,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Disconnect Issue", body="Issue body")
@@ -915,7 +933,9 @@ class TestIssueBuilderPlankaIntegration:
         user = User.objects.filter(is_superuser=False).order_by("pk").first()
         assert user is not None
 
-        user.user_permissions.add(Permission.objects.get(codename="chief_editor"))
+        user.user_permissions.add(
+            Permission.objects.get(codename="chief_editor"), Permission.objects.get(codename="manage_issue_builder")
+        )
         route_client.force_login(user)
 
         issue = Issue.objects.create(name="Planka Resync Blocked Issue", body="Issue body")

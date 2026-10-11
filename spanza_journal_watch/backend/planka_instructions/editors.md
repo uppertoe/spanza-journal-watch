@@ -33,6 +33,8 @@ The main purpose of the editorial process is:
 
 Edits to content should be judicious and preferably minimal where possible
 
+Comments on a card are for discussion. Make any edits to a review in Journal Watch after the card has been pulled in.
+
 ## Escalation protocol
 
 Journal Watch applies the principle that all reviews submitted are published, where possible.

@@ -6,7 +6,7 @@ Chief Editor Guide
 The chief editor takes an issue from creation through to the newsletter.
 The tabs across the top of every issue page are the steps, in order: Setup,
 Articles, Reviewers, Pull Reviews, Edit Reviews, Publish and Newsletter.
-Coordinators see only Articles and Reviewers. The rest of this page is a
+Coordinators see Articles, Reviewers, Pull Reviews and Edit Reviews. The rest of this page is a
 quick reminder of where the buttons are.
 
 
@@ -51,7 +51,7 @@ Click **New issue** on the dashboard, or open **Issues** in the top bar.
    **Rename** and **Change background image** appear on the card once it is
    done.
 3. Under **Coordinators**, add each coordinator's name and email address,
-   then click **Send initial invites**.
+   then click **Send invite** on the bar above the table.
 
 Coordinators see the issue on their dashboard once they have accepted. You
 can come back to this tab at any time to change the name, introduction or
@@ -79,10 +79,14 @@ Step 3: Reviewers
 -----------------
 
 1. Enter each reviewer's name and email address and click **Add**.
-2. Click **Send initial invites**. The links stay valid for 180 days.
-3. *Invited* means the email has gone out. *Active* means the reviewer has
-   accepted and is on the board.
-4. To send a reminder, tick the row and click **Resend to selected**.
+2. Click **Send invite** on the bar above the table. The bar shows how many
+   reviewers have been added but not yet invited. The links stay valid for
+   180 days.
+3. *Not invited* means the reviewer has been added but no email has gone
+   out. *Invited* means the email has gone out. *Active* means the reviewer
+   has accepted and is on the board.
+4. To send a fresh link, tick the row and click **Resend to selected**. The
+   earlier link stops working.
    **Revoke** removes someone from the issue, and **Sync Planka** appears if
    their board membership has failed.
 
@@ -90,11 +94,13 @@ Step 3: Reviewers
 Step 4: Pull Reviews
 --------------------
 
-Reviewers move their finished cards to *Publish ready* on the board.
+Reviewers move their finished cards to *Ready to submit* on the board. The
+coordinator normally pulls and edits the reviews; the
+:ref:`coordinator guide <coordinator>` has the detail.
 
 1. Click **Refresh cards** if the list looks out of date.
 2. Tick the cards you want and click **Import selected**, or click
-   **Import all Publish ready**.
+   **Import all from Ready to submit**.
 
 Each import creates a review from the text below the card's marker line.
 Cards that have already been imported are marked and skipped. **History**
@@ -104,10 +110,16 @@ shows a card's earlier versions if a reviewer has edited it since.
 Step 5: Edit Reviews
 --------------------
 
+Make changes to a review's text here rather than on the Planka card. The
+card's comments are for discussion with the reviewer.
+
 1. Click **Edit** on a review to change its article, author, text, featured
-   flag or featured image, then click **Save**.
-2. Click **Add review** for a review written outside Planka.
-3. **Remove** detaches a review from the issue without deleting it.
+   flag or featured image, then click **Update review**.
+2. When a review needs no more work, click **Mark publish ready**. To mark
+   several at once, tick them and click **Mark selected publish ready**.
+   **Unmark** clears the mark.
+3. Click **Add review** for a review written outside Planka.
+4. **Remove** detaches a review from the issue without deleting it.
 
 At most two reviews can be featured.
 
@@ -116,7 +128,8 @@ Step 6: Publish
 ---------------
 
 1. Check the readiness badges, and fix anything red on the Edit Reviews
-   tab.
+   tab. An amber *Publish ready* badge means the review has not been marked
+   yet, and publishing it asks you to confirm.
 2. Click **Publish all**, or **Publish** on individual rows.
 3. Click **Set … as homepage** to put the issue on the public site.
 

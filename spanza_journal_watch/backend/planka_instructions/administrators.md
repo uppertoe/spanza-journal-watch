@@ -15,7 +15,7 @@ Journal Watch also keeps a record of each edit made in Planka; these are stored 
 
 Before issue publication:
 
-1. All edited cards are pulled from Planka (including those not in Publish ready)
+1. All edited cards are pulled from Planka (including those not in Ready to submit)
 2. Each review has been edited for spelling, grammar and content
 3. Appropriate tags have been selected for each card
 4. Two feature cards have been selected, with cover images from each ([Unsplash](https://unsplash.com) is a good starting point for royalty-free images)

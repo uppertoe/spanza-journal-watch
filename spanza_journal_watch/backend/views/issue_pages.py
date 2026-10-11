@@ -66,6 +66,8 @@ def _get_issue_review_readiness(issue):
             {"label": "Body", "ok": bool((review.body or "").strip()), "required": True},
             {"label": "Author", "ok": review.author is not None, "required": True},
             {"label": "Article title", "ok": bool(review.article.get_title()), "required": True},
+            # Advisory: publishing an unmarked review asks for confirmation instead.
+            {"label": "Publish ready", "ok": review.publish_ready, "required": False},
         ]
         if review.is_featured:
             indicators.append({"label": "Feature image", "ok": bool(review.feature_image), "required": True})
@@ -82,6 +84,7 @@ def _publish_summary(issue, readiness):
         "total": len(readiness),
         "ready": sum(1 for item in readiness if item["is_ready"]),
         "live": sum(1 for item in readiness if item["review"].active),
+        "not_publish_ready": sum(1 for item in readiness if not item["review"].publish_ready),
         "errors": _validate_issue_publish(issue),
     }
 
@@ -138,9 +141,10 @@ def issue_reviewers(request):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def issue_reviews_edit(request):
     issue = _resolve_and_persist_issue(request)
+    _check_coordinator_issue_access(request, issue)
     context = _issue_builder_base_context(issue=issue)
     return render(request, "backend/issue_builder/issue_reviews_edit.html", context)
 
@@ -216,9 +220,10 @@ def toggle_review_active(request, review_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def issue_planka_import(request):
     issue = _resolve_and_persist_issue(request)
+    _check_coordinator_issue_access(request, issue)
 
     context = _issue_builder_base_context(issue=issue)
     binding = context.get("planka_binding")
@@ -276,9 +281,10 @@ def save_issue_draft(request, issue_id=None):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def new_review_form(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     form = IssueBuilderReviewForm(issue=issue)
     return render(
         request,

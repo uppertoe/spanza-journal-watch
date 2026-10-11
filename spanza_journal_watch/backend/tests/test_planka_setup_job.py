@@ -206,7 +206,7 @@ class TestProvisionTask:
         assert binding.project_id == "project-1"
         assert binding.board_id == "board-1"
         assert binding.instructions_board_id == "board-2"
-        assert binding.get_list_id("publish_ready") == "list-publish-ready"
+        assert binding.get_list_id("publish_ready") == "list-ready-to-submit"
 
     def test_task_records_planka_error(self, monkeypatch):
         issue = Issue.objects.create(name="Task Error Issue", body="body")

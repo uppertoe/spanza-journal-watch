@@ -46,6 +46,7 @@ from .shared import (
     PLANKA_LIST_COLORS,
     PLANKA_LIST_LABELS,
     PLANKA_LIST_ORDER,
+    _check_coordinator_issue_access,
     _is_planka_board_not_found_error,
     _is_planka_connection_error,
     _safe_planka_error,
@@ -635,9 +636,10 @@ def planka_update_project_background(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def planka_refresh_publish_cards(request, issue_id):
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
 
     card_scope = (request.GET.get("scope") or "publish").strip().lower()

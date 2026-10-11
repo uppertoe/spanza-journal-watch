@@ -4,6 +4,7 @@
   <div class="col-12">
     <div class="d-flex justify-content-between align-items-end gap-2 mb-1">
       <label class="form-label fw-semibold mb-0" for="id_headline">Editorial headline and bottom line</label>
+      {% if perms.submissions.chief_editor %}
       <button type="button" class="btn btn-sm btn-outline-secondary"
               hx-post="{{ suggest_headline_url }}"
               hx-include="#issue-review-form textarea[name='body'], #issue-review-form [name='article_name'], #issue-review-form [name='existing_article'], #issue-review-form [name='article_mode']"
@@ -12,6 +13,7 @@
               hx-disabled-elt="this">
         Suggest with Claude
       </button>
+      {% endif %}
     </div>
     {% if headline_suggest_error %}
       <div class="alert alert-warning py-2 small mb-2">{{ headline_suggest_error }}</div>

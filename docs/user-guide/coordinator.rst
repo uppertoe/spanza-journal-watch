@@ -3,9 +3,10 @@
 Regional Coordinator Guide
 ==========================
 
-When the chief editor assigns you an issue, two things fall to you:
-shortlisting the articles, and inviting the reviewers. The rest of this page
-is a quick reminder of where the buttons are.
+When the chief editor assigns you an issue, three things fall to you:
+shortlisting the articles, inviting the reviewers, and editing the finished
+reviews. The chief editor then publishes the issue. The rest of this page is
+a quick reminder of where the buttons are.
 
 How it fits together
 --------------------
@@ -20,6 +21,8 @@ How it fits together
          the Planka board.
       3. Reviewers claim articles on the board and write their reviews
          there.
+      4. You pull the finished reviews into Journal Watch, edit them, and
+         mark them publish ready for the chief editor.
 
    .. raw:: html
       :file: _demos/overview.html
@@ -158,11 +161,15 @@ Open **Reviewers** for the issue.
    .. container:: feature-text
 
       1. Enter the reviewer's name and email address and click **Add**.
-      2. Click **Send initial invites**. The links stay valid for 180 days.
-      3. *Invited* means the email has gone out. *Active* means the reviewer
-         has accepted and is on the board.
-      4. To send a reminder, tick the reviewer's row and click **Resend to
-         selected**. **Revoke** removes someone from the issue.
+      2. Click **Send invite** on the bar above the table. The bar shows how
+         many reviewers have been added but not yet invited. The links stay
+         valid for 180 days.
+      3. *Not invited* means the reviewer has been added but no email has
+         gone out. *Invited* means the email has gone out. *Active* means
+         the reviewer has accepted and is on the board.
+      4. To send a fresh link, tick the reviewer's row and click **Resend to
+         selected**. The earlier link stops working. **Revoke** removes
+         someone from the issue.
 
    .. raw:: html
       :file: _demos/invite.html
@@ -175,3 +182,24 @@ On the Planka login page, click **Sign in with Journal Watch**. You are a
 member of the board for every issue you coordinate, so you can move cards
 between lists, comment on them, and see at a glance where each review is up
 to.
+
+Comments on a card are for discussion. Make any edits to a review in Journal
+Watch after the card has been pulled in.
+
+
+Editing the reviews
+-------------------
+
+Reviewers move their finished cards to *Ready to submit* on the board.
+
+1. Open **Pull Reviews** for the issue. Tick the cards you want and click
+   **Import selected**, or click **Import all from Ready to submit**.
+2. Open **Edit Reviews**. Click **Edit** on a review to change its text,
+   author or article, then click **Update review**.
+3. When a review needs no more work, click **Mark publish ready**. To mark
+   several at once, tick them and click **Mark selected publish ready**.
+   **Unmark** clears the mark.
+
+Most reviews need no editing, so they can be marked publish ready as soon as
+they are pulled in. The chief editor publishes the issue once the reviews
+are marked.

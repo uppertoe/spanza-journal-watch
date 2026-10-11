@@ -267,12 +267,13 @@ def _sync_planka_card_into_issue(*, request, issue, binding, selected):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def planka_import_publish_cards_bulk(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
 
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     card_scope = (request.POST.get("card_scope") or "publish").strip().lower()
     if card_scope not in {"publish", "all"}:
@@ -355,12 +356,13 @@ def planka_import_publish_cards_bulk(request, issue_id):
 
 
 @login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
+@permission_required("submissions.manage_issue_builder", raise_exception=True)
 def planka_import_publish_card(request, issue_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Bad Request - POST only")
 
     issue = get_object_or_404(Issue, pk=issue_id)
+    _check_coordinator_issue_access(request, issue)
     binding = get_object_or_404(PlankaIssueBinding, issue=issue)
     card_scope = (request.POST.get("card_scope") or "publish").strip().lower()
     if card_scope not in {"publish", "all"}:

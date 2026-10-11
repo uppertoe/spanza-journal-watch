@@ -48,8 +48,8 @@ Uses perms.submissions.chief_editor to lock chief-editor steps.
     {% if issue_contributors %}<span class="workflow-tab-badge">{{ issue_contributors|length }}</span>{% endif %}
   </a>
 
-  {# Step 4 — Pull Reviews (chief editor only) #}
-  {% if perms.submissions.chief_editor %}
+  {# Step 4 — Pull Reviews #}
+  {% if perms.submissions.manage_issue_builder %}
     <a
       href="{% url 'backend:issue_planka_import' %}?issue={{ selected_issue.pk }}"
       class="workflow-tab{% if cur == 'issue_planka_import' %} is-active{% endif %}"
@@ -66,8 +66,8 @@ Uses perms.submissions.chief_editor to lock chief-editor steps.
     </span>
   {% endif %}
 
-  {# Step 5 — Edit Reviews (chief editor only) #}
-  {% if perms.submissions.chief_editor %}
+  {# Step 5 — Edit Reviews #}
+  {% if perms.submissions.manage_issue_builder %}
     <a
       href="{% url 'backend:issue_reviews_edit' %}?issue={{ selected_issue.pk }}"
       class="workflow-tab{% if cur == 'issue_reviews_edit' %} is-active{% endif %}"

@@ -29,6 +29,12 @@ PLANKA_LIST_ORDER = [
 PLANKA_LIST_LABELS = {
     "candidates": "Candidates",
     "under_review": "Under review",
+    "publish_ready": "Ready to submit",
+}
+
+# Boards created before the last column was renamed still call it this; the
+# key stays "publish_ready" because bindings store their list ids under it.
+PLANKA_LIST_LEGACY_LABELS = {
     "publish_ready": "Publish ready",
 }
 
@@ -78,13 +84,13 @@ PLANKA_REVIEW_INSTRUCTIONS = """\
 
 - **Add yourself as a member** of this card (use the Members section inside the card) so editors \
 can see who is covering which article.
-- Move the card to **Under Review** when you start writing.
-- Move the card to **Publish Ready** when your review is complete.
+- Move the card to **Under review** when you start writing.
+- Move the card to **Ready to submit** when your review is complete.
+- **Use the comments at the bottom of this card for discussion.** Please do not edit another \
+reviewer's text or post a rewritten version in the comments. Your regional coordinator edits each \
+review in Journal Watch before publication, so please send suggested edits to your coordinator.
 
 A suggested review structure is provided below — feel free to use any format you prefer.
-
-**Please do not edit the text of other reviewers.** Instead, use the **Comments** section at the \
-bottom of this card to share feedback or ask questions.
 
 If you lose work or accidentally overwrite content, contact your regional coordinator — \
 previous versions of this card can be restored.\

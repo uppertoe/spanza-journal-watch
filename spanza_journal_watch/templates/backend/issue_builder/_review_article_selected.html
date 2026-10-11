@@ -32,9 +32,11 @@
       {% endif %}
     {% endfor %}
   </div>
+  {% if perms.submissions.chief_editor %}
   <div class="mt-2">
     <a href="{% url 'backend:mesh_mapping_management' %}" target="_blank" class="small text-muted">Manage MeSH mappings &rarr;</a>
   </div>
+  {% endif %}
 </details>
 {% endif %}
 

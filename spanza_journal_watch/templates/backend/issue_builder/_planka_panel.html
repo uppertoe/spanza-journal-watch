@@ -41,7 +41,9 @@
     {% elif not planka_binding %}
       <div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-0">
         <span>This issue has no Planka board yet.</span>
+        {% if perms.submissions.chief_editor %}
         <a class="btn btn-sm btn-primary" href="{% url "backend:issue_builder" %}?issue={{ selected_issue.pk }}#planka-panel">Create it on the Setup tab</a>
+        {% endif %}
       </div>
     {% elif planka_panel_loading %}
       <div
@@ -66,7 +68,7 @@
                 hx-target="#planka-sync-panel"
                 hx-swap="outerHTML"
               >
-                Publish ready
+                Ready to submit
                 <span class="badge text-bg-secondary ms-1">{{ planka_scope_counts.publish|default:0 }}</span>
               </a>
             </li>
@@ -103,7 +105,9 @@
         </a>
       </div>
 
-      {% if planka_board_missing %}
+      {% if planka_board_missing and not perms.submissions.chief_editor %}
+        <div class="alert alert-warning">The Reviews board has been deleted in Planka. The chief editor can recreate it.</div>
+      {% elif planka_board_missing %}
         <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
           <span>The Reviews board has been deleted in Planka. Recreate it to continue.</span>
           <form
@@ -219,7 +223,7 @@
 
           <div class="d-flex flex-wrap gap-2 justify-content-end">
             <button type="submit" name="selection_mode" value="selected" class="btn btn-primary">Import selected</button>
-            <button type="submit" name="selection_mode" value="publish_bucket" class="btn btn-outline-primary">Import all Publish ready</button>
+            <button type="submit" name="selection_mode" value="publish_bucket" class="btn btn-outline-primary">Import all from Ready to submit</button>
           </div>
         </form>
 
