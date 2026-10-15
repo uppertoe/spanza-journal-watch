@@ -314,6 +314,47 @@
   }
 
 
+  /* ---------------- reviewer: filter the board by member ---------------- */
+  function initFilter(d) {
+    var members = d.q("[data-members]"), all = d.q("[data-all]"), target = d.q("[data-target]"), fsel = d.q("[data-fsel]");
+    var favs = { me: d.q("[data-fme]"), other: d.q("[data-fother]") };
+    var pop = d.q(".dm-fpop"), typed = pop.querySelector(".dm-typed"), items = d.qa("[data-uitem]"), cards = d.qa(".dm-card");
+    function apply(who) {
+      cards.forEach(function (c) { c.classList.toggle("gone", !!who && c.getAttribute("data-who") !== who); });
+      all.style.display = who ? "none" : ""; target.style.display = who ? "none" : "";
+      fsel.classList.toggle("show", !!who);
+      Object.keys(favs).forEach(function (k) { favs[k].classList.toggle("on", k === who); });
+    }
+    function reset() {
+      apply(null); pop.classList.remove("show"); typed.textContent = ""; typed.classList.remove("dm-caret");
+      items.forEach(function (i) { i.classList.remove("gone", "lit"); }); d.hideCursor();
+    }
+    if (reduced) { reset(); apply("me"); d.sayNow("Click the target icon beside <b>Members: All</b> to show only the cards you have added yourself to."); return null; }
+    return makeRunner(function () {
+      var s = [
+        [100, function () { reset(); d.say("Two reviewers on this board share the initials PN, so the avatars alone do not show whose card is whose."); }],
+        [3600, function () { d.say("To show only your own cards, click the target icon beside <b>Members: All</b>."); d.moveTo(target); }],
+        [4800, function () { d.click(); d.press(target); }],
+        [5000, function () { apply("me"); }],
+        [5600, function () { d.hideCursor(); d.say("The board now shows only the cards you have added yourself to."); }],
+        [8400, function () { d.say("To clear the filter, click your avatar beside <b>Members</b>."); d.moveTo(favs.me); }],
+        [9600, function () { d.click(); }],
+        [9800, function () { apply(null); }],
+        [10600, function () { d.say("To find another reviewer's cards, click <b>Members: All</b> and search by name."); d.moveTo(members); }],
+        [11800, function () { d.click(); d.press(members); }],
+        [12000, function () { pop.classList.add("show"); d.hideCursor(); }]
+      ];
+      var t = typeInto(s, 12600, typed, "Peter", 110);
+      s.push([t + 200, function () { items.forEach(function (i) { i.classList.toggle("gone", i.getAttribute("data-uitem") !== "other"); }); }]);
+      s.push([t + 900, function () { d.moveTo(d.q("[data-uitem='other']")); }]);
+      s.push([t + 1600, function () { d.click(); d.q("[data-uitem='other']").classList.add("lit"); }]);
+      s.push([t + 1800, function () { apply("other"); }]);
+      s.push([t + 2300, function () { pop.classList.remove("show"); d.hideCursor(); d.say("The board now shows only Peter Ng's cards."); }]);
+      return s;
+    }, 20400);
+  }
+
+
   /* ---------------- overview: what the platform does ---------------- */
   function countSteps(steps, t, el, from, to, dur) {
     var n = 24;
@@ -492,7 +533,7 @@
   }
 
   /* ---------------- boot ---------------- */
-  var inits = { overview: initOverview, go: initGo, load: initLoad, stage: initStage, push: initPush, recheck: initRecheck, invite: initInvite, accept: initAccept, pick: initPick, ready: initReady };
+  var inits = { overview: initOverview, go: initGo, load: initLoad, stage: initStage, push: initPush, recheck: initRecheck, invite: initInvite, accept: initAccept, pick: initPick, ready: initReady, filter: initFilter };
   // Run a demo only while it is on screen. Leaving is debounced so a quick
   // scroll past, or a screenshot that briefly resizes the viewport, does not
   // restart the timeline from the beginning.

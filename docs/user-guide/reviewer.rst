@@ -46,6 +46,22 @@ The **Labels** button filters the cards by journal. A second board,
 **Instructions**, holds the guidance cards.
 
 
+Finding your cards
+------------------
+
+.. container:: feature
+
+   .. container:: feature-text
+
+      To show only your own cards, click the target icon beside **Members:
+      All** above the lists. To find another reviewer's cards, click
+      **Members: All** and search by name, because several reviewers may
+      share the same initials.
+
+   .. raw:: html
+      :file: _demos/filter.html
+
+
 Choosing an article
 -------------------
 
