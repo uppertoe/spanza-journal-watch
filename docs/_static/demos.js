@@ -16,9 +16,57 @@
       timers.push(setTimeout(cycle, period));
     }
     return {
+      build: build,
+      running: function () { return running; },
       start: function () { if (running) return; running = true; cycle(); },
       stop: function () { running = false; timers.forEach(clearTimeout); timers = []; }
     };
+  }
+
+  // A demo that grows and shrinks as it plays pushes the rest of the page up and
+  // down. Before it starts, play the whole timeline instantly, with transitions
+  // off and delayed callbacks run at once, note the tallest the frame and
+  // caption become, and hold them at that height. The first step of every
+  // timeline resets the demo, so replaying it restores the opening frame.
+  // Anything the dry run still misses only ever raises the held height.
+  function holdHeight(d, runner) {
+    var parts = [d.frame, d.root.querySelector(".dm-caption")].filter(Boolean);
+    function grow(el) {
+      var h = el.getBoundingClientRect().height;
+      if (h <= (el._dmHeld || 0)) return;
+      var cs = getComputedStyle(el), edge = 0;
+      ["paddingTop", "paddingBottom", "borderTopWidth", "borderBottomWidth"].forEach(function (k) { edge += parseFloat(cs[k]) || 0; });
+      el._dmHeld = h; el.style.minHeight = (h - edge) + "px";
+    }
+    function measure() {
+      var wasRunning = runner.running(), realTimeout = window.setTimeout;
+      runner.stop();
+      parts.forEach(function (el) { el.style.minHeight = ""; el._dmHeld = 0; });
+      var steps = runner.build().map(function (s, i) { return [s[0], i, s[1]]; });
+      steps.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      d.dry = true; d.root.classList.add("dm-dry");
+      window.setTimeout = function (fn) { try { fn(); } catch (e) { /* ignore */ } return 0; };
+      try {
+        parts.forEach(grow);
+        steps.forEach(function (s) { try { s[2](); } catch (e) { /* ignore */ } parts.forEach(grow); });
+        if (steps.length) steps[0][2]();
+      } finally {
+        window.setTimeout = realTimeout;
+        d.dry = false;
+      }
+      void d.root.offsetWidth;
+      d.root.classList.remove("dm-dry");
+      if (wasRunning) runner.start();
+    }
+    measure();
+    if (!("ResizeObserver" in window)) return;
+    var width = d.root.getBoundingClientRect().width, timer;
+    new ResizeObserver(function () {
+      parts.forEach(grow);
+      var w = d.root.getBoundingClientRect().width;
+      if (Math.abs(w - width) < 1) return;
+      width = w; clearTimeout(timer); timer = setTimeout(measure, 200);
+    }).observe(d.root);
   }
 
   function Demo(root) {
@@ -34,8 +82,11 @@
     this.frame = frame;
     this.q = function (sel) { return root.querySelector(sel); };
     this.qa = function (sel) { return [].slice.call(root.querySelectorAll(sel)); };
+    this.dry = false;
+    var self = this;
     this.say = function (html) {
       if (!cap) return;
+      if (self.dry) { cap.innerHTML = html; return; }
       cap.classList.remove("show");
       setTimeout(function () { cap.innerHTML = html; cap.classList.add("show"); }, 170);
     };
@@ -551,8 +602,9 @@
       var fn = inits[root.getAttribute("data-demo")];
       if (!fn) return;
       root.dataset.demoInit = "1";
-      var runner = fn(new Demo(root));
+      var d = new Demo(root), runner = fn(d);
       if (!runner) return;
+      holdHeight(d, runner);
       root._dmRunner = runner;
       if (io) io.observe(root); else runner.start();
     });

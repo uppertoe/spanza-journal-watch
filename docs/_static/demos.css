@@ -312,3 +312,6 @@ body[data-theme="dark"] .dm { --dm-ok: #5fcf8b; --dm-info: #7ab8ff; --dm-warn: #
 .dm-fpop-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; }
 .dm-fpop-item.gone { display: none; }
 .dm-fpop-item.lit { background: var(--dm-info-bg); }
+
+/* while the engine measures a demo's tallest frame, nothing animates */
+.dm-dry, .dm-dry * { transition: none !important; animation: none !important; }
