@@ -22,6 +22,8 @@ from django.urls import reverse
 from spanza_journal_watch.backend.models import PlankaCardRevision, PlankaIntegrationCredential, PlankaIssueBinding
 from spanza_journal_watch.backend.planka import PlankaAPIError
 from spanza_journal_watch.backend.views import (
+    PLANKA_REVIEW_SEPARATOR_MARKER,
+    _extract_planka_review_body,
     _parse_planka_card_metadata,
     _register_planka_webhook,
     _take_board_description_snapshot,
@@ -850,3 +852,16 @@ class TestParsePlankaCardMetadata:
         meta = _parse_planka_card_metadata(text)
         assert meta["journal_name"] == "Correct Journal"
         assert meta["article_url"] == "https://correct.example.com"
+
+
+class TestExtractPlankaReviewBody:
+    def test_star_bullets_become_dashes(self):
+        text = "Header\n" + PLANKA_REVIEW_SEPARATOR_MARKER + "\nIntro\n\n* First\n* Second\n  * Nested"
+        body, used_separator = _extract_planka_review_body(text)
+        assert used_separator
+        assert body == "Intro\n\n- First\n- Second\n  - Nested"
+
+    def test_emphasis_and_code_fences_untouched(self):
+        text = "*Italic* and **bold**\n\n```\n* literal\n```\n* Item"
+        body, _ = _extract_planka_review_body(text)
+        assert body == "*Italic* and **bold**\n\n```\n* literal\n```\n- Item"

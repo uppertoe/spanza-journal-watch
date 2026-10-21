@@ -283,6 +283,18 @@ def _normalize_planka_review_body(text):
     return body
 
 
+def _normalize_planka_list_markers(text):
+    # Planka's editor saves bullet lists with "*"; reviews use "-". Fenced code is left alone.
+    lines = text.split("\n")
+    in_fence = False
+    for index, line in enumerate(lines):
+        if re.match(r"\s*(```|~~~)", line):
+            in_fence = not in_fence
+        elif not in_fence:
+            lines[index] = re.sub(r"^(\s*)\*(?=[ \t])", r"\1-", line)
+    return "\n".join(lines)
+
+
 def _extract_planka_review_body(text):
     def _canonicalize(value):
         return re.sub(r"\s+", " ", str(value or "")).strip().lower()
@@ -290,7 +302,7 @@ def _extract_planka_review_body(text):
     raw_text = _decode_planka_escaped_text(text)
     if PLANKA_REVIEW_SEPARATOR_MARKER in raw_text:
         _, review_text = raw_text.split(PLANKA_REVIEW_SEPARATOR_MARKER, 1)
-        review_text = review_text.strip()
+        review_text = _normalize_planka_list_markers(review_text.strip())
         return review_text, True
 
     body = raw_text.strip()
@@ -300,7 +312,7 @@ def _extract_planka_review_body(text):
     if _canonicalize(body) == _canonicalize(PLANKA_LEGACY_REVIEW_DESCRIPTION_TEMPLATE):
         return "", False
 
-    return body, False
+    return _normalize_planka_list_markers(body), False
 
 
 def _refresh_binding_lists_from_board(*, client, binding):
