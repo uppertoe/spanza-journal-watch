@@ -192,6 +192,8 @@ class Newsletter(models.Model):
     is_sent = models.BooleanField(default=False)
     is_test_sent = models.BooleanField(default=False)
     resend_enabled = models.BooleanField(default=False)
+    scheduled_send_at = models.DateTimeField(blank=True, null=True)
+    scheduled_by_email = models.EmailField(blank=True, default="")
     issue = models.ForeignKey(Issue, on_delete=models.PROTECT)
     header_image = models.ImageField(
         upload_to=name_image,
@@ -327,7 +329,9 @@ class Newsletter(models.Model):
             )
 
             if content_changed:
+                # An edited newsletter must be tested again, so it is never sent unattended.
                 self.is_test_sent = False
+                self.scheduled_send_at = None
 
         super().save(*args, **kwargs)
 

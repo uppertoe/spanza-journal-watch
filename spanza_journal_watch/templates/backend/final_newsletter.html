@@ -17,6 +17,9 @@
 		{% if newsletter.resend_enabled %}
 			<span class="badge text-bg-danger">Resend enabled</span>
 		{% endif %}
+		{% if newsletter.scheduled_send_at %}
+			<span class="badge text-bg-info">Scheduled</span>
+		{% endif %}
 	</p>
 
 	<div class="card mb-4">
@@ -40,11 +43,25 @@
 					{% csrf_token %}
 					<button type="submit" class="btn btn-outline-danger my-2">Enable one resend</button>
 				</form>
+			{% elif newsletter.scheduled_send_at %}
+				<p>This newsletter is scheduled to be sent to all subscribers at {{ scheduled_send_label }} (Melbourne time).</p>
+				<p class="text-muted">Editing the newsletter cancels the scheduled send.</p>
+				<form method="post" action="{% url "backend:cancel_scheduled_newsletter" newsletter.pk %}">
+					{% csrf_token %}
+					<button type="submit" class="btn btn-outline-secondary my-2">Cancel scheduled send</button>
+				</form>
 			{% elif newsletter.is_test_sent %}
 				<p>Are you sure you're ready to send the newsletter to all subscribers?</p>
 				<form method="post" action="{% url "backend:send_final_newsletter" newsletter.pk %}">
 					{% csrf_token %}
 					<button type="submit" class="btn btn-outline-danger my-2">Send Newsletter</button>
+				</form>
+				<hr>
+				<p class="mb-2">The newsletter can instead be sent to all subscribers at a later time.</p>
+				<form method="post" action="{% url "backend:schedule_newsletter" newsletter.pk %}">
+					{% csrf_token %}
+					{{ schedule_form|crispy }}
+					<button type="submit" class="btn btn-outline-danger">Schedule send</button>
 				</form>
 			{% else %}
 				<p class="mb-0">You must send a test newsletter first. Only tested newsletters may be published.</p>

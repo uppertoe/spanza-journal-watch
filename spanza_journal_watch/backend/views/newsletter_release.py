@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter
@@ -16,6 +17,7 @@ from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newslett
 from ..forms import (
     NewsletterCreateForm,
     NewsletterEditForm,
+    NewsletterScheduleForm,
     NewsletterTestSendForm,
 )
 from .analytics_page import _newsletter_predates_site_analytics, _safe_percentage, _site_analytics_rollout_date
@@ -193,8 +195,54 @@ def final_newsletter(request, pk):
     context = {
         "newsletter": newsletter,
         "test_form": NewsletterTestSendForm(),
+        "schedule_form": NewsletterScheduleForm(),
+        "scheduled_send_label": _format_send_time(newsletter.scheduled_send_at)
+        if newsletter and newsletter.scheduled_send_at
+        else "",
     }
     return render(request, "backend/final_newsletter.html", context)
+
+
+def _format_send_time(value):
+    return timezone.localtime(value).strftime("%-I:%M %p on %A %-d %B %Y").replace("AM", "am").replace("PM", "pm")
+
+
+@login_required
+@permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
+def schedule_newsletter(request, pk):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    newsletter = get_object_or_404(Newsletter, pk=pk)
+    form = NewsletterScheduleForm(request.POST)
+    if not newsletter.is_ready_to_send():
+        messages.error(request, f"Newsletter {newsletter} cannot be scheduled until a test has been sent.")
+    elif form.is_valid():
+        newsletter.scheduled_send_at = form.cleaned_data["send_at"]
+        newsletter.scheduled_by_email = request.user.email or ""
+        newsletter.save(update_fields=["scheduled_send_at", "scheduled_by_email"])
+        when = _format_send_time(newsletter.scheduled_send_at)
+        messages.success(request, f"Newsletter {newsletter} will be sent to all subscribers at {when}.")
+    else:
+        messages.error(request, " ".join(form.errors.get("send_at", ["Enter a valid date and time."])))
+
+    return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
+
+
+@login_required
+@permission_required("backend.send_newsletters", raise_exception=True)  # Prevents login loop
+def cancel_scheduled_newsletter(request, pk):
+    if request.method != "POST":
+        return HttpResponseBadRequest("Bad Request - POST only")
+
+    newsletter = get_object_or_404(Newsletter, pk=pk)
+    if newsletter.scheduled_send_at:
+        when = _format_send_time(newsletter.scheduled_send_at)
+        newsletter.scheduled_send_at = None
+        newsletter.save(update_fields=["scheduled_send_at"])
+        messages.success(request, f"Newsletter {newsletter} will no longer be sent at {when}.")
+
+    return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}))
 
 
 @login_required

@@ -8,6 +8,7 @@ from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 
 from ..layout.models import FeatureArticle, Homepage
@@ -188,6 +189,20 @@ class NewsletterTestSendForm(forms.Form):
 
     def clean_email(self):
         return self.cleaned_data["email"].lower().strip()
+
+
+class NewsletterScheduleForm(forms.Form):
+    send_at = forms.DateTimeField(
+        label="Send at (Melbourne time):",
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+
+    def clean_send_at(self):
+        send_at = self.cleaned_data["send_at"]
+        if send_at <= timezone.now():
+            raise ValidationError("The send time must be in the future.")
+        return send_at
 
 
 class NewsletterEditForm(forms.ModelForm):

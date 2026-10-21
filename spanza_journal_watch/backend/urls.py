@@ -293,6 +293,12 @@ urlpatterns = [
         name="enable_newsletter_resend",
     ),
     path("newsletter/send/confirm/<int:pk>", views.send_final_newsletter, name="send_final_newsletter"),
+    path("newsletter/send/schedule/<int:pk>", views.schedule_newsletter, name="schedule_newsletter"),
+    path(
+        "newsletter/send/schedule/<int:pk>/cancel",
+        views.cancel_scheduled_newsletter,
+        name="cancel_scheduled_newsletter",
+    ),
     path("newsletter/stats/<int:pk>", views.newsletter_stats_detail, name="newsletter_stats_detail"),
     path("analytics", views.analytics_redirect, name="site_analytics"),
     path("analytics/overview/", analytics_views.analytics_overview, name="analytics_overview"),

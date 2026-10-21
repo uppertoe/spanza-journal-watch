@@ -117,7 +117,7 @@ def send_newsletter(newsletter_pk, sender_email=None):
     claimed = (
         Newsletter.objects.filter(pk=newsletter_pk)
         .filter(Q(is_sent=False) | Q(resend_enabled=True))
-        .update(is_sent=True, resend_enabled=False, send_date=timezone.now())
+        .update(is_sent=True, resend_enabled=False, send_date=timezone.now(), scheduled_send_at=None)
     )
     if claimed == 0:
         raise NewsletterNotReadyToSendError(
@@ -182,3 +182,21 @@ def reset_unsubscribe_token(subscriber_pk):
     """
 
     return None
+
+
+@celery_app.task()
+def send_scheduled_newsletters():
+    """Send each newsletter whose scheduled time has passed. Runs every minute from beat."""
+    from .models import Newsletter
+
+    for newsletter in Newsletter.objects.filter(scheduled_send_at__lte=timezone.now()):
+        # Clearing the schedule claims it, so an overlapping run cannot send twice.
+        claimed = Newsletter.objects.filter(pk=newsletter.pk, scheduled_send_at=newsletter.scheduled_send_at).update(
+            scheduled_send_at=None
+        )
+        if not claimed:
+            continue
+        if newsletter.is_ready_to_send():
+            send_newsletter.delay(newsletter.pk, sender_email=newsletter.scheduled_by_email or None)
+        else:
+            logger.warning("Scheduled newsletter %s was not ready to send; schedule cleared", newsletter.pk)

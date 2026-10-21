@@ -11,15 +11,21 @@ Covers:
   - send_final_newsletter: blocks send when not ready (no test send)
 """
 
+import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
-from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
+from spanza_journal_watch.newsletter.tasks import (
+    send_newsletter,
+    send_newsletter_test_email,
+    send_scheduled_newsletters,
+)
 from spanza_journal_watch.submissions.models import Issue
 from spanza_journal_watch.users.tests.factories import UserFactory
 
@@ -266,3 +272,136 @@ class TestSendFinalNewsletter:
             client.post(url)
 
         mock_task.apply_async.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Tests: scheduled sends
+# ---------------------------------------------------------------------------
+
+
+def _make_ready_newsletter():
+    newsletter = _make_newsletter()
+    newsletter.ready_to_send = True
+    newsletter.is_test_sent = True
+    newsletter.save()
+    return newsletter
+
+
+def _local_input(dt):
+    return timezone.localtime(dt).strftime("%Y-%m-%dT%H:%M")
+
+
+class TestScheduleNewsletter:
+    def test_future_time_is_saved_in_melbourne_time(self):
+        client, user = _make_newsletter_manager()
+        newsletter = _make_ready_newsletter()
+
+        resp = client.post(
+            reverse("backend:schedule_newsletter", kwargs={"pk": newsletter.pk}),
+            {"send_at": "2099-01-15T09:00"},
+        )
+
+        assert resp.status_code == 302
+        newsletter.refresh_from_db()
+        local = timezone.localtime(newsletter.scheduled_send_at)
+        assert (local.year, local.hour, local.minute, str(local.tzinfo)) == (2099, 9, 0, "Australia/Melbourne")
+        assert newsletter.scheduled_by_email == user.email
+
+    def test_past_time_is_refused(self):
+        client, _ = _make_newsletter_manager()
+        newsletter = _make_ready_newsletter()
+
+        client.post(
+            reverse("backend:schedule_newsletter", kwargs={"pk": newsletter.pk}),
+            {"send_at": _local_input(timezone.now() - datetime.timedelta(hours=1))},
+        )
+
+        newsletter.refresh_from_db()
+        assert newsletter.scheduled_send_at is None
+
+    def test_untested_newsletter_is_refused(self):
+        client, _ = _make_newsletter_manager()
+        newsletter = _make_newsletter()
+
+        client.post(
+            reverse("backend:schedule_newsletter", kwargs={"pk": newsletter.pk}),
+            {"send_at": "2099-01-15T09:00"},
+        )
+
+        newsletter.refresh_from_db()
+        assert newsletter.scheduled_send_at is None
+
+    def test_page_shows_schedule_form_then_scheduled_time(self):
+        client, _ = _make_newsletter_manager()
+        newsletter = _make_ready_newsletter()
+        url = reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk})
+
+        assert "Schedule send" in client.get(url).content.decode()
+
+        newsletter.scheduled_send_at = timezone.make_aware(datetime.datetime(2099, 1, 15, 9, 0))
+        newsletter.save()
+        content = client.get(url).content.decode()
+        assert "scheduled to be sent to all subscribers at 9:00 am on Thursday 15 January 2099" in content
+        assert "Cancel scheduled send" in content
+
+    def test_cancel_clears_schedule(self):
+        client, _ = _make_newsletter_manager()
+        newsletter = _make_ready_newsletter()
+        newsletter.scheduled_send_at = timezone.now() + datetime.timedelta(days=1)
+        newsletter.save()
+
+        client.post(reverse("backend:cancel_scheduled_newsletter", kwargs={"pk": newsletter.pk}))
+
+        newsletter.refresh_from_db()
+        assert newsletter.scheduled_send_at is None
+
+    def test_editing_content_clears_schedule(self):
+        newsletter = _make_ready_newsletter()
+        newsletter.scheduled_send_at = timezone.now() + datetime.timedelta(days=1)
+        newsletter.save()
+
+        newsletter.subject = "Changed subject"
+        newsletter.save()
+
+        newsletter.refresh_from_db()
+        assert newsletter.scheduled_send_at is None
+        assert not newsletter.is_test_sent
+
+
+class TestSendScheduledNewsletters:
+    def test_due_newsletter_is_sent_once(self):
+        newsletter = _make_ready_newsletter()
+        newsletter.scheduled_send_at = timezone.now() - datetime.timedelta(minutes=1)
+        newsletter.scheduled_by_email = "editor@example.com"
+        newsletter.save()
+
+        with patch("spanza_journal_watch.newsletter.tasks.send_newsletter") as mock_send:
+            send_scheduled_newsletters()
+            send_scheduled_newsletters()
+
+        mock_send.delay.assert_called_once_with(newsletter.pk, sender_email="editor@example.com")
+        newsletter.refresh_from_db()
+        assert newsletter.scheduled_send_at is None
+
+    def test_future_newsletter_is_left_alone(self):
+        newsletter = _make_ready_newsletter()
+        newsletter.scheduled_send_at = timezone.now() + datetime.timedelta(hours=1)
+        newsletter.save()
+
+        with patch("spanza_journal_watch.newsletter.tasks.send_newsletter") as mock_send:
+            send_scheduled_newsletters()
+
+        mock_send.delay.assert_not_called()
+        newsletter.refresh_from_db()
+        assert newsletter.scheduled_send_at is not None
+
+    def test_unready_newsletter_is_not_sent(self):
+        newsletter = _make_newsletter()
+        Newsletter.objects.filter(pk=newsletter.pk).update(
+            scheduled_send_at=timezone.now() - datetime.timedelta(minutes=1)
+        )
+
+        with patch("spanza_journal_watch.newsletter.tasks.send_newsletter") as mock_send:
+            send_scheduled_newsletters()
+
+        mock_send.delay.assert_not_called()
