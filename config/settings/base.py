@@ -172,7 +172,7 @@ MIDDLEWARE = [
     "spanza_journal_watch.utils.middleware.RemoveSlashMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "request_logging.middleware.LoggingMiddleware",
+    "spanza_journal_watch.utils.middleware.LoggingMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

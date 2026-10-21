@@ -1,5 +1,6 @@
 from django.http import HttpResponsePermanentRedirect
 from django.urls import Resolver404, resolve
+from request_logging.middleware import LoggingMiddleware as BaseLoggingMiddleware
 
 
 class RemoveSlashMiddleware:
@@ -30,3 +31,22 @@ class RemoveSlashMiddleware:
                     query = request.META.get("QUERY_STRING", "")
                     return HttpResponsePermanentRedirect(f"{stripped}?{query}" if query else stripped)
         return self.get_response(request)
+
+
+class LoggingMiddleware(BaseLoggingMiddleware):
+    """django-request-logging that leaves multipart bodies unread.
+
+    The package reads request.body on every request, which holds an entire
+    upload in memory and applies DATA_UPLOAD_MAX_MEMORY_SIZE to file data
+    (Django normally exempts files from it). A large feature image therefore
+    raised RequestDataTooBig before the view ran. Multipart requests are still
+    logged, just without their body.
+    """
+
+    def __call__(self, request):
+        if not request.headers.get("content-type", "").startswith("multipart/form-data"):
+            return super().__call__(request)
+        response = self.get_response(request)
+        self.process_request(request, response, b"")
+        self.process_response(request, response)
+        return response
