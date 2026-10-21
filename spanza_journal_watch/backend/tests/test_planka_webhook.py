@@ -865,3 +865,8 @@ class TestExtractPlankaReviewBody:
         text = "*Italic* and **bold**\n\n```\n* literal\n```\n* Item"
         body, _ = _extract_planka_review_body(text)
         assert body == "*Italic* and **bold**\n\n```\n* literal\n```\n- Item"
+
+    def test_underline_markers_removed(self):
+        text = "## **++Methods++**\n\nA ++key++ point and C++ code\n\n```\n++kept++\n```"
+        body, _ = _extract_planka_review_body(text)
+        assert body == "## **Methods**\n\nA key point and C++ code\n\n```\n++kept++\n```"
