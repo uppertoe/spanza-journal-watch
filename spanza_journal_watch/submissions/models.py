@@ -28,7 +28,7 @@ from markdownx.utils import markdownify
 
 from spanza_journal_watch.utils.cache import get_content_cache_version
 from spanza_journal_watch.utils.celerytasks import celery_resize_image
-from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text
+from spanza_journal_watch.utils.functions import estimate_reading_time, get_unique_slug, shorten_text, split_honorific
 from spanza_journal_watch.utils.modelmethods import name_image
 from spanza_journal_watch.utils.models import TimeStampedModel
 
@@ -169,6 +169,10 @@ class Author(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         resize_profile_image = image_changed(self, "profile_image")
+        # Names typed as "Dr Jane Doe" would otherwise display as "Dr Dr Jane Doe".
+        honorific, name = split_honorific(self.name)
+        if honorific:
+            self.title, self.name = honorific, name
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.name))
         super().save(*args, **kwargs)

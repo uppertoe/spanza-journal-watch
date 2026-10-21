@@ -219,7 +219,7 @@ class TestStage1IssueAndReview:
         assert issue.reviews.count() == 1
         review = issue.reviews.first()
         assert review.article.name == "Effect of Drug X on Outcomes"
-        assert review.author.name == "Dr Jane Smith"
+        assert (review.author.title, review.author.name) == ("Dr", "Jane Smith")
         assert review.is_featured is True
 
 

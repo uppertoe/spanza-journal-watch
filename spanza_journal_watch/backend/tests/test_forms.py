@@ -408,7 +408,7 @@ class TestIssueBuilderReviewForm:
 
         assert review.pk is not None
         assert review.article.name == "Test Article"
-        assert review.author.name == "Dr Jane Smith"
+        assert (review.author.title, review.author.name) == ("Dr", "Jane Smith")
         assert issue.reviews.filter(pk=review.pk).exists()
 
     def test_save_uses_existing_article(self):

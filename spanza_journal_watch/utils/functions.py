@@ -1,3 +1,4 @@
+import re
 from html.parser import HTMLParser
 
 from django.apps import apps as django_apps
@@ -176,3 +177,30 @@ def split_title(title):
     if len(head.split()) < MIN_TITLE_WORDS or not tail:
         return text, ""
     return head, tail
+
+
+_HONORIFIC_PREFIX = re.compile(
+    r"^(?P<title>a/prof|assoc(?:iate)?\.? prof(?:essor)?|prof(?:essor)?|dr|mrs|mr|ms|miss)\.?\s+(?P<rest>\S.*)$",
+    re.IGNORECASE,
+)
+_HONORIFIC_DISPLAY = {
+    "dr": "Dr",
+    "prof": "Prof",
+    "professor": "Prof",
+    "mr": "Mr",
+    "mrs": "Mrs",
+    "ms": "Ms",
+    "miss": "Miss",
+}
+
+
+def split_honorific(name):
+    """Split a leading honorific off a person's name: "Dr Jane Doe" -> ("Dr", "Jane Doe").
+
+    Returns ("", name) when the name does not start with one.
+    """
+    match = _HONORIFIC_PREFIX.match((name or "").strip())
+    if not match:
+        return "", (name or "").strip()
+    title = match.group("title").lower().rstrip(".")
+    return _HONORIFIC_DISPLAY.get(title, "A/Prof"), match.group("rest").strip()

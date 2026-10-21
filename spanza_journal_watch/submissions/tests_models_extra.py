@@ -10,7 +10,8 @@ Covers:
 import pytest
 from django.urls import reverse
 
-from spanza_journal_watch.submissions.models import CuratedCollection, MeshTagMapping, Tag
+from spanza_journal_watch.submissions.models import Author, CuratedCollection, MeshTagMapping, Tag
+from spanza_journal_watch.utils.functions import split_honorific
 
 pytestmark = pytest.mark.django_db
 
@@ -113,3 +114,26 @@ class TestImageResizeOnSave:
         service.logo = self._png("replacement.png")
         service.save()
         assert resize.call_count == 2
+
+
+class TestAuthorHonorific:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("Dr Priya Sreedharan", ("Dr", "Priya Sreedharan")),
+            ("dr. Sorcha Evans", ("Dr", "Sorcha Evans")),
+            ("Professor Jane Doe", ("Prof", "Jane Doe")),
+            ("A/Prof Jane Doe", ("A/Prof", "Jane Doe")),
+            ("Assoc Prof Jane Doe", ("A/Prof", "Jane Doe")),
+            ("Drew Barrymore", ("", "Drew Barrymore")),
+            ("Dr", ("", "Dr")),
+        ],
+    )
+    def test_split_honorific(self, raw, expected):
+        assert split_honorific(raw) == expected
+
+    @pytest.mark.django_db
+    def test_save_moves_honorific_into_title(self):
+        author = Author.objects.create(name="Prof Andrew Chazan")
+        assert (author.title, author.name, str(author)) == ("Prof", "Andrew Chazan", "Prof Andrew Chazan")
+        assert author.slug == "andrew-chazan"
