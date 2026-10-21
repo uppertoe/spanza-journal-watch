@@ -245,6 +245,24 @@ class IssueModelTest(TestCase):
         )
         self.assertEqual(self.issue.get_header_feature_article(), feature_article)
 
+    def test_detail_header_shows_own_body_not_another_issues(self):
+        cache.clear()
+        self.issue.active = True
+        self.issue.body = "This special guest edition features reviews from APAGBI."
+        self.issue.save()
+        PageHeader.objects.create(
+            feature_article=FeatureArticle.objects.create(
+                title="January 2026", body="This issue features contributors from Westmead."
+            ),
+            page_type=PageHeader.PageType.ISSUE_DETAIL,
+            active=True,
+        )
+
+        response = self.client.get(self.issue.get_absolute_url())
+
+        self.assertContains(response, "This special guest edition features reviews from APAGBI.")
+        self.assertNotContains(response, "Westmead")
+
 
 class CommentModelTest(TestCase):
     def setUp(self):

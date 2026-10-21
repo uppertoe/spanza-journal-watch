@@ -82,8 +82,10 @@ class IssueDetailView(
         # Rearrange the sidebar to ensure on top in mobile
         context["arrange_sidebar_top"] = self.arrange_sidebar_top
 
-        # Override header
-        override = {"title": self.object.name}
+        # Override header. The active ISSUE_DETAIL header is whichever legacy
+        # per-issue header was edited last, so its body belongs to some other
+        # issue; the issue's own title and body always win.
+        override = {"title": self.object.name, "body": self.object.body}
         header = PageHeader.get_active_for(PageHeader.PageType.ISSUE_DETAIL)
         context["page_header"] = header.collate_fields(**override) if header else override
 
