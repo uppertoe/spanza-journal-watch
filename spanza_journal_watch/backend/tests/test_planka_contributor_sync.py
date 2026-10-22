@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from spanza_journal_watch.backend.models import IssueContributor, PlankaIssueBinding
+from spanza_journal_watch.backend.oidc_validator import _display_name
 from spanza_journal_watch.backend.views.planka_boards import _sync_contributor_to_planka
 from spanza_journal_watch.submissions.models import Issue
 
@@ -18,9 +19,14 @@ class FakePlankaClient:
         self.removed = []
         self.added = []
         self.updated = []
+        self.renamed = []
 
     def find_user_by_email(self, email):
         return {"id": "user-1", "name": "Dr Jane Smith"}
+
+    def update_user(self, user_id, name):
+        self.renamed.append((user_id, name))
+        return {"id": user_id, "name": name}
 
     def find_board_membership(self, board_id, user_id):
         return self.memberships.get(board_id)
@@ -99,3 +105,26 @@ def test_sync_corrects_role_in_place(contributor):
 
     assert client.removed == []
     assert client.updated == [("m-instr", "editor")]
+
+
+def test_planka_name_drops_honorific_so_initials_are_the_persons(contributor):
+    client = FakePlankaClient(
+        {"reviews": {"id": "m-reviews", "role": "editor"}, "instr": {"id": "m-instr", "role": "viewer"}}
+    )
+
+    _sync(client, contributor)
+
+    assert client.renamed == [("user-1", "Jane Smith")]
+
+
+def test_oidc_name_claim_drops_honorific():
+    class User:
+        email = "jane@example.com"
+
+    user = User()
+    user.name = "Dr Jane Smith"
+    assert _display_name(user) == "Jane Smith"
+    user.name = "Jane Smith"
+    assert _display_name(user) == "Jane Smith"
+    user.name = ""
+    assert _display_name(user) == "jane@example.com"

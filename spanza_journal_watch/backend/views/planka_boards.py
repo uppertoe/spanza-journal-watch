@@ -6,6 +6,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from spanza_journal_watch.utils.functions import split_honorific
+
 from ..models import (
     IssueContributor,
     PlankaCardRevision,
@@ -133,7 +135,8 @@ def _sync_contributor_to_planka(contributor):
 
         planka_user = client.find_user_by_email(contributor.email)
 
-        desired_name = (contributor.name or "").strip() or contributor.email
+        # No honorific: Planka builds avatar initials from the name.
+        desired_name = split_honorific(contributor.name)[1] or contributor.email
         if not planka_user:
             try:
                 planka_user = client.create_user(contributor.email, desired_name)
@@ -154,7 +157,7 @@ def _sync_contributor_to_planka(contributor):
         User = get_user_model()
         django_user = User.objects.filter(email__iexact=contributor.email).first()
         if django_user and not (getattr(django_user, "name", "") or "").strip():
-            django_user.name = desired_name
+            django_user.name = (contributor.name or "").strip() or contributor.email
             django_user.save(update_fields=["name"])
 
         planka_user_id = str(planka_user["id"])
