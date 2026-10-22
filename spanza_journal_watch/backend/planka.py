@@ -440,6 +440,10 @@ class PlankaClient:
         )
         return payload.get("item", {})
 
+    def update_board_member(self, membership_id, role):
+        payload = self._request("PATCH", f"/board-memberships/{membership_id}", json={"role": role})
+        return payload.get("item", {})
+
     def remove_board_member(self, membership_id):
         self._request("DELETE", f"/board-memberships/{membership_id}")
         return True

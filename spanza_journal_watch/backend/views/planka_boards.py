@@ -104,6 +104,20 @@ def _take_board_description_snapshot(client, binding):
         )
 
 
+def _ensure_board_membership(client, board_id, planka_user_id, role):
+    """
+    Return the id of the user's membership of the board, adding it or
+    correcting its role as needed. An existing membership is never deleted:
+    Planka drops the user from every card on the board when it is.
+    """
+    existing = client.find_board_membership(board_id, planka_user_id)
+    if not existing:
+        return str(client.add_board_member(board_id, planka_user_id, role=role).get("id", ""))
+    if existing.get("role") != role:
+        client.update_board_member(str(existing["id"]), role)
+    return str(existing["id"])
+
+
 def _sync_contributor_to_planka(contributor):
     """
     Ensure the contributor has a Planka user account and is a member of the
@@ -145,26 +159,16 @@ def _sync_contributor_to_planka(contributor):
 
         planka_user_id = str(planka_user["id"])
 
-        # Remove stale memberships before (re-)adding
-        for stale_id in [contributor.planka_membership_id, contributor.planka_instructions_membership_id]:
-            if stale_id:
-                try:
-                    client.remove_board_member(stale_id)
-                except PlankaAPIError:
-                    pass
-
         # Reviews board — editor so the contributor can edit cards
-        membership = client.add_board_member(binding.board_id, planka_user_id, role="editor")
-        membership_id = str(membership.get("id", ""))
+        membership_id = _ensure_board_membership(client, binding.board_id, planka_user_id, "editor")
 
         # Instructions board — coordinators get editor access; others get read-only viewer
         instructions_membership_id = ""
         if binding.instructions_board_id:
             instructions_role = "editor" if contributor.role == IssueContributor.Role.COORDINATOR else "viewer"
-            instr_membership = client.add_board_member(
-                binding.instructions_board_id, planka_user_id, role=instructions_role
+            instructions_membership_id = _ensure_board_membership(
+                client, binding.instructions_board_id, planka_user_id, instructions_role
             )
-            instructions_membership_id = str(instr_membership.get("id", ""))
 
         contributor.planka_user_id = planka_user_id
         contributor.planka_membership_id = membership_id
