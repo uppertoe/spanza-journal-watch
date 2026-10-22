@@ -196,10 +196,14 @@ def final_newsletter(request, pk):
         "newsletter": newsletter,
         "test_form": NewsletterTestSendForm(),
         "schedule_form": NewsletterScheduleForm(),
+        # A queued test email marks the newsletter as tested a few seconds later; the publish card polls until then.
+        "test_pending": bool(newsletter and request.GET.get("test_queued") and not newsletter.is_test_sent),
         "scheduled_send_label": _format_send_time(newsletter.scheduled_send_at)
         if newsletter and newsletter.scheduled_send_at
         else "",
     }
+    if newsletter and request.headers.get("HX-Request") == "true":
+        return render(request, "backend/_final_newsletter_publish.html", {**context, "oob": True})
     return render(request, "backend/final_newsletter.html", context)
 
 
@@ -261,6 +265,7 @@ def send_test_newsletter(request, pk):
         email = form.cleaned_data["email"]
         send_newsletter_test_email.apply_async((newsletter.pk, email), countdown=1)
         messages.success(request, f"Test newsletter queued for {email}")
+        return redirect(reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk}) + "?test_queued=1")
     else:
         messages.error(request, "Please enter a valid test email address.")
 

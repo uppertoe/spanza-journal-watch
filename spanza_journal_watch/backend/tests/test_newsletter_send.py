@@ -405,3 +405,28 @@ class TestSendScheduledNewsletters:
             send_scheduled_newsletters()
 
         mock_send.delay.assert_not_called()
+
+
+class TestTestSendPolling:
+    def test_page_polls_while_queued_test_is_pending(self):
+        client, _ = _make_newsletter_manager()
+        newsletter = _make_newsletter()
+        url = reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk})
+
+        content = client.get(url + "?test_queued=1").content.decode()
+
+        assert 'hx-trigger="every 2s"' in content
+        assert "The test email is being sent." in content
+        assert 'hx-trigger="every 2s"' not in client.get(url).content.decode()
+
+    def test_poll_returns_send_controls_once_tested(self):
+        client, _ = _make_newsletter_manager()
+        newsletter = _make_ready_newsletter()
+        url = reverse("backend:final_newsletter", kwargs={"pk": newsletter.pk})
+
+        content = client.get(url + "?test_queued=1", headers={"HX-Request": "true"}).content.decode()
+
+        assert 'hx-trigger="every 2s"' not in content
+        assert "Send Newsletter" in content
+        assert 'id="newsletter-status" class="mb-3" hx-swap-oob="true"' in content
+        assert "<h1>" not in content

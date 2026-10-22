@@ -1,0 +1,16 @@
+<p id="newsletter-status" class="mb-3"{% if oob %} hx-swap-oob="true"{% endif %}><strong>Status:</strong>
+	{% if newsletter.is_sent %}
+		<span class="badge text-bg-success">Already sent</span>
+	{% endif %}
+	{% if newsletter.is_test_sent %}
+		<span class="badge text-bg-success">Tested</span>
+	{% else %}
+		<span class="badge text-bg-warning">Not yet tested</span>
+	{% endif %}
+	{% if newsletter.resend_enabled %}
+		<span class="badge text-bg-danger">Resend enabled</span>
+	{% endif %}
+	{% if newsletter.scheduled_send_at %}
+		<span class="badge text-bg-info">Scheduled</span>
+	{% endif %}
+</p>

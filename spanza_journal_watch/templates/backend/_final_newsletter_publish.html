@@ -1,0 +1,49 @@
+{% load crispy_forms_tags %}
+<div
+	id="newsletter-publish"
+	class="card border-danger"
+	{% if test_pending %}
+		hx-get="{% url "backend:final_newsletter" newsletter.pk %}?test_queued=1"
+		hx-trigger="every 2s"
+		hx-swap="outerHTML"
+	{% endif %}
+>
+	<div class="card-header text-danger">Publish to subscriber list</div>
+	<div class="card-body">
+		{% if newsletter.is_sent and not newsletter.resend_enabled %}
+			<p>This newsletter has already been sent. Resending is disabled by default.</p>
+			<form method="post" action="{% url "backend:enable_newsletter_resend" newsletter.pk %}">
+				{% csrf_token %}
+				<button type="submit" class="btn btn-outline-danger my-2">Enable one resend</button>
+			</form>
+		{% elif newsletter.scheduled_send_at %}
+			<p>This newsletter is scheduled to be sent to all subscribers at {{ scheduled_send_label }} (Melbourne time).</p>
+			<p class="text-muted">Editing the newsletter cancels the scheduled send.</p>
+			<form method="post" action="{% url "backend:cancel_scheduled_newsletter" newsletter.pk %}">
+				{% csrf_token %}
+				<button type="submit" class="btn btn-outline-secondary my-2">Cancel scheduled send</button>
+			</form>
+		{% elif newsletter.is_test_sent %}
+			<p>Are you sure you're ready to send the newsletter to all subscribers?</p>
+			<form method="post" action="{% url "backend:send_final_newsletter" newsletter.pk %}">
+				{% csrf_token %}
+				<button type="submit" class="btn btn-outline-danger my-2">Send Newsletter</button>
+			</form>
+			<hr>
+			<p class="mb-2">The newsletter can instead be sent to all subscribers at a later time.</p>
+			<form method="post" action="{% url "backend:schedule_newsletter" newsletter.pk %}">
+				{% csrf_token %}
+				{{ schedule_form|crispy }}
+				<button type="submit" class="btn btn-outline-danger">Schedule send</button>
+			</form>
+		{% elif test_pending %}
+			<p class="mb-0 d-flex align-items-center">
+				<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+				The test email is being sent. The send controls will be shown here once the test email has been sent.
+			</p>
+		{% else %}
+			<p class="mb-0">You must send a test newsletter first. Only tested newsletters may be published.</p>
+		{% endif %}
+	</div>
+</div>
+{% if oob %}{% include "backend/_final_newsletter_status.html" %}{% endif %}
