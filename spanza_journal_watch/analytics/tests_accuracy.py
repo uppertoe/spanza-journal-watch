@@ -358,6 +358,8 @@ def test_open_sweeper_reclassifies_history_idempotently():
     mpp = make("Mozilla/5.0", False, timedelta(hours=1))
     webmail = make(SAFARI_UA, True, timedelta(hours=1))
     prompt = make(SAFARI_UA, False, timedelta(seconds=10))
+    # Opens from before user-agents were stored keep their recorded verdict.
+    unrecorded = make("", False, timedelta(seconds=10))
 
     first = reclassify_newsletter_opens_task(lookback_days=None)
     second = reclassify_newsletter_opens_task(lookback_days=None)
@@ -367,6 +369,7 @@ def test_open_sweeper_reclassifies_history_idempotently():
     assert (rows[mpp].automated, rows[mpp].automated_reason) == (True, "apple_mpp")
     assert (rows[webmail].automated, rows[webmail].automated_reason) == (False, "")
     assert (rows[prompt].automated, rows[prompt].automated_reason) == (True, "send_window")
+    assert (rows[unrecorded].automated, rows[unrecorded].automated_reason) == (False, "")
     assert first["human"] == 2
     assert second == {"automated": {}, "human": 0, "dry_run": False}
 

@@ -406,8 +406,12 @@ def reclassify_newsletter_opens_task(lookback_days=7, dry_run=False):
     no recorded reason are touched. Those are the historical rows and the
     human opens since, which the user-agent and window alone reproduce, so the
     task is idempotent. ``lookback_days=None`` sweeps every open.
+
+    Opens with no user-agent are left alone: before March 2026 none was
+    stored, so those rows keep the verdict they were recorded with, and an
+    empty user-agent since then is flagged when the open is recorded.
     """
-    opens = NewsletterOpen.objects.filter(automated_reason="")
+    opens = NewsletterOpen.objects.filter(automated_reason="").exclude(user_agent="")
     if lookback_days is not None:
         opens = opens.filter(timestamp__gte=timezone.now() - timedelta(days=lookback_days))
 
