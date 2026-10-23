@@ -15,6 +15,6 @@ def content_cache_version(request):
 
     return {
         "content_cache_version": get_content_cache_version(),
-        "default_og_image": request.build_absolute_uri(static("images/logo/spanza-logo-blue.png")),
+        "default_og_image": request.build_absolute_uri(static("images/og/journal-watch-share.png")),
         "media_origin": media_origin,
     }

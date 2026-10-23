@@ -107,6 +107,18 @@ class TestRobotsAndNoindex:
         assert '<meta name="robots" content="noindex">' in client.get(reverse("account_login")).content.decode()
 
 
+class TestShareImage:
+    def test_pages_without_their_own_image_share_the_journal_watch_card(self, client):
+        body = client.get(reverse("home")).content.decode()
+        assert 'property="og:image" content="http://testserver/static/images/og/journal-watch-share' in body
+        assert '<meta name="twitter:card" content="summary_large_image">' in body
+
+    def test_review_without_feature_image_shares_the_journal_watch_card(self, client):
+        body = client.get(_review("Imageless paper").get_absolute_url()).content.decode()
+        assert 'property="og:image" content="http://testserver/static/images/og/journal-watch-share' in body
+        assert '<meta name="twitter:card" content="summary_large_image">' in body
+
+
 class TestIndexNowOnReviewEdit:
     def test_editing_a_live_review_queues_a_ping(self, client):
         from django.contrib.auth.models import Permission

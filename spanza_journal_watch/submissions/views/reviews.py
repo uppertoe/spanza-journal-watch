@@ -79,7 +79,7 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
         og_image = (
             self.request.build_absolute_uri(self.object.feature_image.url)
             if self.object.feature_image
-            else self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png"))
+            else self.request.build_absolute_uri(static("images/og/journal-watch-share.png"))
         )
         article = self.object.article
         item_reviewed = {
