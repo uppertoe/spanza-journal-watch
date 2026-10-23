@@ -415,7 +415,7 @@ class JournalListView(AnonymousCacheMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(_journal_browser_context(self.request))
-        context["page_title"] = "Journals | Journal Watch"
+        context["page_title"] = "Journals | SPANZA Journal Watch"
         context["page_meta_description"] = (
             "Browse recent paediatric anaesthesia articles from the journals SPANZA Journal Watch follows, "
             "month by month, with filters and community recommendations for further reading."

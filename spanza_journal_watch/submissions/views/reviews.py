@@ -16,7 +16,13 @@ from spanza_journal_watch.utils.functions import shorten_text
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HitMixin, HtmxMixin, SidebarMixin
 
 from ..models import Review
-from .shared import SEO_TITLE_MAX_LENGTH, build_request_absolute_url, build_review_meta_description, build_share_urls
+from .shared import (
+    SEO_TITLE_MAX_LENGTH,
+    build_author_schema,
+    build_request_absolute_url,
+    build_review_meta_description,
+    build_share_urls,
+)
 
 
 class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, BaseBreadcrumbMixin, DetailView):
@@ -45,8 +51,12 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
         article_title = self.object.article.get_title().strip()
         headline = self.object.get_display_headline()
         share_title = f"SPANZA Journal Watch - {headline}"
-        seo_title = shorten_text(headline.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
+        # Search results show the paper's title, which carries the terms people
+        # search for; social cards lead with the editorial headline.
+        seo_title = shorten_text(article_title.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
         context["page_title"] = f"{seo_title} | SPANZA Journal Watch"
+        share_card_title = shorten_text(headline.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
+        context["share_card_title"] = f"{share_card_title} | SPANZA Journal Watch"
         context["display_headline"] = headline
         context["has_editorial_headline"] = bool((self.object.editorial_headline or "").strip())
         bottom_line = (self.object.bottom_line or "").strip()
@@ -105,13 +115,10 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
                 "url": canonical_url,
                 "image": og_image,
                 "datePublished": review_date.isoformat() if review_date else "",
-                "author": {
-                    "@type": "Person",
-                    "name": str(self.object.author),
-                },
+                **({"author": build_author_schema(self.request, self.object.author)} if self.object.author else {}),
                 "publisher": {
                     "@type": "Organization",
-                    "name": "Journal Watch",
+                    "name": "SPANZA Journal Watch",
                     "logo": {
                         "@type": "ImageObject",
                         "url": self.request.build_absolute_uri(static("images/logo/spanza-logo-blue.png")),

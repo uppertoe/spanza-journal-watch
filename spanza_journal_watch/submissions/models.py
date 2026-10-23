@@ -302,10 +302,11 @@ class Review(TimeStampedModel):
     slug = models.SlugField(max_length=50, null=False, blank=True, unique=True)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, blank=True, null=True, related_name="reviews")
     body = MarkdownxField()
-    # Editorial framing for search and sharing. The headline is the reviewer's
-    # angle (the question or the finding), which is what people search for; the
-    # paper's own title stays as the subtitle. The bottom line is a short plain
-    # text takeaway used for descriptions and a callout on the page.
+    # Editorial framing for readers and sharing. The headline is the reviewer's
+    # angle (the question or the finding) and leads the page and social cards;
+    # the paper's own title stays in <title>, since it carries the terms people
+    # search for. The bottom line is a short plain text takeaway used for
+    # descriptions and a callout on the page.
     editorial_headline = models.CharField(max_length=140, blank=True)
     bottom_line = models.TextField(blank=True)
     # Machine drafts wait here until the chief editor reads and approves them;

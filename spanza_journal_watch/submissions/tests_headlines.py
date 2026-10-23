@@ -1,6 +1,7 @@
 """Editorial headlines: extraction from the body, drafting via Claude, editor and page rendering."""
 
 import json
+import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -11,7 +12,7 @@ from django.urls import reverse
 
 from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.submissions.headlines import draft_review_headline, extract_bottom_line
-from spanza_journal_watch.submissions.models import Issue, Review
+from spanza_journal_watch.submissions.models import Author, HealthService, Issue, Review
 from spanza_journal_watch.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -135,15 +136,17 @@ class TestPublicRendering:
         assert "Unapproved" not in body
         assert "<title>A paper about neuromuscular block | SPANZA Journal Watch</title>" in body
 
-    def test_headline_becomes_title_h1_and_structured_data(self, client):
+    def test_headline_leads_page_and_cards_while_title_keeps_paper(self, client):
         review = _review(headline="Children need quantitative monitoring of neuromuscular block")
         review.bottom_line = "Monitor every child. Reverse based on the numbers."
         review.save()
         body = client.get(review.get_absolute_url()).content.decode()
+        assert "<title>A paper about neuromuscular block | SPANZA Journal Watch</title>" in body
         assert (
-            "<title>Children need quantitative monitoring of neuromuscular block | SPANZA Journal Watch</title>"
-            in body
+            '<meta property="og:title" content="Children need quantitative monitoring of neuromuscular block'
+            ' | SPANZA Journal Watch">' in body
         )
+        assert '"headline": "Children need quantitative monitoring of neuromuscular block"' in body
         assert "Children need quantitative monitoring of neuromuscular block" in body.split("<article")[0]
         assert '"alternativeHeadline": "A paper about neuromuscular block"' in body
         assert 'name="description" content="Monitor every child. Reverse based on the numbers.' in body
@@ -308,3 +311,48 @@ class TestHeadlineQueue:
     def test_queue_requires_chief_editor(self, client):
         client.force_login(UserFactory())
         assert client.get(reverse("backend:headline_queue")).status_code == 403
+
+
+class TestAuthorStructuredData:
+    def test_review_links_author_page_with_affiliation(self, client):
+        service = HealthService.objects.create(name="Starship Children's Hospital")
+        author = Author.objects.create(name="Jane Smith")
+        author.health_services.add(service)
+        review = _review()
+        review.author = author
+        review.save()
+        body = client.get(review.get_absolute_url()).content.decode()
+        data = _structured(body, "Article")
+        assert data["author"] == {
+            "@type": "Person",
+            "name": "Dr Jane Smith",
+            "url": f"http://testserver{author.get_absolute_url()}",
+            "affiliation": [{"@type": "Organization", "name": "Starship Children's Hospital"}],
+        }
+        assert data["publisher"]["name"] == "SPANZA Journal Watch"
+        assert '<meta property="og:site_name" content="SPANZA Journal Watch">' in body
+
+    def test_anonymous_author_has_no_profile_link(self, client):
+        review = _review()
+        review.author = Author.objects.create(name="Anonymous", title="", anonymous=True)
+        review.save()
+        data = _structured(client.get(review.get_absolute_url()).content.decode(), "Article")
+        assert "url" not in data["author"]
+
+    def test_review_without_author_omits_author(self, client):
+        data = _structured(client.get(_review().get_absolute_url()).content.decode(), "Article")
+        assert "author" not in data
+
+    def test_author_page_person_carries_url(self, client):
+        author = Author.objects.create(name="Jane Smith")
+        _review().__class__.objects.update(author=author)
+        data = _structured(client.get(author.get_absolute_url()).content.decode(), "ProfilePage")
+        assert data["mainEntity"]["url"] == f"http://testserver{author.get_absolute_url()}"
+
+
+def _structured(body, schema_type):
+    for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
+        data = json.loads(block)
+        if data.get("@type") == schema_type:
+            return data
+    raise AssertionError(f"No {schema_type} structured data")

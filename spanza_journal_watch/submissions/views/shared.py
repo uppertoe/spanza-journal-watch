@@ -61,6 +61,17 @@ def build_request_absolute_url(request, path):
     return request.build_absolute_uri(path)
 
 
+def build_author_schema(request, author):
+    """A schema.org Person for a review author, linked to their profile page when they have one."""
+    person = {"@type": "Person", "name": str(author)}
+    if not author.anonymous:
+        person["url"] = build_request_absolute_url(request, author.get_absolute_url())
+    affiliations = [{"@type": "Organization", "name": service.name} for service in author.health_services.all()]
+    if affiliations:
+        person["affiliation"] = affiliations
+    return person
+
+
 # Longest article title we place in <title>; longer ones are cut at a word boundary.
 SEO_TITLE_MAX_LENGTH = 150
 # Search engines flag descriptions shorter than this as too thin to be useful.

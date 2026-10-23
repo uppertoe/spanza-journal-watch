@@ -1,8 +1,9 @@
 """Editorial headlines and bottom lines for reviews.
 
-Search engines rank a review for the question it answers, not for the title of
-the paper it discusses; the paper's own title is always won by the publisher.
-This module derives two short pieces of editorial framing from a review:
+The headline leads the review page and its social cards with the question the
+review answers; the page's <title> keeps the paper's own title, which carries
+the terms people search for. This module derives two short pieces of editorial
+framing from a review:
 
 * ``extract_bottom_line`` pulls the reviewer's own take-home section out of the
   body when one exists (about half of live reviews have one), as plain text.
@@ -100,19 +101,21 @@ paediatric anaesthetists review recent papers for their colleagues. The readers 
 clinicians in Australia and New Zealand.
 
 Given a review, write:
-1. headline: one line of at most 100 characters that says what the review found or the \
-clinical question it settles, in plain Australian English. It must not repeat the paper's \
-title, must not be a question unless the review genuinely leaves it open, and must not use \
-colons, exclamation marks, quotation marks or promotional language. Prefer a concrete clinical \
-claim over a description of the study. Examples of the register: "Neuromuscular block in \
-children needs quantitative monitoring, not clinical judgement"; "Strict milk fasting before \
-infant anaesthesia adds risk without reducing aspiration".
-2. bottom_line: two to four sentences, at most 60 words, giving the reviewer's take-home \
-message for practice. If the review contains its own take-home or bottom-line section, \
-stay faithful to it and condense it; do not introduce claims the reviewer did not make.
+1. headline: one line of at most 100 characters, in plain Australian English, giving the \
+reviewer's verdict on the paper: whether it should change practice, how far its conclusions \
+can be trusted, or what a clinician should take from it. Where the reviewer is sceptical, \
+enthusiastic or qualified, the headline says so. Do not restate the paper's result as though \
+the paper were speaking. It must not repeat the paper's title, must not be a question, and \
+must not use colons, exclamation marks, quotation marks or promotional language. Examples of \
+the register: "The case for routine neuromuscular block, monitoring and reversal in children \
+is compelling"; "Augmented reality may ease preoperative anxiety, but this trial's \
+conclusions outrun its data".
+2. bottom_line: two to four sentences, at most 60 words, giving the reviewer's judgement and \
+the reasons for it, drawn from the commentary, strengths, limitations and bottom line. Refer \
+to the reviewer as "the reviewer". Stay faithful to the reviewer; do not introduce opinions \
+or claims the reviewer did not make.
 
-Do not use dashes as sentence separators. Write in the third person about the study; do not \
-address the reader."""
+Do not use dashes as sentence separators. Do not address the reader."""
 
 _OUTPUT_SCHEMA = {
     "type": "object",

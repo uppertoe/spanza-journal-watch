@@ -12,7 +12,12 @@ from view_breadcrumbs import BaseBreadcrumbMixin
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HitMixin, HtmxMixin, SidebarMixin
 
 from ..models import Author, HealthService, Review
-from .shared import attach_review_display_fields, build_paginated_canonical_url, build_request_absolute_url
+from .shared import (
+    attach_review_display_fields,
+    build_author_schema,
+    build_paginated_canonical_url,
+    build_request_absolute_url,
+)
 
 
 class AuthorDetailView(
@@ -58,10 +63,7 @@ class AuthorDetailView(
                 "@context": "https://schema.org",
                 "@type": "ProfilePage",
                 "url": context["canonical_url"],
-                "mainEntity": {
-                    "@type": "Person",
-                    "name": str(self.object),
-                },
+                "mainEntity": build_author_schema(self.request, self.object),
             }
         )
 

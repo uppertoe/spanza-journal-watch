@@ -3,7 +3,7 @@
 <html lang="{{ LANGUAGE_CODE }}">
   <head>{% include "fragments/head_theme_bootstrap.html" %}
     <meta charset="utf-8">
-    <title>{% block title %}{{ page_title|default:"Journal Watch" }}{% endblock title %}</title>
+    <title>{% block title %}{{ page_title|default:"SPANZA Journal Watch" }}{% endblock title %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{% block meta_description %}{{ page_meta_description|default:"Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature." }}{% endblock meta_description %}">
     <meta name="author" content="Eamonn Upperton">
@@ -13,13 +13,13 @@
     {% breadcrumb_structured_data %}
     {% block head_meta %}
     <meta property="og:type" content="website">
-    <meta property="og:title" content="{{ page_title|default:"Journal Watch" }}">
+    <meta property="og:title" content="{{ page_title|default:"SPANZA Journal Watch" }}">
     <meta property="og:description" content="{{ page_meta_description|default:"Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature." }}">
     {% if canonical_url %}<meta property="og:url" content="{{ canonical_url }}">{% endif %}
-    <meta property="og:site_name" content="Journal Watch">
+    <meta property="og:site_name" content="SPANZA Journal Watch">
     <meta property="og:image" content="{{ default_og_image }}">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="{{ page_title|default:"Journal Watch" }}">
+    <meta name="twitter:title" content="{{ page_title|default:"SPANZA Journal Watch" }}">
     <meta name="twitter:description" content="{{ page_meta_description|default:"Journal Watch is a community of SPANZA members who work to identify and review articles of interest in the paediatric anaesthesia literature." }}">
     <meta name="twitter:image" content="{{ default_og_image }}">
     {% endblock head_meta %}
