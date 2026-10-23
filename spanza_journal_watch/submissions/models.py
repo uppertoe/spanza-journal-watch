@@ -396,6 +396,11 @@ class Review(TimeStampedModel):
         if not self.slug:
             self.slug = get_unique_slug(self, slugify(self.article.name))
 
+        # Only the save that takes a review live may stamp its publish date: older
+        # live reviews have none and fall back to their issue date, and editing
+        # them (a headline, say) must not make them look published today.
+        going_live = self.active and not (self.pk and Review.objects.filter(pk=self.pk, active=True).exists())
+
         # Perform an initial save
         super().save(*args, **kwargs)
 
@@ -403,7 +408,7 @@ class Review(TimeStampedModel):
         # date (the moment it becomes live to readers) rather than self.created:
         # reviews are often drafted days before the issue is published, so
         # created-based dates over-count how long a review has really been live.
-        if not self.publish_date and self.active:
+        if not self.publish_date and going_live:
             today = timezone.localdate()
             Review.objects.filter(pk=self.pk).update(publish_date=today)
             self.publish_date = today

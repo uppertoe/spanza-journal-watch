@@ -9,6 +9,7 @@ import pytest
 from django.contrib.auth.models import Permission
 from django.core.management import call_command
 from django.urls import reverse
+from django.utils import timezone
 
 from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.submissions.headlines import draft_review_headline, extract_bottom_line
@@ -356,3 +357,22 @@ def _structured(body, schema_type):
         if data.get("@type") == schema_type:
             return data
     raise AssertionError(f"No {schema_type} structured data")
+
+
+class TestPublishDateStamp:
+    def test_editing_a_live_review_keeps_its_issue_date_fallback(self):
+        review = _review()
+        Review.objects.filter(pk=review.pk).update(publish_date=None)
+        review.refresh_from_db()
+        review.editorial_headline = "A new headline"
+        review.save()
+        review.refresh_from_db()
+        assert review.publish_date is None
+
+    def test_going_live_stamps_today(self):
+        review = _review(active=False)
+        assert review.publish_date is None
+        review.active = True
+        review.save()
+        review.refresh_from_db()
+        assert review.publish_date == timezone.localdate()
