@@ -4,7 +4,8 @@ import datetime
 import json
 
 from django.contrib.auth.decorators import login_required, permission_required
-from django.db.models import Count, Q
+from django.db.models import Count
+from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
     AnalyticsEvent,
@@ -12,14 +13,14 @@ from spanza_journal_watch.analytics.models import (
     NewsletterOpen,
 )
 from spanza_journal_watch.backend.models import SubscriberCSV
-from spanza_journal_watch.backend.views.analytics_page import (
-    _newsletter_predates_site_analytics,
-    _safe_percentage,
-    _site_analytics_rollout_date,
-)
-from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
+from spanza_journal_watch.backend.views.analytics_page import _site_analytics_rollout_date
+from spanza_journal_watch.newsletter.models import Newsletter, NewsletterDelivery, Subscriber
 
 from .common import VIEW_NEWSLETTER_STATS, _date_range_from_request, _render_analytics
+from .overview import _newsletter_lift_row, _newsletter_lift_windows
+from .rates import newsletter_rates
+
+SEGMENT_NEWSLETTER_COUNT = 10
 
 
 def _acquisition_summary(start_ts, end_ts):
@@ -30,7 +31,12 @@ def _acquisition_summary(start_ts, end_ts):
         {"source": value, "label": label, "count": totals.get(value, 0)} for value, label in Subscriber.Source.choices
     ]
     total = sum(row["count"] for row in by_source)
-    unsubscribed = Subscriber.objects.filter(modified__gte=start_ts, modified__lte=end_ts, subscribed=False).count()
+    # A bounce also clears ``subscribed``, but it is a delivery failure rather than a reader's choice.
+    unsubscribed = (
+        Subscriber.objects.filter(unsubscribed_at__gte=start_ts, unsubscribed_at__lte=end_ts, bounced=False)
+        .exclude(tester=True)
+        .count()
+    )
     return {"by_source": by_source, "total": total, "unsubscribed": unsubscribed}
 
 
@@ -76,11 +82,93 @@ def _recent_subscriber_feed(start_ts, end_ts, limit=20):
     return entries[:limit]
 
 
+def sendable_subscribers():
+    """The subscribers a send would reach now, less testers: the "active subscribers" figure."""
+    return Subscriber.get_valid_subscribers(test_email=False).exclude(tester=True)
+
+
+def _subscriber_segments(newsletters):
+    """Engagement segments, scoring each subscriber only on the newsletters they received.
+
+    Receipt comes from the delivery ledger where a send has one; sends from before the
+    ledger fall back to "subscribed by the send date". A real click counts as an open.
+    """
+    segment_counts = {"highly_engaged": 0, "occasional": 0, "dormant": 0}
+    if not newsletters:
+        return segment_counts
+    nl_ids = [nl.pk for nl in newsletters]
+    subscribers = list(sendable_subscribers().values_list("id", "created"))
+    sub_ids = [sub_id for sub_id, _ in subscribers]
+
+    delivered = set(
+        NewsletterDelivery.objects.filter(newsletter_id__in=nl_ids, subscriber_id__in=sub_ids).values_list(
+            "newsletter_id", "subscriber_id"
+        )
+    )
+    ledger_newsletters = {nl_id for nl_id, _ in delivered}
+    opened = set(
+        NewsletterOpen.objects.filter(newsletter_id__in=nl_ids, automated=False)
+        .values_list("newsletter_id", "subscriber_id")
+        .distinct()
+    )
+    clicked = set(
+        NewsletterClick.objects.filter(newsletter_id__in=nl_ids, automated=False)
+        .values_list("newsletter_id", "subscriber_id")
+        .distinct()
+    )
+
+    for sub_id, created in subscribers:
+        received = [
+            nl.pk
+            for nl in newsletters
+            if ((nl.pk, sub_id) in delivered if nl.pk in ledger_newsletters else created <= nl.send_date)
+        ]
+        if not received:
+            continue
+        clicks = sum(1 for nl_id in received if (nl_id, sub_id) in clicked)
+        opens = sum(1 for nl_id in received if (nl_id, sub_id) in opened or (nl_id, sub_id) in clicked)
+        open_rate = opens / len(received)
+        click_rate = clicks / len(received)
+        if open_rate >= 0.7 and click_rate >= 0.3:
+            segment_counts["highly_engaged"] += 1
+        elif open_rate >= 0.3 or clicks >= 1:
+            segment_counts["occasional"] += 1
+        else:
+            segment_counts["dormant"] += 1
+    return segment_counts
+
+
+def _newsletter_lift(newsletter, rollout_date):
+    """The Overview's lift row, plus the after-week's last day for the in-progress note."""
+    row = _newsletter_lift_row(newsletter, rollout_date)
+    # The after-week ends at local midnight, so its last whole day is the day before.
+    after_end = _newsletter_lift_windows(newsletter)[2]
+    row["window_last_day"] = timezone.localtime(after_end).date() - datetime.timedelta(days=1)
+    return row
+
+
+def _newsletter_referred_visitors(newsletter):
+    """Distinct human visitors who arrived from a newsletter link in the after-week of the lift window."""
+    return (
+        AnalyticsEvent.objects.filter(
+            automated=False,
+            referrer_category="newsletter",
+            visitor_id__isnull=False,
+            timestamp__gte=newsletter.send_date,
+            timestamp__lt=_newsletter_lift_windows(newsletter)[2],
+        )
+        .values("visitor_id")
+        .distinct()
+        .count()
+    )
+
+
 @login_required
 @permission_required(VIEW_NEWSLETTER_STATS, raise_exception=True)
 def analytics_email(request):
     start_date, end_date, start_ts, end_ts = _date_range_from_request(request, default_days=180)
     site_analytics_rollout_date = _site_analytics_rollout_date()
+    now = timezone.now()
 
     newsletters = list(
         Newsletter.objects.filter(
@@ -89,170 +177,46 @@ def analytics_email(request):
             send_date__date__lte=end_date,
         ).order_by("-send_date")
     )
-
-    # Batch all open/click stats so we issue 3 queries for all newsletters combined
-    # rather than 7+ per newsletter.
-    from itertools import groupby as _groupby
-
-    newsletter_ids = [nl.pk for nl in newsletters]
-
-    open_stats = {
-        row["newsletter_id"]: row
-        for row in NewsletterOpen.objects.filter(newsletter_id__in=newsletter_ids)
-        .values("newsletter_id")
-        .annotate(
-            total=Count("id"),
-            human=Count("id", filter=Q(automated=False)),
-            human_unique=Count("subscriber", distinct=True, filter=Q(automated=False)),
-        )
-    }
-
-    click_stats = {
-        row["newsletter_id"]: row
-        for row in NewsletterClick.objects.filter(newsletter_id__in=newsletter_ids)
-        .values("newsletter_id")
-        .annotate(
-            total=Count("id"),
-            human=Count("id", filter=Q(automated=False)),
-            human_unique=Count("subscriber", distinct=True, filter=Q(automated=False)),
-        )
-    }
-
-    # Per-link breakdowns — one query, top 8 per newsletter applied in Python
-    link_rows = list(
-        NewsletterClick.objects.filter(newsletter_id__in=newsletter_ids, automated=False)
-        .exclude(destination_url="")
-        .values("newsletter_id", "destination_url")
-        .annotate(clicks=Count("id"), unique_subscribers=Count("subscriber", distinct=True))
-        .order_by("newsletter_id", "-clicks")
-    )
-    link_clicks_by_nl = {}
-    for nl_id, group in _groupby(link_rows, key=lambda r: r["newsletter_id"]):
-        link_clicks_by_nl[nl_id] = list(group)[:8]
+    rates_by_nl = newsletter_rates(newsletters)
+    newsletter_lift = [_newsletter_lift(nl, site_analytics_rollout_date) for nl in newsletters if nl.send_date]
+    partial_ids = {row["newsletter"].pk for row in newsletter_lift if row["site_analytics_partial"]}
 
     newsletter_rows = []
     for nl in newsletters:
-        ostats = open_stats.get(nl.pk, {})
-        cstats = click_stats.get(nl.pk, {})
-        total_opens_nl = ostats.get("total", 0)
-        total_clicks_nl = cstats.get("total", 0)
-        total_filtered_opens = ostats.get("human", 0)
-        total_filtered_clicks = cstats.get("human", 0)
-        human_opens = ostats.get("human_unique", 0)
-        human_clicks = cstats.get("human_unique", 0)
-        site_analytics_partial = _newsletter_predates_site_analytics(nl)
-
-        post_traffic = None if site_analytics_partial else 0
+        rates = rates_by_nl[nl.pk]
+        site_analytics_partial = nl.pk in partial_ids
+        post_traffic = None
         if nl.send_date and not site_analytics_partial:
-            post_traffic = AnalyticsEvent.objects.filter(
-                event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
-                automated=False,
-                timestamp__gte=nl.send_date,
-                timestamp__lte=nl.send_date + datetime.timedelta(days=7),
-            ).count()
-
+            post_traffic = _newsletter_referred_visitors(nl)
         newsletter_rows.append(
             {
                 "newsletter": nl,
-                "emails_sent": nl.emails_sent or 0,
-                "human_opens": human_opens,
-                "human_open_rate": _safe_percentage(human_opens, nl.emails_sent),
-                "human_clicks": human_clicks,
-                "human_ctr": _safe_percentage(human_clicks, nl.emails_sent),
-                "human_ctor": _safe_percentage(human_clicks, human_opens),
-                "automated_open_share": _safe_percentage(
-                    max(total_opens_nl - total_filtered_opens, 0), total_opens_nl
-                ),
-                "automated_click_share": _safe_percentage(
-                    max(total_clicks_nl - total_filtered_clicks, 0), total_clicks_nl
-                ),
-                "post_send_traffic": post_traffic,
-                "link_clicks": link_clicks_by_nl.get(nl.pk, []),
+                "rates": rates,
+                "post_send_visitors": post_traffic,
+                "post_send_in_progress": bool(nl.send_date and now < _newsletter_lift_windows(nl)[2]),
+                "link_clicks": rates.link_clicks,
                 "site_analytics_partial": site_analytics_partial,
             }
         )
 
-    total_subscribers = Subscriber.objects.filter(subscribed=True).count()
+    total_subscribers = sendable_subscribers().count()
     total_sent = Newsletter.objects.filter(is_sent=True).count()
 
     # Subscriber engagement segmentation (always uses most recent sends, not date-filtered)
-    recent_newsletters = list(Newsletter.objects.filter(is_sent=True).order_by("-send_date")[:10])
-    recent_nl_ids = [nl.id for nl in recent_newsletters]
-    segment_counts = {"highly_engaged": 0, "occasional": 0, "dormant": 0}
-
-    if recent_nl_ids:
-        active_subscribers = list(Subscriber.objects.filter(subscribed=True).values_list("id", flat=True))
-        nl_count = len(recent_nl_ids)
-
-        seg_opens_qs = NewsletterOpen.objects.filter(newsletter_id__in=recent_nl_ids, automated=False)
-        seg_clicks_qs = NewsletterClick.objects.filter(newsletter_id__in=recent_nl_ids, automated=False)
-        opens_per_sub = dict(
-            seg_opens_qs.values("subscriber_id")
-            .annotate(newsletters_opened=Count("newsletter_id", distinct=True))
-            .values_list("subscriber_id", "newsletters_opened")
-        )
-        clicks_per_sub = dict(
-            seg_clicks_qs.values("subscriber_id")
-            .annotate(newsletters_clicked=Count("newsletter_id", distinct=True))
-            .values_list("subscriber_id", "newsletters_clicked")
-        )
-
-        for sub_id in active_subscribers:
-            opened = opens_per_sub.get(sub_id, 0)
-            clicked = clicks_per_sub.get(sub_id, 0)
-            open_rate = opened / nl_count if nl_count else 0
-            click_rate = clicked / nl_count if nl_count else 0
-
-            if open_rate >= 0.7 and click_rate >= 0.3:
-                segment_counts["highly_engaged"] += 1
-            elif open_rate >= 0.3 or clicked >= 1:
-                segment_counts["occasional"] += 1
-            else:
-                segment_counts["dormant"] += 1
-
-    # Newsletter lift — engaged views before/after each send
-    newsletter_lift = []
-    for nl in newsletters:
-        if not nl.send_date:
-            continue
-        if _newsletter_predates_site_analytics(nl):
-            newsletter_lift.append(
-                {
-                    "newsletter": nl,
-                    "before": None,
-                    "after": None,
-                    "lift_pct": None,
-                    "site_analytics_partial": True,
-                }
-            )
-            continue
-        send_dt = nl.send_date
-        before_start = send_dt - datetime.timedelta(days=7)
-        after_end = send_dt + datetime.timedelta(days=7)
-        lift_qs = AnalyticsEvent.objects.filter(event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED, automated=False)
-        before_count = lift_qs.filter(timestamp__gte=before_start, timestamp__lt=send_dt).count()
-        after_count = lift_qs.filter(timestamp__gte=send_dt, timestamp__lte=after_end).count()
-        lift_pct = None
-        if before_count:
-            lift_pct = round((after_count - before_count) / before_count * 100)
-        newsletter_lift.append(
-            {
-                "newsletter": nl,
-                "before": before_count,
-                "after": after_count,
-                "lift_pct": lift_pct,
-                "site_analytics_partial": False,
-            }
-        )
-
-    # Trend chart data — serialise for Chart.js
-    trend_labels = json.dumps([row["newsletter"].send_date.strftime("%-d %b %Y") for row in newsletter_rows if row])
-    trend_open_rates = json.dumps(
-        [row["human_open_rate"].rstrip("%") if row["human_open_rate"] != "0%" else "0" for row in newsletter_rows]
+    recent_newsletters = list(
+        Newsletter.objects.filter(is_sent=True, send_date__isnull=False).order_by("-send_date")[
+            :SEGMENT_NEWSLETTER_COUNT
+        ]
     )
-    trend_ctrs = json.dumps(
-        [row["human_ctr"].rstrip("%") if row["human_ctr"] != "0%" else "0" for row in newsletter_rows]
+    segment_counts = _subscriber_segments(recent_newsletters)
+
+    # Trend chart data — serialise for Chart.js, oldest send first.
+    trend_rows = [row for row in reversed(newsletter_rows) if row["newsletter"].send_date]
+    trend_labels = json.dumps(
+        [timezone.localtime(row["newsletter"].send_date).strftime("%-d %b %Y") for row in trend_rows]
     )
+    trend_open_rates = json.dumps([round(row["rates"].open_rate_value * 100) for row in trend_rows])
+    trend_ctrs = json.dumps([round(row["rates"].click_rate_value * 100) for row in trend_rows])
 
     acquisition = _acquisition_summary(start_ts, end_ts)
     recent_feed = _recent_subscriber_feed(start_ts, end_ts, limit=20)
@@ -264,7 +228,7 @@ def analytics_email(request):
         "total_subscribers": total_subscribers,
         "total_sent": total_sent,
         "segment_counts": segment_counts,
-        "segment_newsletter_count": len(recent_nl_ids),
+        "segment_newsletter_count": len(recent_newsletters),
         "newsletter_lift": newsletter_lift,
         "trend_labels": trend_labels,
         "trend_open_rates": trend_open_rates,

@@ -191,9 +191,10 @@ class TestSendNewsletterTask:
         with (
             patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch") as mock_batch,
             patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats") as mock_stats,
+            patch("spanza_journal_watch.newsletter.tasks.chord"),
         ):
-            mock_batch.delay = MagicMock()
-            mock_stats.delay = MagicMock()
+            mock_batch.si = MagicMock()
+            mock_stats.si = MagicMock()
             send_newsletter(newsletter.pk)
 
         newsletter.refresh_from_db()

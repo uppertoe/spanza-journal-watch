@@ -180,7 +180,13 @@ def test_engaged_human_count_includes_subscriber_and_excludes_bots():
     sub = Subscriber.objects.create(email="reader@example.com")
     subscriber_visitor = uuid.uuid4()
     bot_visitor = uuid.uuid4()
-    _engaged_event(subscriber_visitor, subscriber=sub)  # matched subscriber → engaged
+    _engaged_event(subscriber_visitor, subscriber=sub)  # matched subscriber…
+    AnalyticsEvent.objects.create(  # …with a JS-verified event → engaged
+        event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
+        automated=False,
+        visitor_id=subscriber_visitor,
+        js_verified=True,
+    )
     AnalyticsEvent.objects.create(  # automated, deep scroll, but excluded by qs filter
         event_type=AnalyticsEvent.EventType.PAGE_VISIT,
         automated=True,

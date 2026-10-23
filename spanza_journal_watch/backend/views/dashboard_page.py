@@ -139,7 +139,8 @@ def dashboard(request):
         fetch_hours_ago = round((now - last_fetch.started_at).total_seconds() / 3600, 1)
 
     latest_newsletter = Newsletter.objects.select_related("issue").order_by("-pk").first()
-    subscriber_count = Subscriber.objects.filter(subscribed=True).count()
+    # The sendable base, as on the Newsletter analytics panel: no bounces, complaints or testers.
+    subscriber_count = Subscriber.get_valid_subscribers(test_email=False).exclude(tester=True).count()
 
     # ── At-a-glance metrics (7-day window) ────────────────────────
     review_ct = ContentType.objects.get_for_model(Review)

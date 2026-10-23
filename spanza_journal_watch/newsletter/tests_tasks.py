@@ -227,9 +227,12 @@ class TestSendNewsletter:
         with pytest.raises(NewsletterNotReadyToSendError):
             send_newsletter(newsletter.pk)
 
+    @patch("spanza_journal_watch.newsletter.tasks.chord")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")
-    def test_resend_reaches_only_undelivered_subscribers(self, mock_stats, mock_batch, newsletter, subscriber):
+    def test_resend_reaches_only_undelivered_subscribers(
+        self, mock_stats, mock_batch, mock_chord, newsletter, subscriber
+    ):
         from spanza_journal_watch.newsletter.models import NewsletterDelivery, Subscriber
         from spanza_journal_watch.newsletter.tasks import send_newsletter
 
@@ -243,9 +246,12 @@ class TestSendNewsletter:
 
         send_newsletter(newsletter.pk)
 
-        ((args, _kwargs),) = mock_batch.delay.call_args_list
+        ((args, _kwargs),) = mock_batch.si.call_args_list
         assert args[1] == [missed.pk]
-        assert mock_stats.delay.call_args.kwargs["already_delivered"] == 1
+        # The stats email is the chord's callback, so it is built with .si rather than queued.
+        assert mock_stats.si.call_args.kwargs["already_delivered"] == 1
+        mock_chord.assert_called_once_with([mock_batch.si.return_value])
+        mock_chord.return_value.assert_called_once_with(mock_stats.si.return_value)
 
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_batch")
     @patch("spanza_journal_watch.newsletter.tasks.send_newsletter_stats")

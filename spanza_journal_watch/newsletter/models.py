@@ -10,6 +10,7 @@ from django.db.models.functions import Upper
 from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.urls import reverse
+from django.utils import timezone
 
 from spanza_journal_watch.analytics.links import EmailLinkBuilder
 from spanza_journal_watch.backend.models import SubscriberCSV
@@ -41,6 +42,8 @@ class Subscriber(models.Model):
     complained = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
+    # When the subscriber last left the list; cleared again on resubscribe.
+    unsubscribed_at = models.DateTimeField(blank=True, null=True)
     unsubscribe_token = models.CharField(max_length=64, blank=True, null=True)
     # Opaque identifier used in email tracking links in place of the address.
     tracking_token = models.CharField(max_length=64, unique=True, blank=True, null=True, editable=False)
@@ -175,6 +178,14 @@ class Subscriber(models.Model):
         if not self.unsubscribe_token:
             self.unsubscribe_token = self.generate_unsubscribe_token()
         self.ensure_tracking_token()
+        # Stamp the first unsubscribe and clear it on resubscribe, whichever path flips ``subscribed``.
+        if self.subscribed:
+            self.unsubscribed_at = None
+        elif self.unsubscribed_at is None:
+            self.unsubscribed_at = timezone.now()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "subscribed" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "unsubscribed_at"}
         super().save(*args, **kwargs)
 
     def __str__(self):

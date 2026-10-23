@@ -334,7 +334,7 @@ class TestBackendWorkflows:
     def test_newsletter_stats_detail_math(self, route_client, regression_baseline):
         admin_user = User.objects.filter(is_superuser=True).order_by("pk").first()
         newsletter = Newsletter.objects.order_by("pk").first()
-        subscribers = list(Subscriber.objects.order_by("pk")[:2])
+        subscribers = list(Subscriber.objects.filter(tester=False).order_by("pk")[:2])
 
         assert admin_user is not None
         assert newsletter is not None
@@ -359,18 +359,18 @@ class TestBackendWorkflows:
 
         assert response.status_code == 200
         body = response.content.decode("utf-8", errors="ignore")
-        assert "Distinct (total) emails opened:" in body
-        assert "Distinct (total) links clicked:" in body
-        assert "20%" in body
-        assert "10%" in body
-        assert "50%" in body
-        assert response.context["total_opens"] == 3
-        assert response.context["opens"] == 2
-        assert response.context["total_clicks"] == 2
-        assert response.context["clicks"] == 1
-        assert response.context["open_rate"] == "20%"
-        assert response.context["click_through_rate"] == "10%"
-        assert response.context["click_to_open_rate"] == "50%"
+        assert "Subscribers who opened" in body
+        assert "Subscribers who clicked" in body
+        rates = response.context["rates"]
+        assert rates.open_events == 3
+        assert rates.opened == 2
+        assert rates.click_events == 2
+        assert rates.real_clickers == 1
+        assert rates.open_rate == "20%"
+        assert rates.click_rate == "10%"
+        assert rates.click_to_open == "50%"
+        for value in ("20%", "10%", "50%"):
+            assert value in body
 
 
 @pytest.mark.django_db

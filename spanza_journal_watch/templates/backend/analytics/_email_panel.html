@@ -93,17 +93,17 @@
     <div class="card h-100 border-warning-subtle"><div class="card-body">
       <h6 class="text-muted mb-1 small">Dormant</h6>
       <p class="display-6 mb-0">{{ segment_counts.dormant }}</p>
-      <p class="small text-muted mb-0">Rarely open, no clicks</p>
+      <p class="small text-muted mb-0">Opens under 30%, no clicks</p>
     </div></div>
   </div>
 </div>
-<p class="text-muted small mb-4">Segments based on the last {{ segment_newsletter_count }} newsletter{{ segment_newsletter_count|pluralize }}. "Highly engaged" subscribers are your core audience.</p>
+<p class="text-muted small mb-4">Each subscriber is scored only on the newsletters they received out of the last {{ segment_newsletter_count }} sent.</p>
 {% endif %}
 
 {# ── Newsletter trend chart ────────────────────────────────────── #}
 {% if newsletter_rows %}
 <div class="card mb-4">
-  <div class="card-header">Open rate &amp; CTR trend</div>
+  <div class="card-header">Open rate and click rate</div>
   <div class="card-body">
     <canvas id="newsletter-trend-chart" height="80"></canvas>
   </div>
@@ -113,7 +113,7 @@
 {# ── Newsletter lift ───────────────────────────────────────────── #}
 {% if newsletter_lift %}
 <div class="card mb-4">
-  <div class="card-header">Engagement lift (7-day window)</div>
+  <div class="card-header">Site-wide sustained views before and after each send</div>
   <div class="card-body">
     <div class="row g-3">
       {% for item in newsletter_lift %}
@@ -124,6 +124,10 @@
             <div class="fw-semibold small mb-2">{{ item.newsletter }}</div>
             {% if item.site_analytics_partial %}
             <span class="badge text-bg-warning text-dark">Partial analytics</span>
+            {% elif item.in_progress %}
+            <div class="small text-muted mb-1">Before: {{ item.before }}</div>
+            <span class="badge text-bg-light text-dark border">In progress</span>
+            <div class="small text-muted mt-1">The 7-day window runs to the end of {{ item.window_last_day|date:"j M" }}.</div>
             {% else %}
             <div class="d-flex gap-3 small mb-1">
               <span class="text-muted">Before: {{ item.before }}</span>
@@ -140,7 +144,7 @@
       </div>
       {% endfor %}
     </div>
-    <p class="text-muted mt-2 mb-0" style="font-size:0.7rem">Compares engaged review views in the 7 days before vs after each newsletter send. Pre-rollout sends are marked as partial analytics instead of showing incomplete traffic comparisons.</p>
+    <p class="text-muted mt-2 mb-0" style="font-size:0.7rem">Each card compares site-wide sustained views in the 7 days before a send with the 7 days after it. Sends from before the site analytics rollout are marked as partial.</p>
   </div>
 </div>
 {% endif %}
@@ -155,12 +159,12 @@
           <th>Newsletter</th>
           <th>Sent</th>
           <th>Emails</th>
-          <th>Human opens</th>
-          <th>Open rate</th>
-          <th title="Unique clickers divided by emails sent">CTR</th>
-          <th title="Unique clickers divided by unique openers">CTOR</th>
-          <th title="Percentage of open events flagged as automated (email clients pre-loading, security scanners, etc.)">Bot opens %</th>
-          <th>7-day site traffic</th>
+          <th title="Subscribers who clicked a link are counted as having opened the email.">Opened</th>
+          <th title="The open rate counts subscribers who opened the email or clicked a link in it, as a share of emails sent.">Open rate</th>
+          <th title="The click rate counts subscribers who clicked a link, as a share of emails sent.">Click rate</th>
+          <th title="The click-to-open rate counts subscribers who clicked a link, as a share of those who opened the email.">Click-to-open</th>
+          <th title="Apple Mail Privacy Protection loads the tracking image on delivery, so a machine open shows that the email arrived but not that anyone read it.">Machine opens</th>
+          <th title="Newsletter visitors arrived from a newsletter link in the 7 days after the send.">Newsletter visitors (7 days)</th>
           <th></th>
         </tr>
       </thead>
@@ -174,17 +178,17 @@
             {% endif %}
           </td>
           <td class="small text-muted">{{ row.newsletter.send_date|date:"j M Y"|default:"—" }}</td>
-          <td class="small">{{ row.emails_sent }}</td>
-          <td class="small">{{ row.human_opens }}</td>
-          <td class="small">{{ row.human_open_rate }}</td>
-          <td class="small">{{ row.human_ctr }}</td>
-          <td class="small">{{ row.human_ctor }}</td>
-          <td class="small text-muted">{{ row.automated_open_share }}</td>
+          <td class="small">{{ row.rates.emails_sent }}</td>
+          <td class="small">{{ row.rates.opened }}</td>
+          <td class="small">{{ row.rates.open_rate }}</td>
+          <td class="small">{{ row.rates.click_rate }}</td>
+          <td class="small">{{ row.rates.click_to_open }}</td>
+          <td class="small text-muted">{{ row.rates.machine_openers }}</td>
           <td class="small">
             {% if row.site_analytics_partial %}
             <span class="text-muted">Partial</span>
             {% else %}
-            {{ row.post_send_traffic }} <span class="text-muted">engaged</span>
+            {{ row.post_send_visitors }}{% if row.post_send_in_progress %} <span class="text-muted">so far</span>{% endif %}
             {% endif %}
           </td>
           <td class="text-end">
@@ -221,8 +225,9 @@
 </div>
 
 <div class="alert alert-info small mb-0">
-  <strong>Note on open rates:</strong> Apple Mail Privacy Protection pre-fetches tracking pixels through proxy servers, which can inflate open counts. The bot filter catches many automated opens, but Apple's proxy uses standard user agents. Treat open rates as directional rather than exact. Click-through rates are more reliable.
-  CTR = unique clickers / emails sent. CTOR = unique clickers / unique openers.
+  <strong>Note on open rates:</strong> Apple Mail Privacy Protection loads the tracking image when an email is delivered, so those loads are counted as machine opens and left out of the open rate.
+  A subscriber who clicked a link is counted as having opened the email, even when the tracking image was blocked.
+  The click rate is the more reliable measure of reading.
 </div>
 
 {# ── Trend chart script ───────────────────────────────────────── #}
@@ -246,11 +251,11 @@
     new window.Chart(ctx, {
       type: "line",
       data: {
-        labels: labels.reverse(),
+        labels: labels,
         datasets: [
           {
-            label: "Open rate %",
-            data: openRates.reverse(),
+            label: "Open rate",
+            data: openRates,
             borderColor: "rgba(13, 110, 253, 0.8)",
             backgroundColor: "rgba(13, 110, 253, 0.1)",
             fill: true,
@@ -258,8 +263,8 @@
             pointRadius: 3,
           },
           {
-            label: "CTR %",
-            data: ctrs.reverse(),
+            label: "Click rate",
+            data: ctrs,
             borderColor: "rgba(25, 135, 84, 0.8)",
             backgroundColor: "rgba(25, 135, 84, 0.1)",
             fill: true,

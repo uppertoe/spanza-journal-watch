@@ -11,8 +11,15 @@ from spanza_journal_watch.analytics.models import (
     AnalyticsEvent,
     AutomatedRequestCount,
     HumanConfidence,
+    NewsletterClick,
+    NewsletterOpen,
 )
-from spanza_journal_watch.analytics.utils import stale_browser_reason
+from spanza_journal_watch.analytics.utils import (
+    classify_user_agent_reason,
+    in_newsletter_send_window,
+    stale_browser_reason,
+)
+from spanza_journal_watch.newsletter.models import Newsletter, NewsletterDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -351,3 +358,102 @@ def prune_automated_events_task(retention_days=90, batch_size=5000, dry_run=Fals
         cutoff.date(),
     )
     return {"deleted": total_deleted, "dry_run": False}
+
+
+@celery_app.task
+def mark_newsletter_scanner_bursts_task(lookback_days=7, dry_run=False):
+    """
+    Mark newsletter clicks that belong to a mail-gateway scanner burst.
+
+    The click view already checks each click as it is saved; this sweep
+    applies the same rule to clicks that arrived together and raced past one
+    another, and to clicks recorded before the check existed. A burst is
+    judged per click, never per subscriber, because the same subscriber's own
+    later reading must stay human. Already-marked clicks and events are left
+    alone, so the task is idempotent. ``lookback_days=None`` sweeps every
+    click.
+    """
+    clicks = NewsletterClick.objects.exclude(destination_url="")
+    if lookback_days is not None:
+        clicks = clicks.filter(timestamp__gte=timezone.now() - timedelta(days=lookback_days))
+
+    groups = {}
+    for pk, subscriber_id, newsletter_id, timestamp, url in clicks.order_by(
+        "subscriber_id", "newsletter_id", "timestamp", "pk"
+    ).values_list("pk", "subscriber_id", "newsletter_id", "timestamp", "destination_url"):
+        groups.setdefault((subscriber_id, newsletter_id), []).append((pk, timestamp, url))
+
+    burst_groups = [burst for rows in groups.values() if (burst := NewsletterClick.burst_click_ids(rows))]
+    burst_clicks = sum(len(burst) for burst in burst_groups)
+    if dry_run:
+        logger.info("mark_newsletter_scanner_bursts dry run: %d click(s) in bursts", burst_clicks)
+        return {"burst_clicks": burst_clicks, "marked": 0, "dry_run": True}
+
+    marked = sum(NewsletterClick.mark_scanner_burst(burst) for burst in burst_groups)
+    logger.info("mark_newsletter_scanner_bursts: marked %d of %d burst click(s)", marked, burst_clicks)
+    return {"burst_clicks": burst_clicks, "marked": marked, "dry_run": False}
+
+
+@celery_app.task
+def reclassify_newsletter_opens_task(lookback_days=7, dry_run=False):
+    """
+    Reclassify newsletter opens by user-agent and per-delivery send window.
+
+    Opens recorded before automated_reason existed were judged by rules that
+    have since changed: Gmail's image proxy is now a real open, a bare
+    "Mozilla/5.0" (Apple Mail Privacy Protection) is a machine open, and the
+    send window is measured from each subscriber's delivery. Only opens with
+    no recorded reason are touched. Those are the historical rows and the
+    human opens since, which the user-agent and window alone reproduce, so the
+    task is idempotent. ``lookback_days=None`` sweeps every open.
+    """
+    opens = NewsletterOpen.objects.filter(automated_reason="")
+    if lookback_days is not None:
+        opens = opens.filter(timestamp__gte=timezone.now() - timedelta(days=lookback_days))
+
+    rows = list(
+        opens.values_list("pk", "newsletter_id", "subscriber_id", "timestamp", "user_agent", "automated").order_by()
+    )
+    newsletter_ids = {row[1] for row in rows}
+    delivered = {
+        (newsletter_id, subscriber_id): sent_at
+        for newsletter_id, subscriber_id, sent_at in NewsletterDelivery.objects.filter(
+            newsletter_id__in=newsletter_ids
+        ).values_list("newsletter_id", "subscriber_id", "sent_at")
+    }
+    send_dates = dict(Newsletter.objects.filter(pk__in=newsletter_ids).values_list("pk", "send_date"))
+
+    to_automated = {}
+    to_human = []
+    for pk, newsletter_id, subscriber_id, timestamp, user_agent, automated in rows:
+        reason = classify_user_agent_reason(user_agent, open_pixel=True)
+        if reason is None:
+            delivered_at = delivered.get((newsletter_id, subscriber_id)) or send_dates.get(newsletter_id)
+            if in_newsletter_send_window(delivered_at, at=timestamp):
+                reason = "send_window"
+        if reason is not None:
+            to_automated.setdefault(reason, []).append(pk)
+        elif automated:
+            to_human.append(pk)
+
+    result = {
+        "automated": {reason: len(pks) for reason, pks in to_automated.items()},
+        "human": len(to_human),
+        "dry_run": dry_run,
+    }
+    if dry_run:
+        logger.info("reclassify_newsletter_opens dry run: %s", result)
+        return result
+
+    for reason, pks in to_automated.items():
+        NewsletterOpen.objects.filter(pk__in=pks).update(
+            automated=True,
+            automated_reason=reason,
+            human_confidence=HumanConfidence.SUSPECTED_AUTOMATED,
+        )
+    NewsletterOpen.objects.filter(pk__in=to_human).update(
+        automated=False,
+        human_confidence=HumanConfidence.KNOWN_SUBSCRIBER_HUMAN,
+    )
+    logger.info("reclassify_newsletter_opens: %s", result)
+    return result

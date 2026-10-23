@@ -51,18 +51,18 @@
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span>New releases <span class="text-muted small fw-normal">· published in this window</span></span>
     {% if benchmark_ready %}
-    <span class="badge text-bg-light text-dark" title="Median first-week opens across reviews published in the last 180 days ({{ benchmark_cohort }} reviews)">Typical first week: {{ benchmark_median }} opens</span>
+    <span class="badge text-bg-light text-dark" title="The typical first week is the median first-week impressions across the {{ benchmark_cohort }} reviews published in the last 180 days.">Typical first week: {{ benchmark_median }} impressions</span>
     {% else %}
     <span class="badge text-bg-light text-dark" title="Need at least 5 reviews with a completed first week to set a baseline">Baseline still building</span>
     {% endif %}
   </div>
   <div class="card-body small text-muted pb-2">
-    Judged on their own terms — velocity (engagement per week live) and first-week opens versus the cohort — so freshly-released reviews surface instead of being buried under the archive.
+    New releases are ranked by their engagement score for each week they have been live, and by their first-week impressions against the typical first week.
   </div>
   {% if new_releases %}
   <div class="table-responsive border-top">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Review</th><th>Days live</th><th>Opens</th><th>First week</th><th>Velocity</th></tr></thead>
+      <thead><tr><th>Review</th><th>Days live</th><th>Impressions</th><th>First week</th><th>Velocity</th></tr></thead>
       <tbody>
         {% for item in new_releases %}
         <tr>
@@ -70,7 +70,7 @@
             <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
             <div class="text-muted" style="font-size:0.75rem">
               {{ item.review.article.journal }}
-              · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+              · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}" class="text-decoration-none">events &rarr;</a>
             </div>
           </td>
           <td class="small">{{ item.days_live }}</td>
@@ -152,7 +152,7 @@
           </div>
         </div>
         {% if browse_searches %}
-        <p class="text-muted small mb-0">Plus {{ browse_searches }} journal browser filter action{{ browse_searches|pluralize }} ({{ browse_ctr }} click-through).</p>
+        <p class="text-muted small mb-0">Readers also filtered search results by year or topic without entering search text {{ browse_searches }} time{{ browse_searches|pluralize }}, with a {{ browse_ctr }} click-through rate.</p>
         {% endif %}
       </div>
     </div>
@@ -194,7 +194,7 @@
               {% for item in top_related_destinations %}
               <tr>
                 <td class="small">
-                  <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}"
+                  <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}"
                      class="text-decoration-none"
                      title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:60 }}</a>
                 </td>
@@ -253,16 +253,16 @@
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>Review performance</span>
-        {% if share_attributed_visits %}<span class="badge text-bg-info">{{ share_attributed_visits }} visit{{ share_attributed_visits|pluralize }} from shares</span>{% endif %}
+        {% if share_attributed_visitors %}<span class="badge text-bg-info">{{ share_attributed_visitors }} visitor{{ share_attributed_visitors|pluralize }} from shares</span>{% endif %}
       </div>
       <div class="card-body small text-muted mb-0 pb-0">
-        Separate rankings for reach, depth, click-through, and sharing. <span class="badge text-bg-light text-dark">Low sample</span> means fewer than 5 opens.
+        <span class="badge text-bg-light text-dark">Low sample</span> marks a review with fewer than 5 impressions.
       </div>
       <div class="card-header p-0 border-bottom-0">
         <ul class="nav nav-pills card-header-pills px-3 pt-2" role="tablist">
-          <li class="nav-item"><button class="nav-link active small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-rising" type="button" role="tab" title="Engagement per week since publication — favours fresh reviews">Rising</button></li>
-          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-reach" type="button" role="tab">Most opened</button></li>
-          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-depth" type="button" role="tab">Most read</button></li>
+          <li class="nav-item"><button class="nav-link active small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-rising" type="button" role="tab" title="Rising ranks reviews by their engagement score for each week they have been live in this date range.">Rising</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-reach" type="button" role="tab">Most impressions</button></li>
+          <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-depth" type="button" role="tab">Most sustained views</button></li>
           <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-fulltext" type="button" role="tab">Most clicked through</button></li>
           <li class="nav-item"><button class="nav-link small py-1 px-2" data-bs-toggle="pill" data-bs-target="#tab-review-shares" type="button" role="tab">Most shared</button></li>
         </ul>
@@ -271,7 +271,7 @@
         <div class="tab-pane fade show active" id="tab-review-rising" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Review</th><th>Velocity</th><th>Weeks live</th><th>Opens</th></tr></thead>
+              <thead><tr><th>Review</th><th>Velocity</th><th>Weeks live</th><th>Impressions</th></tr></thead>
               <tbody>
                 {% for item in top_reviews_by_velocity %}
                 <tr>
@@ -279,7 +279,7 @@
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
                     <div class="text-muted" style="font-size:0.75rem">
                       {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
-                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}" class="text-decoration-none">events &rarr;</a>
                     </div>
                   </td>
                   <td>{{ item.velocity }}</td>
@@ -296,7 +296,7 @@
         <div class="tab-pane fade" id="tab-review-reach" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Review</th><th>Opens</th><th>Engaged rate</th><th>Full text CTR</th></tr></thead>
+              <thead><tr><th>Review</th><th>Impressions</th><th>Engaged rate</th><th>Full text CTR</th></tr></thead>
               <tbody>
                 {% for item in top_reviews_by_reach %}
                 <tr>
@@ -304,7 +304,7 @@
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
                     <div class="text-muted" style="font-size:0.75rem">
                       {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
-                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}" class="text-decoration-none">events &rarr;</a>
                     </div>
                   </td>
                   <td>{{ item.opens }}</td>
@@ -321,7 +321,7 @@
         <div class="tab-pane fade" id="tab-review-depth" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Review</th><th>Engaged</th><th>Avg dwell</th><th>Scroll</th><th>Opens</th></tr></thead>
+              <thead><tr><th>Review</th><th>Engaged</th><th>Avg dwell</th><th>Scroll</th><th>Impressions</th></tr></thead>
               <tbody>
                 {% for item in top_reviews_by_depth %}
                 <tr>
@@ -329,7 +329,7 @@
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
                     <div class="text-muted" style="font-size:0.75rem">
                       {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
-                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}" class="text-decoration-none">events &rarr;</a>
                     </div>
                   </td>
                   <td>{{ item.engaged_views }} <span class="text-muted small">({{ item.engaged_rate }})</span></td>
@@ -347,7 +347,7 @@
         <div class="tab-pane fade" id="tab-review-fulltext" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Review</th><th>Full text clicks</th><th>Full text CTR</th><th>Opens</th></tr></thead>
+              <thead><tr><th>Review</th><th>Full text clicks</th><th>Full text CTR</th><th>Impressions</th></tr></thead>
               <tbody>
                 {% for item in top_reviews_by_full_text %}
                 <tr>
@@ -355,7 +355,7 @@
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
                     <div class="text-muted" style="font-size:0.75rem">
                       {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
-                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}" class="text-decoration-none">events &rarr;</a>
                     </div>
                   </td>
                   <td>{{ item.full_text_clicks }}</td>
@@ -372,7 +372,7 @@
         <div class="tab-pane fade" id="tab-review-shares" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Review</th><th>Shares</th><th>Share rate</th><th>Opens</th></tr></thead>
+              <thead><tr><th>Review</th><th>Shares</th><th>Share rate</th><th>Impressions</th></tr></thead>
               <tbody>
                 {% for item in top_reviews_by_shares %}
                 <tr>
@@ -380,7 +380,7 @@
                     <a href="{{ item.review.get_absolute_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none small" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:55 }}</a>
                     <div class="text-muted" style="font-size:0.75rem">
                       {{ item.review.article.journal }}{% if item.low_sample %} <span class="badge text-bg-light text-dark ms-1">Low sample</span>{% endif %}
-                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}" class="text-decoration-none">events &rarr;</a>
+                      · <a href="{% url 'backend:analytics_review_timeline' review_pk=item.review.pk %}?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}" class="text-decoration-none">events &rarr;</a>
                     </div>
                   </td>
                   <td>{{ item.total_shares }}</td>
@@ -410,10 +410,10 @@
   <div class="col-12 col-lg-5">
     <div class="card mb-3">
       <div class="card-header">Featured vs standard</div>
-      <div class="card-body small text-muted mb-2">Are featured reviews actually more engaging, or just more visible?</div>
+      <div class="card-body small text-muted mb-2">Featured reviews are shown more prominently, so compare the engaged rate rather than impressions.</div>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Type</th><th>Opens</th><th>Engaged rate</th><th>Share rate</th></tr></thead>
+          <thead><tr><th>Type</th><th>Impressions</th><th>Engaged rate</th><th>Share rate</th></tr></thead>
           <tbody>
             {% for item in review_type_breakdown %}
             <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged_rate }}</td><td>{{ item.share_rate }}</td></tr>
@@ -425,8 +425,8 @@
     <div class="card">
       <div class="card-header">Share methods</div>
       <div class="card-body">
-        {% if share_attributed_visits %}
-        <p class="small text-muted mb-3">{{ share_attributed_visits }} attributed visit{{ share_attributed_visits|pluralize }} came back through shared links ({{ share_attributed_visit_rate }} of share actions).</p>
+        {% if share_attributed_visitors %}
+        <p class="small text-muted mb-3">{{ share_attributed_visitors }} engaged visitor{{ share_attributed_visitors|pluralize }} arrived through shared links.</p>
         {% endif %}
         {% if share_breakdown %}
         <div class="d-flex flex-column gap-2">
@@ -457,7 +457,7 @@
           {% if tag_type_breakdown %}
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Topic</th><th>Opens</th><th>Engaged rate</th><th>Full text CTR</th><th>Score</th></tr></thead>
+              <thead><tr><th>Topic</th><th>Impressions</th><th>Engaged rate</th><th>Full text CTR</th><th>Score</th></tr></thead>
               <tbody>
                 {% for item in tag_type_breakdown %}
                 <tr>
@@ -478,7 +478,7 @@
         <div class="tab-pane fade" id="tab-journals" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Journal</th><th>Opens</th><th>Engaged</th><th>Score</th></tr></thead>
+              <thead><tr><th>Journal</th><th>Impressions</th><th>Engaged</th><th>Score</th></tr></thead>
               <tbody>
                 {% for item in top_journals %}
                 <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged }}</td><td><span class="badge text-bg-secondary">{{ item.score }}</span></td></tr>
@@ -492,7 +492,7 @@
         <div class="tab-pane fade" id="tab-tags" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Tag</th><th>Opens</th><th>Engaged</th><th>Score</th></tr></thead>
+              <thead><tr><th>Tag</th><th>Impressions</th><th>Engaged</th><th>Score</th></tr></thead>
               <tbody>
                 {% for item in top_tags %}
                 <tr><td class="small">{{ item.label }}</td><td>{{ item.opens }}</td><td>{{ item.engaged }}</td><td><span class="badge text-bg-secondary">{{ item.score }}</span></td></tr>

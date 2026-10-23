@@ -389,32 +389,6 @@ class Review(TimeStampedModel):
         # Fall back to issue date if publish date not set
         return self.publish_date if self.publish_date else self.issues.all()[0].date
 
-    def get_hits(self):
-        from spanza_journal_watch.analytics.models import AnalyticsEvent
-
-        object_id = self.id
-        content_type = ContentType.objects.get_for_model(self)
-
-        human_open_events = AnalyticsEvent.objects.filter(
-            content_type=content_type,
-            object_id=object_id,
-            event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
-            automated=False,
-        )
-        if human_open_events.exists():
-            distinct_session_views = human_open_events.exclude(session_key="").values("session_key").distinct().count()
-            sessionless_views = human_open_events.filter(session_key="").count()
-            return distinct_session_views + sessionless_views
-
-        try:
-            hit = Hit.objects.get(
-                content_type=content_type,
-                object_id=object_id,
-            )
-            return hit.count
-        except Hit.DoesNotExist:
-            return 0
-
     def save(self, *args, **kwargs):
         resize_feature_image = image_changed(self, "feature_image")
         # Create the slug if it doesn't exist

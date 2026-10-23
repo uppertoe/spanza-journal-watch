@@ -29,13 +29,13 @@
 <h6 class="text-muted small fw-semibold mb-2">Most engaged this window</h6>
 <div class="row g-3 mb-4 row-cols-2 row-cols-lg-5">
   {% for item in most_engaged_issues %}
-  {% if item.opens %}
+  {% if item.engaged %}
   <div class="col">
     <div class="card h-100">
       <div class="card-body py-2 px-3">
         <div class="text-muted x-small text-truncate" title="{{ item.issue.name }}">{{ item.issue.name }}</div>
-        <div class="h5 mb-0 mt-1">{{ item.opens }}</div>
-        <div class="text-muted x-small">opens · {{ item.engaged_rate }} engaged</div>
+        <div class="h5 mb-0 mt-1">{{ item.engaged }}</div>
+        <div class="text-muted x-small">sustained views from {{ item.opens }} impressions</div>
       </div>
     </div>
   </div>
@@ -51,7 +51,7 @@
     <table class="table table-sm align-middle mb-0">
       <thead>
         <tr>
-          <th>Issue</th><th>Reviews</th><th>Opens</th><th>Engaged rate</th><th>Full text</th><th>Shares</th><th>Page views</th>
+          <th>Issue</th><th>Reviews</th><th>Impressions</th><th>Engaged rate</th><th>Full text</th><th>Shares</th><th>Page views</th>
         </tr>
       </thead>
       <tbody>

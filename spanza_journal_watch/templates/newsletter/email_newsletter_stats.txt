@@ -1,15 +1,16 @@
 Dear staff member,
 
-A SPANZA Journal Watch newsletter has been successfully sent out to subscribers.
-
-Details below:
+The SPANZA Journal Watch newsletter send has finished.
 
 Newsletter: {{ newsletter }}
-Subscribers: {{ subscriber_count }}
-{% if already_delivered %}Already sent to earlier and skipped: {{ already_delivered }}
-{% endif %}Successful emails sent: {{ newsletter.emails_sent }}
-Number of send batches: {{ batch_count }}
-
+Subscribers in this send: {{ subscriber_count }}
+{% if already_delivered %}Subscribers skipped because they received an earlier send: {{ already_delivered }}
+{% endif %}Emails sent in this send: {{ delivered_this_run }}
+{% if already_delivered %}Emails sent in all sends: {{ newsletter.emails_sent }}
+{% endif %}Send batches: {{ batch_count }}
+{% if not_sent %}
+Journal Watch was not able to send {{ not_sent }} email{{ not_sent|pluralize }}. If you would like those subscribers to receive the newsletter, enable one resend on the newsletter page and send it again.
+{% endif %}
 Regards,
 
 Journal Watch admin

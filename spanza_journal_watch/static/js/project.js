@@ -222,6 +222,51 @@ const getCookie = (name) => {
 // payload is the only channel that can carry this context to the server.
 const LANDING_PAGE_STORAGE_KEY = 'jwLandingPage';
 const SHARE_TOKEN_STORAGE_KEY = 'jwShareToken';
+const VISITOR_ID_STORAGE_KEY = 'jwVisitorId';
+
+// The jwvid cookie is minted by the first beacon response, so beacons fired
+// together on a first visit would each get a different server-minted ID. A
+// client-generated ID sent with every beacon lets the server adopt one ID for
+// all of them; once the cookie is set, the cookie wins.
+const generateVisitorId = () => {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10, 16).join(''),
+  ].join('-');
+};
+
+let memoryVisitorId = '';
+const getClientVisitorId = () => {
+  try {
+    let stored = localStorage.getItem(VISITOR_ID_STORAGE_KEY);
+    if (!stored) {
+      stored = memoryVisitorId || generateVisitorId();
+      localStorage.setItem(VISITOR_ID_STORAGE_KEY, stored);
+    }
+    memoryVisitorId = stored;
+  } catch (_e) {
+    // localStorage unavailable: keep one ID for the life of the page
+    memoryVisitorId = memoryVisitorId || generateVisitorId();
+  }
+  return memoryVisitorId;
+};
 
 const capturePageAttribution = () => {
   try {
@@ -247,6 +292,7 @@ const getPageContext = () => {
     referrer: document.referrer || '',
     landing_page: '',
     share_token: '',
+    visitor_id: getClientVisitorId(),
   };
   try {
     context.landing_page =

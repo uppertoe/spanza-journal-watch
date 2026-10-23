@@ -1,6 +1,7 @@
 """First-week open benchmarks and confidence notes for reviews."""
 
 import datetime
+from collections import Counter
 
 from django.core.cache import cache
 from django.db.models import Count, Q
@@ -25,6 +26,13 @@ from .common import _engaged_human_count
 _FIRST_WINDOW_DAYS = 7
 _BENCHMARK_LOOKBACK_DAYS = 180
 _BENCHMARK_MIN_COHORT = 5
+# Client-hint enforcement went live in prod on this date. Opens recorded before
+# it carry far more undetected bot traffic, so the cohort never reaches back past it.
+CLIENT_HINTS_ENFORCED_DATE = datetime.date(2026, 9, 8)
+
+
+def _local_midnight(day):
+    return timezone.make_aware(datetime.datetime.combine(day, datetime.time.min))
 
 
 def _review_publish_date(review):
@@ -38,25 +46,26 @@ def _review_publish_date(review):
 def _first_window_opens(review, review_ct, today, days=_FIRST_WINDOW_DAYS):
     """REVIEW_OPEN count within the review's own first ``days`` after publish.
 
-    Bounded per review and independent of the dashboard window — a brand-new
-    review's first week may sit outside the selected range. Callers pass a small
-    set (reviews published recently), so the per-review count stays cheap.
+    The window is exactly ``days`` long: from local midnight on the publish date
+    up to (not including) local midnight ``days`` later. Bounded per review and
+    independent of the dashboard window — a brand-new review's first week may
+    sit outside the selected range. Callers pass a small set (reviews published
+    recently), so the per-review count stays cheap.
     """
     publish = _review_publish_date(review)
     if publish is None:
         return None
     window_end = publish + datetime.timedelta(days=days)
-    # Only meaningful once the full first window has elapsed.
+    # Only meaningful once the full first window has elapsed (its exclusive end
+    # is today's midnight or earlier).
     if window_end > today:
         return None
-    start_ts = timezone.make_aware(datetime.datetime.combine(publish, datetime.time.min))
-    end_ts = timezone.make_aware(datetime.datetime.combine(window_end, datetime.time.max))
     return AnalyticsEvent.objects.filter(
         content_type=review_ct,
         object_id=review.pk,
         event_type=AnalyticsEvent.EventType.REVIEW_OPEN,
-        timestamp__gte=start_ts,
-        timestamp__lte=end_ts,
+        timestamp__gte=_local_midnight(publish),
+        timestamp__lt=_local_midnight(window_end),
         automated=False,
     ).count()
 
@@ -65,15 +74,16 @@ def _first_window_benchmark(review_ct, today):
     """Median first-week REVIEW_OPEN count across recently-published reviews.
 
     Cached briefly — it walks a bounded cohort (reviews published in the trailing
-    ~180 days whose first window has fully elapsed). Returns (median, cohort_size);
-    median is None until the cohort reaches _BENCHMARK_MIN_COHORT.
+    ~180 days, and no earlier than CLIENT_HINTS_ENFORCED_DATE, whose first window
+    has fully elapsed). Returns (median, cohort_size); median is None until the
+    cohort reaches _BENCHMARK_MIN_COHORT.
     """
-    cache_key = f"analytics_first_week_benchmark:{today.isoformat()}"
+    cache_key = f"analytics_first_week_benchmark:v2:{today.isoformat()}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached["median"], cached["cohort"]
 
-    cohort_start = today - datetime.timedelta(days=_BENCHMARK_LOOKBACK_DAYS)
+    cohort_start = max(today - datetime.timedelta(days=_BENCHMARK_LOOKBACK_DAYS), CLIENT_HINTS_ENFORCED_DATE)
     window_cutoff = today - datetime.timedelta(days=_FIRST_WINDOW_DAYS)
     counts = []
     reviews = (
@@ -113,20 +123,20 @@ def _referrer_source_breakdown(events_qs):
     Returns a list of {label, category, count, pct}. ``pct`` is the share of the
     total, so the template can render proportional bars without a second pass.
     """
-    rows = list(events_qs.values("referrer_category").annotate(count=Count("id")).order_by("-count"))
-    total = sum(r["count"] for r in rows)
-    breakdown = []
-    for r in rows:
-        category = r["referrer_category"] or "other"
-        breakdown.append(
-            {
-                "label": _REFERRER_CATEGORY_LABELS.get(category, category.title() if category else "Other"),
-                "category": category,
-                "count": r["count"],
-                "pct": round(r["count"] / total * 100) if total else 0,
-            }
-        )
-    return breakdown
+    # A blank category and "other" are both shown as "Other", so they are one row.
+    counts = Counter()
+    for r in events_qs.values("referrer_category").annotate(count=Count("id")).order_by():
+        counts[r["referrer_category"] or "other"] += r["count"]
+    total = sum(counts.values())
+    return [
+        {
+            "label": _REFERRER_CATEGORY_LABELS.get(category, category.title()),
+            "category": category,
+            "count": count,
+            "pct": round(count / total * 100) if total else 0,
+        }
+        for category, count in counts.most_common()
+    ]
 
 
 def _benchmark_verdict(first_week_opens, median):

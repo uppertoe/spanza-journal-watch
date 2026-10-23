@@ -46,9 +46,11 @@ def _visit_is_engaged(visit):
 
     Uses the same signal as the headline engaged-humans KPI: a deliberate
     interaction (full-text click, share, search-result click, journal select…)
-    or a known subscriber. It deliberately ignores sustained-view dwell and raw
-    session duration — the June 2026 bot audit found JS-executing bots game both,
-    so counting them here would let the Audience explorer contradict the KPI.
+    or a known subscriber with a JS-verified event in the visit. It deliberately
+    ignores sustained-view dwell and raw session duration — the June 2026 bot
+    audit found JS-executing bots game both, so counting them here would let the
+    Audience explorer contradict the KPI. Every "engaged visit rate" on the
+    dashboard uses this same test.
     """
     return visit["deliberate"]
 

@@ -34,7 +34,7 @@
     <div class="card h-100"><div class="card-body">
       <h6 class="text-muted mb-1 small">Unique visitors</h6>
       <p class="display-6 mb-0">{{ unique_visitors|intcomma }}</p>
-      <p class="small text-muted mb-0">{{ returning_visitors }} returning ({{ returning_rate }})</p>
+      <p class="small text-muted mb-0" title="{% if returning_basis == 'history' %}A returning visitor used the journal browser before this date range.{% else %}This date range reaches back before visitor history began, so a returning visitor is one with two or more journal visits within the range.{% endif %}">{{ returning_visitors }} returning ({{ returning_rate }})</p>
     </div></div>
   </div>
   <div class="col-6 col-md-3">
@@ -50,8 +50,8 @@
     </div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card h-100"><div class="card-body">
-      <h6 class="text-muted mb-1 small">Reading list users</h6>
+    <div class="card h-100" title="Reading list users are counted across all time, not only this date range."><div class="card-body">
+      <h6 class="text-muted mb-1 small">Reading list users <span class="badge text-bg-light text-muted border fw-normal">All time</span></h6>
       <p class="display-6 mb-0">{{ total_reading_list_users }}</p>
       <p class="small text-muted mb-0">Avg {{ avg_items_per_user }} items each</p>
     </div></div>

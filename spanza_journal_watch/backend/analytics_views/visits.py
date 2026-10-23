@@ -73,24 +73,61 @@ _VISIT_PROGRESSION_EVENT_TYPES = frozenset(
 )
 
 
+# "Seen before the period" needs this much jwvid history ahead of the window
+# start; with less, almost every visitor looks new simply because the cookie
+# had not existed long enough to record their earlier visits.
+_RETURNING_HISTORY_MIN_DAYS = 30
+
+
+def _visitor_id_rollout_date():
+    """Local date of the first event carrying a visitor_id. Fixed once it exists, so cached for an hour."""
+    cache_key = "analytics:visitor_id_rollout_date"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    first = (
+        AnalyticsEvent.objects.filter(visitor_id__isnull=False)
+        .order_by("timestamp")
+        .values_list("timestamp", flat=True)
+        .first()
+    )
+    if first is None:
+        return None
+    rollout = timezone.localtime(first).date()
+    cache.set(cache_key, rollout, 3600)
+    return rollout
+
+
 def _split_new_returning(
-    visitor_ids_in_period, *, start_ts, start_date, rollout_date, visits_per_visitor, period_qs=None
+    visitor_ids_in_period,
+    *,
+    start_ts,
+    start_date,
+    rollout_date,
+    visits_per_visitor,
+    period_qs=None,
+    history_event_types=None,
 ):
     """Split the period's visitors into (new_count, returning_count, basis).
 
     Returning is defined by whether a visitor was already seen *before* the
     period — the genuine loyalty signal, and the same definition the journals
-    panel already uses. This replaces the older "2+ visits within the period",
+    panel uses. This replaces the older "2+ visits within the period",
     which counted a same-day repeat session as returning and labelled every
     single-visit visitor (including long-time readers) as "new".
 
     Seen-before is only meaningful once the jwvid cookie's history predates the
-    period start. For windows reaching back to before analytics rollout there is
-    no history to check, so we fall back to the in-period frequency heuristic and
-    return basis="frequency" so the UI can describe what it's showing.
+    period start by _RETURNING_HISTORY_MIN_DAYS. ``rollout_date`` is the first
+    visitor_id event (:func:`_visitor_id_rollout_date`). For windows starting
+    sooner than that there is too little history to check, so we fall back to
+    the in-period frequency heuristic and return basis="frequency" so the UI can
+    describe what it's showing. ``history_event_types`` restricts the prior
+    history to those event types (the journals panel counts journal use only).
     """
     total = len(visitor_ids_in_period)
-    history_reliable = rollout_date is not None and start_date > rollout_date
+    history_reliable = rollout_date is not None and start_date >= rollout_date + datetime.timedelta(
+        days=_RETURNING_HISTORY_MIN_DAYS
+    )
     if history_reliable and visitor_ids_in_period:
         # A subquery keeps thousands of visitor ids out of the SQL text.
         seen_in_period = (
@@ -98,16 +135,14 @@ def _split_new_returning(
             if period_qs is not None
             else visitor_ids_in_period
         )
-        returning_count = (
-            AnalyticsEvent.objects.filter(
-                automated=False,
-                timestamp__lt=start_ts,
-                visitor_id__in=seen_in_period,
-            )
-            .values("visitor_id")
-            .distinct()
-            .count()
+        history = AnalyticsEvent.objects.filter(
+            automated=False,
+            timestamp__lt=start_ts,
+            visitor_id__in=seen_in_period,
         )
+        if history_event_types is not None:
+            history = history.filter(event_type__in=history_event_types)
+        returning_count = history.values("visitor_id").distinct().count()
         basis = "history"
     else:
         returning_count = sum(1 for v in visits_per_visitor.values() if v >= 2)
@@ -229,10 +264,13 @@ def _note_event(visit, row):
         visit["engaged"] = True
     if event_type in _JOURNAL_EVENT_TYPES:
         visit["journal"] = True
-    if (
-        event_type in DELIBERATE_INTERACTION_EVENT_TYPES
-        or row.get("human_confidence") == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
-    ):
+    if row.get("js_verified"):
+        visit["js_verified"] = True
+    if row.get("subscriber_id"):
+        visit["subscriber"] = True
+    # Same rule as engaged_visitor_ids, judged within the visit: a subscriber
+    # match only counts alongside a JS-verified event, which link scanners lack.
+    if event_type in DELIBERATE_INTERACTION_EVENT_TYPES or (visit["subscriber"] and visit["js_verified"]):
         visit["deliberate"] = True
     if len(visit["event_types"]) < _FLOW_EVENT_LIMIT:
         visit["event_types"].append(event_type)
@@ -256,7 +294,7 @@ def _build_derived_visits(events_qs):
             "landing_page",
             "session_key",
             "js_verified",
-            "human_confidence",
+            "subscriber_id",
             page=KeyTextTransform("page", "metadata"),
             utm_source=KeyTextTransform("utm_source", "metadata"),
             utm_medium=KeyTextTransform("utm_medium", "metadata"),
@@ -288,7 +326,8 @@ def _build_derived_visits(events_qs):
                 "landing_page": _derive_visit_landing_page(row),
                 "first_event": timestamp,
                 "last_event": timestamp,
-                "js_verified": bool(row.get("js_verified")),
+                "js_verified": False,
+                "subscriber": False,
                 "utm_source": _utm_field_from_metadata(row, "utm_source"),
                 "utm_medium": _utm_field_from_metadata(row, "utm_medium"),
                 "utm_campaign": _utm_field_from_metadata(row, "utm_campaign"),
@@ -306,7 +345,6 @@ def _build_derived_visits(events_qs):
 
         current_visit["last_event"] = timestamp
         _note_event(current_visit, row)
-        current_visit["js_verified"] = current_visit["js_verified"] or bool(row.get("js_verified"))
         if not current_visit["landing_page"]:
             current_visit["landing_page"] = _derive_visit_landing_page(row)
         if not current_visit["referrer_category"] and row.get("referrer_category"):
@@ -329,7 +367,8 @@ def _build_derived_visits(events_qs):
 # panel for a given date-range/scope share it. Analytics tolerate minutes of
 # staleness; production uses Redis (a fresh copy per get, so no aliasing) and
 # fails open, while local dev uses DummyCache (this is a transparent no-op).
-_DERIVED_VISITS_CACHE_PREFIX = "analytics:derived_visits:"
+# Versioned: bump when the facts a visit carries change, so stale copies are never served.
+_DERIVED_VISITS_CACHE_PREFIX = "analytics:derived_visits:v2:"
 _CACHE_MISS = object()
 
 
@@ -373,7 +412,7 @@ def warm_derived_visits():
     events, plus the journals panel's previous period, so the first editor of
     the day never waits for the sessionising pass. Returns the visit counts.
     """
-    from .common import default_analytics_window, human_events_between
+    from .common import _previous_period, default_analytics_window, human_events_between
 
     start_date, end_date, start_ts, end_ts = default_analytics_window()
     human_events = human_events_between(start_ts, end_ts)
@@ -382,11 +421,7 @@ def warm_derived_visits():
         "all": len(_build_derived_visits_cached(human_events, force=True)),
         "journals": len(_build_derived_visits_cached(human_events.filter(event_type__in=journal_types), force=True)),
     }
-    period_days = (end_date - start_date).days
-    prev_end = start_date - datetime.timedelta(days=1)
-    prev_start = prev_end - datetime.timedelta(days=period_days)
-    prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
-    prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+    _, _, prev_start_ts, prev_end_ts = _previous_period(start_date, end_date, start_ts)
     prev_events = human_events_between(prev_start_ts, prev_end_ts).filter(event_type__in=journal_types)
     counts["journals_previous"] = len(_build_derived_visits_cached(prev_events, force=True))
     return counts

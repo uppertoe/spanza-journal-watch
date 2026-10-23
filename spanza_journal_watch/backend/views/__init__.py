@@ -14,7 +14,6 @@ from .analytics_page import (
     _safe_percentage,
     _site_analytics_rollout_date,
     analytics_redirect,
-    site_analytics,
 )
 from .authors import (
     affiliation_edit,
@@ -538,7 +537,6 @@ __all__ = [
     "send_final_newsletter",
     "send_test_newsletter",
     "serve_docs",
-    "site_analytics",
     "subscriber_list",
     "suggest_review_headline",
     "tag_add",

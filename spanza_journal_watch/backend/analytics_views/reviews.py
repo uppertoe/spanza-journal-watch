@@ -1,12 +1,9 @@
 """Per-review timeline."""
 
-import datetime
-
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Avg, Count, Q
 from django.shortcuts import redirect, render
-from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
     AnalyticsEvent,
@@ -14,8 +11,9 @@ from spanza_journal_watch.analytics.models import (
 from spanza_journal_watch.submissions.models import Review
 
 from .benchmarks import _referrer_source_breakdown
-from .common import VIEW_SITE_ANALYTICS, _weekly_buckets
+from .common import VIEW_SITE_ANALYTICS, _date_range_from_request
 from .flows import _FLOW_LABELS, _enrich_event_details, _format_event_detail
+from .issues import weekly_buckets_between
 
 
 @login_required
@@ -26,12 +24,7 @@ def analytics_review_timeline(request, review_pk):
     if review is None:
         return redirect("backend:analytics_editorial")
 
-    today = timezone.localdate()
-    lookback_days = 180
-    start_ts = timezone.make_aware(
-        datetime.datetime.combine(today - datetime.timedelta(days=lookback_days), datetime.time.min)
-    )
-    end_ts = timezone.make_aware(datetime.datetime.combine(today, datetime.time.max))
+    start_date, end_date, start_ts, end_ts = _date_range_from_request(request, default_days=180)
 
     review_ct = ContentType.objects.get_for_model(Review)
     events_qs = AnalyticsEvent.objects.filter(
@@ -83,13 +76,14 @@ def analytics_review_timeline(request, review_pk):
 
     # Views over time — weekly REVIEW_OPEN counts for this review.
     open_events = events_qs.filter(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)
-    weekly_opens = _weekly_buckets(open_events, weeks=26)
+    weekly_opens = weekly_buckets_between(open_events, start_date, end_date)
     # How readers reached this review (referrer mix on its opens).
     referrer_breakdown = _referrer_source_breakdown(open_events)
 
     context = {
         "review": review,
-        "lookback_days": lookback_days,
+        "start_date": start_date,
+        "end_date": end_date,
         "total_events": total_events,
         "impressions": totals["impressions"] or 0,
         "sustained_views": totals["sustained"] or 0,

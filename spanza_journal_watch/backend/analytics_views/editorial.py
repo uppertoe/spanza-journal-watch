@@ -9,10 +9,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 
-from spanza_journal_watch.analytics.models import (
-    DELIBERATE_INTERACTION_EVENT_TYPES,
-    AnalyticsEvent,
-)
+from spanza_journal_watch.analytics.models import AnalyticsEvent
 from spanza_journal_watch.backend.views.analytics_page import (
     _build_rate_row,
     _safe_percentage,
@@ -26,8 +23,62 @@ from .benchmarks import (
     _first_window_opens,
     _review_publish_date,
 )
-from .common import VIEW_SITE_ANALYTICS, _base_event_qs, _date_range_from_request, _render_analytics, _weekly_buckets
+from .common import (
+    VIEW_SITE_ANALYTICS,
+    _base_event_qs,
+    _date_range_from_request,
+    _render_analytics,
+    _weekly_buckets,
+    engaged_visitor_ids,
+)
 from .visits import _LOW_SAMPLE_THRESHOLD, _normalise_search_query, _rank_rows
+
+BROWSE_QUERY = "[browse]"
+
+
+def search_click_summary(events_qs):
+    """Searches, result clicks and click-through for a human-filtered, period-scoped queryset.
+
+    A search with no text (a year or topic filter alone) is a browse, counted apart from
+    text searches on both sides of the ratio, so the click-through rate compares like
+    with like. Placeholder queries are dropped from both. Any panel reporting a search
+    click-through rate should use this.
+    """
+    query_counter = Counter()
+    zero_result_counter = Counter()
+    for metadata in events_qs.filter(event_type=AnalyticsEvent.EventType.SEARCH).values_list("metadata", flat=True):
+        label = _normalise_search_query((metadata or {}).get("query"))
+        if label is None:
+            continue
+        query_counter[label] += 1
+        if not (metadata or {}).get("result_count"):
+            zero_result_counter[label] += 1
+
+    click_counter = Counter()
+    for metadata in events_qs.filter(event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK).values_list(
+        "metadata", flat=True
+    ):
+        label = _normalise_search_query((metadata or {}).get("query"))
+        if label is None:
+            continue
+        click_counter[label] += 1
+
+    browse_searches = query_counter.pop(BROWSE_QUERY, 0)
+    browse_clicks = click_counter.pop(BROWSE_QUERY, 0)
+    zero_result_counter.pop(BROWSE_QUERY, 0)
+    total_searches = sum(query_counter.values())
+    total_clicks = sum(click_counter.values())
+    return {
+        "query_counter": query_counter,
+        "click_counter": click_counter,
+        "zero_result_counter": zero_result_counter,
+        "total_searches": total_searches,
+        "total_clicks": total_clicks,
+        "search_ctr": _safe_percentage(total_clicks, total_searches),
+        "browse_searches": browse_searches,
+        "browse_clicks": browse_clicks,
+        "browse_ctr": _safe_percentage(browse_clicks, browse_searches),
+    }
 
 
 @login_required
@@ -127,9 +178,12 @@ def analytics_editorial(request):
             tag_totals[label]["full_text"] += row["full_text_clicks"]
             tag_totals[label]["score"] += score
 
-    # Engagement velocity — score per week since publication. Uses the issue-date
-    # fallback so reviews without their own publish_date still get a velocity.
+    # Engagement velocity — window score per week the review was live in the window.
+    # The score only covers the window, so an older review is divided by the window's
+    # length rather than its full age. Uses the issue-date fallback so reviews without
+    # their own publish_date still get a velocity.
     today = timezone.localdate()
+    window_weeks = ((end_date - start_date).days + 1) / 7
     for item in top_reviews:
         review = item["review"]
         publish = _review_publish_date(review)
@@ -137,7 +191,7 @@ def analytics_editorial(request):
         if publish:
             days_since = max((today - publish).days, 1)
             weeks_since = max(days_since / 7, 0.5)
-            item["velocity"] = round(item["engagement_score"] / weeks_since, 1)
+            item["velocity"] = round(item["engagement_score"] / max(min(weeks_since, window_weeks), 0.5), 1)
             item["weeks_since"] = round(weeks_since, 1)
         else:
             item["velocity"] = None
@@ -217,18 +271,11 @@ def analytics_editorial(request):
     }
     share_breakdown = [{"label": k, "count": v} for k, v in share_counts.items() if v]
 
-    # Share-to-visit attribution — count downstream visits from share tokens
-    # Visitors who arrived via a share link (carry a ref token) AND actually
-    # engaged. Excludes link-preview/unfurl fetchers, which land a single
-    # tokened page_visit with no interaction and would otherwise inflate this.
-    share_attributed_visits = (
-        human_events.exclude(share_token="")
-        .filter(visitor_id__isnull=False)
-        .filter(Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES))
-        .values("visitor_id")
-        .distinct()
-        .count()
-    )
+    # Share attribution — visitors who arrived via a share link (carry a ref token)
+    # AND are engaged humans. Excludes link-preview/unfurl fetchers, which land a
+    # single tokened page_visit with no interaction and would otherwise inflate this.
+    share_visitor_ids = human_events.exclude(share_token="").filter(visitor_id__isnull=False).values("visitor_id")
+    share_attributed_visitors = len(engaged_visitor_ids(human_events.filter(visitor_id__in=share_visitor_ids)))
 
     # Tag-based content type breakdown — shows what topics resonate
     tag_type_breakdown = sorted(
@@ -250,31 +297,10 @@ def analytics_editorial(request):
 
     # ── Search data (merged from analytics_search) ──────────────────
     search_events = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
-    search_click_events = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK)
-
-    search_query_counter = Counter()
-    zero_result_counter = Counter()
-    for metadata in search_events.values_list("metadata", flat=True):
-        label = _normalise_search_query((metadata or {}).get("query"))
-        if label is None:
-            continue
-        search_query_counter[label] += 1
-        if not (metadata or {}).get("result_count"):
-            zero_result_counter[label] += 1
-
-    click_counter = Counter()
-    for metadata in search_click_events.values_list("metadata", flat=True):
-        label = _normalise_search_query((metadata or {}).get("query"))
-        if label is None:
-            continue
-        click_counter[label] += 1
-
-    browse_searches = search_query_counter.pop("[browse]", 0)
-    browse_clicks = click_counter.pop("[browse]", 0)
-    zero_result_counter.pop("[browse]", 0)
-
-    real_search_total = sum(search_query_counter.values())
-    real_click_total = sum(click_counter.values())
+    search = search_click_summary(human_events)
+    click_counter = search["click_counter"]
+    zero_result_counter = search["zero_result_counter"]
+    search_query_counter = search["query_counter"]
 
     search_insights = [
         {
@@ -287,10 +313,11 @@ def analytics_editorial(request):
         for label, count in search_query_counter.most_common(20)
     ]
 
-    zero_result_queries = sorted(
-        [item for item in search_insights if item["zero_results"] > 0],
-        key=lambda x: -x["zero_results"],
-    )
+    # Built from every zero-result query, not only those in the top 20 searches.
+    zero_result_queries = [
+        {"label": label, "searches": search_query_counter[label], "zero_results": zeros}
+        for label, zeros in zero_result_counter.most_common(10)
+    ]
 
     weekly_searches = _weekly_buckets(search_events)
 
@@ -301,7 +328,7 @@ def analytics_editorial(request):
         tag_names_lower[label.lower()] = label
         tag_names_lower[label.lower().lstrip("#")] = label
     unmet_demand = []
-    for zq in zero_result_queries[:10]:
+    for zq in zero_result_queries:
         q_lower = zq["label"].lower()
         matched_tag = tag_names_lower.get(q_lower)
         if matched_tag:
@@ -377,16 +404,15 @@ def analytics_editorial(request):
             _group_summary("Standard reviews", standard_rows),
         ],
         "share_breakdown": share_breakdown,
-        "share_attributed_visits": share_attributed_visits,
-        "share_attributed_visit_rate": _safe_percentage(share_attributed_visits, total_shares),
+        "share_attributed_visitors": share_attributed_visitors,
         # Search data
-        "total_searches": real_search_total,
-        "search_click_count": real_click_total,
-        "search_ctr": _safe_percentage(real_click_total, real_search_total),
-        "browse_searches": browse_searches,
-        "browse_ctr": _safe_percentage(browse_clicks, browse_searches),
+        "total_searches": search["total_searches"],
+        "search_click_count": search["total_clicks"],
+        "search_ctr": search["search_ctr"],
+        "browse_searches": search["browse_searches"],
+        "browse_ctr": search["browse_ctr"],
         "search_insights": search_insights,
-        "zero_result_queries": zero_result_queries[:10],
+        "zero_result_queries": zero_result_queries,
         "weekly_searches": weekly_searches,
         "unmet_demand": unmet_demand,
         # Archive discovery

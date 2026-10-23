@@ -30,25 +30,44 @@ VIEW_SITE_ANALYTICS = "backend.view_site_analytics"
 VIEW_NEWSLETTER_STATS = "backend.view_newsletter_stats"
 
 
-# "Engaged human" KPI: a distinct visitor counts only once they take a
-# *deliberate* action (DELIBERATE_INTERACTION_EVENT_TYPES) or match a subscriber.
-# Passive scroll and bare `search` submissions are excluded — a 2026-06 prod
-# audit showed JS-executing bots game both. The same constant gates the
-# UA-cohort bot sweeper, so "engaged" and "not swept as a bot" always agree.
-def _engaged_human_count(events_qs):
-    """Distinct visitors in ``events_qs`` who took a deliberate engagement action.
-
-    ``events_qs`` is expected to already be human-filtered + period-scoped
-    (i.e. ``_base_event_qs``). Counts distinct ``visitor_id``s that either fired
-    a deliberate interaction or matched a subscriber.
-    """
+# "Engaged human" KPI: a distinct visitor counts once they take a *deliberate*
+# action (DELIBERATE_INTERACTION_EVENT_TYPES), or once a matched subscriber also
+# runs JavaScript. Passive scroll and bare `search` submissions are excluded — a
+# 2026-06 prod audit showed JS-executing bots game both. A subscriber match alone
+# is not enough: hospital link scanners follow newsletter links carrying the
+# subscriber's token, so a 2026-10 audit found most "subscriber" visitors were a
+# single scanner hit with no JS. The same event-type constant gates the UA-cohort
+# bot sweeper, so "engaged" and "not swept as a bot" agree.
+def _engaged_visitor_qs(events_qs):
+    """``visitor_id`` values (one per visitor) of the engaged humans in ``events_qs``."""
     return (
         events_qs.filter(visitor_id__isnull=False)
-        .filter(Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES))
+        .order_by()
         .values("visitor_id")
-        .distinct()
-        .count()
+        .annotate(
+            deliberate_events=Count("id", filter=Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES)),
+            subscriber_events=Count("id", filter=Q(subscriber__isnull=False)),
+            js_events=Count("id", filter=Q(js_verified=True)),
+        )
+        .filter(Q(deliberate_events__gt=0) | Q(subscriber_events__gt=0, js_events__gt=0))
+        .values_list("visitor_id", flat=True)
     )
+
+
+def engaged_visitor_ids(events_qs):
+    """The set of engaged-human ``visitor_id``s in ``events_qs``.
+
+    ``events_qs`` is expected to already be human-filtered + period-scoped
+    (i.e. ``_base_event_qs``). Both conditions are judged across the visitor's
+    events in that queryset, so a subscriber's JS beacon may come from a later
+    page than the subscriber-tagged click.
+    """
+    return set(_engaged_visitor_qs(events_qs))
+
+
+def _engaged_human_count(events_qs):
+    """Distinct engaged-human visitors in ``events_qs`` (see :func:`engaged_visitor_ids`)."""
+    return _engaged_visitor_qs(events_qs).count()
 
 
 DEFAULT_ANALYTICS_DAYS = 90
@@ -60,10 +79,19 @@ def _window_timestamps(start_date, end_date):
     return start_ts, end_ts
 
 
+def _preset_start(today, days):
+    """First day of a ``days``-long window ending today (inclusive)."""
+    return today - datetime.timedelta(days=days - 1)
+
+
 def default_analytics_window(default_days=DEFAULT_ANALYTICS_DAYS):
-    """The window every analytics page opens on: (start_date, end_date, start_ts, end_ts)."""
+    """The window every analytics page opens on: (start_date, end_date, start_ts, end_ts).
+
+    Identical to the matching date preset, so the preset shows as active and the
+    warming task's queryset (and therefore its cache key) matches the request's.
+    """
     today = timezone.localdate()
-    start_date = today - datetime.timedelta(days=default_days)
+    start_date = _preset_start(today, default_days)
     return start_date, today, *_window_timestamps(start_date, today)
 
 
@@ -74,6 +102,25 @@ def _date_range_from_request(request, default_days=DEFAULT_ANALYTICS_DAYS):
     if end_date < start_date:
         start_date, end_date = end_date, start_date
     return start_date, end_date, *_window_timestamps(start_date, end_date)
+
+
+def _previous_period(start_date, end_date, start_ts):
+    """The equal-length period just before the range: (prev_start, prev_end, prev_start_ts, prev_end_ts).
+
+    When the range ends today, the current period has only run until now, so the
+    previous period is cut off at the same elapsed time; otherwise a part-day
+    would be compared against a whole one. The cut-off is floored to the hour so
+    the previous-period queryset (and the visit cache keyed on it) is stable for
+    the warming task's interval.
+    """
+    period_days = (end_date - start_date).days
+    prev_end = start_date - datetime.timedelta(days=1)
+    prev_start = prev_end - datetime.timedelta(days=period_days)
+    prev_start_ts, prev_end_ts = _window_timestamps(prev_start, prev_end)
+    if end_date == timezone.localdate():
+        now = timezone.localtime().replace(minute=0, second=0, microsecond=0)
+        prev_end_ts = min(prev_end_ts, prev_start_ts + (now - start_ts))
+    return prev_start, prev_end, prev_start_ts, prev_end_ts
 
 
 def human_events_between(start_ts, end_ts):
@@ -93,7 +140,7 @@ def _render_analytics(request, template, context, panel_template=None):
         today = timezone.localdate()
         presets = []
         for days in (30, 90, 180):
-            preset_start = today - datetime.timedelta(days=days - 1)
+            preset_start = _preset_start(today, days)
             presets.append(
                 {
                     "label": f"{days}d",
@@ -145,4 +192,4 @@ def _newsletter_send_weeks(weeks=26):
         .order_by("send_date")
         .values("send_date", "id")
     )
-    return [{"date": n["send_date"].date().isoformat(), "id": n["id"]} for n in newsletters]
+    return [{"date": timezone.localtime(n["send_date"]).date().isoformat(), "id": n["id"]} for n in newsletters]

@@ -1,12 +1,10 @@
 """The Journals panel: journal browser usage."""
 
-import datetime
 import json
 from collections import Counter
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db.models import Count, Q
-from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
     AnalyticsEvent,
@@ -22,15 +20,18 @@ from .common import (
     _base_event_qs,
     _date_range_from_request,
     _pct_change,
+    _previous_period,
     _render_analytics,
     _weekly_buckets,
     human_events_between,
 )
+from .editorial import search_click_summary
 from .visits import (
-    _JOURNAL_EVENT_TYPES,
     _VISIT_INACTIVITY_GAP,
     _build_derived_visits_cached,
     _journal_event_type_list,
+    _split_new_returning,
+    _visitor_id_rollout_date,
     _weekly_visit_buckets,
 )
 
@@ -51,15 +52,16 @@ def analytics_journals(request):
     total_visits = len(journal_visits)
     visitor_ids_in_period = {visit["visitor_id"] for visit in journal_visits if visit["visitor_id"]}
     unique_visitors = len(visitor_ids_in_period)
-    returning_visitors = (
-        AnalyticsEvent.objects.filter(
-            event_type__in=_JOURNAL_EVENT_TYPES,
-            visitor_id__in=visitor_ids_in_period,
-            timestamp__lt=start_ts,
-        )
-        .values("visitor_id")
-        .distinct()
-        .count()
+    # Same rule as the Traffic panel: human history only, and only once the
+    # jwvid cookie has enough history before the window to be trusted.
+    _, returning_visitors, returning_basis = _split_new_returning(
+        visitor_ids_in_period,
+        start_ts=start_ts,
+        start_date=start_date,
+        rollout_date=_visitor_id_rollout_date(),
+        visits_per_visitor=Counter(visit["visitor_id"] for visit in journal_visits if visit["visitor_id"]),
+        period_qs=journal_events,
+        history_event_types=_journal_event_type_list(),
     )
     returning_rate = _safe_percentage(returning_visitors, unique_visitors) if unique_visitors else "–"
 
@@ -140,11 +142,7 @@ def analytics_journals(request):
     )
 
     # ── Feature scorecard with period comparisons ──────────────────
-    period_days = (end_date - start_date).days
-    prev_end = start_date - datetime.timedelta(days=1)
-    prev_start = prev_end - datetime.timedelta(days=period_days)
-    prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
-    prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+    prev_start, prev_end, prev_start_ts, prev_end_ts = _previous_period(start_date, end_date, start_ts)
 
     prev_events = human_events_between(prev_start_ts, prev_end_ts)
 
@@ -157,12 +155,7 @@ def analytics_journals(request):
 
     prev_visits = len(_build_derived_visits_cached(prev_events.filter(event_type__in=_journal_event_type_list())))
     prev_stars = states_in_range.filter(starred_at__gte=prev_start_ts, starred_at__lte=prev_end_ts).count()
-    prev_searches = (
-        prev_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
-        .exclude(metadata__query="")
-        .exclude(metadata__query__isnull=True)
-        .count()
-    )
+    prev_searches = search_click_summary(prev_events)["total_searches"]
 
     share_event_types = [
         AnalyticsEvent.EventType.REVIEW_SHARE_COPY_LINK,
@@ -175,14 +168,10 @@ def analytics_journals(request):
     total_shares = human_events.filter(event_type__in=share_event_types).count()
     prev_shares = prev_events.filter(event_type__in=share_event_types).count()
 
-    total_searches = (
-        human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH)
-        .exclude(metadata__query="")
-        .exclude(metadata__query__isnull=True)
-        .count()
-    )
-    search_clicks = human_events.filter(event_type=AnalyticsEvent.EventType.SEARCH_RESULT_CLICK).count()
-    search_ctr = _safe_percentage(search_clicks, total_searches) if total_searches else "–"
+    # Shared with the Editorial panel so both report the same text-search click-through.
+    search_summary = search_click_summary(human_events)
+    total_searches = search_summary["total_searches"]
+    search_ctr = search_summary["search_ctr"] if total_searches else "–"
 
     prev_cpd = CPDReport.objects.filter(created__gte=prev_start_ts, created__lte=prev_end_ts).count()
 
@@ -228,6 +217,7 @@ def analytics_journals(request):
         "unique_visitors": unique_visitors,
         "returning_visitors": returning_visitors,
         "returning_rate": returning_rate,
+        "returning_basis": returning_basis,
         "total_stars": total_stars,
         "total_archives": total_archives,
         "total_recommends": total_recommends,

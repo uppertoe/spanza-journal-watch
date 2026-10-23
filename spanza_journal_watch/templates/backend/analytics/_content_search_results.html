@@ -17,7 +17,7 @@
       <span class="small text-truncate" title="{{ item.issue.name }}">{{ item.issue.name|truncatechars:60 }}
         <span class="text-muted d-block d-sm-inline x-small">· {{ item.issue.date|date:"M Y"|default:"undated" }} · {{ item.review_count }} review{{ item.review_count|pluralize }}</span>
       </span>
-      <span class="text-nowrap x-small text-muted">{{ item.opens }} opens · {{ item.engaged_rate }}</span>
+      <span class="text-nowrap x-small text-muted">{{ item.opens }} impressions · {{ item.engaged_rate }}</span>
     </a>
     {% endfor %}
   </div>
@@ -35,7 +35,7 @@
       <span class="small text-truncate" title="{{ item.review.article.get_title|capfirst }}">{{ item.review.article.get_title|capfirst|truncatechars:60 }}
         <span class="text-muted d-block d-sm-inline x-small">· {{ item.review.article.journal }}</span>
       </span>
-      <span class="text-nowrap x-small text-muted">{{ item.opens }} opens · {{ item.engaged_rate }}</span>
+      <span class="text-nowrap x-small text-muted">{{ item.opens }} impressions · {{ item.engaged_rate }}</span>
     </a>
     {% endfor %}
   </div>

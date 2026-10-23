@@ -11,12 +11,10 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from spanza_journal_watch.analytics.models import (
-    DELIBERATE_INTERACTION_EVENT_TYPES,
     AnalyticsEvent,
     AutomatedRequestCount,
 )
 from spanza_journal_watch.backend.views.analytics_page import (
-    _newsletter_predates_site_analytics,
     _safe_percentage,
     _site_analytics_rollout_date,
 )
@@ -30,9 +28,12 @@ from .common import (
     _date_range_from_request,
     _newsletter_send_weeks,
     _pct_change,
+    _previous_period,
     _render_analytics,
     _weekly_buckets,
+    engaged_visitor_ids,
 )
+from .flows import _visit_is_engaged
 from .visits import (
     _LOW_SAMPLE_THRESHOLD,
     _PAGE_SECTION_LABELS,
@@ -41,6 +42,23 @@ from .visits import (
     _rank_rows,
 )
 
+_LIFT_WINDOW_DAYS = 7
+
+
+def _newsletter_lift_windows(newsletter):
+    """(before_start, send_start, after_end): the seven local days before the send day and the seven from it.
+
+    Day-aligned in local time, so both weeks cover whole Melbourne days and the
+    send day itself (when readers act on the email) falls in the after-week.
+    """
+    send_day = timezone.localtime(newsletter.send_date).date()
+    before_day = send_day - datetime.timedelta(days=_LIFT_WINDOW_DAYS)
+    after_day = send_day + datetime.timedelta(days=_LIFT_WINDOW_DAYS)
+    return tuple(
+        timezone.make_aware(datetime.datetime.combine(day, datetime.time.min))
+        for day in (before_day, send_day, after_day)
+    )
+
 
 def _newsletter_lift_counts(newsletter):
     """Engaged views in the week before and after a send, as one query.
@@ -48,10 +66,8 @@ def _newsletter_lift_counts(newsletter):
     Both windows are fixed once the after-week has elapsed, so the pair is
     cached for a day; a send still inside its after-week is recounted hourly.
     """
-    send_dt = newsletter.send_date
-    before_start = send_dt - datetime.timedelta(days=7)
-    after_end = send_dt + datetime.timedelta(days=7)
-    cache_key = f"analytics:newsletter_lift:{newsletter.pk}:{send_dt.isoformat()}"
+    before_start, send_start, after_end = _newsletter_lift_windows(newsletter)
+    cache_key = f"analytics:newsletter_lift:v2:{newsletter.pk}:{newsletter.send_date.isoformat()}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -59,14 +75,39 @@ def _newsletter_lift_counts(newsletter):
         event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
         automated=False,
         timestamp__gte=before_start,
-        timestamp__lte=after_end,
+        timestamp__lt=after_end,
     ).aggregate(
-        before=Count("id", filter=Q(timestamp__lt=send_dt)),
-        after=Count("id", filter=Q(timestamp__gte=send_dt)),
+        before=Count("id", filter=Q(timestamp__lt=send_start)),
+        after=Count("id", filter=Q(timestamp__gte=send_start)),
     )
     result = (counts["before"], counts["after"])
-    cache.set(cache_key, result, 86400 if after_end < timezone.now() else 3600)
+    cache.set(cache_key, result, 86400 if after_end <= timezone.now() else 3600)
     return result
+
+
+def _newsletter_lift_row(newsletter, rollout_date):
+    """One row of the newsletter-lift table.
+
+    ``lift_pct`` is None while the after-week is still running (``in_progress``)
+    — a part-week would always read as a fall — and when the before-week reaches
+    back before the site-analytics rollout (``site_analytics_partial``), since
+    that baseline is near zero.
+    """
+    before_start, _, after_end = _newsletter_lift_windows(newsletter)
+    row = {
+        "newsletter": newsletter,
+        "before": None,
+        "after": None,
+        "lift_pct": None,
+        "in_progress": after_end > timezone.now(),
+        "site_analytics_partial": rollout_date is not None and before_start.date() < rollout_date,
+    }
+    if row["site_analytics_partial"]:
+        return row
+    row["before"], row["after"] = _newsletter_lift_counts(newsletter)
+    if row["before"] and not row["in_progress"]:
+        row["lift_pct"] = round((row["after"] - row["before"]) / row["before"] * 100)
+    return row
 
 
 @login_required
@@ -89,12 +130,8 @@ def analytics_overview(request):
 
     E = AnalyticsEvent.EventType
 
-    # Previous period for comparison
-    period_days = (end_date - start_date).days
-    prev_end = start_date - datetime.timedelta(days=1)
-    prev_start = prev_end - datetime.timedelta(days=period_days)
-    prev_start_ts = timezone.make_aware(datetime.datetime.combine(prev_start, datetime.time.min))
-    prev_end_ts = timezone.make_aware(datetime.datetime.combine(prev_end, datetime.time.max))
+    # Previous period for comparison (cut to the same elapsed time when the range ends today)
+    prev_start, prev_end, prev_start_ts, prev_end_ts = _previous_period(start_date, end_date, start_ts)
 
     # One pass over both periods: every review KPI, its previous-period twin,
     # the search counts and the per-method share counts as filtered aggregates.
@@ -157,47 +194,34 @@ def analytics_overview(request):
     newsletter_sends = _newsletter_send_weeks(weeks=26)
 
     recent_newsletters = list(Newsletter.objects.filter(is_sent=True).order_by("-send_date")[:4])
-    newsletter_lift = []
-    for nl in recent_newsletters:
-        if not nl.send_date:
-            continue
-        if _newsletter_predates_site_analytics(nl):
-            newsletter_lift.append(
-                {
-                    "newsletter": nl,
-                    "before": None,
-                    "after": None,
-                    "lift_pct": None,
-                    "site_analytics_partial": True,
-                }
-            )
-            continue
-        before_count, after_count = _newsletter_lift_counts(nl)
-        lift_pct = None
-        if before_count:
-            lift_pct = round((after_count - before_count) / before_count * 100)
-        newsletter_lift.append(
-            {
-                "newsletter": nl,
-                "before": before_count,
-                "after": after_count,
-                "lift_pct": lift_pct,
-                "site_analytics_partial": False,
-            }
-        )
+    lift_rollout_date = _site_analytics_rollout_date()
+    newsletter_lift = [_newsletter_lift_row(nl, lift_rollout_date) for nl in recent_newsletters if nl.send_date]
 
     visits = _build_derived_visits_cached(human_events)
 
     # Unique visitors and visits
     unique_visitors = len({v["visitor_id"] for v in visits if v["visitor_id"]})
     unique_sessions = len(visits)
-    # One pass over every event in the period (automated rows included, for the
-    # data-quality figures): human totals, the engaged-human and share-attributed
-    # visitor counts, the distinct Django session keys and the confidence mix.
-    is_human = Q(automated=False)
-    deliberate = Q(visitor_id__isnull=False) & (
-        Q(subscriber__isnull=False) | Q(event_type__in=DELIBERATE_INTERACTION_EVENT_TYPES)
+    # Engaged humans: a deliberate action, or a subscriber match backed by a
+    # JS-verified event (see engaged_visitor_ids; link scanners carry the
+    # subscriber's token but never run JS).
+    engaged_ids = engaged_visitor_ids(human_events)
+    engaged_humans = len(engaged_ids)
+    # Visitors who arrived via a share link (carry a ref token) AND engaged.
+    # Excludes link-preview/unfurl fetchers, which land a single tokened
+    # page_visit with no interaction and would otherwise inflate this.
+    share_token_visitor_ids = set(
+        human_events.filter(visitor_id__isnull=False)
+        .exclude(share_token="")
+        .order_by()
+        .values_list("visitor_id", flat=True)
+        .distinct()
     )
+    share_attributed_visitors = len(engaged_ids & share_token_visitor_ids)
+    # One pass over every event in the period (automated rows included, for the
+    # data-quality figures): human totals, the distinct Django session keys and
+    # the confidence mix.
+    is_human = Q(automated=False)
     all_period = AnalyticsEvent.objects.filter(timestamp__gte=start_ts, timestamp__lte=end_ts)
     all_agg = all_period.aggregate(
         total_all_events=Count("id"),
@@ -207,8 +231,6 @@ def analytics_overview(request):
         subscriber_events=Count(
             "id", filter=is_human & Q(human_confidence=AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN)
         ),
-        engaged_humans=Count("visitor_id", distinct=True, filter=is_human & deliberate),
-        share_attributed_visits=Count("visitor_id", distinct=True, filter=is_human & deliberate & ~Q(share_token="")),
         # Distinct Django session_keys (only written when a request mutates the
         # session, e.g. a JS beacon fires). Used as the bot-signal denominator:
         # cookie-only crawlers rarely trigger session writes, so visitor_id /
@@ -219,7 +241,6 @@ def analytics_overview(request):
             for value in AnalyticsEvent.HumanConfidence.values
         },
     )
-    engaged_humans = all_agg["engaged_humans"]
     unique_session_keys = all_agg["unique_session_keys"]
     human_event_count = all_agg["human_event_count"]
     subscriber_events = all_agg["subscriber_events"]
@@ -232,13 +253,20 @@ def analytics_overview(request):
     )
     # "observe_*" reasons are rules running in observation mode: the rows they
     # flag are still stored as human, so they must not be counted as filtered.
-    filtered_qs = automated_counter_qs.exclude(reason__startswith="observe_")
+    # They are listed separately so the reason breakdown sums to automated_count.
+    is_observe = Q(reason__startswith="observe_")
+    filtered_qs = automated_counter_qs.exclude(is_observe)
     automated_count = filtered_qs.aggregate(total=Coalesce(Sum("count"), 0))["total"]
     automated_breakdown = list(filtered_qs.values("event_type").annotate(total=Sum("count")).order_by("-total"))
-    automated_reason_breakdown = list(
-        automated_counter_qs.values("reason").annotate(total=Sum("count")).order_by("-total")
+    automated_reason_breakdown = list(filtered_qs.values("reason").annotate(total=Sum("count")).order_by("-total"))
+    observed_reason_breakdown = list(
+        automated_counter_qs.filter(is_observe).values("reason").annotate(total=Sum("count")).order_by("-total")
     )
-    total_attempted_events = total_all_events + automated_count
+    # Bot share denominator: stored human events plus every request the bot
+    # filter dropped. Stored automated=True rows (swept after the fact) are left
+    # out — the filter's counter already reflects that traffic, and adding them
+    # as well double-counted bots (87% against a true 81% in October 2026).
+    total_attempted_events = human_event_count + automated_count
     js_verified_count = all_agg["js_verified_count"]
     confidence_breakdown = sorted(
         (
@@ -306,11 +334,6 @@ def analytics_overview(request):
         if count:
             top_share_method = {"label": label, "count": count}
             break
-    # Visitors who arrived via a share link (carry a ref token) AND actually
-    # engaged. Excludes link-preview/unfurl fetchers, which land a single
-    # tokened page_visit with no interaction and would otherwise inflate this.
-    share_attributed_visits = all_agg["share_attributed_visits"]
-
     search_query_counter = Counter()
     zero_result_counter = Counter()
     search_click_counter = Counter()
@@ -360,7 +383,7 @@ def analytics_overview(request):
     section_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "one_step_visits": 0})
     source_summary = defaultdict(int)
     for visit in visits:
-        engaged_visit = visit["engaged"]
+        engaged_visit = _visit_is_engaged(visit)
         one_step_visit = _is_one_step_visit(visit)
         source_summary[visit["referrer_category"] or ""] += 1
         if visit["landing_page"]:
@@ -476,9 +499,9 @@ def analytics_overview(request):
             f"{top_share_method['label']} was the main share path with {top_share_method['count']} "
             f"share action{'s' if top_share_method['count'] != 1 else ''}."
         )
-        if share_attributed_visits:
+        if share_attributed_visitors:
             share_detail += (
-                f" {share_attributed_visits} visit{'s' if share_attributed_visits != 1 else ''} "
+                f" {share_attributed_visitors} visitor{'s' if share_attributed_visitors != 1 else ''} "
                 f"came back through share links."
             )
         overview_editorial_items.append(
@@ -613,6 +636,8 @@ def analytics_overview(request):
         "automated_share": _safe_percentage(automated_count, total_attempted_events),
         "automated_breakdown": automated_breakdown,
         "automated_reason_breakdown": automated_reason_breakdown,
+        "observed_reason_breakdown": observed_reason_breakdown,
+        "share_attributed_visitors": share_attributed_visitors,
         "unique_session_keys": unique_session_keys,
         "visitor_session_ratio": (round(unique_visitors / unique_session_keys, 1) if unique_session_keys else None),
         "js_verified_count": js_verified_count,

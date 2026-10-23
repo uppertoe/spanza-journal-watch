@@ -120,7 +120,6 @@
 <div class="card mb-4">
   <div class="card-header">Stats</div>
   <div class="card-body">
-
     <div class="row g-3 mb-4">
       <div class="col-6 col-md-3">
         <div class="card h-100">
@@ -131,78 +130,47 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card h-100 border-primary-subtle">
+        <div class="card h-100 border-primary-subtle" title="The open rate counts subscribers who opened the email or clicked a link in it, as a share of emails sent.">
           <div class="card-body py-3">
-            <h6 class="text-muted mb-1 small">Open rate (raw)</h6>
+            <h6 class="text-muted mb-1 small">Open rate</h6>
             <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.open_rate }}</p>
           </div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card h-100 border-success-subtle">
+        <div class="card h-100 border-success-subtle" title="The click rate counts subscribers who clicked a link, as a share of emails sent.">
           <div class="card-body py-3">
-            <h6 class="text-muted mb-1 small">Click-through (raw)</h6>
-            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.click_through_rate }}</p>
+            <h6 class="text-muted mb-1 small">Click rate</h6>
+            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.click_rate }}</p>
           </div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card h-100">
+        <div class="card h-100" title="The click-to-open rate counts subscribers who clicked a link, as a share of those who opened the email.">
           <div class="card-body py-3">
-            <h6 class="text-muted mb-1 small">Human open rate</h6>
-            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.human_open_rate }}</p>
+            <h6 class="text-muted mb-1 small">Click-to-open rate</h6>
+            <p class="fs-4 fw-semibold mb-0">{{ newsletter_stats.click_to_open }}</p>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-12">
-        <h6 class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Raw event totals</h6>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="text-muted small">Opens (distinct)</div>
-        <div class="fs-5">{{ newsletter_stats.opens }} <span class="text-muted small">({{ newsletter_stats.total_opens }} total)</span></div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="text-muted small">Clicks (distinct)</div>
-        <div class="fs-5">{{ newsletter_stats.clicks }} <span class="text-muted small">({{ newsletter_stats.total_clicks }} total)</span></div>
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-12">
-        <h6 class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Human activity (automation filtered)</h6>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="text-muted small">Human opens</div>
-        <div class="fs-5">{{ newsletter_stats.human_opens }} <span class="text-muted small">({{ newsletter_stats.total_human_opens }} total)</span></div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="text-muted small">Human open rate</div>
-        <div class="fs-5">{{ newsletter_stats.human_open_rate }}</div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="text-muted small">Human clicks</div>
-        <div class="fs-5">{{ newsletter_stats.human_clicks }} <span class="text-muted small">({{ newsletter_stats.total_human_clicks }} total)</span></div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="text-muted small">Human CTR</div>
-        <div class="fs-5">{{ newsletter_stats.human_click_through_rate }}</div>
       </div>
     </div>
 
     <div class="row g-3">
-      <div class="col-12">
-        <h6 class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.04em">Automation filter impact</h6>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Subscribers who opened</div>
+        <div class="fs-5">{{ newsletter_stats.opened }}</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="text-muted small">Automated opens</div>
-        <div class="fs-5">{{ newsletter_stats.automated_opens }} <span class="text-muted small">({{ newsletter_stats.automated_open_share }})</span></div>
+        <div class="text-muted small">Subscribers who clicked</div>
+        <div class="fs-5">{{ newsletter_stats.real_clickers }}</div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="text-muted small">Automated clicks</div>
-        <div class="fs-5">{{ newsletter_stats.automated_clicks }} <span class="text-muted small">({{ newsletter_stats.automated_click_share }})</span></div>
+        <div class="text-muted small" title="Apple Mail Privacy Protection loads the tracking image on delivery, so a machine open shows that the email arrived but not that anyone read it.">Machine opens</div>
+        <div class="fs-5">{{ newsletter_stats.machine_openers }}</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-muted small">Events flagged as automated</div>
+        <div class="fs-5">{{ newsletter_stats.automated_open_share }} <span class="text-muted small">of opens</span> · {{ newsletter_stats.automated_click_share }} <span class="text-muted small">of clicks</span></div>
       </div>
     </div>
 

@@ -3,8 +3,7 @@ Additional model tests for submissions app.
 
 Covers:
 1. CuratedCollection — slug generation, get_absolute_url, str
-2. Review.get_hits — tested in submissions/tests.py but adding edge cases
-3. MeshTagMapping — str representation
+2. MeshTagMapping — str representation
 """
 
 import pytest

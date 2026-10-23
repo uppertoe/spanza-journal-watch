@@ -1,9 +1,14 @@
+import re
 import uuid
 
 from django.conf import settings
 
 VISITOR_COOKIE_NAME = "jwvid"
 VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
+
+# A client-generated visitor ID is adopted only in the exact form
+# crypto.randomUUID() produces: a hyphenated version-4 UUID.
+_CLIENT_VISITOR_ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 # Paths whose responses must never carry a session Set-Cookie.
 # These are sub-resource or utility views served through the Django middleware
@@ -72,11 +77,24 @@ class SafeSessionCookieMiddleware:
         return response
 
 
-def ensure_visitor_id(request):
+def valid_client_visitor_id(value):
+    """Return the normalised client visitor ID, or None if it is not a v4 UUID."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip().lower()
+    return value if _CLIENT_VISITOR_ID_RE.match(value) else None
+
+
+def ensure_visitor_id(request, client_visitor_id=None):
     """
     Return (visitor_id, created) for this request, minting a UUID if the
     jwvid cookie is absent.  Also attaches the ID to
     request.analytics_visitor_id so record_event picks it up.
+
+    ``client_visitor_id`` is the ID the page's script generated and sends with
+    every beacon. When the cookie is absent it is adopted instead of minting,
+    so the beacons a first visit fires before the cookie returns all share one
+    ID. The cookie always wins once it is set.
 
     Only call this from uncacheable endpoints (the analytics beacon,
     newsletter click redirects) — the caller is responsible for setting the
@@ -87,7 +105,7 @@ def ensure_visitor_id(request):
     visitor_id = request.COOKIES.get(VISITOR_COOKIE_NAME) or ""
     created = False
     if not visitor_id:
-        visitor_id = str(uuid.uuid4())
+        visitor_id = valid_client_visitor_id(client_visitor_id) or str(uuid.uuid4())
         created = True
     request.analytics_visitor_id = visitor_id
     return visitor_id, created

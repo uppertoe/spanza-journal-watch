@@ -1,10 +1,12 @@
 import logging
+from datetime import timedelta
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import MultipleObjectsReturned
 from django.db import IntegrityError, models
 from django.db.models import F
+from django.db.models.functions import TruncDate
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -20,6 +22,18 @@ from spanza_journal_watch.analytics.utils import (
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 
 logger = logging.getLogger(__name__)
+
+# Mail-gateway link scanners follow every link in a newsletter within seconds;
+# a reader follows one to three. A subscriber's clicks that reach this many
+# distinct destinations within the window either side of a click are a scan.
+SCANNER_BURST_MIN_URLS = 6
+SCANNER_BURST_WINDOW = timedelta(seconds=15)
+SCANNER_BURST_REASON = "scanner_burst"
+
+NEWSLETTER_CLICK_SOURCE = "newsletter_click"
+# How far a newsletter_click event's timestamp may sit from its click's, for
+# events recorded before the click ID was stored in their metadata.
+NEWSLETTER_CLICK_EVENT_SLACK = timedelta(seconds=2)
 
 REFERRER_CHOICES = [
     ("newsletter", "Newsletter"),
@@ -59,6 +73,9 @@ class NewsletterOpen(models.Model):
         choices=HumanConfidence,
         default=HumanConfidence.PROBABLE_HUMAN,
     )
+    # The deciding signal when automated is True ("apple_mpp", "send_window",
+    # "ua_marker", ...); blank for human opens.
+    automated_reason = models.CharField(max_length=32, blank=True, default="")
 
     @staticmethod
     def render_tracking_pixel(tracker):
@@ -85,10 +102,100 @@ class NewsletterClick(models.Model):
         default=HumanConfidence.PROBABLE_HUMAN,
     )
     destination_url = models.URLField(max_length=512, blank=True, default="")
+    # The deciding signal when automated is True ("scanner_burst",
+    # "send_window", "ua_marker", ...); blank for human clicks.
+    automated_reason = models.CharField(max_length=32, blank=True, default="")
 
     @classmethod
     def get_between_timestamps(cls, newsletter, start_timestamp, end_timestamp):
         return cls.objects.filter(newsletter=newsletter, timestamp__gte=start_timestamp, timestamp__lte=end_timestamp)
+
+    @classmethod
+    def mark_scanner_burst(cls, click_ids):
+        """Mark ``click_ids`` and their newsletter_click events as a scanner burst.
+
+        Clicks already classified as automated keep their reason. Events are
+        matched by the click ID stored in their metadata; events recorded
+        before that link existed are matched by subscriber, destination and
+        time. Returns the number of clicks marked.
+        """
+        click_ids = list(click_ids)
+        clicks = cls.objects.filter(pk__in=click_ids)
+        event_filter = models.Q(metadata__newsletter_click_id__in=click_ids)
+        for subscriber_id, timestamp, url in clicks.values_list("subscriber_id", "timestamp", "destination_url"):
+            event_filter |= models.Q(
+                subscriber_id=subscriber_id,
+                metadata__destination_url=url,
+                metadata__newsletter_click_id__isnull=True,
+                timestamp__gte=timestamp - NEWSLETTER_CLICK_EVENT_SLACK,
+                timestamp__lte=timestamp + NEWSLETTER_CLICK_EVENT_SLACK,
+            )
+
+        marked = clicks.filter(automated=False).update(
+            automated=True,
+            automated_reason=SCANNER_BURST_REASON,
+            human_confidence=HumanConfidence.SUSPECTED_AUTOMATED,
+        )
+
+        events = AnalyticsEvent.objects.filter(
+            event_filter,
+            source=NEWSLETTER_CLICK_SOURCE,
+            automated=False,
+        )
+        # Count before the update, as the downgrade sweepers do, so the
+        # "filtered as bot" totals include events marked after the fact.
+        buckets = list(
+            events.annotate(day=TruncDate("timestamp")).values("day", "event_type").annotate(n=models.Count("id"))
+        )
+        events.update(automated=True, human_confidence=HumanConfidence.SUSPECTED_AUTOMATED)
+        for bucket in buckets:
+            AutomatedRequestCount.bump(
+                bucket["event_type"], reason=SCANNER_BURST_REASON, date=bucket["day"], by=bucket["n"]
+            )
+        return marked
+
+    @classmethod
+    def burst_click_ids(cls, clicks):
+        """Return the IDs among ``clicks`` that fall in a scanner burst.
+
+        ``clicks`` is an iterable of ``(id, timestamp, destination_url)`` for
+        one subscriber and newsletter, ordered by timestamp. A click is in a
+        burst when the clicks within SCANNER_BURST_WINDOW either side of it
+        reach SCANNER_BURST_MIN_URLS distinct destinations; every click in that
+        window is then part of the burst.
+        """
+        clicks = list(clicks)
+        burst = set()
+        start = end = 0
+        for _pk, timestamp, _url in clicks:
+            while clicks[start][1] < timestamp - SCANNER_BURST_WINDOW:
+                start += 1
+            while end < len(clicks) and clicks[end][1] <= timestamp + SCANNER_BURST_WINDOW:
+                end += 1
+            window = clicks[start:end]
+            if len({url for _id, _ts, url in window}) >= SCANNER_BURST_MIN_URLS:
+                burst.update(pk for pk, _ts, _url in window)
+        return burst
+
+    def check_scanner_burst(self):
+        """Mark this click's burst, if it is part of one. Returns True if so."""
+        nearby = (
+            NewsletterClick.objects.filter(
+                subscriber_id=self.subscriber_id,
+                newsletter_id=self.newsletter_id,
+                timestamp__gte=self.timestamp - 2 * SCANNER_BURST_WINDOW,
+                timestamp__lte=self.timestamp + 2 * SCANNER_BURST_WINDOW,
+            )
+            .exclude(destination_url="")
+            .order_by("timestamp", "pk")
+            .values_list("pk", "timestamp", "destination_url")
+        )
+        burst = self.burst_click_ids(nearby)
+        if self.pk not in burst:
+            return False
+        NewsletterClick.mark_scanner_burst(burst)
+        self.refresh_from_db(fields=["automated", "automated_reason", "human_confidence"])
+        return True
 
     def __str__(self):
         return str(self.subscriber)
@@ -176,12 +283,20 @@ class AnalyticsEvent(models.Model):
         utm_source=None,
         landing_page=None,
         share_token=None,
+        automated=None,
+        automated_reason="",
     ):
         """
         The referrer/utm_source/landing_page/share_token kwargs carry page
         context from the JS beacon payload; beacon requests are same-origin so
         their own headers/query string can't supply these. When omitted (server-
         rendered call sites like newsletter clicks), request headers are used.
+
+        ``automated`` passes in a classification the caller has already made
+        (a newsletter click carries its NewsletterClick's verdict). The request
+        is then not reclassified, and an automated event is kept, flagged, so a
+        later burst check can find it; it is counted in AutomatedRequestCount
+        under ``automated_reason`` as a dropped request would be.
         """
         subscriber = _get_subscriber_for_analytics(subscriber_id, log_context="analytics event")
 
@@ -192,10 +307,11 @@ class AnalyticsEvent(models.Model):
         referrer_domain = ""
         session_sequence = 0
         if request is not None:
-            automated_reason = classify_automated_reason(request, event_type=event_type)
-            if automated_reason is not None:
-                AutomatedRequestCount.bump(event_type, reason=automated_reason)
-                return None
+            if automated is None:
+                reason = classify_automated_reason(request, event_type=event_type)
+                if reason is not None:
+                    AutomatedRequestCount.bump(event_type, reason=reason)
+                    return None
             if not client_hints_enforced():
                 # Observation mode: count and tag client-hint anomalies without
                 # dropping the row, so the rule can be judged against real
@@ -211,7 +327,10 @@ class AnalyticsEvent(models.Model):
             referrer_domain = extract_referrer_domain(request, referrer=referrer)
         landing_page = (landing_page or "")[:512]
         share_token = (share_token or "")[:32]
-        human_confidence = classify_event_confidence(automated=False, subscriber=subscriber)
+        automated = bool(automated)
+        if automated:
+            AutomatedRequestCount.bump(event_type, reason=(automated_reason or "")[:32])
+        human_confidence = classify_event_confidence(automated=automated, subscriber=subscriber)
 
         content_type = None
         object_id = None
@@ -232,7 +351,7 @@ class AnalyticsEvent(models.Model):
             metadata=metadata or {},
             subscriber=subscriber,
             user_agent=user_agent,
-            automated=False,
+            automated=automated,
             session_key=session_key,
             human_confidence=human_confidence,
             visitor_id=visitor_id,

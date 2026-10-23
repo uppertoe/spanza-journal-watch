@@ -14,23 +14,33 @@ from django.views.decorators.http import require_POST
 
 from spanza_journal_watch.analytics.links import destination_is_signed, has_web_scheme
 from spanza_journal_watch.analytics.middleware import ensure_visitor_id, set_visitor_cookie
-from spanza_journal_watch.analytics.models import AnalyticsEvent, NewsletterClick, NewsletterOpen
+from spanza_journal_watch.analytics.models import (
+    NEWSLETTER_CLICK_SOURCE,
+    AnalyticsEvent,
+    NewsletterClick,
+    NewsletterOpen,
+)
 from spanza_journal_watch.analytics.utils import (
     classify_event_confidence,
+    classify_newsletter_event_reason,
     is_probable_automated_event,
-    is_probable_automated_newsletter_event,
     set_newsletter_referrer_in_session,
 )
 from spanza_journal_watch.backend.models import PubmedArticle
 from spanza_journal_watch.newsletter.cookies import set_subscribed_cookie
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 from spanza_journal_watch.submissions.models import Hit, Review
+from spanza_journal_watch.utils.functions import get_domain_url
 
 logger = logging.getLogger(__name__)
 
 # Hosts that newsletters sent before destinations were signed linked to
 # directly. Unsigned links to anywhere else are refused.
 _LEGACY_EXTERNAL_HOSTS = frozenset({"spanza.org.au", "www.spanza.org.au"})
+
+# Source of the page-visit event for a click on a link in a confirmation or
+# other non-newsletter email.
+EMAIL_CLICK_SOURCE = "email_click"
 
 
 def _get_newsletter(token):
@@ -108,29 +118,50 @@ def _resolve_email_link(request):
     return subscriber, "/"
 
 
+def _identify_subscriber_in_session(request, subscriber):
+    """Identify the subscriber in the session, unless it already holds another.
+
+    A forwarded newsletter carries the original recipient's links; the person
+    who follows them keeps the identity their session already has.
+    """
+    existing = request.session.get("subscriber_id")
+    if existing and existing != subscriber.pk:
+        return
+    request.session["subscriber_id"] = subscriber.pk
+    request.session["subscriber_email"] = subscriber.email
+
+
+def _local_destination_path(request, url):
+    """Return the path of ``url`` if it is on this site, else None."""
+    hosts = {request.get_host()}
+    site_host = urlparse(get_domain_url()).netloc
+    if site_host:
+        hosts.add(site_host)
+    if not url_has_allowed_host_and_scheme(url, allowed_hosts=hosts):
+        return None
+    return urlparse(url).path or "/"
+
+
 def track_email_open(request):
-    token = request.GET.get("token") or None
+    # Link checkers send HEAD before (or instead of) fetching; only a GET is
+    # an image load.
+    if request.method == "GET":
+        newsletter = _get_newsletter(request.GET.get("token") or None)
+        subscriber = _get_subscriber(request)
 
-    newsletter = _get_newsletter(token)
-    subscriber = _get_subscriber(request)
+        if newsletter and subscriber:
+            reason = classify_newsletter_event_reason(request, newsletter, subscriber, open_pixel=True)
+            automated = reason is not None
+            NewsletterOpen.objects.create(
+                subscriber=subscriber,
+                newsletter=newsletter,
+                user_agent=request.headers.get("user-agent", ""),
+                automated=automated,
+                automated_reason=reason or "",
+                human_confidence=classify_event_confidence(automated=automated, subscriber=subscriber),
+            )
 
-    if newsletter and subscriber:
-        automated = is_probable_automated_newsletter_event(request, newsletter)
-        tracker = NewsletterOpen(
-            subscriber=subscriber,
-            newsletter=newsletter,
-            user_agent=request.headers.get("user-agent", ""),
-            automated=automated,
-            human_confidence=classify_event_confidence(automated=automated, subscriber=subscriber),
-        )
-        tracker.save()
-
-        # Identify the subscriber in the session
-        request.session["subscriber_id"] = subscriber.pk
-        request.session["subscriber_email"] = subscriber.email
-
-    response = HttpResponse(_get_tracking_pixel(), content_type="image/png")
-    return response
+    return HttpResponse(_get_tracking_pixel(), content_type="image/png")
 
 
 def _get_tracking_pixel():
@@ -143,39 +174,54 @@ def _get_tracking_pixel():
 
 
 def track_newsletter_link(request, newsletter_token):
-    newsletter = _get_newsletter(newsletter_token)
     subscriber, destination = _resolve_email_link(request)
+    response = HttpResponseRedirect(destination)
+    # Link checkers send HEAD before the GET; only the GET is recorded.
+    if request.method != "GET":
+        return response
+
+    newsletter = _get_newsletter(newsletter_token)
 
     # This redirect is the first request of a newsletter visit, and the HTML
     # it lands on is CDN-cached (no Set-Cookie), so mint the visitor ID here.
     visitor_id, visitor_cookie_created = ensure_visitor_id(request)
 
     if newsletter and subscriber:
-        automated = is_probable_automated_newsletter_event(request, newsletter)
-        tracker = NewsletterClick(
+        reason = classify_newsletter_event_reason(request, newsletter, subscriber)
+        automated = reason is not None
+        click = NewsletterClick.objects.create(
             subscriber=subscriber,
             newsletter=newsletter,
             user_agent=request.headers.get("user-agent", ""),
             automated=automated,
+            automated_reason=reason or "",
             human_confidence=classify_event_confidence(automated=automated, subscriber=subscriber),
             destination_url=destination[:512],
         )
-        tracker.save()
+        click.check_scanner_burst()
 
-        # Identify the subscriber in the session
-        request.session["subscriber_id"] = subscriber.pk
-        request.session["subscriber_email"] = subscriber.email
+        _identify_subscriber_in_session(request, subscriber)
         set_newsletter_referrer_in_session(request)
 
-        AnalyticsEvent.record_event(
-            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-            request=request,
-            subscriber_id=subscriber.pk,
-            source="newsletter_click",
-            metadata={"newsletter_id": newsletter.pk, "destination_url": destination[:512]},
-        )
+        # A link to another site is not a visit to this one; the click row
+        # above is the whole record of it.
+        landing_page = _local_destination_path(request, destination)
+        if landing_page is not None:
+            AnalyticsEvent.record_event(
+                event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+                request=request,
+                subscriber_id=subscriber.pk,
+                source=NEWSLETTER_CLICK_SOURCE,
+                metadata={
+                    "newsletter_id": newsletter.pk,
+                    "newsletter_click_id": click.pk,
+                    "destination_url": destination[:512],
+                },
+                landing_page=landing_page,
+                automated=click.automated,
+                automated_reason=click.automated_reason,
+            )
 
-    response = HttpResponseRedirect(destination)
     if subscriber:
         set_subscribed_cookie(response)
     if visitor_cookie_created:
@@ -202,24 +248,28 @@ def page_view(request, model=None, slug=None):
 
 
 def track_email_click(request):
-    # Sets the session ID on following an email link
+    # Links in confirmation and other one-off emails. Sets the session ID on
+    # following the link; the visit is not attributed to the newsletter.
     subscriber, destination = _resolve_email_link(request)
+    response = HttpResponseRedirect(destination)
+    if request.method != "GET":
+        return response
 
     visitor_id, visitor_cookie_created = ensure_visitor_id(request)
 
     if subscriber:
-        request.session["subscriber_id"] = subscriber.pk
-        request.session["subscriber_email"] = subscriber.email
-        set_newsletter_referrer_in_session(request)
-        AnalyticsEvent.record_event(
-            event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-            request=request,
-            subscriber_id=subscriber.pk,
-            source="newsletter_click",
-            metadata={"destination_url": destination[:512]},
-        )
+        _identify_subscriber_in_session(request, subscriber)
+        landing_page = _local_destination_path(request, destination)
+        if landing_page is not None:
+            AnalyticsEvent.record_event(
+                event_type=AnalyticsEvent.EventType.PAGE_VISIT,
+                request=request,
+                subscriber_id=subscriber.pk,
+                source=EMAIL_CLICK_SOURCE,
+                metadata={"destination_url": destination[:512]},
+                landing_page=landing_page,
+            )
 
-    response = HttpResponseRedirect(destination)
     if subscriber:
         set_subscribed_cookie(response)
     if visitor_cookie_created:
@@ -288,8 +338,12 @@ def track_event(request):
     source = payload.get("source") or ""
     event_path = str(event_metadata.get("path") or urlparse(page_url).path or "")
     skip_record = source == "page_load" and _is_excluded_page_path(event_path)
+    # Staff browsing the public site are not readers.
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated and user.is_staff:
+        skip_record = True
 
-    visitor_id, visitor_cookie_created = ensure_visitor_id(request)
+    visitor_id, visitor_cookie_created = ensure_visitor_id(request, client_visitor_id=payload.get("visitor_id"))
 
     if not skip_record:
         AnalyticsEvent.record_event(

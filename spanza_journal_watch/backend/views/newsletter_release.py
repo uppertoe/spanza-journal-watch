@@ -10,7 +10,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
 from spanza_journal_watch.newsletter.models import Newsletter
 from spanza_journal_watch.newsletter.tasks import send_newsletter, send_newsletter_test_email
 
@@ -20,7 +19,7 @@ from ..forms import (
     NewsletterScheduleForm,
     NewsletterTestSendForm,
 )
-from .analytics_page import _newsletter_predates_site_analytics, _safe_percentage, _site_analytics_rollout_date
+from .analytics_page import _newsletter_predates_site_analytics, _site_analytics_rollout_date
 from .shared import _resolve_and_persist_issue
 
 logger = logging.getLogger(__name__)
@@ -56,41 +55,9 @@ def _newsletter_ready_to_send(newsletter):
 
 
 def _newsletter_stats(newsletter):
-    from spanza_journal_watch.analytics.models import NewsletterClick, NewsletterOpen
+    from spanza_journal_watch.backend.analytics_views.rates import newsletter_rate
 
-    opens_qs = NewsletterOpen.objects.filter(newsletter=newsletter)
-    clicks_qs = NewsletterClick.objects.filter(newsletter=newsletter)
-    total_opens = opens_qs.values("subscriber").count()
-    opens = opens_qs.values("subscriber").distinct().count()
-    total_clicks = clicks_qs.values("subscriber").count()
-    clicks = clicks_qs.values("subscriber").distinct().count()
-    human_opens_qs = opens_qs.filter(automated=False)
-    human_clicks_qs = clicks_qs.filter(automated=False)
-    total_human_opens = human_opens_qs.values("subscriber").count()
-    human_opens = human_opens_qs.values("subscriber").distinct().count()
-    total_human_clicks = human_clicks_qs.values("subscriber").count()
-    human_clicks = human_clicks_qs.values("subscriber").distinct().count()
-    automated_opens = max(total_opens - total_human_opens, 0)
-    automated_clicks = max(total_clicks - total_human_clicks, 0)
-    return {
-        "emails_sent": newsletter.emails_sent,
-        "opens": opens,
-        "total_opens": total_opens,
-        "clicks": clicks,
-        "total_clicks": total_clicks,
-        "human_opens": human_opens,
-        "total_human_opens": total_human_opens,
-        "human_clicks": human_clicks,
-        "total_human_clicks": total_human_clicks,
-        "automated_opens": automated_opens,
-        "automated_clicks": automated_clicks,
-        "automated_open_share": f"{round(automated_opens / total_opens * 100)}%" if total_opens else "0%",
-        "automated_click_share": f"{round(automated_clicks / total_clicks * 100)}%" if total_clicks else "0%",
-        "open_rate": f"{round(opens / newsletter.emails_sent * 100)}%" if newsletter.emails_sent else "—",
-        "human_open_rate": f"{round(human_opens / newsletter.emails_sent * 100)}%" if newsletter.emails_sent else "—",
-        "click_through_rate": f"{round(clicks / opens * 100)}%" if opens else "—",
-        "human_click_through_rate": f"{round(human_clicks / human_opens * 100)}%" if human_opens else "—",
-    }
+    return newsletter_rate(newsletter)
 
 
 @login_required
@@ -333,65 +300,10 @@ def send_final_newsletter(request, pk):
 @permission_required("backend.view_newsletter_stats", raise_exception=True)  # Prevents login loop
 def newsletter_stats_detail(request, pk):
     newsletter = get_object_or_404(Newsletter, pk=pk)
-
-    opens_qs = NewsletterOpen.objects.filter(newsletter=newsletter)
-    clicks_qs = NewsletterClick.objects.filter(newsletter=newsletter)
-
-    subscriber_opens = opens_qs.values("subscriber")
-    total_opens = subscriber_opens.count()
-    opens = subscriber_opens.distinct().count()
-
-    subscriber_clicks = clicks_qs.values("subscriber")
-    total_clicks = subscriber_clicks.count()
-    clicks = subscriber_clicks.distinct().count()
-
-    human_subscriber_opens = opens_qs.filter(automated=False).values("subscriber")
-    total_human_opens = human_subscriber_opens.count()
-    human_opens = human_subscriber_opens.distinct().count()
-
-    human_subscriber_clicks = clicks_qs.filter(automated=False).values("subscriber")
-    total_human_clicks = human_subscriber_clicks.count()
-    human_clicks = human_subscriber_clicks.distinct().count()
-
-    automated_opens = max(total_opens - total_human_opens, 0)
-    automated_clicks = max(total_clicks - total_human_clicks, 0)
-    automated_open_share = f"{str(round(automated_opens / total_opens * 100))}%" if total_opens else "0%"
-    automated_click_share = f"{str(round(automated_clicks / total_clicks * 100))}%" if total_clicks else "0%"
-
-    open_rate = _safe_percentage(opens, newsletter.emails_sent)
-    click_through_rate = _safe_percentage(clicks, newsletter.emails_sent)
-    click_to_open_rate = _safe_percentage(clicks, opens)
-    human_open_rate = _safe_percentage(human_opens, newsletter.emails_sent)
-    human_click_through_rate = _safe_percentage(human_clicks, newsletter.emails_sent)
-    human_click_to_open_rate = _safe_percentage(human_clicks, human_opens)
-    partial_site_analytics = _newsletter_predates_site_analytics(newsletter)
-    site_analytics_rollout_date = _site_analytics_rollout_date()
-
     context = {
         "newsletter": newsletter,
-        "newsletters_sent": newsletter.emails_sent,
-        "total_opens": total_opens,
-        "opens": opens,
-        "total_clicks": total_clicks,
-        "clicks": clicks,
-        "open_rate": open_rate,
-        "click_through_rate": click_through_rate,
-        "click_to_open_rate": click_to_open_rate,
-        "total_human_opens": total_human_opens,
-        "human_opens": human_opens,
-        "total_human_clicks": total_human_clicks,
-        "human_clicks": human_clicks,
-        "human_open_rate": human_open_rate,
-        "human_click_through_rate": human_click_through_rate,
-        "human_click_to_open_rate": human_click_to_open_rate,
-        "automated_opens": automated_opens,
-        "automated_clicks": automated_clicks,
-        "automated_open_share": automated_open_share,
-        "automated_click_share": automated_click_share,
-        "partial_site_analytics": partial_site_analytics,
-        "site_analytics_rollout_date": site_analytics_rollout_date,
+        "rates": _newsletter_stats(newsletter),
+        "partial_site_analytics": _newsletter_predates_site_analytics(newsletter),
+        "site_analytics_rollout_date": _site_analytics_rollout_date(),
     }
-
-    template = "backend/newsletter_stats_detail.html"
-
-    return render(request, template, context)
+    return render(request, "backend/newsletter_stats_detail.html", context)

@@ -63,13 +63,14 @@ class TestTrackEmailOpen:
         )
         assert NewsletterOpen.objects.filter(newsletter=newsletter, subscriber=subscriber).exists()
 
-    def test_sets_subscriber_in_session(self, client):
+    def test_does_not_set_subscriber_in_session(self, client):
+        # An image fetch (often a proxy or prefetch) is not the reader's browser.
         newsletter, subscriber = _make_newsletter_and_subscriber()
         client.get(
             reverse("analytics:track_email_open"),
             {"email": subscriber.email, "token": newsletter.email_token},
         )
-        assert client.session.get("subscriber_id") == subscriber.pk
+        assert client.session.get("subscriber_id") is None
 
     def test_invalid_token_still_returns_pixel(self, client):
         response = client.get(

@@ -1,5 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import F, Value
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
@@ -43,7 +45,10 @@ def _get_subscriber_by_unsubscribe_token(unsubscribe_token):
 def _sync_exact_email_subscription_state(email, subscribed):
     subscribers = Subscriber.by_email(email)
     if subscribers.exists():
-        subscribers.update(subscribed=subscribed, modified=timezone.now())
+        now = timezone.now()
+        # A bulk update skips Subscriber.save, so unsubscribed_at is kept in step here.
+        unsubscribed_at = None if subscribed else Coalesce(F("unsubscribed_at"), Value(now))
+        subscribers.update(subscribed=subscribed, unsubscribed_at=unsubscribed_at, modified=now)
     return subscribers
 
 

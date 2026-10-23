@@ -1,11 +1,14 @@
 import base64
+import datetime
 import logging
 import uuid
 
+from celery import chord
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.mail import send_mail
-from django.db.models import F, Q
+from django.db.models import F, Q, Value
+from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -19,8 +22,20 @@ class NewsletterNotReadyToSendError(Exception):
 
 
 @celery_app.task()
-def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipient_email=None, already_delivered=0):
-    from .models import Newsletter
+def send_newsletter_stats(
+    newsletter_pk,
+    subscriber_count,
+    batch_count,
+    recipient_email=None,
+    already_delivered=0,
+    run_started_at=None,
+):
+    """Email the sender a summary of one send run.
+
+    ``send_newsletter`` queues this as the callback of the batch chord, so it runs once every batch
+    has finished and ``run_started_at`` (ISO timestamp of the claim) scopes the count to this run.
+    """
+    from .models import Newsletter, NewsletterDelivery
 
     newsletter = Newsletter.objects.get(pk=newsletter_pk)
 
@@ -34,11 +49,18 @@ def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipien
     if not recipients:
         return
 
+    deliveries = NewsletterDelivery.objects.filter(newsletter_id=newsletter_pk)
+    if run_started_at:
+        deliveries = deliveries.filter(sent_at__gte=datetime.datetime.fromisoformat(run_started_at))
+
+    delivered_this_run = deliveries.count()
     context = {
         "newsletter": newsletter,
         "subscriber_count": subscriber_count,
         "batch_count": batch_count,
         "already_delivered": already_delivered,
+        "delivered_this_run": delivered_this_run,
+        "not_sent": max(subscriber_count - delivered_this_run, 0),
     }
     template = "newsletter/email_newsletter_stats.txt"
     subject = "Journal Watch - Newsletter send statistics"
@@ -46,6 +68,12 @@ def send_newsletter_stats(newsletter_pk, subscriber_count, batch_count, recipien
 
     for email in recipients:
         send_mail(subject, body, None, [email])
+
+
+@celery_app.task()
+def send_newsletter_stats_after_failure(request, exc, traceback, *args, **kwargs):
+    """Error callback for the batch chord: a failed batch still produces the summary email."""
+    send_newsletter_stats(*args, **kwargs)
 
 
 BATCH_SIZE = 50  # Adjust this batch size as needed
@@ -114,10 +142,17 @@ def send_newsletter(newsletter_pk, sender_email=None):
     # Atomic claim: a single conditional UPDATE either flips is_sent False→True
     # or consumes resend_enabled. Guarantees at-most-once dispatch even if two
     # send requests arrive concurrently.
+    run_started_at = timezone.now()
     claimed = (
         Newsletter.objects.filter(pk=newsletter_pk)
         .filter(Q(is_sent=False) | Q(resend_enabled=True))
-        .update(is_sent=True, resend_enabled=False, send_date=timezone.now(), scheduled_send_at=None)
+        # A resend keeps the first send_date, so the analytics windows do not move.
+        .update(
+            is_sent=True,
+            resend_enabled=False,
+            send_date=Coalesce(F("send_date"), Value(run_started_at)),
+            scheduled_send_at=None,
+        )
     )
     if claimed == 0:
         raise NewsletterNotReadyToSendError(
@@ -131,14 +166,21 @@ def send_newsletter(newsletter_pk, sender_email=None):
         subscribers.exclude(newsletter_deliveries__newsletter_id=newsletter_pk).values_list("pk", flat=True)
     )
 
-    batch_count = 0
-    for batch_pks in get_subscriber_batches(subscriber_pks, BATCH_SIZE):
-        send_newsletter_batch.delay(newsletter_pk, batch_pks, False)
-        batch_count += 1
+    batches = [
+        send_newsletter_batch.si(newsletter_pk, batch_pks, False)
+        for batch_pks in get_subscriber_batches(subscriber_pks, BATCH_SIZE)
+    ]
+    stats_args = (newsletter_pk, len(subscriber_pks), len(batches), sender_email)
+    stats_kwargs = {"already_delivered": already_delivered, "run_started_at": run_started_at.isoformat()}
+    if not batches:
+        send_newsletter_stats.delay(*stats_args, **stats_kwargs)
+        return
 
-    send_newsletter_stats.delay(
-        newsletter_pk, len(subscriber_pks), batch_count, sender_email, already_delivered=already_delivered
-    )
+    # The stats email is the chord callback, so it reports only once every batch has finished.
+    # If a batch fails the chord callback never runs, so the error callback sends it instead.
+    callback = send_newsletter_stats.si(*stats_args, **stats_kwargs)
+    callback.link_error(send_newsletter_stats_after_failure.s(*stats_args, **stats_kwargs))
+    chord(batches)(callback)
 
 
 @celery_app.task()

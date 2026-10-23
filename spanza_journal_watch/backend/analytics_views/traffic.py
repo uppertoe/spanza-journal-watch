@@ -24,6 +24,7 @@ from .visits import (
     _build_derived_visits_cached,
     _normalise_search_query,
     _split_new_returning,
+    _visitor_id_rollout_date,
     _weekly_visits_by_referrer,
 )
 
@@ -58,7 +59,7 @@ def analytics_traffic(request):
         summary["visits"] += 1
         if visit["visitor_id"]:
             summary["visitor_ids"].add(visit["visitor_id"])
-        if visit["engaged"]:
+        if _visit_is_engaged(visit):
             summary["engaged_visits"] += 1
         if visit["js_verified"]:
             summary["js_verified_visits"] += 1
@@ -91,7 +92,7 @@ def analytics_traffic(request):
 
     visitor_ids_in_period = {visit["visitor_id"] for visit in visits if visit["visitor_id"]}
 
-    # Per-visitor visit frequency and distinct active days within the period.
+    # Per-visitor visit frequency and distinct active (local, not UTC) days within the period.
     visits_per_visitor = Counter()
     visitor_dates = defaultdict(set)
     for visit in visits:
@@ -99,7 +100,7 @@ def analytics_traffic(request):
         if not vid:
             continue
         visits_per_visitor[vid] += 1
-        visitor_dates[vid].add(visit["first_event"].date())
+        visitor_dates[vid].add(timezone.localtime(visit["first_event"]).date())
     multi_day_count = sum(1 for ds in visitor_dates.values() if len(ds) >= 2)
 
     rollout_date = _site_analytics_rollout_date()
@@ -107,7 +108,7 @@ def analytics_traffic(request):
         visitor_ids_in_period,
         start_ts=start_ts,
         start_date=start_date,
-        rollout_date=rollout_date,
+        rollout_date=_visitor_id_rollout_date(),
         visits_per_visitor=visits_per_visitor,
         period_qs=human_events,
     )
@@ -116,7 +117,7 @@ def analytics_traffic(request):
     section_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "single_event_visits": 0})
     landing_summary = defaultdict(lambda: {"visits": 0, "engaged_visits": 0, "single_event_visits": 0})
     for visit in visits:
-        engaged_visit = visit["engaged"]
+        engaged_visit = _visit_is_engaged(visit)
         single_event_visit = _is_one_step_visit(visit)
         sections_seen = visit["sections"]
         for section in sections_seen:
@@ -279,7 +280,8 @@ def analytics_traffic(request):
         if parts:
             referrer_insight = "Visit starts: " + ", ".join(parts) + "."
 
-    # rollout_date is computed above for the new/returning split.
+    # The site-analytics rollout (first JS event) dates the whole dataset; the
+    # new/returning split above dates its history from the first visitor_id.
     rollout_mature = False
     if rollout_date is not None:
         rollout_mature = (timezone.localdate() - rollout_date).days >= 90

@@ -1,10 +1,12 @@
 """Issue-level analytics."""
 
+import datetime
 from collections import Counter, defaultdict
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q
+from django.db.models.functions import TruncWeek
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -17,7 +19,7 @@ from spanza_journal_watch.backend.views.analytics_page import (
 from spanza_journal_watch.submissions.models import Issue, Review
 
 from .benchmarks import _confidence_summary, _referrer_source_breakdown
-from .common import VIEW_SITE_ANALYTICS, _base_event_qs, _date_range_from_request, _render_analytics, _weekly_buckets
+from .common import VIEW_SITE_ANALYTICS, _base_event_qs, _date_range_from_request, _render_analytics
 from .visits import _LOW_SAMPLE_THRESHOLD, _rank_rows
 
 _ISSUE_SHARE_EVENT_TYPES = [
@@ -28,6 +30,23 @@ _ISSUE_SHARE_EVENT_TYPES = [
     AnalyticsEvent.EventType.REVIEW_SHARE_X,
     AnalyticsEvent.EventType.REVIEW_SHARE_FACEBOOK,
 ]
+
+
+def weekly_buckets_between(qs, start_date, end_date, timestamp_field="timestamp"):
+    """Weekly counts (Monday-start) covering the selected range, for the drill-down charts."""
+    tz = timezone.get_current_timezone()
+    first_week = start_date - datetime.timedelta(days=start_date.weekday())
+    last_week = end_date - datetime.timedelta(days=end_date.weekday())
+    raw = {
+        entry["week"].astimezone(tz).date(): entry["count"]
+        for entry in qs.annotate(week=TruncWeek(timestamp_field, tzinfo=tz)).values("week").annotate(count=Count("id"))
+    }
+    buckets = []
+    week = first_week
+    while week <= last_week:
+        buckets.append({"label": week.strftime("%-d %b"), "count": raw.get(week, 0), "week_start": week.isoformat()})
+        week += datetime.timedelta(days=7)
+    return buckets
 
 
 def _issue_page_visits_by_slug(human_events):
@@ -113,8 +132,9 @@ def analytics_issues(request):
         )
 
     tracked_issue_count = len(issue_rows)
-    most_engaged_issues = _rank_rows(issue_rows, ("opens", "engaged", "shares"), limit=5)
-    any_engaged_issues = any(r["opens"] for r in most_engaged_issues)
+    # Ranked on sustained views: an impression alone says nothing about engagement.
+    most_engaged_issues = _rank_rows(issue_rows, ("engaged", "opens", "shares"), limit=5)
+    any_engaged_issues = any(r["engaged"] for r in most_engaged_issues)
 
     context = {
         "start_date": start_date,
@@ -190,7 +210,7 @@ def analytics_issue_detail(request, issue_pk):
     review_rows.sort(key=lambda r: (r["opens"], r["engaged"], r["shares"]), reverse=True)
 
     open_events = issue_review_events.filter(event_type=E.REVIEW_OPEN)
-    weekly_opens = _weekly_buckets(open_events, weeks=26)
+    weekly_opens = weekly_buckets_between(open_events, start_date, end_date)
     referrer_breakdown = _referrer_source_breakdown(open_events)
 
     page_view_count = _issue_page_visits_by_slug(human_events).get(issue.slug, 0)

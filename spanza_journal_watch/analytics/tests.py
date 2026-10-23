@@ -650,11 +650,11 @@ def test_analytics_email_uses_event_counts_for_bot_share_and_marks_partial_site_
 
     assert response.status_code == 200
     row = response.context["newsletter_rows"][0]
-    assert row["automated_open_share"] == "25%"
-    assert row["human_ctr"] == "10%"
-    assert row["human_ctor"] == "50%"
+    assert row["rates"].automated_open_share == "25%"
+    assert row["rates"].click_rate == "10%"
+    assert row["rates"].click_to_open == "50%"
     assert row["site_analytics_partial"] is True
-    assert row["post_send_traffic"] is None
+    assert row["post_send_visitors"] is None
     body = response.content.decode("utf-8", errors="ignore")
     assert "Partial analytics" in body
 
@@ -718,7 +718,7 @@ def test_analytics_editorial_surfaces_unmet_demand_and_review_rankings(client):
     assert response.context["top_reviews_by_shares"][0]["review"] == review
     body = response.content.decode("utf-8", errors="ignore")
     assert "Unmet demand" in body
-    assert "Most opened" in body
+    assert "Most impressions" in body
     assert "Most shared" in body
 
 
@@ -813,7 +813,8 @@ def test_analytics_traffic_source_breakdown_uses_visit_starts_not_internal_follo
         js_verified=True,
     )
     internal_engaged = AnalyticsEvent.objects.create(
-        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        # A deliberate action: a sustained view alone no longer makes a visit engaged.
+        event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
         automated=False,
         visitor_id=visitor_id,
         session_key="visit-source",
@@ -902,7 +903,8 @@ def test_analytics_traffic_surfaces_landing_friction_and_search_dead_ends(client
         metadata={"page": "search"},
     )
     successful_engaged = AnalyticsEvent.objects.create(
-        event_type=AnalyticsEvent.EventType.REVIEW_ENGAGED,
+        # A deliberate action: a sustained view alone no longer makes a visit engaged.
+        event_type=AnalyticsEvent.EventType.REVIEW_FULL_TEXT_CLICK,
         automated=False,
         visitor_id=successful_visitor,
         session_key="search-landing-success",
@@ -1764,14 +1766,16 @@ def test_track_email_click_records_analytics_event(client):
         {"email": subscriber.email, "next": "/"},
     )
     assert response.status_code == 302
+    # Confirmation-email clicks are not newsletter clicks: their own source,
+    # and no newsletter referrer override.
     events = AnalyticsEvent.objects.filter(
         event_type=AnalyticsEvent.EventType.PAGE_VISIT,
-        source="newsletter_click",
+        source="email_click",
     )
     assert events.count() == 1
     event = events.first()
     assert event.subscriber_id == subscriber.pk
-    assert event.referrer_category == REFERRER_NEWSLETTER
+    assert event.referrer_category != REFERRER_NEWSLETTER
 
 
 def test_track_email_click_skips_event_when_no_subscriber(client):
@@ -1780,7 +1784,7 @@ def test_track_email_click_skips_event_when_no_subscriber(client):
         {"email": "unknown@example.com", "next": "/"},
     )
     assert response.status_code == 302
-    assert not AnalyticsEvent.objects.filter(source="newsletter_click").exists()
+    assert not AnalyticsEvent.objects.filter(source="email_click").exists()
 
 
 def test_track_newsletter_link_records_analytics_event(client):

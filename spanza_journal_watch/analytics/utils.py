@@ -102,7 +102,18 @@ AUTOMATED_USER_AGENT_MARKERS = [
     "t7/",
 ]
 
+# Opens and clicks this soon after the newsletter reached a subscriber are
+# taken to be mail-gateway scanners rather than the reader.
 NEWSLETTER_AUTOMATION_WINDOW = timedelta(seconds=60)
+
+# Apple Mail Privacy Protection fetches every image on delivery, whether or not
+# the message is read, under a bare "Mozilla/5.0" user-agent.
+APPLE_MPP_USER_AGENT = "mozilla/5.0"
+
+# Image proxies that fetch the open pixel only when the reader opens the
+# message (Gmail). A site page fetched through one is still not a person
+# browsing, so the markers stay in the list for site traffic.
+_OPEN_PIXEL_PROXY_MARKERS = frozenset({"googleimageproxy"})
 
 # Event types recorded without JS that modern browsers would always surface with
 # sec-fetch-* headers. Missing those headers on these events strongly implies a
@@ -206,16 +217,22 @@ def _automated_ua_markers():
     return AUTOMATED_USER_AGENT_MARKERS + [m.lower() for m in extra]
 
 
-def classify_automated_reason(request, event_type=None):
-    """Return a coarse reason token if the request looks automated, else None.
+def classify_user_agent_reason(user_agent, *, open_pixel=False):
+    """Return a reason token from the user-agent string alone, else None.
 
-    The token is the deciding signal (for observability / AutomatedRequestCount),
-    not a per-marker value — kept low-cardinality on purpose.
+    ``open_pixel`` applies the newsletter open-pixel rules: a bare
+    "Mozilla/5.0" is an Apple Mail Privacy Protection prefetch, and Gmail's
+    image proxy is a real open.
     """
-    user_agent = (request.headers.get("user-agent") or "").lower()
+    user_agent = (user_agent or "").lower()
     if not user_agent:
         return "empty_ua"
-    if any(marker in user_agent for marker in _automated_ua_markers()):
+    if open_pixel and user_agent.strip() == APPLE_MPP_USER_AGENT:
+        return "apple_mpp"
+    markers = _automated_ua_markers()
+    if open_pixel:
+        markers = [m for m in markers if m not in _OPEN_PIXEL_PROXY_MARKERS]
+    if any(marker in user_agent for marker in markers):
         return "ua_marker"
     # Generic crawler convention: UA contains a URL identifying the bot
     # (e.g. "... +http://example.com/bot"). Real browsers never do this.
@@ -228,6 +245,20 @@ def classify_automated_reason(request, event_type=None):
     # fabricate a "Chrome/NNN.0.0.0" stub — catch the mismatch.
     if "chrome/" in user_agent and "applewebkit/" not in user_agent:
         return "chrome_fabrication"
+    return None
+
+
+def classify_automated_reason(request, event_type=None, *, open_pixel=False):
+    """Return a coarse reason token if the request looks automated, else None.
+
+    The token is the deciding signal (for observability / AutomatedRequestCount),
+    not a per-marker value — kept low-cardinality on purpose. ``open_pixel``
+    selects the newsletter open-pixel rules (see classify_user_agent_reason),
+    and skips the cross-site no-cors rule, which every webmail image load meets.
+    """
+    reason = classify_user_agent_reason(request.headers.get("user-agent"), open_pixel=open_pixel)
+    if reason is not None:
+        return reason
     if client_hints_enforced():
         anomaly = client_hints_anomaly(request)
         if anomaly is not None:
@@ -243,7 +274,7 @@ def classify_automated_reason(request, event_type=None):
 
     sec_fetch_mode = (request.headers.get("sec-fetch-mode") or "").lower()
     sec_fetch_site = (request.headers.get("sec-fetch-site") or "").lower()
-    if sec_fetch_mode == "no-cors" and sec_fetch_site == "cross-site":
+    if not open_pixel and sec_fetch_mode == "no-cors" and sec_fetch_site == "cross-site":
         # Often image preloading/proxy behavior
         return "image_proxy"
 
@@ -260,15 +291,45 @@ def is_probable_automated_event(request, event_type=None):
     return classify_automated_reason(request, event_type=event_type) is not None
 
 
-def is_probable_automated_newsletter_event(request, newsletter):
-    if is_probable_automated_event(request):
-        return True
+def newsletter_delivered_at(newsletter, subscriber=None):
+    """Return when ``newsletter`` reached ``subscriber``, else its send date.
 
-    if newsletter and newsletter.send_date:
-        if timezone.now() - newsletter.send_date <= NEWSLETTER_AUTOMATION_WINDOW:
-            return True
+    Sends spread over many minutes, so the per-subscriber delivery time is the
+    one the send window is measured from whenever a delivery row exists.
+    """
+    from spanza_journal_watch.newsletter.models import NewsletterDelivery
 
-    return False
+    if newsletter is None:
+        return None
+    if subscriber is not None:
+        sent_at = (
+            NewsletterDelivery.objects.filter(newsletter=newsletter, subscriber=subscriber)
+            .values_list("sent_at", flat=True)
+            .first()
+        )
+        if sent_at is not None:
+            return sent_at
+    return newsletter.send_date
+
+
+def in_newsletter_send_window(delivered_at, at=None):
+    if delivered_at is None:
+        return False
+    return (at or timezone.now()) - delivered_at <= NEWSLETTER_AUTOMATION_WINDOW
+
+
+def classify_newsletter_event_reason(request, newsletter, subscriber=None, *, open_pixel=False):
+    """Return the reason a newsletter open or click looks automated, else None."""
+    reason = classify_automated_reason(request, open_pixel=open_pixel)
+    if reason is not None:
+        return reason
+    if in_newsletter_send_window(newsletter_delivered_at(newsletter, subscriber)):
+        return "send_window"
+    return None
+
+
+def is_probable_automated_newsletter_event(request, newsletter, subscriber=None):
+    return classify_newsletter_event_reason(request, newsletter, subscriber) is not None
 
 
 def classify_event_confidence(*, automated, subscriber=None):

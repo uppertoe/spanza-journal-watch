@@ -54,14 +54,14 @@
 
 <div class="row g-3 mb-2">
   <div class="col-6 col-md-4 col-xl">
-    <div class="card h-100 border-success-subtle" title="Distinct visitors who took a deliberate action — sustained read, click, share, journal select — or matched a subscriber. The trustworthy headline figure: passive scroll and bare search are excluded because both are gamed by JS-executing bots."><div class="card-body">
+    <div class="card h-100 border-success-subtle" title="Engaged humans are distinct visitors who took a deliberate action, such as opening the full text, sharing a review or clicking a search result, or known subscribers whose visit was verified in a browser."><div class="card-body">
       <h6 class="text-muted mb-1 small">Engaged humans</h6>
       <p class="display-6 mb-0">{{ engaged_humans }}</p>
     </div></div>
   </div>
   <div class="col-6 col-md-4 col-xl">
     <div class="card h-100"><div class="card-body">
-      <h6 class="text-muted mb-1 small" title="All visitors passing the bot filter, including those who left without engaging">Visitors (incl. non-engaged)</h6>
+      <h6 class="text-muted mb-1 small" title="Visitors includes everyone who passed the bot filter, whether or not they engaged.">Visitors</h6>
       <p class="display-6 mb-0">{{ unique_visitors }}</p>
     </div></div>
   </div>
@@ -150,6 +150,8 @@
         <span class="text-muted">{{ item.newsletter.send_date|date:"j M" }}:</span>
         {% if item.site_analytics_partial %}
         <span class="badge text-bg-warning text-dark">Partial</span>
+        {% elif item.in_progress %}
+        <span class="badge text-bg-light text-dark border" title="The 7-day window after this send has not yet closed.">In progress</span>
         {% elif item.lift_pct is not None %}
         <span class="badge {% if item.lift_pct >= 0 %}text-bg-success{% else %}text-bg-secondary{% endif %}">
           {% if item.lift_pct >= 0 %}+{% endif %}{{ item.lift_pct }}%
@@ -191,9 +193,19 @@
     </div>
     <div class="row g-3 text-center mb-3">
       <div class="col-6 col-md-3">
-        <div class="small text-muted">Known subscribers</div>
+        <div class="small text-muted">Events from known subscribers</div>
         <div class="fw-semibold">{{ subscriber_events }} <span class="text-muted small fw-normal">({{ subscriber_share }})</span></div>
       </div>
+      {% if observed_reason_breakdown %}
+      <div class="col-12 col-md-9 text-start" title="These requests showed a signal that Journal Watch is still assessing, so they are counted as human.">
+        <div class="small text-muted mb-1">Kept as human, under observation</div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for row in observed_reason_breakdown %}
+          <span class="badge text-bg-light border small fw-normal">{{ row.reason }}: {{ row.total }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       {% if automated_breakdown %}
       <div class="col-12 col-md-9 text-start">
         <div class="small text-muted mb-1">Bot volume by event type (in range)</div>
