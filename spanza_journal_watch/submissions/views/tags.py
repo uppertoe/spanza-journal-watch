@@ -5,7 +5,7 @@ import json
 from django.core.cache import cache
 from django.db.models import Count, Exists, F, IntegerField, OuterRef, Subquery, Value, Window
 from django.db.models.functions import Coalesce, RowNumber
-from django.http import JsonResponse
+from django.http import Http404, HttpResponsePermanentRedirect, JsonResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.views.decorators.cache import cache_page
@@ -33,6 +33,67 @@ def _curated_tag_queryset_with_review_count():
             Value(0),
         )
     )
+
+
+# Retired free-text tags whose best topic is not the one sharing the most articles, chosen by hand.
+# None sends the tag to Explore, for tags that describe the kind of paper rather than its subject.
+_RETIRED_TAG_SUCCESSORS = {
+    "ponv": "postoperative-complications",
+    "complication": "postoperative-complications",
+    "scoliosis": "scoliosis-spine",
+    "sevoflurane": "volatile-anaesthetics",
+    "bis": "eeg-neuromonitoring",
+    "neurophysiology": "eeg-neuromonitoring",
+    "nirs": "monitoring",
+    "lines": "vascular-access",
+    "arterial": "vascular-access",
+    "apls": "resuscitation",
+    "ttm": "resuscitation",
+    "dexmedetomidine": "sedation",
+    "remimazolam": "sedation",
+    "premed": "sedation",
+    "premedication": "sedation",
+    "mri": "sedation",
+    "anxiety": "preoperative-assessment",
+    "asthma": "respiratory",
+    "caudal": "regional-anaesthesia",
+    "neuroprotection": "neurodevelopment",
+    "nap": "safety",
+    **dict.fromkeys(
+        [
+            "rct",
+            "survey",
+            "review",
+            "editorial",
+            "bayesian",
+            "ai",
+            "ml",
+            "empathy",
+            "emr",
+            "documentation",
+            "screening",
+            "technique",
+            "preclinical",
+        ]
+    ),
+}
+
+
+def _successor_url(retired):
+    """The active topic for a retired tag, so its old links still land somewhere useful.
+
+    A hand-chosen successor wins; otherwise the active topic sharing the most articles with the tag.
+    """
+    if retired.slug in _RETIRED_TAG_SUCCESSORS:
+        successor = Tag.objects.filter(active=True, slug=_RETIRED_TAG_SUCCESSORS[retired.slug]).first()
+    else:
+        successor = (
+            Tag.objects.filter(active=True, articles__in=retired.articles.all())
+            .annotate(shared=Count("articles"))
+            .order_by("-shared", "-curated", "display_order", "pk")
+            .first()
+        )
+    return successor.get_absolute_url() if successor else reverse("submissions:tag_list")
 
 
 class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMixin, ListView):
@@ -224,9 +285,14 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
     # Frontend options
     article_cols = 1
 
-    def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        return obj
+    def get(self, request, *args, **kwargs):
+        try:
+            return super().get(request, *args, **kwargs)
+        except Http404:
+            retired = Tag.objects.filter(active=False, slug=kwargs.get("slug")).first()
+            if retired is None:
+                raise
+            return HttpResponsePermanentRedirect(_successor_url(retired))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

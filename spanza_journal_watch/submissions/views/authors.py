@@ -3,8 +3,10 @@
 import json
 
 from django.db.models import Count, Prefetch, Q
+from django.http import Http404, HttpResponsePermanentRedirect
 from django.urls import reverse
 from django.utils.functional import cached_property
+from django.utils.text import slugify
 from django.views.generic import ListView
 from django.views.generic.detail import SingleObjectMixin
 from view_breadcrumbs import BaseBreadcrumbMixin
@@ -44,7 +46,16 @@ class AuthorDetailView(
 
     def get(self, request, *args, **kwargs):
         # Gets the Author object from the url kwargs
-        self.object = self.get_object(queryset=Author.objects.exclude(anonymous=True))
+        authors = Author.objects.exclude(anonymous=True)
+        try:
+            self.object = self.get_object(queryset=authors)
+        except Http404:
+            # Older addresses left out the honorific, e.g. /about/jane-citizen for Dr Jane Citizen.
+            slug = kwargs.get("slug")
+            match = next((author for author in authors.exclude(slug=slug) if slugify(author.name) == slug), None)
+            if match is None:
+                raise
+            return HttpResponsePermanentRedirect(match.get_absolute_url())
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):

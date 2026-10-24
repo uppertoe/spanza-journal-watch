@@ -111,6 +111,62 @@ class TagListViewTest(TestCase):
         )
 
 
+class RetiredAddressRedirectTest(TestCase):
+    def setUp(self):
+        cache.clear()
+        journal = Journal.objects.create(name="Redirect Test Journal")
+        self.airway = Tag.objects.create(text="Airway", curated=True, active=True)
+        self.neonatal = Tag.objects.create(text="Neonatal", curated=True, active=True)
+        self.retired = Tag.objects.create(text="neonate", active=False)
+        for index in range(2):
+            article = PubmedArticle.objects.create(title=f"Neonatal article {index}", journal=journal)
+            article.tags.add(self.retired, self.neonatal)
+        article.tags.add(self.airway)
+
+    def test_retired_tag_redirects_to_topic_sharing_most_articles(self):
+        response = self.client.get(reverse("submissions:tag_detail", kwargs={"slug": "neonate"}))
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], self.neonatal.get_absolute_url())
+
+    def test_old_tags_address_reaches_successor_topic(self):
+        response = self.client.get("/tags/neonate", follow=True)
+        self.assertEqual(response.redirect_chain[-1], (self.neonatal.get_absolute_url(), 301))
+        self.assertEqual(response.status_code, 200)
+
+    def test_retired_tag_without_shared_articles_redirects_to_explore(self):
+        Tag.objects.create(text="orphan", active=False)
+        response = self.client.get(reverse("submissions:tag_detail", kwargs={"slug": "orphan"}))
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], reverse("submissions:tag_list"))
+
+    def test_hand_chosen_successor_overrides_shared_articles(self):
+        sedation = Tag.objects.create(text="Sedation", curated=True, active=True)
+        Tag.objects.create(text="premed", active=False).articles.add(*self.retired.articles.all())
+        response = self.client.get(reverse("submissions:tag_detail", kwargs={"slug": "premed"}))
+        self.assertEqual(response["Location"], sedation.get_absolute_url())
+
+    def test_tag_describing_the_kind_of_paper_redirects_to_explore(self):
+        Tag.objects.create(text="rct", active=False).articles.add(*self.retired.articles.all())
+        response = self.client.get(reverse("submissions:tag_detail", kwargs={"slug": "rct"}))
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], reverse("submissions:tag_list"))
+
+    def test_unknown_tag_is_not_found(self):
+        response = self.client.get(reverse("submissions:tag_detail", kwargs={"slug": "no-such-tag"}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_author_address_without_honorific_redirects(self):
+        author = Author.objects.create(name="Dr Jane Citizen", slug="dr-jane-citizen")
+        response = self.client.get(reverse("submissions:author_detail", kwargs={"slug": "jane-citizen"}))
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], author.get_absolute_url())
+
+    def test_anonymous_author_address_is_not_redirected(self):
+        Author.objects.create(name="Dr Jane Citizen", slug="dr-jane-citizen", anonymous=True)
+        response = self.client.get(reverse("submissions:author_detail", kwargs={"slug": "jane-citizen"}))
+        self.assertEqual(response.status_code, 404)
+
+
 class JournalModelTest(TestCase):
     def setUp(self):
         self.journal = Journal.objects.create(name="Test Journal")
