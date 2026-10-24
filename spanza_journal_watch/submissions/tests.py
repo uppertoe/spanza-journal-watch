@@ -140,7 +140,7 @@ class RetiredAddressRedirectTest(TestCase):
         self.assertEqual(response["Location"], reverse("submissions:tag_list"))
 
     def test_hand_chosen_successor_overrides_shared_articles(self):
-        sedation = Tag.objects.create(text="Sedation", curated=True, active=True)
+        sedation, _ = Tag.objects.update_or_create(slug="sedation", defaults={"text": "Sedation", "active": True})
         Tag.objects.create(text="premed", active=False).articles.add(*self.retired.articles.all())
         response = self.client.get(reverse("submissions:tag_detail", kwargs={"slug": "premed"}))
         self.assertEqual(response["Location"], sedation.get_absolute_url())
