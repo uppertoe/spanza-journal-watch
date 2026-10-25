@@ -197,6 +197,15 @@ class TopicAndAuthorPageTest(TestCase):
         body = self.client.get(self.other.get_absolute_url()).content.decode()
         self.assertIn('<meta name="robots" content="noindex,follow">', body)
 
+    def test_health_services_with_commas_stay_readable(self):
+        self.author.health_services.filter(name="Example Children's Hospital").delete()
+        self.author.health_services.create(name="Adelaide Women's and Children's Hospital, Adelaide")
+        self.author.health_services.create(name="Monash Children's Hospital")
+        body = self.client.get(self.author.get_absolute_url()).content.decode()
+        self.assertIn(
+            "Adelaide Women&#x27;s and Children&#x27;s Hospital, Adelaide, and Monash Children&#x27;s Hospital,", body
+        )
+
     def test_author_page_summarises_reviews_and_links_topics(self):
         body = self.client.get(self.author.get_absolute_url()).content.decode()
         summary = (

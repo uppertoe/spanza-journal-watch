@@ -23,11 +23,11 @@ from .shared import (
 
 
 def _join(items):
-    """'a', 'a and b', 'a, b and c', with a final comma when an item has its own 'and'."""
+    """'a', 'a and b', 'a, b and c', with a final comma when an item has its own 'and' or comma."""
     items = list(items)
     if len(items) == 1:
         return items[0]
-    serial = "," if len(items) > 2 and any(" and " in item for item in items) else ""
+    serial = "," if any(" and " in item or "," in item for item in items[:-1]) else ""
     return f"{', '.join(items[:-1])}{serial} and {items[-1]}"
 
 
@@ -89,7 +89,7 @@ class AuthorDetailView(
         )
         context["author_topics"] = topics
         review_count = context["paginator"].count
-        services = [service.name for service in self.object.health_services.all()]
+        services = [service.name for service in self.object.health_services.order_by("name")]
         who = f"{self.object}, of {_join(services)}," if services else str(self.object)
         summary = f"{who} has reviewed {review_count} paper{'s' if review_count != 1 else ''} for SPANZA Journal Watch"
         context["author_summary"] = f"{summary}."

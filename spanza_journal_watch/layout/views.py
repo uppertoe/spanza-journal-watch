@@ -62,7 +62,7 @@ class HomepageView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListView):
         context["article_cols"] = self.article_cols
         context["feature_text_styles"] = self.feature_text_styles
         context["page_title"] = "SPANZA Journal Watch"
-        context["current_issue_kicker"] = f"{homepage.issue.name} issue" if homepage is not None else "Current issue"
+        context["current_issue_kicker"] = homepage.issue.name if homepage is not None else "Current issue"
         context["show_default_action_dock"] = False
         context["action_dock_aria_label"] = "Homepage quick navigation"
         context["page_meta_description"] = (
