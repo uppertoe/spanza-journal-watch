@@ -13,13 +13,27 @@ from view_breadcrumbs import BaseBreadcrumbMixin
 
 from spanza_journal_watch.utils.mixins import AnonymousCacheMixin, HitMixin, HtmxMixin, SidebarMixin
 
-from ..models import Author, HealthService, Review
+from ..models import Author, HealthService, Review, Tag
 from .shared import (
     attach_review_display_fields,
     build_author_schema,
     build_paginated_canonical_url,
     build_request_absolute_url,
 )
+
+
+def _join(items):
+    """'a', 'a and b', 'a, b and c', with a final comma when an item has its own 'and'."""
+    items = list(items)
+    if len(items) == 1:
+        return items[0]
+    serial = "," if len(items) > 2 and any(" and " in item for item in items) else ""
+    return f"{', '.join(items[:-1])}{serial} and {items[-1]}"
+
+
+def _lower_first(text):
+    # "Paediatric pain management" -> "paediatric pain management", but "COVID-19 and anaesthesia" stays.
+    return text if text[1:2].isupper() else text[:1].lower() + text[1:]
 
 
 class AuthorDetailView(
@@ -64,9 +78,25 @@ class AuthorDetailView(
         context["show_default_action_dock"] = False
         context["action_dock_aria_label"] = "Author page navigation"
         context["page_title"] = f"{self.object} | SPANZA Journal Watch"
+
+        # The topics this author has reviewed, most reviewed first.
+        topics = list(
+            Tag.objects.filter(
+                active=True, curated=True, articles__reviews__author=self.object, articles__reviews__active=True
+            )
+            .annotate(author_reviews=Count("articles__reviews", distinct=True))
+            .order_by("-author_reviews", "display_order")
+        )
+        context["author_topics"] = topics
+        review_count = context["paginator"].count
+        services = [service.name for service in self.object.health_services.all()]
+        who = f"{self.object}, of {_join(services)}," if services else str(self.object)
+        summary = f"{who} has reviewed {review_count} paper{'s' if review_count != 1 else ''} for SPANZA Journal Watch"
+        context["author_summary"] = f"{summary}."
         context["page_meta_description"] = (
-            f"Paediatric anaesthesia literature reviews by {self.object} for SPANZA Journal Watch: "
-            "summaries and expert commentary on recent research of interest to clinicians."
+            f"{summary}, on topics including {_join([_lower_first(t.get_display_name()) for t in topics[:3]])}."
+            if topics
+            else f"{summary}."
         )
         context["canonical_url"] = build_paginated_canonical_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
@@ -74,7 +104,10 @@ class AuthorDetailView(
                 "@context": "https://schema.org",
                 "@type": "ProfilePage",
                 "url": context["canonical_url"],
-                "mainEntity": build_author_schema(self.request, self.object),
+                "mainEntity": {
+                    **build_author_schema(self.request, self.object),
+                    **({"knowsAbout": [topic.get_display_name() for topic in topics]} if topics else {}),
+                },
             }
         )
 

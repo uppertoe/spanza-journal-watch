@@ -201,7 +201,14 @@ class Author(TimeStampedModel):
 
 
 class Tag(models.Model):
+    # Topic pages with fewer live reviews than this stay out of search results until they fill up.
+    MIN_REVIEWS_TO_INDEX = 2
+
     text = models.CharField(max_length=255, unique=True, blank=False, null=False)
+    name = models.CharField(
+        max_length=120, blank=True, help_text="Heading for the topic page, e.g. 'Paediatric airway management'"
+    )
+    introduction = models.TextField(blank=True, help_text="One or two sentences shown under the topic page heading")
     slug = models.SlugField(max_length=255, blank=True, unique=True)
     active = models.BooleanField(default=True)
     curated = models.BooleanField(default=False)
@@ -225,6 +232,9 @@ class Tag(models.Model):
 
     def __str__(self):
         return f"#{self.text}"
+
+    def get_display_name(self):
+        return self.name or str(self)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -359,8 +369,14 @@ class Review(TimeStampedModel):
         text = strip_tags(html).strip()
         return text
 
+    # A line of up to three words with no sentence punctuation, or a short phrase ending in a colon, is a
+    # section label typed as plain text ("Aim", "Summary:", "Study Design") rather than the reviewer's prose.
+    _section_label_re = re.compile(r"^(?:\w[\w'’-]*(?:\s+\w[\w'’-]*){0,2}|[^.!?:]{1,40}:)$")
+
     def get_truncated_body(self):
-        return shorten_text(self.get_plain_body(exclude_headings=True), self.TRUNCATED_BODY_LENGTH)
+        lines = self.get_plain_body(exclude_headings=True).splitlines()
+        prose = " ".join(line.strip() for line in lines if not self._section_label_re.match(line.strip()))
+        return shorten_text(" ".join(prose.split()), self.TRUNCATED_BODY_LENGTH)
 
     @property
     def headline_status(self):
@@ -387,8 +403,10 @@ class Review(TimeStampedModel):
         return self.article.name
 
     def get_review_date(self):
-        # Fall back to issue date if publish date not set
-        return self.publish_date if self.publish_date else self.issues.all()[0].date
+        # Fall back to the date of the earliest issue the review appeared in.
+        if self.publish_date:
+            return self.publish_date
+        return min((issue.date for issue in self.issues.all() if issue.date), default=None)
 
     def save(self, *args, **kwargs):
         resize_feature_image = image_changed(self, "feature_image")

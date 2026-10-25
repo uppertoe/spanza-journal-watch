@@ -9,7 +9,7 @@
     <div class="tag-directory py-2">
         {% for tag in tags %}
         <a href="{{ tag.get_absolute_url }}" class="tag-directory__item">
-            <span class="tag-directory__name">{{ tag }}</span>
+            <span class="tag-directory__name">{{ tag.get_display_name }}</span>
             <span class="tag-directory__count">{{ tag.review_count }}</span>
         </a>
         {% endfor %}

@@ -137,7 +137,7 @@ class TestPublicRendering:
         assert "Unapproved" not in body
         assert "<title>A paper about neuromuscular block | SPANZA Journal Watch</title>" in body
 
-    def test_headline_leads_page_and_cards_while_title_keeps_paper(self, client):
+    def test_paper_title_leads_page_while_headline_stays_subtle(self, client):
         review = _review(headline="Children need quantitative monitoring of neuromuscular block")
         review.bottom_line = "Monitor every child. Reverse based on the numbers."
         review.save()
@@ -147,9 +147,12 @@ class TestPublicRendering:
             '<meta property="og:title" content="Children need quantitative monitoring of neuromuscular block'
             ' | SPANZA Journal Watch">' in body
         )
-        assert '"headline": "Children need quantitative monitoring of neuromuscular block"' in body
-        assert "Children need quantitative monitoring of neuromuscular block" in body.split("<article")[0]
-        assert '"alternativeHeadline": "A paper about neuromuscular block"' in body
+        page_heading = re.search(r'<h1 class="abstract-header__title">(.*?)</h1>', body, re.S).group(1)
+        assert "A paper about neuromuscular block" in page_heading
+        assert "Children need quantitative monitoring" not in page_heading
+        assert '<p class="jw-review-headline">Children need quantitative monitoring of neuromuscular block</p>' in body
+        assert '"headline": "A paper about neuromuscular block"' in body
+        assert '"alternativeHeadline": "Children need quantitative monitoring of neuromuscular block"' in body
         assert 'name="description" content="Monitor every child. Reverse based on the numbers.' in body
         assert 'aria-label="Bottom line"' in body
 
@@ -158,6 +161,8 @@ class TestPublicRendering:
         body = client.get(review.get_absolute_url()).content.decode()
         assert "<title>A paper about neuromuscular block | SPANZA Journal Watch</title>" in body
         assert 'aria-label="Bottom line"' not in body
+        assert "jw-review-headline" not in body
+        assert "alternativeHeadline" not in body
 
 
 class TestEditor:

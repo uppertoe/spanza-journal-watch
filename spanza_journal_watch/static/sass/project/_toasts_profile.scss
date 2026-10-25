@@ -125,6 +125,13 @@
   }
 }
 
+/* The editorial headline sits quietly beneath the paper's title wherever a review is listed. */
+.jw-review-headline {
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.25rem;
+}
+
 /* ── Dot indicator (reading list / nav) ─────────────────── */
 .jw-dot-indicator {
   position: absolute;

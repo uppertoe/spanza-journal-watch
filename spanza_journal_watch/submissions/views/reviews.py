@@ -57,8 +57,6 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
         context["page_title"] = f"{seo_title} | SPANZA Journal Watch"
         share_card_title = shorten_text(headline.rstrip(".").strip(), SEO_TITLE_MAX_LENGTH)
         context["share_card_title"] = f"{share_card_title} | SPANZA Journal Watch"
-        context["display_headline"] = headline
-        context["has_editorial_headline"] = bool((self.object.editorial_headline or "").strip())
         bottom_line = (self.object.bottom_line or "").strip()
         share_description = bottom_line or self.object.get_truncated_body().strip()
         context["page_meta_description"] = build_review_meta_description(
@@ -109,8 +107,9 @@ class ReviewDetailView(AnonymousCacheMixin, HitMixin, SidebarMixin, HtmxMixin, B
             {
                 "@context": "https://schema.org",
                 "@type": "Article",
-                "headline": shorten_text(headline, 110),
-                "alternativeHeadline": shorten_text(article_title, 150),
+                # The page leads with the paper's title, so the markup does too.
+                "headline": shorten_text(article_title, 110),
+                **({"alternativeHeadline": headline} if self.object.editorial_headline else {}),
                 "description": share_description,
                 "url": canonical_url,
                 "image": og_image,

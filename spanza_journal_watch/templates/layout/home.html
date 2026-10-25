@@ -7,10 +7,10 @@
 {% block main-feature %}
 {% if page_header %}
     {% with page_header as content %}
-    {% include "fragments/main_feature.html" with header_kicker="Current issue" %}
+    {% include "fragments/main_feature.html" with header_kicker=current_issue_kicker %}
     {% endwith %}
 {% else %}
-    {% include "fragments/main_feature.html" with title="Welcome to Journal Watch" body="Catch up on notable papers from the paediatric anaesthesia literature, chosen and reviewed by the community." header_theme="home" header_pattern="ripple" header_kicker="Current issue" %}
+    {% include "fragments/main_feature.html" with title="Welcome to Journal Watch" body="Catch up on notable papers from the paediatric anaesthesia literature, chosen and reviewed by the community." header_theme="home" header_pattern="ripple" header_kicker=current_issue_kicker %}
 {% endif %}
 {% endblock main-feature %}
 
@@ -26,7 +26,7 @@
 {% endblock card-feature %}
 
 {% block article-title %}
-<h3 class="home-article-title fst-italic">More in this issue:</h3>
+<h3 class="home-article-title fst-italic">More in this issue</h3>
 {% endblock article-title %}
 {% block article-block %}
 <div id="article-block" class="home-article-block">

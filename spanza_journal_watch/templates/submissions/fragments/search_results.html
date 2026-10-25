@@ -20,6 +20,7 @@
                 <h3 class="mb-0">{{ review.article.get_title|capfirst }}</h3>
                 <h5 class="text-muted">{{ review.article.get_subtitle|capfirst }}</h5>
             </a>
+            {% include "fragments/review_headline.html" %}
 
             <p class="mb-0 fst-italic">{{ review.article.journal }}</p>
             <p class="mb-2">
@@ -41,7 +42,7 @@
                             hx-target="#search-results"
                             hx-push-url="true"
                             class="badge rounded-pill text-bg-secondary text-decoration-none"
-                        >{{ tag }}</a>
+                        >{{ tag.get_display_name }}</a>
                     {% endfor %}
                 </div>
             {% endif %}

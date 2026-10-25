@@ -30,6 +30,7 @@ class TestSitemapMatchesTheSite:
         curated_empty = Tag.objects.create(text="empty", curated=True, active=True)
         uncurated_used = Tag.objects.create(text="misc", curated=False, active=True)
         _review("Airway paper", tags=[curated_used, uncurated_used])
+        _review("Second airway paper", tags=[curated_used, uncurated_used])
         _review("Retired paper", active=False, tags=[curated_empty])
 
         items = list(TagSitemap().items())

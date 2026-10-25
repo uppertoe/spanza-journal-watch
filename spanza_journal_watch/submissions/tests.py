@@ -167,6 +167,49 @@ class RetiredAddressRedirectTest(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class TopicAndAuthorPageTest(TestCase):
+    def setUp(self):
+        cache.clear()
+        journal = Journal.objects.create(name="Topic Page Journal")
+        self.topic = Tag.objects.create(
+            text="Topic page airway",
+            name="Paediatric airway management",
+            introduction="Journal Watch reviewers assess recent papers on the paediatric airway.",
+            curated=True,
+            active=True,
+        )
+        self.other = Tag.objects.create(text="Topic page fasting", name="Preoperative fasting", curated=True)
+        self.author = Author.objects.create(name="Dr Jane Citizen", slug="dr-jane-citizen")
+        self.author.health_services.create(name="Example Children's Hospital")
+        for index, tags in enumerate([[self.topic], [self.topic, self.other]]):
+            article = PubmedArticle.objects.create(title=f"Topic page article {index}", journal=journal)
+            article.tags.add(*tags)
+            Review.objects.create(article=article, body="body", active=True, author=self.author, slug=f"tp-{index}")
+
+    def test_topic_page_uses_name_and_introduction(self):
+        body = self.client.get(self.topic.get_absolute_url()).content.decode()
+        self.assertIn("<title>Paediatric airway management | SPANZA Journal Watch</title>", body)
+        self.assertIn("Journal Watch reviewers assess recent papers on the paediatric airway.", body)
+        self.assertIn('content="Journal Watch reviewers assess recent papers on the paediatric airway."', body)
+        self.assertNotIn('name="robots"', body)
+
+    def test_topic_with_a_single_review_is_kept_out_of_search(self):
+        body = self.client.get(self.other.get_absolute_url()).content.decode()
+        self.assertIn('<meta name="robots" content="noindex,follow">', body)
+
+    def test_author_page_summarises_reviews_and_links_topics(self):
+        body = self.client.get(self.author.get_absolute_url()).content.decode()
+        summary = (
+            "Dr Jane Citizen, of Example Children&#x27;s Hospital, has reviewed 2 papers for SPANZA Journal Watch"
+        )
+        self.assertIn(f"{summary}.", body)
+        self.assertIn(
+            f'content="{summary}, on topics including paediatric airway management and preoperative fasting."', body
+        )
+        self.assertIn(f'<a href="{self.topic.get_absolute_url()}">Paediatric airway management</a>', body)
+        self.assertIn('"knowsAbout": ["Paediatric airway management", "Preoperative fasting"]', body)
+
+
 class JournalModelTest(TestCase):
     def setUp(self):
         self.journal = Journal.objects.create(name="Test Journal")
@@ -248,6 +291,18 @@ class ReviewModelTest(TestCase):
     def test_get_absolute_url(self):
         url = reverse("submissions:review_detail", kwargs={"slug": self.review.slug})
         self.assertEqual(self.review.get_absolute_url(), url)
+
+    def test_get_truncated_body_skips_section_labels_typed_as_text(self):
+        self.review.body = "Aim\r\nTo evaluate the programme.\r\n\r\nSummary:\r\nThis is a survey study."
+        self.assertEqual(self.review.get_truncated_body(), "To evaluate the programme. This is a survey study.")
+
+    def test_review_date_is_publish_date_or_earliest_issue(self):
+        later = Issue.objects.create(name="Later issue", body="b", date=datetime.date(2026, 1, 1))
+        earlier = Issue.objects.create(name="Earlier issue", body="b", date=datetime.date(2025, 9, 1))
+        self.review.issues.add(later, earlier)
+        self.assertEqual(self.review.get_review_date(), datetime.date(2025, 9, 1))
+        self.review.publish_date = datetime.date(2025, 10, 1)
+        self.assertEqual(self.review.get_review_date(), datetime.date(2025, 10, 1))
 
     def test_get_truncated_body_excludes_markdown_headings(self):
         self.review.body = "# Main heading\n\nIntro paragraph.\n\n## Secondary heading\n\nMore body copy."

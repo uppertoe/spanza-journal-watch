@@ -3,8 +3,8 @@
 import json
 
 from django.core.cache import cache
-from django.db.models import Count, Exists, F, IntegerField, OuterRef, Subquery, Value, Window
-from django.db.models.functions import Coalesce, RowNumber
+from django.db.models import Count, Exists, F, IntegerField, OuterRef, Q, Subquery, Value, Window
+from django.db.models.functions import Coalesce, NullIf, RowNumber
 from django.http import Http404, HttpResponsePermanentRedirect, JsonResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -127,10 +127,10 @@ class TagListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumbMi
 
         if query:
             normalized_query = query[1:] if query.startswith("#") else query
-            queryset = queryset.filter(text__icontains=normalized_query)
+            queryset = queryset.filter(Q(text__icontains=normalized_query) | Q(name__icontains=normalized_query))
 
         if sort == "name":
-            return queryset.order_by("text")
+            return queryset.order_by(Coalesce(NullIf("name", Value("")), "text"))
 
         if sort == "trending":
             # Sort by engagement score client-side after annotation
@@ -280,7 +280,7 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
     # Breadcrumb
     @cached_property
     def crumbs(self):
-        return [("Explore", reverse("submissions:tag_list")), (self.object, "")]
+        return [("Explore", reverse("submissions:tag_list")), (self.object.get_display_name(), "")]
 
     # Frontend options
     article_cols = 1
@@ -298,12 +298,15 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
         context = super().get_context_data(**kwargs)
 
         # Override header
+        display_name = self.object.get_display_name()
         header = PageHeader.get_active_for(PageHeader.PageType.TAG)
-        override = {"title": str(self.object)}
+        override = {"title": display_name}
+        if self.object.introduction:
+            override["body"] = self.object.introduction
         context["page_header"] = header.collate_fields(**override) if header else override
 
         context["article_cols"] = self.article_cols
-        context["page_title"] = f"{self.object} | SPANZA Journal Watch"
+        context["page_title"] = f"{display_name} | SPANZA Journal Watch"
         # The latest active review of each article on the tag, in one query.
         tag_reviews = list(
             Review.objects.filter(active=True, article__tags=self.object)
@@ -318,16 +321,18 @@ class TagDetailView(AnonymousCacheMixin, SidebarMixin, BaseBreadcrumbMixin, Deta
 
         review_count = len(tag_reviews)
         count_label = f"{review_count} SPANZA Journal Watch review{'s' if review_count != 1 else ''}"
-        context["page_meta_description"] = (
+        context["page_meta_description"] = self.object.introduction or (
             f"{count_label} on {self.object}: summaries and expert commentary on "
             "paediatric anaesthesia research, selected from the literature by SPANZA members."
         )
+        if review_count < Tag.MIN_REVIEWS_TO_INDEX:
+            context["meta_robots"] = "noindex,follow"
         context["canonical_url"] = build_request_absolute_url(self.request, self.object.get_absolute_url())
         context["structured_data"] = json.dumps(
             {
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
-                "name": str(self.object),
+                "name": display_name,
                 "url": context["canonical_url"],
                 "description": context["page_meta_description"],
             }

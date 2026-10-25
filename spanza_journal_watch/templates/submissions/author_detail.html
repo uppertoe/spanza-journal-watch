@@ -1,14 +1,18 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block main-feature %}
-{% include "fragments/main_feature.html" with title=author|capfirst body="Browse reviews written by this Journal Watch contributor." header_theme="about" header_pattern="halo" header_kicker="Contributor profile" %}
+{% include "fragments/main_feature.html" with title=author|capfirst body=author_summary header_theme="about" header_pattern="halo" header_kicker="Contributor profile" %}
 {% endblock main-feature %}
 
 {% block card-feature %}
-<h2 class="link-body-emphasis mb-2">{{ author|capfirst }}</h2>
-{% for service in author.health_services.all %}
-<h5 class="mb-2">{{ service|capfirst }}</h5></a>
-{% endfor %}
+{% if author_topics %}
+<nav class="jw-author-topics mb-3" aria-label="Topics reviewed">
+  <p class="mb-1">{{ author }} has reviewed papers on these topics:</p>
+  <ul class="list-inline mb-0">
+    {% for topic in author_topics %}<li class="list-inline-item"><a href="{{ topic.get_absolute_url }}">{{ topic.get_display_name }}</a>{% if not forloop.last %} ·{% endif %}</li>{% endfor %}
+  </ul>
+</nav>
+{% endif %}
 {% endblock card-feature %}
 
 {% if reviews %}

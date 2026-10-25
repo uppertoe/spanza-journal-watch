@@ -17,7 +17,7 @@
 <h4 class="fst-italic">Topics</h4>
 <ol class="list-unstyled mb-0">
     {% for tag in sidebar_tags %}
-    <li><a href="{{ tag.get_absolute_url }}">{{ tag }}</a></li>
+    <li><a href="{{ tag.get_absolute_url }}">{{ tag.get_display_name }}</a></li>
     {% endfor %}
 </ol>
 </div>

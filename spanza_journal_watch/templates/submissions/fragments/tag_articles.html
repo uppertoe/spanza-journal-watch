@@ -1,5 +1,5 @@
 {% load cache responsive_images %}
-{% cache 1800 "tag_detail_articles" content_cache_version request.get_full_path %}
+{% cache 1800 "tag_detail_articles_v3" content_cache_version request.get_full_path %}
 <div id="articles">
     <div class="row row-cols-{{ article_cols }} g-3 py-2">
         {% for review in tag_reviews %}
@@ -27,6 +27,7 @@
                 <div class="d-flex card-body flex-column">
                     <h5 class="card-title">{{ article.get_title|capfirst }}</h5>
                     {% if article.get_subtitle %}<p class="card-subtitle mb-1">{{ article.get_subtitle|capfirst }}</p>{% endif %}
+                    {% include "fragments/review_headline.html" %}
                     <div class="mb-2"></div>
                     <p class="card-subtitle text-muted mb-1 fst-italic">{{ article.journal }}</a>
                     <p class="card-subtitle text-muted mb-1">Reviewed {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>

@@ -179,7 +179,7 @@ class IssueSitemap(Sitemap):
 
 
 class TagSitemap(Sitemap):
-    """Curated topics with at least one live review: the same set /explore lists.
+    """Curated topics with enough live reviews to be indexed (Tag.MIN_REVIEWS_TO_INDEX).
 
     Uncurated or empty topics used to be submitted too, which handed search
     engines pages the site itself does not link to and that have nothing on
@@ -200,7 +200,7 @@ class TagSitemap(Sitemap):
                     "articles__reviews__modified", filter=models.Q(articles__reviews__active=True)
                 ),
             )
-            .filter(review_count__gt=0)
+            .filter(review_count__gte=Tag.MIN_REVIEWS_TO_INDEX)
             .order_by("text")
         )
 

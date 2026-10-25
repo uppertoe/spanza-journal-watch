@@ -7,7 +7,7 @@
       </span>
     </div>
     <h6 class="card-title topic-card__title mb-1">
-      <a href="{{ tag.get_absolute_url }}" class="text-decoration-none stretched-link">{{ tag }}</a>
+      <a href="{{ tag.get_absolute_url }}" class="text-decoration-none stretched-link">{{ tag.get_display_name }}</a>
     </h6>
     <p class="topic-card__count mb-0">
       {{ tag.review_count }} review{{ tag.review_count|pluralize }}

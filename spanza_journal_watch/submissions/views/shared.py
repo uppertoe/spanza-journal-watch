@@ -101,13 +101,14 @@ def build_paginated_canonical_url(request, path):
     return canonical
 
 
-def attach_review_display_fields(reviews, *, issue=None, include_share_context=False, request=None):
+def attach_review_display_fields(reviews, *, include_share_context=False, request=None):
     review_list = list(reviews)
     if not review_list:
         return review_list
 
     for review in review_list:
-        review.display_review_date = issue.date if issue and issue.date else review.get_review_date()
+        # One date per review wherever it is listed, so the same review never shows two different months.
+        review.display_review_date = review.get_review_date()
 
         if include_share_context:
             article_title = review.article.get_title().strip()

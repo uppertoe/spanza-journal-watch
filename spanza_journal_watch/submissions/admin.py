@@ -23,9 +23,9 @@ class AuthorAdmin(admin.ModelAdmin):
 
 @admin.register(models.Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ("text", "curated", "display_order", "active")
+    list_display = ("text", "name", "curated", "display_order", "active")
     list_filter = ("active", "curated")
-    search_fields = ("text",)
+    search_fields = ("text", "name")
     readonly_fields = ("slug",)
 
 

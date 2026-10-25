@@ -1,9 +1,9 @@
 {% with review.article.tags_curated as review_tags %}
 {% if review_tags %}
 <p class="review-tags mb-3 small text-body-secondary">
-    <span class="me-1">Tags:</span>
+    <span class="me-1">Topics:</span>
     {% for tag in review_tags|slice:":8" %}
-        <a href="{{ tag.get_absolute_url }}" class="review-tags__link">{{ tag }}</a>{% if not forloop.last %}<span class="mx-1 text-body-tertiary">·</span>{% endif %}
+        <a href="{{ tag.get_absolute_url }}" class="review-tags__link">{{ tag.get_display_name }}</a>{% if not forloop.last %}<span class="mx-1 text-body-tertiary">·</span>{% endif %}
     {% endfor %}
 </p>
 {% endif %}

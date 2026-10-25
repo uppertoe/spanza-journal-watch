@@ -77,18 +77,25 @@ def _live_review(pmid, title):
 
 class TestTagSitemap:
     def test_inactive_tags_excluded(self):
-        # The sitemap mirrors /explore: curated topics that have at least one live review.
+        # The sitemap lists curated topics with enough live reviews to be indexed.
         article, _ = _live_review("880001", "Tagged paper")
+        second, _ = _live_review("880011", "Second tagged paper")
         active = Tag.objects.create(text="Sitemap Active Tag Unique", active=True, curated=True)
         inactive = Tag.objects.create(text="Sitemap Inactive Tag Unique", active=False, curated=True)
-        active.articles.add(article)
-        inactive.articles.add(article)
+        active.articles.add(article, second)
+        inactive.articles.add(article, second)
 
         items = list(TagSitemap().items())
         item_pks = [t.pk for t in items]
 
         assert active.pk in item_pks
         assert inactive.pk not in item_pks
+
+    def test_topic_with_a_single_review_excluded(self):
+        article, _ = _live_review("880012", "Lonely paper")
+        thin = Tag.objects.create(text="Sitemap Thin Tag Unique", active=True, curated=True)
+        thin.articles.add(article)
+        assert thin.pk not in [t.pk for t in TagSitemap().items()]
 
     def test_all_items_have_absolute_url(self):
         article, _ = _live_review("880002", "Tagged paper two")

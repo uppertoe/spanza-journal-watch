@@ -95,7 +95,6 @@ class IssueDetailView(
         context["articles"] = paginator.get_page(page.number)
         attach_review_display_fields(
             context["articles"],
-            issue=self.object,
             include_share_context=True,
             request=self.request,
         )
