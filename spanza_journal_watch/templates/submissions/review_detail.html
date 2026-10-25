@@ -29,7 +29,10 @@
   <p class="mb-0">{{ review.bottom_line }}</p>
 </aside>
 {% endif %}
-<div class="d-flex mt-2 mb-3 justify-content-between align-items-center flex-wrap gap-2">
+<div class="mb-3">
+    {% include 'fragments/share_actions.html' with show_social_links=True %}
+</div>
+<div class="d-flex mt-auto justify-content-between align-items-center flex-wrap gap-2">
     <div>
     <div class="btn-group">
         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-custom-class="journalwatch-popover" data-bs-title="{{ review.article.journal|default:review.article.source_journal_name }}" data-bs-content="{{ review.article.citation }}">Citation</button>
@@ -44,9 +47,6 @@
     {% endif %}
 </div>
 <p class="text-break">{{ review.get_markdown_body|safe }}</p>
-<div class="mb-3">
-    {% include 'fragments/share_actions.html' with show_social_links=True %}
-</div>
 </article>
 {% include 'fragments/review_tags_inline.html' %}
 {% include 'fragments/related_reviews.html' %}

@@ -3,13 +3,16 @@
     {% for review in articles %}
     <article class="article-post deferred-article" id="list-item-{{ review.slug }}" data-analytics-review-id="{{ review.pk }}" data-analytics-source="issue_detail">
     {# Everything but the reading-list button is the same for every reader, so each card is cached in two pieces around it. #}
-    {% cache 1800 "review_card_head_v4" review.pk review.modified review.display_review_date content_cache_version request.get_host %}
+    {% cache 1800 "review_card_head_v5" review.pk review.modified review.display_review_date content_cache_version request.get_host %}
     <a href="{{ review.get_absolute_url }}" class="text-decoration-none"><h2 class="link-body-emphasis mb-2">{{ review.article.get_title|capfirst }}</h2></a>
     {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
     {% include "fragments/review_headline.html" %}
     <p class="mb-1 fst-italic">{{ review.article.journal }}</p>
     <p class="mb-1">Reviewed {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
-    <div class="d-flex mt-2 mb-3 justify-content-between align-items-center flex-wrap gap-2">
+    <div class="mb-3">
+        {% include 'fragments/share_actions.html' with share_title=review.share_title share_description=review.share_description share_email_summary=review.share_email_summary canonical_url=review.canonical_url share_text=review.share_text email_share_url=review.email_share_url bluesky_share_url=review.bluesky_share_url x_share_url=review.x_share_url facebook_share_url=review.facebook_share_url show_social_links=True %}
+    </div>
+    <div class="d-flex mt-auto justify-content-between align-items-center flex-wrap gap-2">
         <div>
         <div class="btn-group">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-custom-class="journalwatch-popover" data-bs-title="{{ review.article.journal }}" data-bs-content="{{ review.article.citation }}">Citation</button>
@@ -21,12 +24,9 @@
         <div id="review-star-actions-{{ review.pk }}">
             {% include "submissions/fragments/review_star_button.html" with pubmed_article=review.article pubmed_user_state=review.pubmed_user_state pubmed_session_starred=review.pubmed_session_starred star_target_id=review.star_target_id star_count=review.star_count %}
         </div>
-    {% cache 1800 "review_card_body_v2" review.pk review.modified content_cache_version request.get_host %}
+    {% cache 1800 "review_card_body_v3" review.pk review.modified content_cache_version request.get_host %}
     </div>
     <p class="text-break">{{ review.get_markdown_body|safe }}</p>
-    <div class="mb-3">
-        {% include 'fragments/share_actions.html' with share_title=review.share_title share_description=review.share_description share_email_summary=review.share_email_summary canonical_url=review.canonical_url share_text=review.share_text email_share_url=review.email_share_url bluesky_share_url=review.bluesky_share_url x_share_url=review.x_share_url facebook_share_url=review.facebook_share_url show_social_links=True %}
-    </div>
     {% include 'fragments/review_tags_inline.html' %}
     {% with related_reviews=review.related_reviews %}
     {% include 'fragments/related_reviews.html' with related_source_context='issue' %}
