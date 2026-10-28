@@ -14,7 +14,6 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.urls import reverse
 
 from spanza_journal_watch.cpd.models import CPDReport
@@ -164,7 +163,7 @@ class TestDownloadReport:
             date_from=date(2026, 1, 1),
             date_to=date(2026, 6, 30),
             status=CPDReport.Status.READY,
-            file=ContentFile(b"%PDF-fake", name="report.pdf"),
+            pdf=b"%PDF-fake",
         )
         client.force_login(cpd_user)
         response = client.get(reverse("cpd:download", args=[report.pk]))
@@ -176,7 +175,7 @@ class TestDownloadReport:
             date_from=date(2026, 1, 1),
             date_to=date(2026, 6, 30),
             status=CPDReport.Status.READY,
-            file=ContentFile(b"%PDF-fake-content", name="report.pdf"),
+            pdf=b"%PDF-fake-content",
         )
         client.force_login(cpd_user)
         response = client.get(reverse("cpd:download", args=[report.pk]))
@@ -212,3 +211,46 @@ class TestArticleCountPreview:
         )
         assert response.status_code == 200
         assert response.content == b"0"
+
+
+# ---------------------------------------------------------------------------
+# 6. Full-text clicks respect the CPD tracking setting
+# ---------------------------------------------------------------------------
+
+
+class TestFullTextClickRecording:
+    @pytest.fixture()
+    def article(self):
+        from spanza_journal_watch.backend.models import PubmedArticle
+        from spanza_journal_watch.submissions.models import Journal
+
+        return PubmedArticle.objects.create(title="Tracked article", journal=Journal.objects.create(name="J"))
+
+    def _click(self, client, article):
+        return client.post(reverse("submissions:journal_article_mark_fulltext", args=[article.pk]))
+
+    def test_not_recorded_against_account_when_tracking_off(self, client, cpd_user, article):
+        from spanza_journal_watch.backend.models import PubmedArticleUserState
+
+        client.force_login(cpd_user)
+        self._click(client, article)
+        assert not PubmedArticleUserState.objects.filter(user=cpd_user, full_text_clicked_at__isnull=False).exists()
+        # The click is still remembered for this visit
+        assert client.get(reverse("submissions:journal_fulltext_ids")).json()["ids"] == [article.pk]
+
+    def test_recorded_against_account_when_tracking_on(self, client, cpd_user, article):
+        from spanza_journal_watch.backend.models import PubmedArticleUserState
+
+        cpd_user.cpd_tracking_enabled = True
+        cpd_user.save(update_fields=["cpd_tracking_enabled"])
+        client.force_login(cpd_user)
+        self._click(client, article)
+        assert PubmedArticleUserState.objects.filter(user=cpd_user, full_text_clicked_at__isnull=False).exists()
+
+    def test_session_clicks_not_moved_to_account_when_tracking_off(self, cpd_user, article):
+        from spanza_journal_watch.backend.models import PubmedArticleUserState
+        from spanza_journal_watch.users.utils import migrate_session_fulltext_to_user
+
+        session = {"fulltext_clicked_ids": [article.pk]}
+        assert migrate_session_fulltext_to_user(session, cpd_user) == 0
+        assert not PubmedArticleUserState.objects.filter(user=cpd_user).exists()

@@ -55,19 +55,13 @@ def _get_newsletter(token):
 def _get_subscriber(request):
     """Identify the subscriber from the tracking token in the link.
 
-    Newsletters sent before tracking tokens existed carry the address instead;
-    it is still honoured so opens and clicks on those issues keep attributing.
+    Newsletters sent before tracking tokens existed carry the address instead.
+    Those links still lead to their destination but identify no one: an
+    address in a URL would let anyone check whether it is subscribed.
     """
     tracking_token = request.GET.get("t") or ""
     if tracking_token:
         return Subscriber.objects.filter(tracking_token=tracking_token).first()
-
-    email = request.GET.get("email") or ""
-    if email:
-        subscriber = Subscriber.first_by_email(email)
-        if not subscriber:
-            logger.warning("No matching subscriber for legacy email link")
-        return subscriber
     return None
 
 
@@ -304,12 +298,46 @@ def _extract_utm_params_from_url(page_url):
     return params
 
 
+# A beacon carries a handful of short fields; anything larger is not ours.
+MAX_BEACON_BYTES = 8 * 1024
+MAX_METADATA_KEYS = 20
+MAX_METADATA_VALUE_LENGTH = 512
+
+
+def _bounded_scalar(value):
+    if isinstance(value, str):
+        return value[:MAX_METADATA_VALUE_LENGTH]
+    if isinstance(value, bool | int | float) or value is None:
+        return value
+    raise ValueError
+
+
+def _bounded_metadata(metadata):
+    """Keep the beacon's metadata to a few short values or short lists of them."""
+    if not isinstance(metadata, dict):
+        return {}
+    bounded = {}
+    for key, value in list(metadata.items())[:MAX_METADATA_KEYS]:
+        try:
+            if isinstance(value, list):
+                bounded[str(key)[:64]] = [_bounded_scalar(item) for item in value[:MAX_METADATA_KEYS]]
+            else:
+                bounded[str(key)[:64]] = _bounded_scalar(value)
+        except ValueError:
+            continue
+    return bounded
+
+
 @csrf_exempt
 @require_POST
 def track_event(request):
+    if len(request.body) > MAX_BEACON_BYTES:
+        return HttpResponseBadRequest("Analytics payload too large")
     try:
         payload = loads(request.body.decode("utf-8"))
     except (JSONDecodeError, UnicodeDecodeError):
+        return HttpResponseBadRequest("Invalid analytics payload")
+    if not isinstance(payload, dict):
         return HttpResponseBadRequest("Invalid analytics payload")
 
     event_type = (payload.get("event_type") or "").strip()
@@ -325,11 +353,9 @@ def track_event(request):
         except (Review.DoesNotExist, TypeError, ValueError):
             return HttpResponseBadRequest("Invalid review")
 
-    subscriber_id = request.session.get("subscriber_id")
-
     # Page context travels in the payload: the beacon request itself is always
     # same-origin, so its Referer/query string say nothing about the page.
-    event_metadata = payload.get("metadata") or {}
+    event_metadata = _bounded_metadata(payload.get("metadata"))
     page_url = (payload.get("page_url") or "")[:1024]
     utm_params = _extract_utm_params_from_url(page_url)
     if utm_params:
@@ -350,7 +376,9 @@ def track_event(request):
             event_type=event_type,
             request=request,
             content_object=review,
-            subscriber_id=subscriber_id,
+            # Reading is recorded against the anonymous visitor only, never the
+            # subscriber the session may have identified from a newsletter link.
+            subscriber_id=None,
             source=source,
             duration_ms=payload.get("duration_ms"),
             scroll_depth=payload.get("scroll_depth"),

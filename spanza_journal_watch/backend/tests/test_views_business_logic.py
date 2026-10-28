@@ -831,3 +831,56 @@ class TestToggleReviewActive:
         client, _ = editor_client()
         response = client.post(self._url(review))
         assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Revoking a coordinator withdraws the access the role granted
+# ---------------------------------------------------------------------------
+
+
+class TestIssueRevokeContributorPermissions:
+    def _coordinator(self, issue, email):
+        user = UserFactory(email=email)
+        for codename in ("regional_coordinator", "manage_issue_builder", "invited_contributor"):
+            user.user_permissions.add(Permission.objects.get(content_type__app_label="submissions", codename=codename))
+        user.is_staff = True
+        user.save(update_fields=["is_staff"])
+        contributor = IssueContributor.objects.create(
+            issue=issue,
+            email=email,
+            user=user,
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.ACTIVE,
+        )
+        return user, contributor
+
+    def _revoke(self, issue, contributor):
+        client, _ = manager_client()
+        url = reverse(
+            "backend:issue_revoke_contributor", kwargs={"issue_id": issue.pk, "contributor_id": contributor.pk}
+        )
+        client.post(url, headers={"HX-Request": "true"})
+
+    def test_revoked_coordinator_loses_permissions_and_staff(self, issue):
+        user, contributor = self._coordinator(issue, "coord-revoked@example.com")
+        self._revoke(issue, contributor)
+
+        user = type(user).objects.get(pk=user.pk)
+        assert not user.has_perm("submissions.manage_issue_builder")
+        assert not user.has_perm("submissions.invited_contributor")
+        assert user.is_staff is False
+
+    def test_coordinator_of_another_issue_keeps_access(self, issue):
+        user, contributor = self._coordinator(issue, "coord-two@example.com")
+        IssueContributor.objects.create(
+            issue=Issue.objects.create(name="Second issue", active=False),
+            email=user.email,
+            user=user,
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.ACTIVE,
+        )
+        self._revoke(issue, contributor)
+
+        user = type(user).objects.get(pk=user.pk)
+        assert user.has_perm("submissions.manage_issue_builder")
+        assert user.is_staff is True

@@ -59,7 +59,7 @@ class TestTrackEmailOpen:
         newsletter, subscriber = _make_newsletter_and_subscriber()
         client.get(
             reverse("analytics:track_email_open"),
-            {"email": subscriber.email, "token": newsletter.email_token},
+            {"t": subscriber.tracking_token, "token": newsletter.email_token},
         )
         assert NewsletterOpen.objects.filter(newsletter=newsletter, subscriber=subscriber).exists()
 
@@ -133,7 +133,8 @@ class TestTrackEmailClick:
         )
         assert response.status_code == 302
         assert response["Location"] == "/reviews/some-review"
-        assert client.session.get("subscriber_id") == subscriber.pk
+        # An address in a URL identifies no one
+        assert client.session.get("subscriber_id") is None
 
     def test_legacy_link_to_a_known_article_is_followed(self, client):
         subscriber = Subscriber.objects.create(email="click-article@example.com", subscribed=True)
@@ -159,7 +160,7 @@ class TestTrackEmailClick:
         subscriber = Subscriber.objects.create(email="click-session@example.com", subscribed=True)
         client.get(
             reverse("analytics:track_email_click"),
-            {"email": subscriber.email, "next": "/"},
+            {"t": subscriber.tracking_token, "next": "/"},
         )
         assert client.session.get("subscriber_id") == subscriber.pk
 
@@ -181,7 +182,7 @@ class TestTrackNewsletterLink:
         newsletter, subscriber = _make_newsletter_and_subscriber()
         client.get(
             reverse("analytics:track_newsletter_email_link", args=[newsletter.email_token]),
-            {"email": subscriber.email, "next": "/"},
+            {"t": subscriber.tracking_token, "next": "/"},
         )
         assert NewsletterClick.objects.filter(newsletter=newsletter, subscriber=subscriber).exists()
 
@@ -286,3 +287,24 @@ class TestTrackEventEdgeCases:
     def test_get_not_allowed(self, client):
         response = client.get(reverse("analytics:track_event"))
         assert response.status_code == 405
+
+
+class TestTrackEventBounds:
+    def test_oversized_payload_is_refused(self, client):
+        response = client.post(
+            reverse("analytics:track_event"),
+            data={"event_type": "page_visit", "metadata": {"filler": "x" * 20000}},
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
+    def test_metadata_is_bounded(self):
+        from spanza_journal_watch.analytics.views import _bounded_metadata
+
+        bounded = _bounded_metadata(
+            {"query": "q" * 2000, "selected_tags": ["airway", "sedation"], "nested": {"a": 1}, "page": 2}
+        )
+        assert len(bounded["query"]) == 512
+        assert bounded["selected_tags"] == ["airway", "sedation"]
+        assert bounded["page"] == 2
+        assert "nested" not in bounded

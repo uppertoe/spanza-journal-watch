@@ -483,8 +483,16 @@ class TestProvision:
             assert "journalwatch-ses-events" in topic_arn
             assert inbound_topic_arn is None
 
+            # Backups are versioned, with old versions expiring, so the server
+            # cannot destroy them
             backup_versioning = s3.get_bucket_versioning(Bucket=f"{BUCKET}-backups")
-            assert "Status" not in backup_versioning
+            assert backup_versioning["Status"] == "Enabled"
+            backup_rules = s3.get_bucket_lifecycle_configuration(Bucket=f"{BUCKET}-backups")["Rules"]
+            assert any(rule["ID"] == "expire-old-versions" for rule in backup_rules)
+
+            # Old media versions and raw inbound mail expire in the main bucket
+            main_rules = {rule["ID"] for rule in s3.get_bucket_lifecycle_configuration(Bucket=BUCKET)["Rules"]}
+            assert {"expire-old-media-versions", "expire-inbound-email"} <= main_rules
 
     def test_provision_idempotent(self, ses_v2, ses):
         """Running provision twice should not raise."""

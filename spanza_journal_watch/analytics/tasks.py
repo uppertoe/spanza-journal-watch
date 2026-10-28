@@ -324,7 +324,7 @@ def prune_automated_events_task(retention_days=90, batch_size=5000, dry_run=Fals
 
     Only ``automated=True`` events are removed. Genuine human events (and
     newsletter-referred visits, which the sweepers never downgrade) are kept
-    indefinitely, so human-engagement reporting is unaffected.
+    for the personal-data retention period (``purge_expired_personal_records``).
 
     Deletes in batches to keep each transaction small and avoid holding a long
     lock on a table that's written on every request. The ``(automated,
@@ -358,6 +358,43 @@ def prune_automated_events_task(retention_days=90, batch_size=5000, dry_run=Fals
         cutoff.date(),
     )
     return {"deleted": total_deleted, "dry_run": False}
+
+
+def _delete_in_batches(queryset, batch_size):
+    total = 0
+    while True:
+        batch_ids = list(queryset.values_list("pk", flat=True)[:batch_size])
+        if not batch_ids:
+            return total
+        queryset.model.objects.filter(pk__in=batch_ids).delete()
+        total += len(batch_ids)
+        if len(batch_ids) < batch_size:
+            return total
+
+
+@celery_app.task
+def purge_expired_personal_records(batch_size=5000):
+    """Delete records about people once they are older than the retention period.
+
+    Covers reading activity, newsletter opens, clicks and deliveries, and inbox
+    threads. Subscriber rows are kept even after unsubscribing or bouncing: the
+    address is what stops a later list import from emailing that person again.
+    Newsletter totals stored on the Newsletter itself are unaffected.
+    """
+    from django.conf import settings
+
+    from spanza_journal_watch.backend.models import EmailThread
+
+    cutoff = timezone.now() - timedelta(days=settings.PERSONAL_DATA_RETENTION_DAYS)
+    deleted = {
+        "analytics_events": _delete_in_batches(AnalyticsEvent.objects.filter(timestamp__lt=cutoff), batch_size),
+        "newsletter_opens": _delete_in_batches(NewsletterOpen.objects.filter(timestamp__lt=cutoff), batch_size),
+        "newsletter_clicks": _delete_in_batches(NewsletterClick.objects.filter(timestamp__lt=cutoff), batch_size),
+        "newsletter_deliveries": _delete_in_batches(NewsletterDelivery.objects.filter(sent_at__lt=cutoff), batch_size),
+        "inbox_threads": _delete_in_batches(EmailThread.objects.filter(last_message_at__lt=cutoff), batch_size),
+    }
+    logger.info("purge_expired_personal_records: deleted %s older than %s", deleted, cutoff.date())
+    return deleted
 
 
 @celery_app.task

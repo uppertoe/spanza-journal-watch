@@ -1,9 +1,17 @@
 import logging
 
-from django.contrib.auth.signals import user_logged_out
+from django.conf import settings
+from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(user_logged_in)
+def shorten_staff_sessions(sender, request, user, **kwargs):
+    """Staff can see subscriber lists, analytics and the inbox, so their sessions end sooner."""
+    if request is not None and user.is_staff:
+        request.session.set_expiry(getattr(settings, "STAFF_SESSION_COOKIE_AGE", 12 * 60 * 60))
 
 
 @receiver(user_logged_out)

@@ -88,8 +88,8 @@ def _iter_xlsx_rows(file_obj):
 
 
 def _load_rows(subscriber_csv):
-    suffix = Path(subscriber_csv.file.name).suffix.lower()
-    with subscriber_csv.file.open("rb") as file_obj:
+    suffix = Path(subscriber_csv.filename).suffix.lower()
+    with subscriber_csv.open_upload() as file_obj:
         if suffix == ".xlsx":
             return [row for row in _iter_xlsx_rows(file_obj) if any(value for value in row)]
         return [row for row in _iter_csv_rows(file_obj) if any(value for value in row)]
@@ -195,7 +195,9 @@ def process_subscriber_csv_record(subscriber_csv):
     subscriber_csv.processed = True
     subscriber_csv.row_count = rows_parsed
     subscriber_csv.email_added_count = records_added
-    subscriber_csv.save(update_fields=["processed", "row_count", "email_added_count", "modified"])
+    # The addresses now live on Subscriber rows; the uploaded list is not kept.
+    subscriber_csv.content = b""
+    subscriber_csv.save(update_fields=["processed", "row_count", "email_added_count", "content", "modified"])
 
     return {
         "rows_parsed": rows_parsed,

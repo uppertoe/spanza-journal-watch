@@ -28,7 +28,7 @@
               {% endif %}
             </td>
             <td class="text-end">
-              {% if report.status == "ready" and report.file %}
+              {% if report.status == "ready" %}
                 <a href="{% url 'cpd:download' report.pk %}" class="btn btn-sm btn-outline-primary" download>Download</a>
               {% endif %}
             </td>

@@ -18,6 +18,7 @@ from spanza_journal_watch.analytics.utils import (
     client_hints_anomaly,
     client_hints_enforced,
     extract_referrer_domain,
+    session_fingerprint,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 
@@ -321,7 +322,7 @@ class AnalyticsEvent(models.Model):
                     AutomatedRequestCount.bump(event_type, reason=f"observe_{anomaly}")
                     metadata = {**(metadata or {}), "client_hints": anomaly.removeprefix("client_hints_")}
             user_agent = request.headers.get("user-agent", "")
-            session_key = request.session.session_key or ""
+            session_key = session_fingerprint(request.session.session_key)
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
             referrer_category = categorize_referrer(request, referrer=referrer, utm_source=utm_source)
             referrer_domain = extract_referrer_domain(request, referrer=referrer)

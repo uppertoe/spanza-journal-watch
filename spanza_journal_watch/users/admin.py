@@ -1,3 +1,4 @@
+from allauth.account.decorators import secure_admin_login
 from django.contrib import admin
 from django.contrib.auth import admin as auth_admin
 from django.contrib.auth import get_user_model
@@ -10,6 +11,9 @@ User = get_user_model()
 admin.site.site_header = "Journal Watch Administration"
 admin.site.site_title = "Journal Watch Admin"
 admin.site.index_title = "Site administration"
+# Sign in to the admin through the site's own sign-in, with its rate limits,
+# rather than the admin's unthrottled password form.
+admin.site.login = secure_admin_login(admin.site.login)
 
 
 @admin.register(User)

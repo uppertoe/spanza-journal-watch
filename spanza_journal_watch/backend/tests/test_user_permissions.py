@@ -392,8 +392,8 @@ class TestChiefEditorPromotion:
         assert target.has_perm("backend.send_newsletters") is True
         assert target.is_staff is True
 
-    def test_demote_removes_only_chief_editor(self):
-        """Demoting removes chief_editor but leaves other permissions."""
+    def test_demote_removes_the_whole_bundle(self):
+        """Demoting removes chief_editor and the access that came with it."""
         chief = UserFactory(email="chief2@example.com")
         _make_chief_editor(chief)
 
@@ -408,8 +408,34 @@ class TestChiefEditorPromotion:
 
         target = User.objects.get(pk=target.pk)
         assert target.has_perm("submissions.chief_editor") is False
-        # Other permissions should remain
+        assert target.has_perm("submissions.manage_issue_builder") is False
+        assert target.has_perm("backend.manage_subscriber_csv") is False
+        assert target.is_staff is False
+
+    def test_demote_keeps_coordinator_access_for_an_active_coordinator(self):
+        from spanza_journal_watch.backend.models import IssueContributor
+        from spanza_journal_watch.submissions.models import Issue
+
+        chief = UserFactory(email="chief3@example.com")
+        _make_chief_editor(chief)
+        target = UserFactory(email="target4@example.com")
+        _make_chief_editor(target)
+        IssueContributor.objects.create(
+            issue=Issue.objects.create(name="Coordinated issue"),
+            email=target.email,
+            user=target,
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.ACTIVE,
+        )
+
+        client = Client()
+        client.force_login(User.objects.get(pk=chief.pk))
+        client.post(reverse("backend:user_toggle_chief_editor", kwargs={"user_id": target.pk}))
+
+        target = User.objects.get(pk=target.pk)
         assert target.has_perm("submissions.manage_issue_builder") is True
+        assert target.has_perm("backend.manage_subscriber_csv") is False
+        assert target.is_staff is True
 
     def test_cannot_promote_self(self):
         """A chief editor cannot modify their own chief editor status."""

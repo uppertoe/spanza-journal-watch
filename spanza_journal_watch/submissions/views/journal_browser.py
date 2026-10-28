@@ -505,13 +505,17 @@ def journal_article_toggle_star(request, article_id):
 @csrf_exempt
 @require_POST
 def journal_article_mark_fulltext(request, article_id):
-    """Record that a user clicked full text. Works for both authenticated and anonymous users."""
+    """Record that a user clicked full text.
+
+    The click is kept against the account only when the member has turned CPD
+    tracking on; otherwise it lives in the session, as for anonymous readers.
+    """
     try:
         article = PubmedArticle.objects.get(pk=article_id)
     except PubmedArticle.DoesNotExist:
         return JsonResponse({"ok": False}, status=404)
 
-    if request.user.is_authenticated:
+    if request.user.is_authenticated and request.user.cpd_tracking_enabled:
         state, _ = PubmedArticleUserState.objects.get_or_create(user=request.user, article=article)
         if not state.full_text_clicked_at:
             state.full_text_clicked_at = timezone.now()
@@ -528,14 +532,15 @@ def journal_article_mark_fulltext(request, article_id):
 @noindex_response
 def journal_fulltext_ids(request):
     """Return article IDs the current user/session has clicked full text on."""
+    ids = list(request.session.get("fulltext_clicked_ids", []))
     if request.user.is_authenticated:
-        ids = list(
-            PubmedArticleUserState.objects.filter(user=request.user, full_text_clicked_at__isnull=False).values_list(
-                "article_id", flat=True
-            )
-        )
-    else:
-        ids = request.session.get("fulltext_clicked_ids", [])
+        ids += [
+            article_id
+            for article_id in PubmedArticleUserState.objects.filter(
+                user=request.user, full_text_clicked_at__isnull=False
+            ).values_list("article_id", flat=True)
+            if article_id not in ids
+        ]
     return JsonResponse({"ids": ids})
 
 
@@ -602,13 +607,13 @@ def journal_article_toggle_recommend(request, article_id):
 def _toggle_visitor_recommendation(request, article):
     """Record or withdraw a signed-out recommendation for this session."""
     from spanza_journal_watch.analytics.middleware import VISITOR_COOKIE_NAME
-    from spanza_journal_watch.analytics.utils import is_probable_automated_event
+    from spanza_journal_watch.analytics.utils import is_probable_automated_event, session_fingerprint
 
     if is_probable_automated_event(request, event_type="recommend"):
         return
     if not request.session.session_key:
         request.session.create()
-    session_key = request.session.session_key
+    session_key = session_fingerprint(request.session.session_key)
     recommended = request.session.get("recommended_article_ids", [])
     if article.pk in recommended:
         recommended.remove(article.pk)

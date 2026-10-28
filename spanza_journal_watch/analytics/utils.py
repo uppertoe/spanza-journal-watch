@@ -5,6 +5,21 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
+
+SESSION_FINGERPRINT_SALT = "spanza_journal_watch.analytics.session_fingerprint"
+
+
+def session_fingerprint(session_key):
+    """Return a one-way stand-in for a session key.
+
+    Analytics only needs to group rows by session. Storing the key itself kept
+    a live sign-in cookie in the database, readable by analytics staff.
+    """
+    if not session_key:
+        return ""
+    return salted_hmac(SESSION_FINGERPRINT_SALT, session_key, algorithm="sha256").hexdigest()
+
 
 AUTOMATED_USER_AGENT_MARKERS = [
     # Email security scanners

@@ -14,7 +14,9 @@ class CPDReport(TimeStampedModel):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     date_from = models.DateField()
     date_to = models.DateField()
-    file = models.FileField(upload_to="cpd_reports/%Y/%m/", blank=True)
+    # Held in the database with the reading record it is built from, and
+    # served only to its owner. Reports are deleted after 30 days.
+    pdf = models.BinaryField(blank=True, editable=False)
     article_count = models.PositiveIntegerField(default=0)
     celery_task_id = models.CharField(max_length=255, blank=True)
     error_message = models.TextField(blank=True)

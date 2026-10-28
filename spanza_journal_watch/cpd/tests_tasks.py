@@ -3,7 +3,7 @@ Tests for CPD Celery tasks.
 
 Covers:
 1. generate_cpd_report_task — status transitions, PDF generation, error handling
-2. cleanup_expired_cpd_reports — deletes old reports and files
+2. cleanup_expired_cpd_reports — deletes old reports
 """
 
 from datetime import date, timedelta
@@ -11,7 +11,6 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from spanza_journal_watch.cpd.models import CPDReport
@@ -50,13 +49,12 @@ class TestGenerateCpdReportTask:
         assert pending_report.status == CPDReport.Status.READY
 
     @patch("spanza_journal_watch.cpd.tasks.generate_cpd_pdf", return_value=b"%PDF-fake")
-    def test_success_saves_pdf_file(self, mock_pdf, pending_report):
+    def test_success_saves_pdf(self, mock_pdf, pending_report):
         from spanza_journal_watch.cpd.tasks import generate_cpd_report_task
 
         generate_cpd_report_task(pending_report.pk)
         pending_report.refresh_from_db()
-        assert pending_report.file
-        assert "cpd_report_" in pending_report.file.name
+        assert bytes(pending_report.pdf) == b"%PDF-fake"
 
     @patch("spanza_journal_watch.cpd.tasks.generate_cpd_pdf", return_value=b"%PDF-fake")
     def test_success_sets_article_count(self, mock_pdf, pending_report, cpd_user):
@@ -174,7 +172,7 @@ class TestCleanupExpiredCpdReports:
         cleanup_expired_cpd_reports()
         assert CPDReport.objects.filter(pk=recent.pk).exists()
 
-    def test_deletes_files_from_storage(self, cpd_user):
+    def test_deletes_expired_report_with_pdf(self, cpd_user):
         from spanza_journal_watch.cpd.tasks import cleanup_expired_cpd_reports
 
         report = CPDReport.objects.create(
@@ -182,7 +180,7 @@ class TestCleanupExpiredCpdReports:
             date_from=date(2025, 1, 1),
             date_to=date(2025, 6, 30),
             status=CPDReport.Status.READY,
-            file=ContentFile(b"%PDF-fake", name="old_report.pdf"),
+            pdf=b"%PDF-fake",
         )
         CPDReport.objects.filter(pk=report.pk).update(created=timezone.now() - timedelta(days=31))
 

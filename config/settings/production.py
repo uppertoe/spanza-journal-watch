@@ -80,6 +80,12 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
 SECURE_HSTS_PRELOAD = env.bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
 
 
+# Caddy sets X-Client-IP from the connecting client (see journalwatch.caddy),
+# so allauth's per-IP sign-in limits apply to each reader. AccountAdapter
+# falls back to the connecting address when the header is absent.
+CLIENT_IP_HEADER = env("DJANGO_CLIENT_IP_HEADER", default="X-Client-IP")
+
+
 # STORAGES
 # ------------------------------------------------------------------------------
 # https://django-storages.readthedocs.io/en/latest/#installation
@@ -248,7 +254,8 @@ sentry_sdk.init(
     dsn=SENTRY_DSN,
     integrations=integrations,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
-    send_default_pii=False,  # Events carry the user id only, never the address or IP
+    send_default_pii=False,  # No user, address, IP or cookies on events
+    max_request_body_size="never",  # Form posts carry emails, sign-in codes and enquiry text
     attach_stacktrace=env.bool("SENTRY_ATTACH_STACKTRACE", default=True),
     max_breadcrumbs=env.int("SENTRY_MAX_BREADCRUMBS", default=100),
     traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),

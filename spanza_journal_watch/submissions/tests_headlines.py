@@ -73,6 +73,16 @@ class TestDraftReviewHeadline:
         assert "Monitor quantitatively." in kwargs["messages"][0]["content"]
         assert "A paper about neuromuscular block" in kwargs["messages"][0]["content"]
 
+    def test_anonymous_reviewer_name_is_not_sent(self):
+        review = _review()
+        review.author = Author.objects.create(name="Jane Hidden", anonymous=True)
+        review.save()
+        client = _fake_client({"headline": "H", "bottom_line": "B"})
+        draft_review_headline(review, client=client)
+        prompt = client.beta.messages.create.call_args.kwargs["messages"][0]["content"]
+        assert "Jane Hidden" not in prompt
+        assert "Reviewer:" not in prompt
+
     def test_refusal_and_bad_json_return_none(self):
         review = _review()
         assert draft_review_headline(review, client=_fake_client({}, stop_reason="refusal")) is None

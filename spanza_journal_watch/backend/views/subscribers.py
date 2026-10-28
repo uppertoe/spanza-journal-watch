@@ -90,9 +90,7 @@ def edit_csv_header(request, save_token):
         form = HeaderForm(initial={"header": subscriber_csv.header})
 
     # Re-peek into the CSV
-    file = subscriber_csv.file.open()
-    peek = peek_csv(file, user_header=subscriber_csv.header)
-    file.close()
+    peek = peek_csv(subscriber_csv.open_upload(), user_header=subscriber_csv.header)
 
     context = {"header_form": form, "instance": subscriber_csv}
     context.update(peek)
@@ -243,9 +241,12 @@ def user_toggle_chief_editor(request, user_id):
     is_chief = target_user.has_perm("submissions.chief_editor")
 
     if is_chief:
-        # Demote: remove only chief_editor
+        # Demote: remove chief_editor and everything the role brought with it
+        from .contributors import withdraw_unneeded_role_permissions
+
         perm = DjangoPerm.objects.get(content_type__app_label="submissions", codename="chief_editor")
         target_user.user_permissions.remove(perm)
+        withdraw_unneeded_role_permissions(target_user)
         messages.success(request, f"Removed chief editor role from {target_user.email}")
     else:
         # Promote: grant full bundle
@@ -281,6 +282,9 @@ def user_toggle_active(request, user_id):
     target_user = get_object_or_404(User, pk=user_id)
     if target_user == request.user:
         messages.error(request, "You cannot lock your own account.")
+        return redirect(reverse("backend:subscriber_list") + "?view=users")
+    if target_user.is_superuser and not request.user.is_superuser:
+        messages.error(request, "Only an administrator can lock an administrator's account.")
         return redirect(reverse("backend:subscriber_list") + "?view=users")
     target_user.is_active = not target_user.is_active
     target_user.save(update_fields=["is_active"])

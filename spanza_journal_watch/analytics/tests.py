@@ -114,7 +114,7 @@ def test_track_event_records_review_share_event(client):
     assert event.human_confidence == AnalyticsEvent.HumanConfidence.PROBABLE_HUMAN
 
 
-def test_track_event_with_subscriber_session_records_known_subscriber_confidence(client):
+def test_track_event_is_not_linked_to_the_session_subscriber(client):
     review = _make_review()
     subscriber = Subscriber.objects.create(email="reader@example.com", subscribed=True)
     session = client.session
@@ -134,8 +134,8 @@ def test_track_event_with_subscriber_session_records_known_subscriber_confidence
 
     assert response.status_code == 200
     event = AnalyticsEvent.objects.get(event_type=AnalyticsEvent.EventType.REVIEW_OPEN)
-    assert event.subscriber == subscriber
-    assert event.human_confidence == AnalyticsEvent.HumanConfidence.KNOWN_SUBSCRIBER_HUMAN
+    # Reading is held against the anonymous visitor, not the subscriber
+    assert event.subscriber is None
 
 
 def test_search_page_hands_the_search_to_the_page_script(client):
@@ -1763,7 +1763,7 @@ def test_track_email_click_records_analytics_event(client):
     subscriber = Subscriber.objects.create(email="clicker@example.com", subscribed=True)
     response = client.get(
         reverse("analytics:track_email_click"),
-        {"email": subscriber.email, "next": "/"},
+        {"t": subscriber.tracking_token, "next": "/"},
     )
     assert response.status_code == 302
     # Confirmation-email clicks are not newsletter clicks: their own source,
@@ -1792,7 +1792,7 @@ def test_track_newsletter_link_records_analytics_event(client):
     newsletter = _make_newsletter(send_date=timezone.now() - NEWSLETTER_AUTOMATION_WINDOW * 2)
     response = client.get(
         reverse("analytics:track_newsletter_email_link", args=[newsletter.email_token]),
-        {"email": subscriber.email, "next": "/"},
+        {"t": subscriber.tracking_token, "next": "/"},
     )
     assert response.status_code == 302
     events = AnalyticsEvent.objects.filter(

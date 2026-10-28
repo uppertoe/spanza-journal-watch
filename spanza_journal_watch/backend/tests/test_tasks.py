@@ -13,7 +13,6 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 
 from spanza_journal_watch.backend.models import FetchLog, PubmedImportBatch, SubscriberCSV, WatchedJournal
 from spanza_journal_watch.newsletter.models import Subscriber
@@ -30,10 +29,10 @@ pytestmark = pytest.mark.django_db
 
 class TestProcessSubscriberCsvRecord:
     def _make_csv(self, content, name="test.csv", header=True):
-        csv_file = SimpleUploadedFile(name, content.encode("utf-8"), content_type="text/csv")
         return SubscriberCSV.objects.create(
             name="Test CSV",
-            file=csv_file,
+            filename=name,
+            content=content.encode("utf-8"),
             confirmed=True,
             header=header,
         )

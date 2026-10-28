@@ -1,6 +1,7 @@
 import base64
 import datetime
 import hashlib
+import io
 import logging
 import secrets
 import uuid
@@ -14,7 +15,6 @@ from django.db import models
 from django.utils import timezone
 from django.utils.html import escape, strip_tags
 
-from spanza_journal_watch.utils.modelmethods import name_csv
 from spanza_journal_watch.utils.models import TimeStampedModel
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,10 @@ class SubscriberCSV(models.Model):
     )
 
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to=name_csv)
+    # The uploaded list is held in the database alongside the subscribers it
+    # creates, and cleared once the import has run.
+    filename = models.CharField(max_length=255, blank=True)
+    content = models.BinaryField(blank=True, editable=False)
     confirmed = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
     processed = models.BooleanField(default=False)
@@ -63,6 +66,12 @@ class SubscriberCSV(models.Model):
 
     def is_ready_to_process(self):
         return self.confirmed and not self.processed
+
+    def open_upload(self):
+        """Return the uploaded list as a file-like object named like the upload."""
+        upload = io.BytesIO(bytes(self.content or b""))
+        upload.name = self.filename
+        return upload
 
     def save(self, *args, **kwargs):
         # Refresh the save token

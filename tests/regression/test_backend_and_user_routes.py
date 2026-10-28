@@ -200,7 +200,9 @@ class TestBackendWorkflows:
             b"email\nheader-check@example.test\n",
             content_type="text/csv",
         )
-        csv_obj = SubscriberCSV.objects.create(name="Header test", file=csv_upload, header=True)
+        csv_obj = SubscriberCSV.objects.create(
+            name="Header test", filename=csv_upload.name, content=csv_upload.read(), header=True
+        )
 
         response = route_client.post(
             reverse("backend:edit_csv_header", kwargs={"save_token": csv_obj.save_token}),
@@ -224,7 +226,9 @@ class TestBackendWorkflows:
             b"email\nprocess-check@example.test\n",
             content_type="text/csv",
         )
-        csv_obj = SubscriberCSV.objects.create(name="Process test", file=csv_upload, header=True)
+        csv_obj = SubscriberCSV.objects.create(
+            name="Process test", filename=csv_upload.name, content=csv_upload.read(), header=True
+        )
 
         queued = {"pk": None}
 

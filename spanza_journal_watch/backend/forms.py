@@ -159,11 +159,12 @@ def peek_csv(file, user_header=None):
 
 
 class SubscriberCSVForm(forms.ModelForm):
+    file = forms.FileField()
+
     class Meta:
         model = SubscriberCSV
         fields = [
             "name",
-            "file",
         ]
 
     def clean(self):
@@ -178,6 +179,16 @@ class SubscriberCSVForm(forms.ModelForm):
 
         cleaned_data.update(csv_preview)
         return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        upload = self.cleaned_data["file"]
+        upload.seek(0)
+        instance.content = upload.read()
+        instance.filename = upload.name
+        if commit:
+            instance.save()
+        return instance
 
 
 class HeaderForm(forms.Form):

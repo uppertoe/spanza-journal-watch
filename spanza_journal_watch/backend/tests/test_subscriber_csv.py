@@ -56,11 +56,8 @@ def _csv_file(rows, filename="subscribers.csv"):
 
 def _make_subscriber_csv(rows, name="Test CSV", header=False):
     """Directly create a SubscriberCSV instance with a simple in-memory CSV."""
-    from django.core.files.base import ContentFile
-
     content = "\n".join(rows).encode("utf-8")
-    csv_obj = SubscriberCSV(name=name, header=header)
-    csv_obj.file.save("test.csv", ContentFile(content), save=False)
+    csv_obj = SubscriberCSV(name=name, header=header, filename="test.csv", content=content)
     csv_obj.save()
     return csv_obj
 

@@ -26,22 +26,27 @@ def _window():
 
 
 class TestSourcePopulation:
+    def _subscribe_and_confirm(self, client, url, data):
+        """The source travels in the confirmation link and is saved once the link is followed."""
+        from unittest.mock import patch
+
+        with patch("spanza_journal_watch.newsletter.views.send_subscription_request_email") as request_task:
+            client.post(url, data, HTTP_HX_REQUEST="true")
+        email, source = request_task.delay.call_args.args
+        from spanza_journal_watch.newsletter.confirmation import make_confirm_token
+
+        with patch("spanza_journal_watch.newsletter.views.send_confirmation_email"):
+            client.post(f"/newsletter/confirm/{make_confirm_token(email, source)}")
+        return Subscriber.objects.get(email=email)
+
     def test_drawer_subscribe_sets_source_drawer(self, client):
-        client.post(
-            "/newsletter/subscribe?source=drawer",
-            {"email": "drawer-src@example.com", "source": "drawer"},
-            HTTP_HX_REQUEST="true",
+        sub = self._subscribe_and_confirm(
+            client, "/newsletter/subscribe?source=drawer", {"email": "drawer-src@example.com", "source": "drawer"}
         )
-        sub = Subscriber.objects.get(email="drawer-src@example.com")
         assert sub.source == Subscriber.Source.DRAWER
 
     def test_form_subscribe_sets_source_subscribe_form(self, client):
-        client.post(
-            "/newsletter/subscribe",
-            {"email": "form-src@example.com"},
-            HTTP_HX_REQUEST="true",
-        )
-        sub = Subscriber.objects.get(email="form-src@example.com")
+        sub = self._subscribe_and_confirm(client, "/newsletter/subscribe", {"email": "form-src@example.com"})
         assert sub.source == Subscriber.Source.SUBSCRIBE_FORM
 
     def test_toggle_subscription_creates_with_user_signup(self, client):
@@ -56,7 +61,8 @@ class TestSourcePopulation:
         csv_path.write_text("a@example.com\nb@example.com\n")
         csv = SubscriberCSV.objects.create(
             name="batch.csv",
-            file=str(csv_path),
+            filename="batch.csv",
+            content=csv_path.read_bytes(),
             confirmed=True,
             header=False,
         )
@@ -72,7 +78,7 @@ class TestAcquisitionSummary:
         Subscriber.objects.create(email="d1@example.com", source=Subscriber.Source.DRAWER)
         Subscriber.objects.create(email="d2@example.com", source=Subscriber.Source.DRAWER)
         Subscriber.objects.create(email="f1@example.com", source=Subscriber.Source.SUBSCRIBE_FORM)
-        csv = SubscriberCSV.objects.create(name="x.csv", file="x.csv")
+        csv = SubscriberCSV.objects.create(name="x.csv", filename="x.csv")
         Subscriber.objects.create(email="c1@example.com", from_csv=csv, source=Subscriber.Source.CSV_IMPORT)
 
         summary = _acquisition_summary(start_ts, end_ts)
@@ -101,7 +107,9 @@ class TestAcquisitionSummary:
 class TestRecentFeed:
     def test_csv_collapsed_to_single_entry(self):
         start_ts, end_ts = _window()
-        csv = SubscriberCSV.objects.create(name="spring-2026.csv", file="x.csv", email_added_count=42, processed=True)
+        csv = SubscriberCSV.objects.create(
+            name="spring-2026.csv", filename="x.csv", email_added_count=42, processed=True
+        )
         for i in range(5):
             Subscriber.objects.create(email=f"csv-{i}@example.com", from_csv=csv, source=Subscriber.Source.CSV_IMPORT)
         Subscriber.objects.create(email="d@example.com", source=Subscriber.Source.DRAWER)
@@ -116,7 +124,7 @@ class TestRecentFeed:
 
     def test_csv_entry_omitted_if_not_processed(self):
         start_ts, end_ts = _window()
-        SubscriberCSV.objects.create(name="pending.csv", file="x.csv", processed=False)
+        SubscriberCSV.objects.create(name="pending.csv", filename="x.csv", processed=False)
         feed = _recent_subscriber_feed(start_ts, end_ts, limit=20)
         assert not any(e["kind"] == "csv" for e in feed)
 

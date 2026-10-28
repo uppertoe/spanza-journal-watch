@@ -216470,7 +216470,7 @@
     "pk": 6,
     "fields": {
       "name": "August 2023 SPANZA mailing list",
-      "file": "backend/subscribercsv/august-2023-spanza-mailing-list-list.csv",
+      "filename": "august-2023-spanza-mailing-list-list.csv",
       "confirmed": true,
       "created": "2023-09-14T23:24:08.534Z",
       "processed": true,
@@ -216489,7 +216489,7 @@
     "pk": 7,
     "fields": {
       "name": "SPANZA list October 2023",
-      "file": "backend/subscribercsv/spanza-list-october-2023-list.csv",
+      "filename": "spanza-list-october-2023-list.csv",
       "confirmed": true,
       "created": "2023-10-09T04:48:40.630Z",
       "processed": true,
@@ -216508,7 +216508,7 @@
     "pk": 9,
     "fields": {
       "name": "December 2023 subscriber list",
-      "file": "backend/subscribercsv/december-2023-subscriber-list-list.csv",
+      "filename": "december-2023-subscriber-list-list.csv",
       "confirmed": true,
       "created": "2023-12-14T13:17:47.741Z",
       "processed": true,
@@ -216527,7 +216527,7 @@
     "pk": 11,
     "fields": {
       "name": "June 2024 subscribers",
-      "file": "backend/subscribercsv/june-2024-subscribers-list.csv",
+      "filename": "june-2024-subscribers-list.csv",
       "confirmed": true,
       "created": "2024-06-20T01:40:40.078Z",
       "processed": true,
@@ -216546,7 +216546,7 @@
     "pk": 12,
     "fields": {
       "name": "Subscribers Sept 2024",
-      "file": "backend/subscribercsv/subscribers-sept-2024-list.csv",
+      "filename": "subscribers-sept-2024-list.csv",
       "confirmed": true,
       "created": "2024-09-03T23:22:21.082Z",
       "processed": true,
@@ -216565,7 +216565,7 @@
     "pk": 13,
     "fields": {
       "name": "November 2024",
-      "file": "backend/subscribercsv/november-2024-list.csv",
+      "filename": "november-2024-list.csv",
       "confirmed": true,
       "created": "2024-11-14T08:58:39.658Z",
       "processed": true,
@@ -216584,7 +216584,7 @@
     "pk": 14,
     "fields": {
       "name": "march-2025",
-      "file": "backend/subscribercsv/march-2025-list.csv",
+      "filename": "march-2025-list.csv",
       "confirmed": true,
       "created": "2025-03-19T01:30:56.703Z",
       "processed": true,
@@ -216603,7 +216603,7 @@
     "pk": 15,
     "fields": {
       "name": "list_may_2025",
-      "file": "backend/subscribercsv/list_may_2025-list.csv",
+      "filename": "list_may_2025-list.csv",
       "confirmed": true,
       "created": "2025-05-29T06:48:13.258Z",
       "processed": true,
@@ -216622,7 +216622,7 @@
     "pk": 16,
     "fields": {
       "name": "July 2025",
-      "file": "backend/subscribercsv/july-2025-list.csv",
+      "filename": "july-2025-list.csv",
       "confirmed": true,
       "created": "2025-07-14T01:48:58.276Z",
       "processed": true,
@@ -216641,7 +216641,7 @@
     "pk": 17,
     "fields": {
       "name": "September 2025",
-      "file": "backend/subscribercsv/september-2025-list.csv",
+      "filename": "september-2025-list.csv",
       "confirmed": true,
       "created": "2025-09-11T03:39:57.394Z",
       "processed": true,
@@ -216660,7 +216660,7 @@
     "pk": 18,
     "fields": {
       "name": "jw-members-jan-2026",
-      "file": "backend/subscribercsv/jw-members-jan-2026-list.csv",
+      "filename": "jw-members-jan-2026-list.csv",
       "confirmed": true,
       "created": "2026-01-22T21:25:22.630Z",
       "processed": true,

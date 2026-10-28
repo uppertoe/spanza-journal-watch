@@ -35,7 +35,9 @@ def migrate_session_recommendations_to_user(session, user):
     twice, once as a visitor and once as a member.
     """
     recommended_ids = session.pop("recommended_article_ids", [])
-    session_key = getattr(session, "session_key", None)
+    from spanza_journal_watch.analytics.utils import session_fingerprint
+
+    session_key = session_fingerprint(getattr(session, "session_key", None))
 
     from spanza_journal_watch.backend.models import (
         PubmedArticle,
@@ -65,8 +67,11 @@ def migrate_session_recommendations_to_user(session, user):
 def migrate_session_fulltext_to_user(session, user):
     """Move session-based full-text click records to PubmedArticleUserState.
 
-    Called alongside star migration at signup and login.
+    Called alongside star migration at signup and login. Clicks stay in the
+    session unless the member has turned CPD tracking on.
     """
+    if not user.cpd_tracking_enabled:
+        return 0
     clicked_ids = session.pop("fulltext_clicked_ids", [])
     if not clicked_ids:
         return 0

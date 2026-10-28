@@ -174,6 +174,51 @@ def _grant_contributor_permissions(user, contributor):
         user.save(update_fields=["is_staff"])
 
 
+CHIEF_EDITOR_ONLY_PERMISSIONS = [
+    ("backend", "manage_subscriber_csv"),
+    ("backend", "send_newsletters"),
+    ("backend", "view_newsletter_stats"),
+    ("backend", "view_site_analytics"),
+]
+COORDINATOR_PERMISSIONS = [
+    ("submissions", "regional_coordinator"),
+    ("submissions", "manage_issue_builder"),
+]
+
+
+def withdraw_unneeded_role_permissions(user):
+    """Remove the permissions and staff status a user no longer holds a role for.
+
+    Called after a chief editor is demoted or a contributor revoked. Roles are
+    granted as bundles of global permissions, so removing only the role's own
+    permission left access to subscriber lists, analytics and author emails.
+    """
+    from django.contrib.auth.models import Permission
+
+    def _remove(specs):
+        for app_label, codename in specs:
+            perm = Permission.objects.filter(content_type__app_label=app_label, codename=codename).first()
+            if perm:
+                user.user_permissions.remove(perm)
+
+    if user.user_permissions.filter(content_type__app_label="submissions", codename="chief_editor").exists():
+        return
+    _remove(CHIEF_EDITOR_ONLY_PERMISSIONS)
+
+    active_rows = IssueContributor.objects.filter(user=user, status=IssueContributor.Status.ACTIVE)
+    is_coordinator = active_rows.filter(role=IssueContributor.Role.COORDINATOR).exists()
+    if not is_coordinator:
+        _remove(COORDINATOR_PERMISSIONS)
+    if not active_rows.exists():
+        _remove([("submissions", "invited_contributor")])
+
+    for attr in ("_perm_cache", "_user_perm_cache"):
+        user.__dict__.pop(attr, None)
+    if user.is_staff and not user.is_superuser and not is_coordinator:
+        user.is_staff = False
+        user.save(update_fields=["is_staff"])
+
+
 @login_required
 @permission_required("submissions.manage_issue_builder", raise_exception=True)
 def contributor_author_lookup(request):
@@ -487,6 +532,9 @@ def issue_revoke_contributor(request, issue_id, contributor_id):
         consumed_at__isnull=True,
         expires_at__gt=now,
     ).update(consumed_at=now)
+
+    if contributor.user_id:
+        withdraw_unneeded_role_permissions(contributor.user)
 
     messages.success(request, f"Access revoked for {contributor.email}.")
     return _render_issue_contributors_panel(request, issue, role=contributor.role)

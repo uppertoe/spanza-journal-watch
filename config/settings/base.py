@@ -362,6 +362,14 @@ LOGGING = {
     "root": {"level": "INFO", "handlers": ["console"]},
 }
 
+# Reading activity, newsletter opens, clicks and deliveries, and inbox threads
+# are deleted once older than this (analytics.tasks.purge_expired_personal_records).
+PERSONAL_DATA_RETENTION_DAYS = env.int("PERSONAL_DATA_RETENTION_DAYS", default=730)
+
+# Staff sessions expire after 12 hours rather than the default two weeks
+# (users.signals.shorten_staff_sessions).
+STAFF_SESSION_COOKIE_AGE = 12 * 60 * 60
+
 # django-request-logging
 # ------------------------------------------------------------------------------
 # Log 4xx responses at WARNING rather than the package default of ERROR. Routine
@@ -381,6 +389,11 @@ REQUEST_LOGGING_SENSITIVE_HEADERS = [
     "Cookie",
     "Set-Cookie",
 ]
+# Never log request or response bodies. The package logs them with the headers
+# on every 4xx/5xx, so a failed sign-in, subscribe or enquiry wrote the email
+# address, sign-in code or message text to the log file and to Sentry.
+DJANGO_REQUEST_LOGGING_LOG_BODY_DEFAULT_VALUE = False
+DJANGO_REQUEST_LOGGING_LOG_RESPONSE_DEFAULT_VALUE = False
 
 # Celery
 # ------------------------------------------------------------------------------

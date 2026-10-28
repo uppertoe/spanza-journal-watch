@@ -219,6 +219,11 @@ def bucket_policy(bucket, *, enable_media_public_read=True, ses_inbound_source_a
 # ---------------------------------------------------------------------------
 
 
+MEDIA_NONCURRENT_EXPIRATION_DAYS = 7
+INBOUND_EMAIL_EXPIRATION_DAYS = 730
+BACKUP_NONCURRENT_EXPIRATION_DAYS = 30
+
+
 def setup_s3(
     s3,
     bucket,
@@ -229,6 +234,8 @@ def setup_s3(
     ses_inbound_source_arn=None,
     backup_noncurrent_expiration_days=0,
     enable_versioning=True,
+    private_data_expiration=False,
+    all_noncurrent_expiration_days=0,
 ):
     section("S3 bucket")
 
@@ -316,14 +323,42 @@ def setup_s3(
             }
         )
 
+    if private_data_expiration:
+        # Deleted or replaced media (photographs, retired uploads) must not
+        # linger as old versions, and raw inbound mail follows the app's
+        # personal-data retention period (PERSONAL_DATA_RETENTION_DAYS).
+        rules.append(
+            {
+                "ID": "expire-old-media-versions",
+                "Status": "Enabled",
+                "Filter": {"Prefix": "media/"},
+                "NoncurrentVersionExpiration": {"NoncurrentDays": MEDIA_NONCURRENT_EXPIRATION_DAYS},
+            }
+        )
+        rules.append(
+            {
+                "ID": "expire-inbound-email",
+                "Status": "Enabled",
+                "Filter": {"Prefix": "email/"},
+                "Expiration": {"Days": INBOUND_EMAIL_EXPIRATION_DAYS},
+                "NoncurrentVersionExpiration": {"NoncurrentDays": MEDIA_NONCURRENT_EXPIRATION_DAYS},
+            }
+        )
+    if all_noncurrent_expiration_days and all_noncurrent_expiration_days > 0:
+        rules.append(
+            {
+                "ID": "expire-old-versions",
+                "Status": "Enabled",
+                "Filter": {"Prefix": ""},
+                "NoncurrentVersionExpiration": {"NoncurrentDays": all_noncurrent_expiration_days},
+            }
+        )
+
     s3.put_bucket_lifecycle_configuration(
         Bucket=bucket,
         LifecycleConfiguration={"Rules": rules},
     )
-    if backup_noncurrent_expiration_days and backup_noncurrent_expiration_days > 0:
-        ok(f"Lifecycle rules: incomplete multipart (7d) + old backup versions ({backup_noncurrent_expiration_days}d)")
-    else:
-        ok("Lifecycle rules: incomplete multipart uploads expire after 7d")
+    ok(f"Lifecycle rules: {', '.join(rule['ID'] for rule in rules)}")
 
 
 # ---------------------------------------------------------------------------
@@ -711,7 +746,13 @@ def provision(
     inbound_rule_arn = None
     inbound_topic_arn = None
 
-    setup_s3(s3, bucket, region, backup_noncurrent_expiration_days=backup_noncurrent_expiration_days)
+    setup_s3(
+        s3,
+        bucket,
+        region,
+        backup_noncurrent_expiration_days=backup_noncurrent_expiration_days,
+        private_data_expiration=True,
+    )
     if planka_bucket != bucket:
         setup_s3(
             s3,
@@ -727,7 +768,12 @@ def provision(
             region,
             enable_media_public_read=False,
             backup_noncurrent_expiration_days=0,
-            enable_versioning=False,
+            # Versioned so a compromised server, whose backup user may delete
+            # objects (restic needs it for locks and pruning) but not object
+            # versions, cannot destroy backups: deletions stay recoverable
+            # until the old versions expire.
+            enable_versioning=True,
+            all_noncurrent_expiration_days=BACKUP_NONCURRENT_EXPIRATION_DAYS,
         )
     if enable_inbound:
         _, _, _, _, inbound_rule_arn = inbound_ses_names(region, account_id, domain, suffix=suffix)
@@ -741,6 +787,7 @@ def provision(
             enable_media_public_read=True,
             ses_inbound_source_arn=inbound_rule_arn,
             backup_noncurrent_expiration_days=backup_noncurrent_expiration_days,
+            private_data_expiration=True,
         )
         inbound_topic_arn, _, _, inbound_rule_arn = setup_inbound_ses(
             ses, sns, bucket, region, account_id, domain, suffix=suffix

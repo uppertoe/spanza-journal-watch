@@ -22,7 +22,6 @@ def toggle_cpd_tracking(request):
     AnalyticsEvent.record_event(
         event_type=AnalyticsEvent.EventType.CPD_TRACKING_TOGGLE,
         request=request,
-        subscriber_id=request.session.get("subscriber_id"),
         source="profile_drawer",
         metadata={"enabled": bool(request.user.cpd_tracking_enabled)},
     )
@@ -34,7 +33,7 @@ def toggle_cpd_tracking(request):
 @login_required
 def report_page(request):
     today = date.today()
-    reports = CPDReport.objects.filter(user=request.user).order_by("-created")[:20]
+    reports = CPDReport.objects.filter(user=request.user).defer("pdf").order_by("-created")[:20]
 
     # Default date range: Jan 1 – Dec 31 of current year
     default_from = date(today.year, 1, 1)
@@ -79,7 +78,7 @@ def generate_report(request):
     if date_from > date_to:
         return HttpResponse("Start date must be before end date", status=400)
 
-    user_reports = list(CPDReport.objects.filter(user=request.user).order_by("-created")[:20])
+    user_reports = list(CPDReport.objects.filter(user=request.user).defer("pdf").order_by("-created")[:20])
 
     # Prevent generating while one is already in progress
     if any(r.status in (CPDReport.Status.PENDING, CPDReport.Status.GENERATING) for r in user_reports):
@@ -88,9 +87,6 @@ def generate_report(request):
     # Enforce max 5 reports per user — delete oldest to make room
     if len(user_reports) >= 5:
         stale = user_reports[4:]
-        for r in stale:
-            if r.file:
-                r.file.delete(save=False)
         CPDReport.objects.filter(pk__in=[r.pk for r in stale]).delete()
 
     report = CPDReport.objects.create(
@@ -101,24 +97,25 @@ def generate_report(request):
     generate_cpd_report_task.delay(report.pk)
 
     # Re-fetch to include the newly created report
-    reports = CPDReport.objects.filter(user=request.user).order_by("-created")[:20]
+    reports = CPDReport.objects.filter(user=request.user).defer("pdf").order_by("-created")[:20]
     return render(request, "cpd/_report_list.html", {"reports": reports})
 
 
 @login_required
 def report_status(request):
-    reports = CPDReport.objects.filter(user=request.user).order_by("-created")[:20]
+    reports = CPDReport.objects.filter(user=request.user).defer("pdf").order_by("-created")[:20]
     return render(request, "cpd/_report_list.html", {"reports": reports})
 
 
 @login_required
 def download_report(request, report_id):
     report = get_object_or_404(CPDReport, pk=report_id, user=request.user)
-    if report.status != CPDReport.Status.READY or not report.file:
+    if report.status != CPDReport.Status.READY or not report.pdf:
         return HttpResponse("Report not ready", status=404)
 
-    response = HttpResponse(report.file.read(), content_type="application/pdf")
+    response = HttpResponse(bytes(report.pdf), content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="cpd_report_{report.date_from}_{report.date_to}.pdf"'
+    response["Cache-Control"] = "private, no-store"
     return response
 
 

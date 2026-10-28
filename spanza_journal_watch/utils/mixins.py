@@ -35,6 +35,14 @@ class AnonymousCacheMixin:
         if request.COOKIES.get(session_cookie_name) and request.session.get("subscriber_id"):
             return super().dispatch(request, *args, **kwargs)
 
+        # Skip cache when a flash message is waiting: the rendered toast is
+        # meant for this visitor only. Messages sit in the "messages" cookie,
+        # falling back to the session when they are too large for it.
+        if request.COOKIES.get(getattr(settings, "MESSAGE_COOKIE_NAME", "messages")) or (
+            request.COOKIES.get(session_cookie_name) and request.session.get("_messages")
+        ):
+            return super().dispatch(request, *args, **kwargs)
+
         is_htmx = request.headers.get("HX-Request") == "true"
         sub_flag = int(has_subscribed_cookie(request))
         version = get_content_cache_version()

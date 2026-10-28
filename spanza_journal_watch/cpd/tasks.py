@@ -1,7 +1,6 @@
 import logging
 from datetime import timedelta
 
-from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from config.celery_app import app as celery_app
@@ -55,11 +54,10 @@ def generate_cpd_report_task(self, report_id):
             articles_by_date=articles_by_date,
         )
 
-        filename = f"cpd_report_{report.user.pk}_{report.date_from}_{report.date_to}.pdf"
-        report.file.save(filename, ContentFile(pdf_bytes), save=False)
+        report.pdf = pdf_bytes
         report.article_count = article_count
         report.status = CPDReport.Status.READY
-        report.save(update_fields=["file", "article_count", "status"])
+        report.save(update_fields=["pdf", "article_count", "status"])
 
         logger.info("CPD report %s generated: %d articles", report_id, article_count)
 
@@ -75,11 +73,6 @@ def generate_cpd_report_task(self, report_id):
 def cleanup_expired_cpd_reports():
     """Delete CPD reports older than 30 days."""
     cutoff = timezone.now() - timedelta(days=30)
-    expired = CPDReport.objects.filter(created__lt=cutoff)
-    # Delete files from storage before bulk-deleting records
-    for report in expired.only("file"):
-        if report.file:
-            report.file.delete(save=False)
-    count, _ = expired.delete()
+    count, _ = CPDReport.objects.filter(created__lt=cutoff).delete()
     if count:
         logger.info("Cleaned up %d expired CPD reports", count)

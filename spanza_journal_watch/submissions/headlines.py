@@ -145,7 +145,8 @@ def _review_prompt(review):
         f"Paper title: {article.get_title().strip()}",
         f"Journal: {article.journal or article.source_journal_name or 'unknown'}",
     ]
-    if review.author:
+    # An anonymous reviewer's name never leaves the site.
+    if review.author and not review.author.anonymous:
         parts.append(f"Reviewer: {review.author}")
     if existing:
         parts.append(f"The reviewer's own take-home section, verbatim: {existing}")

@@ -31,3 +31,19 @@ def test_non_multipart_body_still_cached_for_logging():
 
     assert LoggingMiddleware(view)(request).status_code == 200
     assert seen["body"]
+
+
+def test_failed_request_body_is_not_logged(caplog):
+    request = RequestFactory().post(
+        "/accounts/login/",
+        {"login": "member@example.com", "code": "123456"},
+        content_type="application/x-www-form-urlencoded",
+    )
+
+    with caplog.at_level("DEBUG", logger="django.request"):
+        LoggingMiddleware(lambda req: HttpResponse(status=429))(request)
+
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "POST /accounts/login/" in logged
+    assert "member@example.com" not in logged
+    assert "123456" not in logged

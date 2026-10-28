@@ -11,6 +11,7 @@ from markdownx import urls as markdownx
 
 from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import views as backend_views
+from spanza_journal_watch.backend.oidc_validator import EditorialAuthorizationView
 from spanza_journal_watch.events.models import LiveSessionSitemap
 from spanza_journal_watch.layout.feeds import LatestReviewsFeed
 from spanza_journal_watch.layout.models import (
@@ -82,6 +83,8 @@ urlpatterns = [
         name="chief_editor_invite_accept",
     ),
     # OAuth2 / OIDC provider (Django acts as IdP for Planka)
+    # Shadows DOT's authorize view so only contributors and staff can sign in to Planka
+    path("o/authorize/", EditorialAuthorizationView.as_view()),
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),

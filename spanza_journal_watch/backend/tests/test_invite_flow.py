@@ -425,6 +425,52 @@ class TestInviteSignupEndToEnd:
         assert contributor.status == IssueContributor.Status.ACTIVE
         assert contributor.user_id == user.pk
 
+    def test_signup_via_invite_with_other_address_is_not_verified(self, settings):
+        """An invite proves control of the invited address only, not whatever is typed at signup."""
+        settings.ACCOUNT_ALLOW_REGISTRATION = True
+
+        issue = make_issue()
+        contributor = make_contributor(issue, email="invited@example.com")
+        invite, raw_token = make_invite(contributor)
+
+        client = Client()
+        client.get(invite_url(raw_token))
+        client.post(
+            reverse("account_signup"),
+            {
+                "email": "someone-else@example.com",
+                "password1": "Str0ng!Pass42x",
+                "password2": "Str0ng!Pass42x",
+            },
+        )
+
+        user = User.objects.get(email="someone-else@example.com")
+        assert not EmailAddress.objects.filter(user=user, verified=True).exists()
+
+    def test_consumed_invite_does_not_verify_signup(self, settings):
+        """A used invite link no longer opens signup or verifies the address."""
+        settings.ACCOUNT_ALLOW_REGISTRATION = True
+
+        issue = make_issue()
+        contributor = make_contributor(issue, email="reused@example.com")
+        invite, raw_token = make_invite(contributor)
+
+        client = Client()
+        client.get(invite_url(raw_token))
+        invite.consumed_at = timezone.now()
+        invite.save(update_fields=["consumed_at"])
+        client.post(
+            reverse("account_signup"),
+            {
+                "email": "reused@example.com",
+                "password1": "Str0ng!Pass42x",
+                "password2": "Str0ng!Pass42x",
+            },
+        )
+
+        user = User.objects.get(email="reused@example.com")
+        assert not EmailAddress.objects.filter(user=user, verified=True).exists()
+
     def test_signup_without_invite_token_still_blocked(self, settings):
         """Signup must still be refused when there's no invite token in session."""
         settings.ACCOUNT_ALLOW_REGISTRATION = False
