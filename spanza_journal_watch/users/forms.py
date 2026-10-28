@@ -70,19 +70,21 @@ class UserSignupForm(SignupForm):
 
         AccountAdapter.confirm_email_on_invite(user)
 
-        # Optionally subscribe to newsletter
+        # The newsletter starts once the address is confirmed. An invite has
+        # already confirmed it; otherwise the newsletter receiver acts when the
+        # sign-in code is entered.
         if self.cleaned_data.get("subscribe_to_newsletter"):
-            from spanza_journal_watch.newsletter.models import Subscriber
+            from allauth.account.models import EmailAddress
 
-            subscriber, created = Subscriber.objects.get_or_create(
-                email__iexact=user.email,
-                defaults={"email": user.email},
+            from spanza_journal_watch.newsletter.confirmation import (
+                SUBSCRIBE_ON_CONFIRM_SESSION_KEY,
+                subscribe_account_holder,
             )
-            if not created and not subscriber.subscribed:
-                subscriber.subscribed = True
-                subscriber.save(update_fields=["subscribed", "modified"])
-            request.session["subscribed"] = True
-            request.session["subscriber_id"] = subscriber.pk
+
+            if EmailAddress.objects.filter(user=user, email__iexact=user.email, verified=True).exists():
+                subscribe_account_holder(request, user)
+            else:
+                request.session[SUBSCRIBE_ON_CONFIRM_SESSION_KEY] = True
 
         # Migrate session-based starred articles and full-text clicks to this new user
         from spanza_journal_watch.users.utils import (

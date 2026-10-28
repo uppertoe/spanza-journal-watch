@@ -4,7 +4,7 @@ import pytest
 from django.core import mail
 from django.urls import reverse
 
-from spanza_journal_watch.newsletter.confirmation import build_confirmation_request_email
+from spanza_journal_watch.newsletter.confirmation import build_confirmation_request_email, make_confirm_token
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 
 
@@ -22,9 +22,8 @@ class TestNewsletterFlows:
         # Double opt-in: nothing is stored until the emailed link is followed
         assert not Subscriber.objects.filter(email="new-subscriber@example.test").exists()
 
-        request_email = build_confirmation_request_email(
-            "new-subscriber@example.test", Subscriber.Source.SUBSCRIBE_FORM
-        )
+        code = make_confirm_token("new-subscriber@example.test", Subscriber.Source.SUBSCRIBE_FORM)
+        request_email = build_confirmation_request_email("new-subscriber@example.test", code)
         assert request_email.subject == "Confirm your Journal Watch subscription"
         assert "Confirm subscription" in request_email.alternatives[0][0]
         confirm_path = re.search(r"https?://[^/\s]+(/newsletter/confirm/\S+)", request_email.body).group(1)
@@ -33,8 +32,13 @@ class TestNewsletterFlows:
         assert route_client.get(confirm_path).status_code == 200
         assert not Subscriber.objects.filter(email="new-subscriber@example.test").exists()
 
+        assert code in confirm_path
+        assert "new-subscriber" not in confirm_path
+
         confirm_response = route_client.post(confirm_path)
-        assert confirm_response.status_code == 302
+        assert confirm_response.status_code == 200
+        assert "base.html" in [t.name for t in confirm_response.templates]
+        assert "Your subscription to the Journal Watch newsletter is confirmed." in confirm_response.content.decode()
         assert Subscriber.objects.filter(email="new-subscriber@example.test", subscribed=True).exists()
 
     def test_unsubscribe_get_and_post(self, route_client, regression_baseline):

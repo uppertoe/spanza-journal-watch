@@ -1,7 +1,7 @@
 import datetime
 import re
 from datetime import timedelta
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.conf import settings
 from django.utils import timezone
@@ -19,6 +19,50 @@ def session_fingerprint(session_key):
     if not session_key:
         return ""
     return salted_hmac(SESSION_FINGERPRINT_SALT, session_key, algorithm="sha256").hexdigest()
+
+
+# Pages whose URLs carry confirmation codes, invite tokens or account details.
+# Analytics keeps only the prefix of such a path. The page beacon in
+# static/js/project.js skips the same prefixes.
+PRIVATE_PATH_PREFIXES = ("/newsletter/", "/users/", "/accounts/", "/invites/")
+# Query parameter carrying a subscriber's tracking token in email links.
+TRACKING_TOKEN_PARAM = "t"
+
+
+def private_path_prefix(path):
+    """Return the private prefix ``path`` starts with, else None."""
+    return next((prefix for prefix in PRIVATE_PATH_PREFIXES if (path or "").startswith(prefix)), None)
+
+
+def scrub_private_url(value):
+    """Cut a private path or URL down to its prefix and drop any tracking token from its query string.
+
+    Values that are not paths or URLs are returned unchanged.
+    """
+    if not isinstance(value, str) or not (value.startswith("/") or "://" in value):
+        return value
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return ""
+    prefix = private_path_prefix(parsed.path)
+    if prefix:
+        return prefix
+    if parsed.query:
+        query = parse_qsl(parsed.query, keep_blank_values=True)
+        kept = [(key, item) for key, item in query if key != TRACKING_TOKEN_PARAM]
+        if len(kept) != len(query):
+            return urlunparse(parsed._replace(query=urlencode(kept)))
+    return value
+
+
+def scrub_private_metadata(value):
+    """Apply ``scrub_private_url`` to every string in a metadata dict or list."""
+    if isinstance(value, dict):
+        return {key: scrub_private_metadata(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [scrub_private_metadata(item) for item in value]
+    return scrub_private_url(value)
 
 
 AUTOMATED_USER_AGENT_MARKERS = [

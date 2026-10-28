@@ -156,13 +156,15 @@ class TestTrackEmailClick:
         )
         assert response["Location"] == "/"
 
-    def test_sets_subscriber_in_session(self, client):
+    def test_marks_browser_subscribed_without_identifying_session(self, client):
         subscriber = Subscriber.objects.create(email="click-session@example.com", subscribed=True)
-        client.get(
+        response = client.get(
             reverse("analytics:track_email_click"),
             {"t": subscriber.tracking_token, "next": "/"},
         )
-        assert client.session.get("subscriber_id") == subscriber.pk
+        assert response.cookies["jw_sub"].value == "1"
+        assert client.session.get("subscriber_id") is None
+        assert client.session.get("subscriber_email") is None
 
     def test_missing_subscriber_still_redirects(self, client):
         response = client.get(

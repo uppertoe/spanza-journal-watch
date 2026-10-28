@@ -21,7 +21,7 @@ class NewsletterNotReadyToSendError(Exception):
     pass
 
 
-@celery_app.task()
+@celery_app.task(ignore_result=True)
 def send_newsletter_stats(
     newsletter_pk,
     subscriber_count,
@@ -70,7 +70,7 @@ def send_newsletter_stats(
         send_mail(subject, body, None, [email])
 
 
-@celery_app.task()
+@celery_app.task(ignore_result=True)
 def send_newsletter_stats_after_failure(request, exc, traceback, *args, **kwargs):
     """Error callback for the batch chord: a failed batch still produces the summary email."""
     send_newsletter_stats(*args, **kwargs)
@@ -92,6 +92,8 @@ def get_subscriber_batches(subscriber_pks, batch_size):
         yield subscriber_pks[start : start + batch_size]
 
 
+# Keeps its result: the stats chord counts finished batches through the result backend.
+# Its arguments are primary keys only.
 @celery_app.task()
 def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
     from .models import Newsletter, NewsletterDelivery, Subscriber
@@ -127,7 +129,7 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
             newsletter_queryset.update(emails_sent=F("emails_sent") + successful)
 
 
-@celery_app.task()
+@celery_app.task(ignore_result=True)
 def send_newsletter(newsletter_pk, sender_email=None):
     from .models import Newsletter, Subscriber
 
@@ -183,7 +185,7 @@ def send_newsletter(newsletter_pk, sender_email=None):
     chord(batches)(callback)
 
 
-@celery_app.task()
+@celery_app.task(ignore_result=True)
 def send_newsletter_test_email(newsletter_pk, recipient_email):
     from .models import Newsletter, Subscriber
 
@@ -200,7 +202,7 @@ def send_newsletter_test_email(newsletter_pk, recipient_email):
         newsletter_queryset.update(is_test_sent=True)
 
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(bind=True, max_retries=3, ignore_result=True)
 def send_confirmation_email(self, subscriber_pk):
     """Sends a single EmailMessage object"""
 
@@ -210,17 +212,17 @@ def send_confirmation_email(self, subscriber_pk):
         subscriber = Subscriber.objects.get(pk=subscriber_pk)
         email = subscriber.generate_confirmation_email()
         email.send()
-        logger.info("Sign-up email sent to %s", subscriber.email)
+        logger.info("Sign-up email sent to subscriber %s", subscriber.pk)
     except Subscriber.DoesNotExist as exc:
         raise self.retry(exc=exc, countdown=3 * 60)
 
 
-@celery_app.task()
-def send_subscription_request_email(email, source):
-    """Send the double opt-in link to an address someone entered in a subscribe form."""
+@celery_app.task(ignore_result=True)
+def send_subscription_request_email(email, code):
+    """Send the double opt-in link, carrying ``code``, to an address someone entered in a subscribe form."""
     from .confirmation import build_confirmation_request_email
 
-    build_confirmation_request_email(email, source).send()
+    build_confirmation_request_email(email, code).send()
     logger.info("Subscription confirmation request sent")
 
 

@@ -18,6 +18,8 @@ from spanza_journal_watch.analytics.utils import (
     client_hints_anomaly,
     client_hints_enforced,
     extract_referrer_domain,
+    scrub_private_metadata,
+    scrub_private_url,
     session_fingerprint,
 )
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
@@ -326,7 +328,9 @@ class AnalyticsEvent(models.Model):
             visitor_id = getattr(request, "analytics_visitor_id", None) or None
             referrer_category = categorize_referrer(request, referrer=referrer, utm_source=utm_source)
             referrer_domain = extract_referrer_domain(request, referrer=referrer)
-        landing_page = (landing_page or "")[:512]
+        # Confirmation, invite and account URLs are kept to their prefix.
+        landing_page = scrub_private_url(landing_page or "")[:512]
+        metadata = scrub_private_metadata(metadata or {})
         share_token = (share_token or "")[:32]
         automated = bool(automated)
         if automated:

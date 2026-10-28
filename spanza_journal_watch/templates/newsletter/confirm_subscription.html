@@ -11,7 +11,9 @@
         <div class="card border-0">
             <div class="card-body p-4 p-md-5 text-center">
                 <p class="text-uppercase text-secondary fw-semibold mb-2">Newsletter</p>
-                {% if email %}
+                {% if confirmed %}
+                    <h1 class="h4 mb-0">Your subscription to the Journal Watch newsletter is confirmed.</h1>
+                {% elif email %}
                     <h1 class="h3 mb-3">Confirm your subscription</h1>
                     <p class="text-body-secondary mb-4">
                         Confirm that you would like the Journal Watch newsletter sent to this address:

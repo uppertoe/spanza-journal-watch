@@ -1,13 +1,28 @@
 import json
 import logging
 
+from allauth.account.signals import email_confirmed
 from django.conf import settings
+from django.dispatch import receiver
 
 from spanza_journal_watch.newsletter.models import Newsletter
 
+from .confirmation import SUBSCRIBE_ON_CONFIRM_SESSION_KEY, subscribe_account_holder
 from .models import Subscriber
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(email_confirmed)
+def subscribe_on_email_confirmed(sender, request, email_address, **kwargs):
+    """Subscribe a new member who asked for the newsletter at sign-up, now that the address is confirmed."""
+    session = getattr(request, "session", None)
+    if session is None or not session.pop(SUBSCRIBE_ON_CONFIRM_SESSION_KEY, False):
+        return
+    user = email_address.user
+    if Subscriber.normalize_email(email_address.email) != Subscriber.normalize_email(user.email):
+        return
+    subscribe_account_holder(request, user)
 
 
 def _get_subscribers(email):
@@ -97,8 +112,8 @@ def handle_bounce(event):
     # Only permanent bounces should suppress future sends.
     if bounce_type != "permanent":
         logger.info(
-            "Transient bounce for email %s (subtype %s); kept on mailing list",
-            ", ".join(_extract_recipients(event)) or "(unknown)",
+            "Transient bounce for %d recipient(s) (subtype %s); kept on mailing list",
+            len(_extract_recipients(event)),
             bounce_subtype,
         )
         return
@@ -116,12 +131,12 @@ def handle_bounce(event):
                 subscriber.subscribed = False
                 subscriber.save(update_fields=["bounced", "subscribed", "modified"])
                 logger.info(
-                    "Email to %s bounced permanently (%s); removed from mailing list",
-                    subscriber,
+                    "Email to subscriber %s bounced permanently (%s); removed from mailing list",
+                    subscriber.pk,
                     bounce_subtype,
                 )
         else:
-            logger.warning("No subscriber found for permanent bounced email %s (%s)", recipient, bounce_subtype)
+            logger.warning("No subscriber found for a permanent bounce (%s)", bounce_subtype)
 
 
 def handle_complaint(event):
@@ -137,9 +152,9 @@ def handle_complaint(event):
                 subscriber.complained = True
                 subscriber.subscribed = False
                 subscriber.save(update_fields=["complained", "subscribed", "modified"])
-                logger.info("Email to %s complained; removed from mailing list", subscriber)
+                logger.info("Email to subscriber %s complained; removed from mailing list", subscriber.pk)
         else:
-            logger.warning("No subscriber found for complaint event (%s)", recipient)
+            logger.warning("No subscriber found for a complaint event")
 
 
 def handle_unsubscribed(event):
@@ -154,9 +169,9 @@ def handle_unsubscribed(event):
             for subscriber in subscribers:
                 subscriber.subscribed = False
                 subscriber.save(update_fields=["subscribed", "modified"])
-                logger.info("Email to %s unsubscribed via ESP event.", subscriber)
+                logger.info("Subscriber %s unsubscribed via ESP event.", subscriber.pk)
         else:
-            logger.warning("No subscriber found for unsubscribe event (%s)", recipient)
+            logger.warning("No subscriber found for an unsubscribe event")
 
 
 def _is_subscription_opt_out(event):
@@ -203,7 +218,6 @@ def get_metadata(event):
 if not settings.DEBUG:  # Anymail only available in production
     try:
         from anymail.signals import tracking  # type: ignore[import-not-found]
-        from django.dispatch import receiver
     except ModuleNotFoundError:
         tracking = None
 

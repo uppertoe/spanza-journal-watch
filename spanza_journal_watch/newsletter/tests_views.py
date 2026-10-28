@@ -6,12 +6,15 @@ Covers:
 2. toggle_subscription — requires login, creates if missing, toggles if existing
 """
 
+import base64
 from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from spanza_journal_watch.newsletter.confirmation import read_confirm_token
+from spanza_journal_watch.newsletter.cookies import JW_SUB_COOKIE_NAME
 from spanza_journal_watch.newsletter.models import Subscriber
 
 User = get_user_model()
@@ -47,7 +50,24 @@ class TestSubscribeView:
         )
         assert response.status_code == 302
         assert not Subscriber.objects.filter(email="newsub@example.com").exists()
-        mock_task.delay.assert_called_once_with("newsub@example.com", Subscriber.Source.SUBSCRIBE_FORM)
+        email, code = mock_task.delay.call_args.args
+        assert email == "newsub@example.com"
+        assert read_confirm_token(code) == ("newsub@example.com", Subscriber.Source.SUBSCRIBE_FORM)
+
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_confirm_code_does_not_carry_the_address(self, mock_task, client):
+        client.post(reverse("newsletter:subscribe"), {"email": "opaque@example.com"}, HTTP_HX_REQUEST="true")
+        _email, code = mock_task.delay.call_args.args
+        assert "opaque" not in code
+        assert "opaque" not in base64.urlsafe_b64decode(code + "==").decode("latin-1")
+
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_send_slot_is_released_when_the_email_cannot_be_queued(self, mock_task, client):
+        mock_task.delay.side_effect = [RuntimeError("broker unavailable"), None]
+        with pytest.raises(RuntimeError):
+            client.post(reverse("newsletter:subscribe"), {"email": "retry@example.com"}, HTTP_HX_REQUEST="true")
+        client.post(reverse("newsletter:subscribe"), {"email": "retry@example.com"}, HTTP_HX_REQUEST="true")
+        assert mock_task.delay.call_count == 2
 
     @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
     def test_htmx_post_does_not_resubscribe_until_confirmed(self, mock_task, client):
@@ -95,9 +115,26 @@ class TestConfirmSubscription:
         assert not Subscriber.objects.filter(email="confirm@example.com").exists()
 
     @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    def test_post_shows_confirmation_on_a_full_page(self, mock_task, client):
+        response = client.post(self._url())
+        assert response.status_code == 200
+        assert "base.html" in [t.name for t in response.templates]
+        assert b"Your subscription to the Journal Watch newsletter is confirmed." in response.content
+        assert response.cookies[JW_SUB_COOKIE_NAME].value == "1"
+
+    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    def test_link_cannot_subscribe_again_after_use(self, mock_task, client):
+        url = self._url()
+        client.post(url)
+        Subscriber.objects.filter(email="confirm@example.com").update(subscribed=False)
+        response = client.post(url)
+        assert b"This confirmation link has expired or is not valid." in response.content
+        assert Subscriber.objects.get(email="confirm@example.com").subscribed is False
+
+    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
     def test_post_subscribes_and_identifies_session(self, mock_task, client):
         response = client.post(self._url())
-        assert response.status_code == 302
+        assert response.status_code == 200
         subscriber = Subscriber.objects.get(email="confirm@example.com")
         assert subscriber.subscribed is True
         assert subscriber.source == Subscriber.Source.SUBSCRIBE_FORM

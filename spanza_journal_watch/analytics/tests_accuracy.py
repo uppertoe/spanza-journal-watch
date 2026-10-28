@@ -218,13 +218,28 @@ def test_click_keeps_a_different_subscriber_already_in_the_session(client):
     assert client.session["subscriber_id"] == forwarded_to.pk
 
 
-def test_click_sets_session_subscriber_when_empty(client):
+def test_click_is_recorded_without_identifying_the_session(client):
     newsletter = _newsletter()
     subscriber = _subscriber()
 
-    client.get(_link(subscriber, newsletter, "/"), HTTP_USER_AGENT=SAFARI_UA)
+    response = client.get(_link(subscriber, newsletter, "/"), HTTP_USER_AGENT=SAFARI_UA)
 
-    assert client.session["subscriber_id"] == subscriber.pk
+    assert NewsletterClick.objects.filter(subscriber=subscriber, newsletter=newsletter).exists()
+    assert response.cookies["jw_sub"].value == "1"
+    assert "subscriber_id" not in client.session
+    assert "subscriber_email" not in client.session
+
+
+def test_forwarded_link_does_not_show_the_recipient_address_in_the_drawer(client):
+    newsletter = _newsletter()
+    recipient = _subscriber("recipient@example.com")
+
+    client.get(_link(recipient, newsletter, "/"), HTTP_USER_AGENT=SAFARI_UA)
+    content = client.get("/").content.decode()
+
+    assert "You're subscribed" in content
+    assert "recipient@example.com" not in content
+    assert "drawer-unsubscribe" not in content
 
 
 def test_confirmation_email_click_is_not_a_newsletter_click(client):

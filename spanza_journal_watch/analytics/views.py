@@ -24,6 +24,7 @@ from spanza_journal_watch.analytics.utils import (
     classify_event_confidence,
     classify_newsletter_event_reason,
     is_probable_automated_event,
+    private_path_prefix,
     set_newsletter_referrer_in_session,
 )
 from spanza_journal_watch.backend.models import PubmedArticle
@@ -112,19 +113,6 @@ def _resolve_email_link(request):
     return subscriber, "/"
 
 
-def _identify_subscriber_in_session(request, subscriber):
-    """Identify the subscriber in the session, unless it already holds another.
-
-    A forwarded newsletter carries the original recipient's links; the person
-    who follows them keeps the identity their session already has.
-    """
-    existing = request.session.get("subscriber_id")
-    if existing and existing != subscriber.pk:
-        return
-    request.session["subscriber_id"] = subscriber.pk
-    request.session["subscriber_email"] = subscriber.email
-
-
 def _local_destination_path(request, url):
     """Return the path of ``url`` if it is on this site, else None."""
     hosts = {request.get_host()}
@@ -194,7 +182,9 @@ def track_newsletter_link(request, newsletter_token):
         )
         click.check_scanner_burst()
 
-        _identify_subscriber_in_session(request, subscriber)
+        # The click is recorded against the subscription, but the session is
+        # not tied to the subscriber: a forwarded newsletter carries the same
+        # links. The jw_sub cookie set below only marks the browser as subscribed.
         set_newsletter_referrer_in_session(request)
 
         # A link to another site is not a visit to this one; the click row
@@ -242,8 +232,8 @@ def page_view(request, model=None, slug=None):
 
 
 def track_email_click(request):
-    # Links in confirmation and other one-off emails. Sets the session ID on
-    # following the link; the visit is not attributed to the newsletter.
+    # Links in confirmation and other one-off emails. The visit is recorded
+    # against the subscription but not attributed to the newsletter.
     subscriber, destination = _resolve_email_link(request)
     response = HttpResponseRedirect(destination)
     if request.method != "GET":
@@ -252,7 +242,6 @@ def track_email_click(request):
     visitor_id, visitor_cookie_created = ensure_visitor_id(request)
 
     if subscriber:
-        _identify_subscriber_in_session(request, subscriber)
         landing_page = _local_destination_path(request, destination)
         if landing_page is not None:
             AnalyticsEvent.record_event(
@@ -280,6 +269,8 @@ def _is_excluded_page_path(path):
     admin_url = (getattr(settings, "ADMIN_URL", "admin/") or "").strip("/")
     admin_prefix = f"/{admin_url}/" if admin_url else None
     if admin_prefix and path.startswith(admin_prefix):
+        return True
+    if private_path_prefix(path):
         return True
     return any(path.startswith(prefix) for prefix in _PAGE_VISIT_EXCLUDED_PREFIXES)
 

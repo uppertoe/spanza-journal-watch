@@ -11,7 +11,13 @@ from django.views.decorators.http import require_POST
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent
 
-from .confirmation import claim_send_slot, read_confirm_token
+from .confirmation import (
+    claim_send_slot,
+    discard_confirm_token,
+    make_confirm_token,
+    read_confirm_token,
+    release_send_slot,
+)
 from .cookies import JW_SUB_COOKIE_NAME, set_subscribed_cookie
 from .forms import SubscriberForm
 from .models import Subscriber
@@ -145,7 +151,14 @@ def subscribe(request):
             existing = Subscriber.first_by_email(email)
             already_subscribed = bool(existing and existing.subscribed)
             if not already_subscribed and claim_send_slot(email):
-                send_subscription_request_email.delay(email, source)
+                code = make_confirm_token(email, source)
+                try:
+                    send_subscription_request_email.delay(email, code)
+                except Exception:
+                    # Not queued: let the reader try again straight away.
+                    release_send_slot(email)
+                    discard_confirm_token(code)
+                    raise
 
             if is_drawer:
                 return render(request, "newsletter/_drawer_confirm_sent.html", {"email": email})
@@ -202,9 +215,12 @@ def confirm_subscription(request, token):
         metadata={"resubscribe": bool(existing)},
     )
     send_confirmation_email.delay(subscriber.pk)
+    # Used once: after an unsubscribe, the same link does not subscribe the address again.
+    discard_confirm_token(token)
 
-    messages.success(request, "Your subscription to the Journal Watch newsletter is confirmed.")
-    response = redirect("newsletter:success")
+    # The confirmation is shown on this page rather than as a flash message,
+    # which a cached page could show again later.
+    response = render(request, "newsletter/confirm_subscription.html", {"confirmed": True})
     set_subscribed_cookie(response)
     return response
 

@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
+from spanza_journal_watch.newsletter.confirmation import read_confirm_token
 from spanza_journal_watch.newsletter.context_processors import subscriber_state
 from spanza_journal_watch.newsletter.cookies import JW_SUB_COOKIE_NAME
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
@@ -55,7 +56,9 @@ class TestDrawerSubscribe:
         # Nothing is stored or marked until the link is followed
         assert not Subscriber.objects.filter(email="drawer@example.com").exists()
         assert JW_SUB_COOKIE_NAME not in response.cookies
-        mock_task.delay.assert_called_once_with("drawer@example.com", Subscriber.Source.DRAWER)
+        email, code = mock_task.delay.call_args.args
+        assert email == "drawer@example.com"
+        assert read_confirm_token(code) == ("drawer@example.com", Subscriber.Source.DRAWER)
 
     @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
     def test_drawer_get_returns_form_fragment(self, mock_task, client):
@@ -78,7 +81,7 @@ class TestDrawerSubscribe:
 
     def test_confirming_sets_jw_sub_cookie(self, client):
         response = _confirm(client, "cookie-drawer@example.com")
-        assert response.status_code == 302
+        assert response.status_code == 200
         assert response.cookies[JW_SUB_COOKIE_NAME].value == "1"
 
 

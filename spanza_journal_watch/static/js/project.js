@@ -223,6 +223,17 @@ const getCookie = (name) => {
 const LANDING_PAGE_STORAGE_KEY = 'jwLandingPage';
 const SHARE_TOKEN_STORAGE_KEY = 'jwShareToken';
 const VISITOR_ID_STORAGE_KEY = 'jwVisitorId';
+// Pages whose URLs carry confirmation codes, invite tokens or account details
+// are not recorded. Keep in step with PRIVATE_PATH_PREFIXES in analytics/utils.py.
+const PRIVATE_PATH_PREFIXES = [
+  '/newsletter/',
+  '/users/',
+  '/accounts/',
+  '/invites/',
+];
+const isPrivatePath = (path) =>
+  PRIVATE_PATH_PREFIXES.some((prefix) => (path || '').startsWith(prefix));
+const onPrivatePage = isPrivatePath(window.location.pathname);
 
 // The jwvid cookie is minted by the first beacon response, so beacons fired
 // together on a first visit would each get a different server-minted ID. A
@@ -270,7 +281,7 @@ const getClientVisitorId = () => {
 
 const capturePageAttribution = () => {
   try {
-    if (!sessionStorage.getItem(LANDING_PAGE_STORAGE_KEY)) {
+    if (!onPrivatePage && !sessionStorage.getItem(LANDING_PAGE_STORAGE_KEY)) {
       sessionStorage.setItem(
         LANDING_PAGE_STORAGE_KEY,
         window.location.pathname,
@@ -286,10 +297,24 @@ const capturePageAttribution = () => {
 };
 capturePageAttribution();
 
+const sameSitePrivateUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === window.location.origin && isPrivatePath(parsed.pathname)
+    );
+  } catch (_e) {
+    return false;
+  }
+};
+
 const getPageContext = () => {
+  const referrer = document.referrer || '';
   const context = {
-    page_url: window.location.href,
-    referrer: document.referrer || '',
+    page_url: onPrivatePage ? '' : window.location.href,
+    referrer: sameSitePrivateUrl(referrer)
+      ? window.location.origin + '/'
+      : referrer,
     landing_page: '',
     share_token: '',
     visitor_id: getClientVisitorId(),
@@ -332,6 +357,7 @@ const sendAnalyticsEvent = (payload, { beacon = false } = {}) => {
 // so the origin only learns about the visit from this request. It also mints
 // the jwvid visitor cookie and a fresh CSRF cookie on its response.
 const sendPageLoadEvent = () => {
+  if (onPrivatePage) return;
   const pageMeta = document.querySelector('[data-analytics-page]');
   const metadata = { path: window.location.pathname };
   if (pageMeta && pageMeta.dataset.analyticsPage) {

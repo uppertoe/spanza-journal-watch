@@ -32,11 +32,10 @@ class TestSourcePopulation:
 
         with patch("spanza_journal_watch.newsletter.views.send_subscription_request_email") as request_task:
             client.post(url, data, HTTP_HX_REQUEST="true")
-        email, source = request_task.delay.call_args.args
-        from spanza_journal_watch.newsletter.confirmation import make_confirm_token
+        email, code = request_task.delay.call_args.args
 
         with patch("spanza_journal_watch.newsletter.views.send_confirmation_email"):
-            client.post(f"/newsletter/confirm/{make_confirm_token(email, source)}")
+            client.post(f"/newsletter/confirm/{code}")
         return Subscriber.objects.get(email=email)
 
     def test_drawer_subscribe_sets_source_drawer(self, client):
