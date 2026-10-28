@@ -1,13 +1,15 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.sitemaps.views import sitemap
 from django.http import HttpResponse
 from django.urls import include, path, re_path
 from django.views import defaults as default_views
 from django.views.decorators.cache import cache_control, cache_page
 from django.views.generic.base import TemplateView
-from markdownx import urls as markdownx
+from markdownx.views import ImageUploadView, MarkdownifyView
+from oauth2_provider import urls as oauth2_urls
 
 from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import views as backend_views
@@ -24,6 +26,12 @@ from spanza_journal_watch.layout.models import (
 )
 from spanza_journal_watch.layout.views import HomepageView, indexnow_key
 from spanza_journal_watch.users.views import invite_aware_login_view, invite_aware_signup_view
+
+# Planka needs only sign-in, tokens and discovery. Application registration,
+# token management and the device flow are left out.
+oauth2_patterns = [
+    pattern for pattern in oauth2_urls.base_urlpatterns if not pattern.name.startswith("device")
+] + oauth2_urls.oidc_urlpatterns
 
 sitemaps = {
     "pages": StaticPagesSitemap,
@@ -86,10 +94,12 @@ urlpatterns = [
     # OAuth2 / OIDC provider (Django acts as IdP for Planka)
     # Shadows DOT's authorize view so only contributors and staff can sign in to Planka
     path("o/authorize/", EditorialAuthorizationView.as_view()),
-    path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
+    path("o/", include((oauth2_patterns, "oauth2_provider"), namespace="oauth2_provider")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
-    path("markdownx/", include(markdownx)),
+    # The markdown editor is used only in the admin, so only staff may upload or preview.
+    path("markdownx/upload/", staff_member_required(ImageUploadView.as_view()), name="markdownx_upload"),
+    path("markdownx/markdownify/", staff_member_required(MarkdownifyView.as_view()), name="markdownx_markdownify"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if not settings.DEBUG:

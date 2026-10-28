@@ -499,6 +499,9 @@ MARKDOWNX_MARKDOWN_EXTENSIONS = [
     "markdown.extensions.sane_lists",  # if you like smarter lists
     # <-- NO 'nl2br' here!
 ]
+# Raster images only: markdownx trusts the declared type and serves SVG and GIF unprocessed.
+MARKDOWNX_UPLOAD_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
+MARKDOWNX_UPLOAD_MAX_SIZE = 5 * 1024 * 1024
 
 # tiny-MCE
 # ------------------------------------------------------------------------------
