@@ -53,12 +53,12 @@ www.{$DOMAIN} {
         }
     }
 
-    # X-Client-IP is set by Caddy, overwriting anything the request carried,
+    # X-Forwarded-For is replaced by Caddy, overwriting anything the request carried,
     # so Django can rate-limit sign-in attempts per reader rather than treating
     # every request as coming from Caddy. With trusted_proxies set for the
     # Cloudflare ranges in the scaffold, client_ip is the reader's address.
     reverse_proxy journal-watch:5000 {
-        header_up X-Client-IP {client_ip}
+        header_up X-Forwarded-For {client_ip}
     }
 }
 

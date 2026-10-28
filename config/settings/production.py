@@ -83,10 +83,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
 SECURE_HSTS_PRELOAD = env.bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
 
 
-# Caddy sets X-Client-IP from the connecting client (see journalwatch.caddy),
-# so allauth's per-IP sign-in limits apply to each reader. AccountAdapter
+# Caddy replaces X-Forwarded-For with the single address Cloudflare reports
+# (see journalwatch.caddy), so allauth's per-IP sign-in limits apply to each reader. AccountAdapter
 # falls back to the connecting address when the header is absent.
-CLIENT_IP_HEADER = env("DJANGO_CLIENT_IP_HEADER", default="X-Client-IP")
+CLIENT_IP_HEADER = env("DJANGO_CLIENT_IP_HEADER", default="X-Forwarded-For")
 
 
 # STORAGES
