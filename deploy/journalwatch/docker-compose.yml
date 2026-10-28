@@ -109,8 +109,6 @@ services:
     - pg_stat_statements.max=10000
     - -c
     - track_io_timing=on
-    - -c
-    - log_min_duration_statement=250ms
     # Tuning for 1.9GB-RAM VPS — give PG enough cache/work_mem to avoid disk
     # spills, but cap so it doesn't crowd out Django/Celery.
     - -c
@@ -302,4 +300,3 @@ services:
       retries: 5
     networks:
       - jw_internal
-

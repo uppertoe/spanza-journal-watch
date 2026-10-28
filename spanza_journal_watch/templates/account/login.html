@@ -80,4 +80,6 @@
   New here? Just enter your email above. Or <a href="{% url 'account_signup' %}{% if redirect_field_value %}?{{ redirect_field_name }}={{ redirect_field_value|urlencode }}{% endif %}">create an account</a> and choose the newsletter at the same time.
 </p>
 {% endif %}
+
+<p class="small text-center mt-4 mb-0"><a href="{% url 'privacy' %}" class="link-secondary">Privacy policy</a></p>
 {% endblock %}

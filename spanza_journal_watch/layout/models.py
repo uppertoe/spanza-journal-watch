@@ -246,6 +246,7 @@ class StaticPagesSitemap(Sitemap):
         ("submissions:journal_list", 0.5),
         ("submissions:about", 0.5),
         ("events:session_list", 0.5),
+        ("privacy", 0.2),
     )
 
     def items(self):

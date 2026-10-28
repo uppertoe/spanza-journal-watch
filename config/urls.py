@@ -57,6 +57,7 @@ urlpatterns = [
         ),
     ),
     path("feed/", cache_page(3600)(LatestReviewsFeed()), name="review_feed"),
+    path("privacy", TemplateView.as_view(template_name="privacy.html"), name="privacy"),
     # IndexNow ownership key: /<key>.txt (404 unless it matches settings.INDEXNOW_KEY)
     re_path(r"^(?P<key>[A-Za-z0-9-]{8,128})\.txt$", indexnow_key, name="indexnow_key"),
     # Django Admin, use {% url 'admin:index' %}
