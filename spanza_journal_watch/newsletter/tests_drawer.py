@@ -2,8 +2,8 @@
 Tests for the drawer-subscribe flow and the jw_sub cookie.
 
 Covers:
-1. Drawer subscribe endpoint returns a success fragment and sets jw_sub.
-2. Non-drawer subscribe still redirects and sets jw_sub.
+1. Drawer subscribe asks the reader to confirm; confirming sets jw_sub.
+2. Non-drawer subscribe redirects without setting jw_sub.
 3. Newsletter click views set jw_sub when a subscriber is resolved.
 4. SubscriberCookieMiddleware sets jw_sub for authenticated subscribers.
 5. Context processor reports is_known_subscriber correctly.
@@ -33,30 +33,31 @@ pytestmark = pytest.mark.django_db
 # ---------------------------------------------------------------------------
 
 
+def _confirm(client, email, source="drawer"):
+    """Follow the double opt-in link as the address's owner would."""
+    from spanza_journal_watch.newsletter.confirmation import make_confirm_token
+
+    with patch("spanza_journal_watch.newsletter.views.send_confirmation_email"):
+        return client.post(reverse("newsletter:confirm-subscription", args=[make_confirm_token(email, source)]))
+
+
 class TestDrawerSubscribe:
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_drawer_post_returns_success_fragment(self, mock_task, client):
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_drawer_post_asks_reader_to_confirm(self, mock_task, client):
         response = client.post(
             reverse("newsletter:subscribe") + "?source=drawer",
             {"email": "drawer@example.com", "source": "drawer"},
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
-        assert b"You're subscribed" in response.content
+        assert b"We have sent a confirmation link to" in response.content
         assert b"drawer@example.com" in response.content
-        assert Subscriber.objects.filter(email="drawer@example.com").exists()
+        # Nothing is stored or marked until the link is followed
+        assert not Subscriber.objects.filter(email="drawer@example.com").exists()
+        assert JW_SUB_COOKIE_NAME not in response.cookies
+        mock_task.delay.assert_called_once_with("drawer@example.com", Subscriber.Source.DRAWER)
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_drawer_post_sets_jw_sub_cookie(self, mock_task, client):
-        response = client.post(
-            reverse("newsletter:subscribe"),
-            {"email": "cookie-drawer@example.com", "source": "drawer"},
-            HTTP_HX_REQUEST="true",
-        )
-        assert response.status_code == 200
-        assert response.cookies[JW_SUB_COOKIE_NAME].value == "1"
-
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
     def test_drawer_get_returns_form_fragment(self, mock_task, client):
         response = client.get(
             reverse("newsletter:subscribe") + "?source=drawer",
@@ -65,13 +66,18 @@ class TestDrawerSubscribe:
         assert response.status_code == 200
         assert b"drawer-subscribe-container" in response.content
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_nondrawer_post_sets_jw_sub_cookie_and_redirects(self, mock_task, client):
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_nondrawer_post_redirects_without_cookie(self, mock_task, client):
         response = client.post(
             reverse("newsletter:subscribe"),
             {"email": "legacy@example.com"},
             HTTP_HX_REQUEST="true",
         )
+        assert response.status_code == 302
+        assert JW_SUB_COOKIE_NAME not in response.cookies
+
+    def test_confirming_sets_jw_sub_cookie(self, client):
+        response = _confirm(client, "cookie-drawer@example.com")
         assert response.status_code == 302
         assert response.cookies[JW_SUB_COOKIE_NAME].value == "1"
 
@@ -83,16 +89,16 @@ class TestDrawerSubscribe:
 
 class TestNewsletterClickSetsCookie:
     def test_track_email_click_sets_cookie_for_known_subscriber(self, client):
-        Subscriber.objects.create(email="click@example.com", subscribed=True)
+        subscriber = Subscriber.objects.create(email="click@example.com", subscribed=True)
         response = client.get(
-            reverse("analytics:track_email_click") + "?email=click@example.com&next=/",
+            reverse("analytics:track_email_click") + f"?t={subscriber.tracking_token}&next=/",
         )
         assert response.status_code == 302
         assert response.cookies[JW_SUB_COOKIE_NAME].value == "1"
 
     def test_track_email_click_skips_cookie_when_no_subscriber(self, client):
         response = client.get(
-            reverse("analytics:track_email_click") + "?email=unknown@example.com&next=/",
+            reverse("analytics:track_email_click") + "?t=unknown-token&next=/",
         )
         assert response.status_code == 302
         assert JW_SUB_COOKIE_NAME not in response.cookies
@@ -107,7 +113,7 @@ class TestNewsletterClickSetsCookie:
                 "analytics:track_newsletter_email_link",
                 kwargs={"newsletter_token": newsletter.email_token},
             )
-            + f"?email={subscriber.email}&next=/",
+            + f"?t={subscriber.tracking_token}&next=/",
         )
         assert response.status_code == 302
         assert response.cookies[JW_SUB_COOKIE_NAME].value == "1"
@@ -263,24 +269,18 @@ class TestWelcomeEmailNudge:
 
 
 class TestDrawerSubscribeOOBSwap:
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_drawer_success_includes_oob_masthead(self, mock_task, client):
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_drawer_request_leaves_masthead_alone(self, mock_task, client):
         response = client.post(
             reverse("newsletter:subscribe") + "?source=drawer",
             {"email": "oob@example.com", "source": "drawer"},
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
-        content = response.content.decode()
-        # OOB masthead fragment
-        assert 'id="masthead-profile-button"' in content
-        assert 'hx-swap-oob="true"' in content
-        # Post-subscribe state is still anonymous, so the button invites sign-in
-        assert 'aria-label="Newsletter and sign in"' in content
-        assert ">Sign in<" in content
-        assert 'aria-label="Newsletter and sign in"' in content
+        # The reader is not a known subscriber until the link is followed
+        assert 'hx-swap-oob="true"' not in response.content.decode()
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
     def test_nondrawer_success_does_not_include_oob(self, mock_task, client):
         response = client.post(
             reverse("newsletter:subscribe"),
@@ -307,14 +307,9 @@ class TestSubscribedDrawerPanel:
         # Falls back to generic email-link guidance
         assert "link in any of our emails" in content
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_post_subscribe_session_shows_email_and_unsubscribe(self, mock_task, client):
-        # Subscribe via drawer to populate session
-        client.post(
-            reverse("newsletter:subscribe") + "?source=drawer",
-            {"email": "session@example.com", "source": "drawer"},
-            HTTP_HX_REQUEST="true",
-        )
+    def test_post_subscribe_session_shows_email_and_unsubscribe(self, client):
+        # Confirming the subscription populates the session
+        _confirm(client, "session@example.com")
         # Reopen the page as the same client
         response = client.get("/")
         content = response.content.decode()
@@ -329,14 +324,9 @@ class TestSubscribedDrawerPanel:
 
 
 class TestDrawerUnsubscribe:
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_drawer_unsubscribe_clears_state(self, mock_task, client):
-        # First subscribe via drawer
-        client.post(
-            reverse("newsletter:subscribe") + "?source=drawer",
-            {"email": "bye@example.com", "source": "drawer"},
-            HTTP_HX_REQUEST="true",
-        )
+    def test_drawer_unsubscribe_clears_state(self, client):
+        # First subscribe and confirm
+        _confirm(client, "bye@example.com")
         subscriber = Subscriber.objects.get(email="bye@example.com")
         assert subscriber.subscribed is True
 

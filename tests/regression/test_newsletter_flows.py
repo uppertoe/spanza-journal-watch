@@ -1,7 +1,10 @@
+import re
+
 import pytest
 from django.core import mail
 from django.urls import reverse
 
+from spanza_journal_watch.newsletter.confirmation import build_confirmation_request_email
 from spanza_journal_watch.newsletter.models import Newsletter, Subscriber
 
 
@@ -16,6 +19,22 @@ class TestNewsletterFlows:
 
         assert response.status_code == 302
         assert reverse("newsletter:success") in response.headers.get("Location", "")
+        # Double opt-in: nothing is stored until the emailed link is followed
+        assert not Subscriber.objects.filter(email="new-subscriber@example.test").exists()
+
+        request_email = build_confirmation_request_email(
+            "new-subscriber@example.test", Subscriber.Source.SUBSCRIBE_FORM
+        )
+        assert request_email.subject == "Confirm your Journal Watch subscription"
+        assert "Confirm subscription" in request_email.alternatives[0][0]
+        confirm_path = re.search(r"https?://[^/\s]+(/newsletter/confirm/\S+)", request_email.body).group(1)
+
+        # Opening the link (as a mail scanner would) confirms nothing
+        assert route_client.get(confirm_path).status_code == 200
+        assert not Subscriber.objects.filter(email="new-subscriber@example.test").exists()
+
+        confirm_response = route_client.post(confirm_path)
+        assert confirm_response.status_code == 302
         assert Subscriber.objects.filter(email="new-subscriber@example.test", subscribed=True).exists()
 
     def test_unsubscribe_get_and_post(self, route_client, regression_baseline):

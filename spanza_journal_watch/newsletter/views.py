@@ -11,10 +11,11 @@ from django.views.decorators.http import require_POST
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent
 
+from .confirmation import claim_send_slot, read_confirm_token
 from .cookies import JW_SUB_COOKIE_NAME, set_subscribed_cookie
 from .forms import SubscriberForm
 from .models import Subscriber
-from .tasks import send_confirmation_email
+from .tasks import send_confirmation_email, send_subscription_request_email
 
 
 def _render_masthead_button_oob(request, is_known_subscriber):
@@ -79,7 +80,7 @@ def confirm_unsubscribe(request, unsubscribe_token):
     subscriber = _get_subscriber_by_unsubscribe_token(unsubscribe_token)
     if subscriber:
         _unsubscribe_subscriber(request, subscriber)
-        messages.warning(request, f"'{subscriber.email}' been unsubscribed successfully.")
+        messages.warning(request, "You have been unsubscribed from the Journal Watch newsletter.")
     else:
         messages.error(request, "Invalid unsubscribe link.")
 
@@ -136,60 +137,76 @@ def subscribe(request):
         form = SubscriberForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"]
+            source = Subscriber.Source.DRAWER if is_drawer else Subscriber.Source.SUBSCRIBE_FORM
 
-            # Check if email exists
+            # Double opt-in: nothing changes until the owner of the address
+            # follows the emailed link. The response is the same whether or not
+            # the address is already subscribed, so the form reveals nothing.
             existing = Subscriber.first_by_email(email)
-            if existing:
-                existing.subscribed = True
-                existing.save(update_fields=["subscribed", "modified"])
-                _sync_exact_email_subscription_state(email, True)
-                subscriber = existing
-            else:
-                subscriber = form.save(commit=False)
-                subscriber.source = Subscriber.Source.DRAWER if is_drawer else Subscriber.Source.SUBSCRIBE_FORM
-                subscriber.save()
-            messages.success(request, f"'{email}' subscribed successfully.")
-
-            # Set subscribed flag in session
-            request.session["subscribed"] = True
-            request.session["subscriber_id"] = subscriber.pk
-            request.session["subscriber_email"] = email
-
-            AnalyticsEvent.record_event(
-                event_type=AnalyticsEvent.EventType.NEWSLETTER_SUBSCRIBE,
-                request=request,
-                subscriber_id=subscriber.pk,
-                source="drawer" if is_drawer else "subscribe_form",
-                metadata={"resubscribe": bool(existing)},
-            )
-
-            # Send confirmation email
-            send_confirmation_email.delay(subscriber.pk)
+            already_subscribed = bool(existing and existing.subscribed)
+            if not already_subscribed and claim_send_slot(email):
+                send_subscription_request_email.delay(email, source)
 
             if is_drawer:
-                success_html = render_to_string(
-                    "newsletter/_drawer_subscribed_panel.html",
-                    {
-                        "subscriber_email": email,
-                        "can_unsubscribe_from_drawer": True,
-                        "just_subscribed": True,
-                    },
-                    request=request,
-                )
-                oob_html = _render_masthead_button_oob(request, is_known_subscriber=True)
-                response = HttpResponse(success_html + oob_html)
-                set_subscribed_cookie(response)
-                return response
+                return render(request, "newsletter/_drawer_confirm_sent.html", {"email": email})
 
-            response = redirect("newsletter:success")
-            set_subscribed_cookie(response)
-            return response
+            messages.success(
+                request,
+                f"We have sent a confirmation link to {email}. "
+                "Your subscription will begin once you follow the link in that email.",
+            )
+            return redirect("newsletter:success")
     else:
         form = SubscriberForm()
 
     if is_drawer:
         return render(request, "newsletter/_drawer_subscribe_form.html", {"form": form})
     return render(request, "newsletter/subscribe.html", {"form": form})
+
+
+def confirm_subscription(request, token):
+    """The double opt-in link. A GET only shows the button, so mail scanners that open links confirm nothing."""
+    confirmed = read_confirm_token(token)
+    if confirmed is None:
+        return render(request, "newsletter/confirm_subscription.html", {})
+    email, source = confirmed
+
+    if request.method != "POST":
+        return render(request, "newsletter/confirm_subscription.html", {"email": email, "token": token})
+
+    existing = Subscriber.first_by_email(email)
+    if existing:
+        subscriber = existing
+        if not subscriber.subscribed:
+            subscriber.subscribed = True
+            subscriber.save(update_fields=["subscribed", "modified"])
+            _sync_exact_email_subscription_state(email, True)
+    else:
+        known_sources = {choice for choice, _label in Subscriber.Source.choices}
+        subscriber = Subscriber.objects.create(
+            email=email,
+            subscribed=True,
+            source=source if source in known_sources else Subscriber.Source.SUBSCRIBE_FORM,
+        )
+
+    # Following the link proves the reader controls the address
+    request.session["subscribed"] = True
+    request.session["subscriber_id"] = subscriber.pk
+    request.session["subscriber_email"] = email
+
+    AnalyticsEvent.record_event(
+        event_type=AnalyticsEvent.EventType.NEWSLETTER_SUBSCRIBE,
+        request=request,
+        subscriber_id=subscriber.pk,
+        source="drawer" if source == Subscriber.Source.DRAWER else "subscribe_form",
+        metadata={"resubscribe": bool(existing)},
+    )
+    send_confirmation_email.delay(subscriber.pk)
+
+    messages.success(request, "Your subscription to the Journal Watch newsletter is confirmed.")
+    response = redirect("newsletter:success")
+    set_subscribed_cookie(response)
+    return response
 
 
 @require_POST

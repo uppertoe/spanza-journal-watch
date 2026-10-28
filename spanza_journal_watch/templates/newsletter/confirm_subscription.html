@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Confirm your subscription{% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+
+{% block content %}
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+                <p class="text-uppercase text-secondary fw-semibold mb-2">Newsletter</p>
+                {% if email %}
+                    <h1 class="h3 mb-3">Confirm your subscription</h1>
+                    <p class="text-body-secondary mb-4">
+                        Confirm that you would like the Journal Watch newsletter sent to this address:
+                        <span class="fw-semibold text-body">{{ email }}</span>
+                    </p>
+                    <form method="post" action="{% url 'newsletter:confirm-subscription' token=token %}"
+                          class="d-flex flex-wrap justify-content-center gap-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">Confirm subscription</button>
+                    </form>
+                {% else %}
+                    <p class="text-body-secondary mb-0">
+                        This confirmation link has expired or is not valid. You can subscribe again from any page of the site.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

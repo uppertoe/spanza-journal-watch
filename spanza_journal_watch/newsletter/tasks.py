@@ -216,6 +216,15 @@ def send_confirmation_email(self, subscriber_pk):
 
 
 @celery_app.task()
+def send_subscription_request_email(email, source):
+    """Send the double opt-in link to an address someone entered in a subscribe form."""
+    from .confirmation import build_confirmation_request_email
+
+    build_confirmation_request_email(email, source).send()
+    logger.info("Subscription confirmation request sent")
+
+
+@celery_app.task()
 def reset_unsubscribe_token(subscriber_pk):
     """Compatibility shim for older flows/tests.
 

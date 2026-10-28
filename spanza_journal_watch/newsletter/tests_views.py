@@ -38,51 +38,85 @@ class TestSubscribeView:
         )
         assert response.status_code == 200
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_htmx_post_creates_subscriber(self, mock_task, client):
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_htmx_post_sends_confirmation_request_and_stores_nothing(self, mock_task, client):
         response = client.post(
             reverse("newsletter:subscribe"),
             {"email": "newsub@example.com"},
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 302
-        assert Subscriber.objects.filter(email="newsub@example.com").exists()
+        assert not Subscriber.objects.filter(email="newsub@example.com").exists()
+        mock_task.delay.assert_called_once_with("newsub@example.com", Subscriber.Source.SUBSCRIBE_FORM)
+
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_htmx_post_does_not_resubscribe_until_confirmed(self, mock_task, client):
+        sub = Subscriber.objects.create(email="existing@example.com", subscribed=False)
+        client.post(reverse("newsletter:subscribe"), {"email": "existing@example.com"}, HTTP_HX_REQUEST="true")
+        sub.refresh_from_db()
+        assert sub.subscribed is False
         mock_task.delay.assert_called_once()
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_htmx_post_resubscribes_existing(self, mock_task, client):
-        sub = Subscriber.objects.create(email="existing@example.com", subscribed=False)
-        client.post(
-            reverse("newsletter:subscribe"),
-            {"email": "existing@example.com"},
-            HTTP_HX_REQUEST="true",
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_already_subscribed_address_gets_same_response_and_no_email(self, mock_task, client):
+        Subscriber.objects.create(email="already@example.com", subscribed=True)
+        response = client.post(
+            reverse("newsletter:subscribe"), {"email": "already@example.com"}, HTTP_HX_REQUEST="true"
         )
+        assert response.status_code == 302
+        assert not mock_task.delay.called
+
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_repeat_requests_send_one_email(self, mock_task, client, settings):
+        settings.CACHES = {
+            "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "optin"}
+        }
+        for _ in range(3):
+            client.post(reverse("newsletter:subscribe"), {"email": "repeat@example.com"}, HTTP_HX_REQUEST="true")
+        assert mock_task.delay.call_count == 1
+
+    @patch("spanza_journal_watch.newsletter.views.send_subscription_request_email")
+    def test_htmx_post_does_not_identify_session(self, mock_task, client):
+        client.post(reverse("newsletter:subscribe"), {"email": "session@example.com"}, HTTP_HX_REQUEST="true")
+        assert client.session.get("subscriber_id") is None
+        assert client.session.get("subscribed") is None
+
+
+class TestConfirmSubscription:
+    def _url(self, email="confirm@example.com", source=Subscriber.Source.SUBSCRIBE_FORM):
+        from spanza_journal_watch.newsletter.confirmation import make_confirm_token
+
+        return reverse("newsletter:confirm-subscription", args=[make_confirm_token(email, source)])
+
+    def test_get_shows_button_and_subscribes_no_one(self, client):
+        response = client.get(self._url())
+        assert response.status_code == 200
+        assert b"Confirm subscription" in response.content
+        assert not Subscriber.objects.filter(email="confirm@example.com").exists()
+
+    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    def test_post_subscribes_and_identifies_session(self, mock_task, client):
+        response = client.post(self._url())
+        assert response.status_code == 302
+        subscriber = Subscriber.objects.get(email="confirm@example.com")
+        assert subscriber.subscribed is True
+        assert subscriber.source == Subscriber.Source.SUBSCRIBE_FORM
+        assert client.session.get("subscriber_id") == subscriber.pk
+        mock_task.delay.assert_called_once_with(subscriber.pk)
+
+    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
+    def test_post_resubscribes_existing_address(self, mock_task, client):
+        sub = Subscriber.objects.create(email="confirm@example.com", subscribed=False)
+        client.post(self._url())
         sub.refresh_from_db()
         assert sub.subscribed is True
+        assert Subscriber.objects.filter(email="confirm@example.com").count() == 1
 
-    @patch("spanza_journal_watch.newsletter.views.send_confirmation_email")
-    def test_htmx_post_does_not_match_partial_email(self, mock_task, client):
-        Subscriber.objects.create(email="existing@example.com", subscribed=False)
-
-        response = client.post(
-            reverse("newsletter:subscribe"),
-            {"email": "ing@example.com"},
-            HTTP_HX_REQUEST="true",
-        )
-
-        assert response.status_code == 302
-        assert Subscriber.objects.filter(email="existing@example.com").count() == 1
-        assert Subscriber.objects.filter(email="ing@example.com").count() == 1
-
-    def test_htmx_post_sets_session(self, client):
-        with patch("spanza_journal_watch.newsletter.views.send_confirmation_email"):
-            client.post(
-                reverse("newsletter:subscribe"),
-                {"email": "session@example.com"},
-                HTTP_HX_REQUEST="true",
-            )
-        assert client.session.get("subscribed") is True
-        assert client.session.get("subscriber_id") is not None
+    def test_tampered_link_is_refused(self, client):
+        response = client.post(self._url() + "x")
+        assert response.status_code == 200
+        assert b"This confirmation link has expired or is not valid." in response.content
+        assert not Subscriber.objects.exists()
 
 
 # ---------------------------------------------------------------------------
