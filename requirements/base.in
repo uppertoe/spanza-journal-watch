@@ -26,7 +26,6 @@ crispy-bootstrap5
 django-redis
 django-webpack-loader
 django-view-breadcrumbs
-django-request-logging
 django-markdownx
 bleach
 openpyxl

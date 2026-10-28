@@ -61,7 +61,7 @@ cryptography==46.0.7
     #   jwcrypto
 defusedxml==0.7.1
     # via fpdf2
-django==6.0.4
+django==6.0.9
     # via
     #   -r requirements/base.in
     #   crispy-bootstrap5
@@ -73,11 +73,10 @@ django==6.0.4
     #   django-model-utils
     #   django-oauth-toolkit
     #   django-redis
-    #   django-request-logging
     #   django-timezone-field
     #   django-tinymce
     #   django-view-breadcrumbs
-django-allauth==65.15.1
+django-allauth==65.21.0
     # via -r requirements/base.in
 django-celery-beat==2.9.0
     # via -r requirements/base.in
@@ -96,8 +95,6 @@ django-model-utils==5.0.0
 django-oauth-toolkit[oidc]==3.2.0
     # via -r requirements/base.in
 django-redis==6.0.0
-    # via -r requirements/base.in
-django-request-logging==0.7.5
     # via -r requirements/base.in
 django-timezone-field==7.2.1
     # via django-celery-beat

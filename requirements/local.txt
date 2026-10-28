@@ -104,7 +104,7 @@ dill==0.4.1
     # via pylint
 distlib==0.4.0
     # via virtualenv
-django==6.0.4
+django==6.0.9
     # via
     #   -r requirements/base.in
     #   crispy-bootstrap5
@@ -119,13 +119,12 @@ django==6.0.4
     #   django-model-utils
     #   django-oauth-toolkit
     #   django-redis
-    #   django-request-logging
     #   django-stubs
     #   django-stubs-ext
     #   django-timezone-field
     #   django-tinymce
     #   django-view-breadcrumbs
-django-allauth==65.15.1
+django-allauth==65.21.0
     # via -r requirements/base.in
 django-celery-beat==2.9.0
     # via -r requirements/base.in
@@ -150,8 +149,6 @@ django-model-utils==5.0.0
 django-oauth-toolkit[oidc]==3.2.0
     # via -r requirements/base.in
 django-redis==6.0.0
-    # via -r requirements/base.in
-django-request-logging==0.7.5
     # via -r requirements/base.in
 django-stubs==6.0.2
     # via -r requirements/local.in
