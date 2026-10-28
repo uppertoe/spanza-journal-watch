@@ -5,6 +5,10 @@
 {# Django prefers the form field over the X-CSRFToken header htmx sends. #}
 <img id="subscribe-spinner" class="htmx-indicator px-2" src="{% static "images/spinners/pulse-rings-multiple.svg" %}" alt=""/>
 {{ form.email }}
+<div class="jw-hp" aria-hidden="true">
+<label for="id_jw_hp_extra_masthead">Leave this field empty</label>
+<input type="text" name="jw_hp_extra" id="id_jw_hp_extra_masthead" tabindex="-1" autocomplete="off" value="">
+</div>
 <button class="btn btn-outline-warning btn-sm" type="submit" hx-post="{% url "newsletter:subscribe" %}" hx-target="#subscribe-container" hx-swap="outerHTML" hx-indicator="#subscribe-spinner">Subscribe</button>
 </form>
 </div>

@@ -462,6 +462,8 @@ OAUTH2_PROVIDER = {
         "profile": "Profile information",
     },
     "PKCE_REQUIRED": env.bool("OIDC_PKCE_REQUIRED", default=False),
+    # Planka keeps its own session once signed in, so renewal tokens need not last.
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 30 * 24 * 60 * 60,
 }
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")

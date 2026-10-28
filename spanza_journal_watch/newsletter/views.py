@@ -10,9 +10,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from spanza_journal_watch.analytics.models import AnalyticsEvent
+from spanza_journal_watch.users.views import HONEYPOT_FIELD
 
 from .confirmation import (
     claim_send_slot,
+    claim_visitor_slot,
     discard_confirm_token,
     make_confirm_token,
     read_confirm_token,
@@ -150,7 +152,10 @@ def subscribe(request):
             # the address is already subscribed, so the form reveals nothing.
             existing = Subscriber.first_by_email(email)
             already_subscribed = bool(existing and existing.subscribed)
-            if not already_subscribed and claim_send_slot(email):
+            # A filled trap field means a form-filling bot. It and a visitor over
+            # the hourly limit see the usual reply, but no email is sent.
+            sendable = not request.POST.get(HONEYPOT_FIELD) and not already_subscribed
+            if sendable and claim_visitor_slot(request) and claim_send_slot(email):
                 code = make_confirm_token(email, source)
                 try:
                     send_subscription_request_email.delay(email, code)

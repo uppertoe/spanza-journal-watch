@@ -7,6 +7,10 @@
     {# No {% csrf_token %}: a token baked into CDN-cached markup goes stale, and #}
     {# Django prefers the form field over the X-CSRFToken header htmx sends. #}
     <input type="hidden" name="source" value="drawer">
+    <div class="jw-hp" aria-hidden="true">
+      <label for="id_jw_hp_extra_drawer">Leave this field empty</label>
+      <input type="text" name="jw_hp_extra" id="id_jw_hp_extra_drawer" tabindex="-1" autocomplete="off" value="">
+    </div>
     <div class="input-group input-group-sm">
       {{ form.email }}
       <button class="btn btn-primary" type="submit">

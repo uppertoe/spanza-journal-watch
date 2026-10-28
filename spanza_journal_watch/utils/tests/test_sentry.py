@@ -25,3 +25,24 @@ def test_before_send_redacts_message_logentry_exception_and_breadcrumbs():
 def test_before_breadcrumb_leaves_text_without_addresses_alone():
     crumb = {"message": "GET /reviews/caudal-blocks", "data": {"status": 200}}
     assert before_breadcrumb(dict(crumb), None) == crumb
+
+
+def test_request_tokens_and_query_strings_are_removed():
+    from spanza_journal_watch.utils.sentry import before_send
+
+    event = {
+        "request": {
+            "url": "https://journalwatch.org.au/newsletter/unsubscribe/abc123/confirm",
+            "query_string": "t=tracking-token",
+        }
+    }
+    request = before_send(event, None)["request"]
+    assert request["url"] == "https://journalwatch.org.au/newsletter/unsubscribe/[token]/confirm"
+    assert "query_string" not in request
+
+
+def test_confirmation_codes_and_invitations_are_removed_from_paths():
+    from spanza_journal_watch.utils.sentry import redact_request
+
+    assert redact_request({"url": "/newsletter/confirm/Xyz_9"})["url"] == "/newsletter/confirm/[token]"
+    assert redact_request({"url": "/invites/issue/tok/"})["url"] == "/invites/issue/[token]/"

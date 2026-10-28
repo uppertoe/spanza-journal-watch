@@ -259,6 +259,7 @@ sentry_sdk.init(
     integrations=integrations,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
     send_default_pii=False,  # No user, address, IP or cookies on events
+    include_local_variables=False,  # Working values can hold addresses and tokens
     max_request_body_size="never",  # Form posts carry emails, sign-in codes and enquiry text
     attach_stacktrace=env.bool("SENTRY_ATTACH_STACKTRACE", default=True),
     max_breadcrumbs=env.int("SENTRY_MAX_BREADCRUMBS", default=100),

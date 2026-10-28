@@ -27,6 +27,8 @@ SUBSCRIBE_ON_CONFIRM_SESSION_KEY = "subscribe_on_confirm"
 # One confirmation email per address in this window, so the form cannot be used
 # to fill someone's inbox.
 RESEND_INTERVAL = 10 * 60
+# Confirmation emails one visitor may set off in an hour, across all addresses.
+VISITOR_HOURLY_LIMIT = 5
 
 # Local development runs on DummyCache, which keeps nothing; the codes are then
 # held in this process instead, so confirmation links still work there.
@@ -64,6 +66,21 @@ def claim_send_slot(email):
     return cache.add(
         f"newsletter:confirm-sent:{signing.Signer(salt=CONFIRM_SALT).signature(email)}", 1, RESEND_INTERVAL
     )
+
+
+def claim_visitor_slot(request):
+    """True while this visitor has set off fewer than VISITOR_HOURLY_LIMIT confirmation emails this hour."""
+    from allauth.account.adapter import get_adapter
+
+    ip = get_adapter(request).get_client_ip(request)
+    key = f"newsletter:confirm-visitor:{signing.Signer(salt=CONFIRM_SALT).signature(ip)}"
+    cache.add(key, 0, 60 * 60)
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        # The dummy cache used in local development keeps nothing.
+        return True
+    return count <= VISITOR_HOURLY_LIMIT
 
 
 def release_send_slot(email):
