@@ -1,0 +1,44 @@
+// On phones each row of the privacy policy's tables becomes a labelled block,
+// with the first column as its heading and the other columns as label and value.
+@media (max-width: 767.98px) {
+  .privacy-table {
+    thead {
+      display: none;
+    }
+
+    tr,
+    td {
+      display: block;
+    }
+
+    tr {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    tr:first-child {
+      border-top: 1px solid var(--bs-border-color);
+    }
+
+    td {
+      padding: 0.15rem 0;
+      border: 0;
+    }
+
+    td:first-child {
+      font-weight: 600;
+      padding-bottom: 0.35rem;
+    }
+
+    td:not(:first-child)::before {
+      content: attr(data-label);
+      display: block;
+      color: var(--bs-secondary-color);
+      font-size: 0.8em;
+    }
+
+    td:not(:first-child) + td {
+      padding-top: 0.4rem;
+    }
+  }
+}
