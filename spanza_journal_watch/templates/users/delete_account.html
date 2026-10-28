@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Delete your account{% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+
+{% block content %}
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12 col-md-10 col-lg-8">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5">
+                <p class="text-uppercase text-secondary fw-semibold mb-2">Account</p>
+                <h1 class="h3 mb-3">Delete your account</h1>
+                {% if allowed %}
+                    <p class="text-body-secondary">
+                        Deleting your account removes your name, your email address, your reading list, your CPD reading record and your CPD reports. We cannot restore an account once it has been deleted.
+                    </p>
+                    {% if is_subscribed %}
+                        <p class="text-body-secondary">
+                            Your newsletter subscription will end. We keep your email address only so that we do not email you again.
+                        </p>
+                    {% endif %}
+                    {% if review_count %}
+                        <div class="alert alert-warning" role="alert">
+                            You have written {{ review_count }} published review{{ review_count|pluralize }} for Journal Watch. Your review{{ review_count|pluralize }} will stay published, credited to Anonymous instead of your name, and your author page will be removed.
+                        </div>
+                    {% endif %}
+                    <form method="post" action="{% url 'users:delete' %}" class="d-flex flex-wrap gap-2 mt-4">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Delete my account</button>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </form>
+                {% else %}
+                    <p class="text-body-secondary mb-0">
+                        Editorial staff accounts are deleted by an administrator. If you would like your account deleted, you can contact us at <a href="mailto:journalwatch@spanza.org.au">journalwatch@spanza.org.au</a>.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block sidebar %}{% endblock sidebar %}

@@ -29,7 +29,7 @@
                    hx-target="#search-results"
                    hx-push-url="true"
                    class="text-decoration-none">{{ review.display_review_date|date:"F Y" }}</a>
-                by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a>
+                by {% if review.author.anonymous %}{{ review.author }}{% else %}<a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a>{% endif %}
             </p>
 
             {% with review.article.tags.all as review_tags %}

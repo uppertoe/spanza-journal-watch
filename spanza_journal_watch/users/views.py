@@ -57,6 +57,35 @@ user_redirect_view = UserRedirectView.as_view()
 
 
 @login_required
+def delete_account_view(request):
+    """Confirmation page for a reader closing their own account; the POST deletes it."""
+    from django.contrib import messages
+    from django.contrib.auth import logout
+    from django.shortcuts import redirect
+
+    from spanza_journal_watch.newsletter.models import Subscriber
+    from spanza_journal_watch.users.deletion import can_delete_own_account, delete_account, published_review_count
+
+    user = request.user
+    allowed = can_delete_own_account(user)
+    if request.method == "POST" and allowed:
+        logout(request)
+        delete_account(user)
+        messages.success(request, "Your account has been deleted.")
+        return redirect("home")
+
+    is_subscribed = Subscriber.by_email(user.email).filter(subscribed=True).exists() or (
+        Subscriber.objects.filter(user=user, subscribed=True).exists()
+    )
+    context = {
+        "allowed": allowed,
+        "is_subscribed": is_subscribed,
+        "review_count": published_review_count(user),
+    }
+    return render(request, "users/delete_account.html", context)
+
+
+@login_required
 @require_POST
 def update_profile_name(request):
     """Update the user's display name from the profile drawer."""
@@ -127,9 +156,9 @@ HONEYPOT_FIELD = "jw_hp_extra"
 def _new_signup_allowed():
     """Cap new accounts site-wide per clock hour.
 
-    A per-IP limit is not possible yet: behind Cloudflare and Caddy every request
-    reaches Django from the proxy's address. The cap stops a bot from creating
-    accounts (and sending verification emails) at volume.
+    allauth's own signup limit is per IP; this site-wide cap stops a bot that
+    rotates addresses from creating accounts (and sending verification emails)
+    at volume.
     """
     from django.core.cache import cache
     from django.utils import timezone

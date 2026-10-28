@@ -7,7 +7,7 @@
     <p class="card-subtitle text-muted fst-italic mb-0">{{ review.article.journal|default:review.article.source_journal_name }}</p>
     <span class="badge text-bg-warning-subtle text-warning-emphasis jw-star-count-badge{% if not star_count %} d-none{% endif %}" data-article-id="{{ review.article.pk }}"><svg class="bi me-1" width="0.8em" height="0.8em" aria-hidden="true"><use href="#icon-star-fill"></use></svg><span class="jw-star-count-value">{{ star_count|default:"0" }}</span></span>
   </div>
-  <p class="card-subtitle text-muted mb-3">Reviewed {{ review.get_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+  <p class="card-subtitle text-muted mb-3">Reviewed {{ review.get_review_date|date:"F Y" }} by {% if review.author.anonymous %}{{ review.author }}{% else %}<a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a>{% endif %}</p>
   <p class="mb-1">{{ review.article.citation }}</p>
   <a href="{{ review.article.url }}" class="my-2 icon-link gap-1 icon-link-hover text-decoration-none" target="_blank" rel="noopener noreferrer" data-analytics-full-text data-cpd-article-id="{{ review.article.pk }}">View full text article<svg class="bi"><use xlink:href="#chevron-right"/></svg></a>
   {% include "fragments/cpd_hint.html" %}

@@ -22,7 +22,7 @@
 {% if review.article.get_subtitle %}<p class="card-subtitle mb-1">{{ review.article.get_subtitle|capfirst }}</p>{% endif %}
 {% include "fragments/review_headline.html" %}
 <p class="card-subtitle text-muted mb-1 fst-italic">{{ review.article.journal|default:review.article.source_journal_name }}</a>
-<p class="card-subtitle text-muted mb-1">Reviewed {{ review.display_review_date|date:"F Y" }} by <a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a></p>
+<p class="card-subtitle text-muted mb-1">Reviewed {{ review.display_review_date|date:"F Y" }} by {% if review.author.anonymous %}{{ review.author }}{% else %}<a href="{{ review.author.get_absolute_url }}">{{ review.author }}</a>{% endif %}</p>
 {% if review.bottom_line %}
 <aside class="jw-bottom-line my-3" aria-label="Bottom line">
   <p class="text-uppercase small fw-semibold mb-1">Bottom line</p>

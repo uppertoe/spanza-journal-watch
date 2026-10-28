@@ -39,6 +39,9 @@
         {% endif %}
         <a href="{% url 'account_logout' %}" class="btn btn-outline-secondary">Log out</a>
       </div>
+      <p class="text-center small mt-3 mb-0">
+        <a href="{% url 'users:delete' %}" class="link-secondary">Delete account</a>
+      </p>
 
     {% else %}
       {# ── Anonymous: account first ───────────────────── #}
