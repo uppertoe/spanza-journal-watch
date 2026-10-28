@@ -88,4 +88,4 @@ if not settings.DEBUG:  # Anymail only available in production
                 in_reply_to=in_reply_to,
             )
 
-            logger.info("Email received from %s: %s (thread %s)", message.envelope_sender, event.event_id, thread.pk)
+            logger.info("Email received: %s (thread %s)", event.event_id, thread.pk)

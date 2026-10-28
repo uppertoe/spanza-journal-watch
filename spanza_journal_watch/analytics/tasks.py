@@ -377,21 +377,26 @@ def purge_expired_personal_records(batch_size=5000):
     """Delete records about people once they are older than the retention period.
 
     Covers reading activity, newsletter opens, clicks and deliveries, and inbox
-    threads. Subscriber rows are kept even after unsubscribing or bouncing: the
+    threads with their inbound messages. Subscriber rows are kept even after unsubscribing or bouncing: the
     address is what stops a later list import from emailing that person again.
     Newsletter totals stored on the Newsletter itself are unaffected.
     """
     from django.conf import settings
 
-    from spanza_journal_watch.backend.models import EmailThread
+    from spanza_journal_watch.backend.models import EmailThread, InboundEmail
 
     cutoff = timezone.now() - timedelta(days=settings.PERSONAL_DATA_RETENTION_DAYS)
+    expired_threads = EmailThread.objects.filter(last_message_at__lt=cutoff)
+    # Inbound messages outlive their thread otherwise (InboundEmail.thread is SET_NULL). Only the
+    # parsed message is held here: the raw copy in S3 expires under the bucket's lifecycle rule.
+    expired_inbound = InboundEmail.objects.filter(Q(created__lt=cutoff) | Q(thread__in=expired_threads))
     deleted = {
         "analytics_events": _delete_in_batches(AnalyticsEvent.objects.filter(timestamp__lt=cutoff), batch_size),
         "newsletter_opens": _delete_in_batches(NewsletterOpen.objects.filter(timestamp__lt=cutoff), batch_size),
         "newsletter_clicks": _delete_in_batches(NewsletterClick.objects.filter(timestamp__lt=cutoff), batch_size),
         "newsletter_deliveries": _delete_in_batches(NewsletterDelivery.objects.filter(sent_at__lt=cutoff), batch_size),
-        "inbox_threads": _delete_in_batches(EmailThread.objects.filter(last_message_at__lt=cutoff), batch_size),
+        "inbound_emails": _delete_in_batches(expired_inbound, batch_size),
+        "inbox_threads": _delete_in_batches(expired_threads, batch_size),
     }
     logger.info("purge_expired_personal_records: deleted %s older than %s", deleted, cutoff.date())
     return deleted

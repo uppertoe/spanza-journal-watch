@@ -1,6 +1,10 @@
+import datetime
+import time
+
+from django.conf import settings
+from django.contrib.auth import logout
 from django.http import HttpResponsePermanentRedirect
 from django.urls import Resolver404, resolve
-from request_logging.middleware import LoggingMiddleware as BaseLoggingMiddleware
 
 
 class RemoveSlashMiddleware:
@@ -33,20 +37,44 @@ class RemoveSlashMiddleware:
         return self.get_response(request)
 
 
-class LoggingMiddleware(BaseLoggingMiddleware):
-    """django-request-logging that leaves multipart bodies unread.
+STAFF_SIGNED_IN_AT_SESSION_KEY = "staff_signed_in_at"
 
-    The package reads request.body on every request, which holds an entire
-    upload in memory and applies DATA_UPLOAD_MAX_MEMORY_SIZE to file data
-    (Django normally exempts files from it). A large feature image therefore
-    raised RequestDataTooBig before the view ran. Multipart requests are still
-    logged, just without their body.
+
+class StaffSessionLimitMiddleware:
+    """End a staff session STAFF_SESSION_COOKIE_AGE after sign-in, however the person signed in.
+
+    The user_logged_in signal records the sign-in time, but allauth's password
+    sign-in sets the session expiry again afterwards. This middleware runs after
+    the view, so it has the last word on the expiry, and signs out a staff
+    session that has outlived the limit. Sessions without a recorded time (such
+    as a reader made staff while signed in) are timed from their next request.
     """
 
+    def __init__(self, get_response):
+        self.get_response = get_response
+
     def __call__(self, request):
-        if not request.headers.get("content-type", "").startswith("multipart/form-data"):
-            return super().__call__(request)
+        if self._is_staff_session(request) and self._deadline(request.session) <= time.time():
+            logout(request)
         response = self.get_response(request)
-        self.process_request(request, response, b"")
-        self.process_response(request, response)
+        if self._is_staff_session(request):
+            deadline = datetime.datetime.fromtimestamp(self._deadline(request.session), tz=datetime.UTC)
+            if request.session.get_expiry_date() > deadline + datetime.timedelta(seconds=1):
+                request.session.set_expiry(deadline)
         return response
+
+    @staticmethod
+    def _is_staff_session(request):
+        # An empty session is checked first so anonymous requests never load a user or mark the session accessed.
+        session = getattr(request, "session", None)
+        if session is None or session.is_empty():
+            return False
+        user = getattr(request, "user", None)
+        return bool(user is not None and user.is_authenticated and user.is_staff)
+
+    @staticmethod
+    def _deadline(session):
+        signed_in_at = session.get(STAFF_SIGNED_IN_AT_SESSION_KEY)
+        if signed_in_at is None:
+            signed_in_at = session[STAFF_SIGNED_IN_AT_SESSION_KEY] = time.time()
+        return signed_in_at + getattr(settings, "STAFF_SESSION_COOKIE_AGE", 12 * 60 * 60)

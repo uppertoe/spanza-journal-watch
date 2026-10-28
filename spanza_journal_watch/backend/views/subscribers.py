@@ -246,7 +246,7 @@ def user_toggle_chief_editor(request, user_id):
 
         perm = DjangoPerm.objects.get(content_type__app_label="submissions", codename="chief_editor")
         target_user.user_permissions.remove(perm)
-        withdraw_unneeded_role_permissions(target_user)
+        withdraw_unneeded_role_permissions(target_user, chief_editor_removed=True)
         messages.success(request, f"Removed chief editor role from {target_user.email}")
     else:
         # Promote: grant full bundle

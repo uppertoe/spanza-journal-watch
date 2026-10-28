@@ -2,7 +2,6 @@
 Base settings to build other settings files upon.
 """
 
-import logging
 from pathlib import Path
 
 import environ
@@ -172,8 +171,8 @@ MIDDLEWARE = [
     "spanza_journal_watch.utils.middleware.RemoveSlashMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "spanza_journal_watch.utils.middleware.LoggingMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "spanza_journal_watch.utils.middleware.StaffSessionLimitMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
@@ -366,34 +365,9 @@ LOGGING = {
 # are deleted once older than this (analytics.tasks.purge_expired_personal_records).
 PERSONAL_DATA_RETENTION_DAYS = env.int("PERSONAL_DATA_RETENTION_DAYS", default=730)
 
-# Staff sessions expire after 12 hours rather than the default two weeks
-# (users.signals.shorten_staff_sessions).
+# Staff sessions expire 12 hours after sign-in rather than the default two weeks
+# (users.signals.shorten_staff_sessions, utils.middleware.StaffSessionLimitMiddleware).
 STAFF_SESSION_COOKIE_AGE = 12 * 60 * 60
-
-# django-request-logging
-# ------------------------------------------------------------------------------
-# Log 4xx responses at WARNING rather than the package default of ERROR. Routine
-# bot traffic — credential scans (/.env, /wp-login.php) and crawls of deleted
-# tag pages (/explore/<slug> for tags removed by Tag.delete_if_orphaned) — is
-# almost all 4xx. At ERROR these flooded the logs and, in production, were
-# forwarded to Sentry as events (Sentry's logging integration uses
-# event_level=ERROR), burning quota on non-actionable noise.
-REQUEST_LOGGING_HTTP_4XX_LOG_LEVEL = logging.WARNING
-# Mask Cookie/Set-Cookie when logging request headers. The package masks only
-# Authorization/Proxy-Authorization by default, so on every logged request the
-# full Cookie header — including the live sessionid and jwvid visitor ID — was
-# written to logs (and Sentry breadcrumbs) in cleartext.
-REQUEST_LOGGING_SENSITIVE_HEADERS = [
-    "Authorization",
-    "Proxy-Authorization",
-    "Cookie",
-    "Set-Cookie",
-]
-# Never log request or response bodies. The package logs them with the headers
-# on every 4xx/5xx, so a failed sign-in, subscribe or enquiry wrote the email
-# address, sign-in code or message text to the log file and to Sentry.
-DJANGO_REQUEST_LOGGING_LOG_BODY_DEFAULT_VALUE = False
-DJANGO_REQUEST_LOGGING_LOG_RESPONSE_DEFAULT_VALUE = False
 
 # Celery
 # ------------------------------------------------------------------------------
@@ -405,7 +379,8 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=env("REDIS_URL", default="r
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-result_backend
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#result-extended
-CELERY_RESULT_EXTENDED = True
+# Off, so task arguments (account IDs, Planka memberships) are not copied into Redis results.
+CELERY_RESULT_EXTENDED = False
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#result-backend-always-retry
 # https://github.com/celery/celery/pull/6122
 CELERY_RESULT_BACKEND_ALWAYS_RETRY = True

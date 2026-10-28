@@ -186,12 +186,19 @@ COORDINATOR_PERMISSIONS = [
 ]
 
 
-def withdraw_unneeded_role_permissions(user):
-    """Remove the permissions and staff status a user no longer holds a role for.
+CONTRIBUTOR_PERMISSIONS = [("submissions", "invited_contributor")]
 
-    Called after a chief editor is demoted or a contributor revoked. Roles are
-    granted as bundles of global permissions, so removing only the role's own
-    permission left access to subscriber lists, analytics and author emails.
+
+def withdraw_unneeded_role_permissions(user, *, chief_editor_removed=False):
+    """Remove the role permissions and staff status a user no longer holds a role for.
+
+    Called after a chief editor is demoted (``chief_editor_removed``) or a
+    contributor revoked. Roles are granted as bundles of global permissions, so
+    removing only the role's own permission left access to subscriber lists,
+    analytics and author emails. Only the bundle of the role that ended is
+    withdrawn, and only where no remaining role still needs it. Staff status is
+    kept for superusers and for anyone left with a group or a permission beyond
+    the reviewer's, since that access was granted for some other reason.
     """
     from django.contrib.auth.models import Permission
 
@@ -201,22 +208,48 @@ def withdraw_unneeded_role_permissions(user):
             if perm:
                 user.user_permissions.remove(perm)
 
-    if user.user_permissions.filter(content_type__app_label="submissions", codename="chief_editor").exists():
-        return
-    _remove(CHIEF_EDITOR_ONLY_PERMISSIONS)
-
+    is_chief_editor = user.user_permissions.filter(
+        content_type__app_label="submissions", codename="chief_editor"
+    ).exists()
     active_rows = IssueContributor.objects.filter(user=user, status=IssueContributor.Status.ACTIVE)
     is_coordinator = active_rows.filter(role=IssueContributor.Role.COORDINATOR).exists()
-    if not is_coordinator:
-        _remove(COORDINATOR_PERMISSIONS)
+
+    if not is_chief_editor:
+        if chief_editor_removed:
+            _remove(CHIEF_EDITOR_ONLY_PERMISSIONS)
+        if not is_coordinator:
+            _remove(COORDINATOR_PERMISSIONS)
     if not active_rows.exists():
-        _remove([("submissions", "invited_contributor")])
+        _remove(CONTRIBUTOR_PERMISSIONS)
 
     for attr in ("_perm_cache", "_user_perm_cache"):
         user.__dict__.pop(attr, None)
-    if user.is_staff and not user.is_superuser and not is_coordinator:
-        user.is_staff = False
-        user.save(update_fields=["is_staff"])
+    if not user.is_staff or user.is_superuser or is_chief_editor or is_coordinator:
+        return
+    # Whatever survived the withdrawal was granted for another reason; reviewers never needed staff status.
+    other_permissions = user.user_permissions.exclude(
+        content_type__app_label="submissions", codename="invited_contributor"
+    ).exists()
+    if other_permissions or user.groups.exists():
+        return
+    user.is_staff = False
+    user.save(update_fields=["is_staff"])
+
+
+def remove_planka_board_memberships(client, binding, planka_user_id, membership_id="", instructions_membership_id=""):
+    """Remove a Planka user from an issue's two boards; cards, comments and history stay on the boards.
+
+    Stored membership IDs are used when present, otherwise the board is
+    searched for the user. Raises PlankaAPIError if Planka refuses a removal.
+    """
+    slots = [(binding.board_id if binding else None, membership_id)]
+    slots.append((binding.instructions_board_id if binding else None, instructions_membership_id))
+    for board_id, stored_id in slots:
+        if not stored_id and board_id and planka_user_id:
+            found = client.find_board_membership(board_id, planka_user_id)
+            stored_id = str(found.get("id", "")) if found else ""
+        if stored_id:
+            client.remove_board_member(stored_id)
 
 
 @login_required
@@ -490,21 +523,13 @@ def issue_revoke_contributor(request, issue_id, contributor_id):
         try:
             client = shared._build_planka_client()
             binding = PlankaIssueBinding.objects.filter(issue=issue).first()
-
-            # If membership IDs aren't stored, look them up via the API
-            if binding and not contributor.planka_membership_id:
-                found = client.find_board_membership(binding.board_id, contributor.planka_user_id)
-                if found:
-                    contributor.planka_membership_id = str(found.get("id", ""))
-
-            if binding and binding.instructions_board_id and not contributor.planka_instructions_membership_id:
-                found = client.find_board_membership(binding.instructions_board_id, contributor.planka_user_id)
-                if found:
-                    contributor.planka_instructions_membership_id = str(found.get("id", ""))
-
-            for membership_id in [contributor.planka_membership_id, contributor.planka_instructions_membership_id]:
-                if membership_id:
-                    client.remove_board_member(membership_id)
+            remove_planka_board_memberships(
+                client,
+                binding,
+                contributor.planka_user_id,
+                contributor.planka_membership_id,
+                contributor.planka_instructions_membership_id,
+            )
             contributor.planka_membership_id = ""
             contributor.planka_instructions_membership_id = ""
             contributor.planka_sync_state = IssueContributor.PlankaSyncState.OK

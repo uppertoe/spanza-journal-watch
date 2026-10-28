@@ -622,3 +622,69 @@ class TestChiefEditorInviteFlow:
         url = reverse("backend:send_chief_editor_invite")
         response = client.post(url, {"email": "new@example.com", "name": "New"})
         assert response.status_code == 403
+
+
+class TestRoleWithdrawal:
+    """Ending one role withdraws that role's bundle, not access granted for another reason."""
+
+    @staticmethod
+    def _grant(user, *specs):
+        from django.contrib.auth.models import Permission as DjangoPerm
+
+        for app_label, codename in specs:
+            user.user_permissions.add(DjangoPerm.objects.get(content_type__app_label=app_label, codename=codename))
+
+    def _revoked_coordinator(self, email):
+        user = UserFactory(email=email, is_staff=True)
+        self._grant(user, ("submissions", "regional_coordinator"), ("submissions", "manage_issue_builder"))
+        IssueContributor.objects.create(
+            issue=make_issue(),
+            email=email,
+            user=user,
+            role=IssueContributor.Role.COORDINATOR,
+            status=IssueContributor.Status.REVOKED,
+        )
+        return user
+
+    def test_contributor_revocation_keeps_analytics_access(self):
+        from spanza_journal_watch.backend.views.contributors import withdraw_unneeded_role_permissions
+
+        user = self._revoked_coordinator("analyst@example.com")
+        self._grant(user, ("backend", "view_site_analytics"))
+
+        withdraw_unneeded_role_permissions(user)
+
+        user = User.objects.get(pk=user.pk)
+        assert user.has_perm("submissions.manage_issue_builder") is False
+        assert user.has_perm("backend.view_site_analytics") is True
+        assert user.is_staff is True
+
+    def test_coordinator_with_no_other_access_loses_staff(self):
+        from spanza_journal_watch.backend.views.contributors import withdraw_unneeded_role_permissions
+
+        user = self._revoked_coordinator("former@example.com")
+        withdraw_unneeded_role_permissions(user)
+        assert User.objects.get(pk=user.pk).is_staff is False
+
+    def test_staff_with_another_permission_or_group_stay_staff(self):
+        from django.contrib.auth.models import Group
+
+        from spanza_journal_watch.backend.views.contributors import withdraw_unneeded_role_permissions
+
+        with_permission = self._revoked_coordinator("admin-perm@example.com")
+        self._grant(with_permission, ("newsletter", "view_subscriber"))
+        in_group = self._revoked_coordinator("grouped@example.com")
+        in_group.groups.add(Group.objects.create(name="Site editors"))
+
+        for user in (with_permission, in_group):
+            withdraw_unneeded_role_permissions(user)
+            assert User.objects.get(pk=user.pk).is_staff is True
+
+    def test_superuser_stays_staff(self):
+        from spanza_journal_watch.backend.views.contributors import withdraw_unneeded_role_permissions
+
+        user = self._revoked_coordinator("super@example.com")
+        User.objects.filter(pk=user.pk).update(is_superuser=True)
+        user = User.objects.get(pk=user.pk)
+        withdraw_unneeded_role_permissions(user)
+        assert User.objects.get(pk=user.pk).is_staff is True

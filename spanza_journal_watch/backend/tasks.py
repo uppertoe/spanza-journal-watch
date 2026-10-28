@@ -807,3 +807,53 @@ def warm_analytics_visits_task():
     counts = warm_derived_visits()
     logger.info("Warmed analytics visits: %s", counts)
     return counts
+
+
+@celery_app.task()
+def withdraw_planka_access_for_deleted_account(user_pk, memberships):
+    """Take a deleted account off its issue boards in Planka and deactivate its Planka user.
+
+    ``memberships`` holds one dict per contributor row the account had, with
+    ``issue_id``, ``planka_user_id``, ``membership_id`` and
+    ``instructions_membership_id``. Cards, comments and actions stay in Planka.
+    """
+    from .models import PlankaIssueBinding
+    from .planka import PlankaAPIError
+    from .views.contributors import remove_planka_board_memberships
+    from .views.shared import _build_planka_client
+
+    if not any(entry.get("planka_user_id") or entry.get("membership_id") for entry in memberships):
+        return
+    try:
+        client = _build_planka_client()
+    except PlankaAPIError:
+        logger.info("Planka is not configured, so Planka access for deleted user %s was left as it is", user_pk)
+        return
+
+    planka_user_ids = []
+    for entry in memberships:
+        planka_user_id = entry.get("planka_user_id") or ""
+        binding = PlankaIssueBinding.objects.filter(issue_id=entry.get("issue_id")).first()
+        try:
+            remove_planka_board_memberships(
+                client,
+                binding,
+                planka_user_id,
+                entry.get("membership_id") or "",
+                entry.get("instructions_membership_id") or "",
+            )
+        except PlankaAPIError as error:
+            logger.warning(
+                "Could not remove Planka board access for deleted user %s on issue %s: %s",
+                user_pk,
+                entry.get("issue_id"),
+                error,
+            )
+        if planka_user_id and planka_user_id not in planka_user_ids:
+            planka_user_ids.append(planka_user_id)
+
+    for planka_user_id in planka_user_ids:
+        try:
+            client.deactivate_user(planka_user_id)
+        except PlankaAPIError as error:
+            logger.warning("Could not deactivate the Planka user for deleted user %s: %s", user_pk, error)

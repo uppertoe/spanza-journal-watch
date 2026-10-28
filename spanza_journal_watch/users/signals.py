@@ -1,4 +1,5 @@
 import logging
+import time
 
 from django.conf import settings
 from django.contrib.auth.signals import user_logged_in, user_logged_out
@@ -9,8 +10,15 @@ logger = logging.getLogger(__name__)
 
 @receiver(user_logged_in)
 def shorten_staff_sessions(sender, request, user, **kwargs):
-    """Staff can see subscriber lists, analytics and the inbox, so their sessions end sooner."""
+    """Staff can see subscriber lists, analytics and the inbox, so their sessions end sooner.
+
+    allauth sets the expiry again after this signal on a password sign-in, so
+    StaffSessionLimitMiddleware holds the session to the sign-in time recorded here.
+    """
+    from spanza_journal_watch.utils.middleware import STAFF_SIGNED_IN_AT_SESSION_KEY
+
     if request is not None and user.is_staff:
+        request.session[STAFF_SIGNED_IN_AT_SESSION_KEY] = time.time()
         request.session.set_expiry(getattr(settings, "STAFF_SESSION_COOKIE_AGE", 12 * 60 * 60))
 
 
@@ -26,7 +34,8 @@ def revoke_planka_sessions_on_logout(sender, request, user, **kwargs):
         return
 
     _revoke_planka_db_sessions(user)
-    _revoke_oauth2_tokens(user)
+    if user.pk is not None:  # A deleted account's tokens went with it
+        _revoke_oauth2_tokens(user)
 
 
 def _revoke_planka_db_sessions(user):
@@ -51,11 +60,11 @@ def _revoke_planka_db_sessions(user):
                 with conn.cursor() as cur:
                     cur.execute("DELETE FROM session WHERE user_id = %s", (planka_user_id,))
                     if cur.rowcount:
-                        logger.info("Revoked %d Planka session(s) for user %s", cur.rowcount, user.email)
+                        logger.info("Revoked %d Planka session(s) for user %s", cur.rowcount, user.pk)
         finally:
             conn.close()
     except Exception:
-        logger.exception("Failed to revoke Planka sessions for user %s", user.email)
+        logger.exception("Failed to revoke Planka sessions for user %s", user.pk)
 
 
 def _resolve_planka_user_id(user, db_url):
@@ -75,7 +84,7 @@ def _resolve_planka_user_id(user, db_url):
         finally:
             conn.close()
     except Exception:
-        logger.exception("Failed to look up Planka user ID for %s", user.email)
+        logger.exception("Failed to look up Planka user ID for user %s", user.pk)
         return None
 
 
@@ -89,6 +98,6 @@ def _revoke_oauth2_tokens(user):
         revoked = AccessToken.objects.filter(user=user, expires__gt=now).update(expires=now)
         RefreshToken.objects.filter(user=user, revoked__isnull=True).update(revoked=now)
         if revoked:
-            logger.info("Revoked %d OAuth2 token(s) for user %s", revoked, user.email)
+            logger.info("Revoked %d OAuth2 token(s) for user %s", revoked, user.pk)
     except Exception:
-        logger.exception("Failed to revoke OAuth2 tokens for user %s", user.email)
+        logger.exception("Failed to revoke OAuth2 tokens for user %s", user.pk)

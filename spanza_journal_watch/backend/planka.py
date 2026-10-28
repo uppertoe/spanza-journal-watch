@@ -430,6 +430,15 @@ class PlankaClient:
         payload = self._request("PATCH", f"/users/{user_id}", json={"role": role})
         return payload.get("item", {})
 
+    def deactivate_user(self, user_id):
+        """Stop a Planka user signing in; their cards, comments and actions are kept.
+
+        Needs an admin API key. Unlike DELETE /users/{id}, which also deletes
+        projects the user manages, deactivation changes nothing else.
+        """
+        payload = self._request("PATCH", f"/users/{user_id}", json={"isDeactivated": True})
+        return payload.get("item", {})
+
     # Board membership
 
     def add_board_member(self, board_id, user_id, role="editor"):

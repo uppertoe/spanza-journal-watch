@@ -6,6 +6,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 
+from spanza_journal_watch.utils.sentry import before_breadcrumb as sentry_before_breadcrumb
+from spanza_journal_watch.utils.sentry import before_send as sentry_before_send
+
 from .base import *  # noqa
 from .base import LOG_FILE, env
 
@@ -210,9 +213,10 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        # Caddy logs every request; Django logs only 4xx (WARNING) and 5xx (ERROR) responses.
         "django.request": {
             "handlers": ["console", "access_logs"],
-            "level": "INFO",
+            "level": "WARNING",
             "propagate": False,
         },
         "django.db.backends": {
@@ -258,6 +262,8 @@ sentry_sdk.init(
     max_request_body_size="never",  # Form posts carry emails, sign-in codes and enquiry text
     attach_stacktrace=env.bool("SENTRY_ATTACH_STACKTRACE", default=True),
     max_breadcrumbs=env.int("SENTRY_MAX_BREADCRUMBS", default=100),
+    before_send=sentry_before_send,  # Replaces email addresses in messages and exception text
+    before_breadcrumb=sentry_before_breadcrumb,
     traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
     profiles_sample_rate=env.float("SENTRY_PROFILES_SAMPLE_RATE", default=0.1),
 )

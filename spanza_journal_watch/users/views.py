@@ -69,8 +69,9 @@ def delete_account_view(request):
     user = request.user
     allowed = can_delete_own_account(user)
     if request.method == "POST" and allowed:
-        logout(request)
+        # Deleting first means a failed deletion leaves the reader signed in to try again.
         delete_account(user)
+        logout(request)
         messages.success(request, "Your account has been deleted.")
         return redirect("home")
 

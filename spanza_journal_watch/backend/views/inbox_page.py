@@ -135,7 +135,7 @@ def inbox_reply(request, thread_id):
     try:
         email.send()
     except Exception:
-        logger.exception("Failed to send inbox reply to %s (thread %s)", thread.external_address, thread_id)
+        logger.exception("Failed to send inbox reply (thread %s)", thread_id)
         messages.error(request, "Failed to send reply. Please try again.")
         return redirect("backend:inbox_thread", thread_id=thread_id)
 
