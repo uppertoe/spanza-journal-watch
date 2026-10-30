@@ -1,25 +1,10 @@
 import logging
-import time
 
 from django.conf import settings
-from django.contrib.auth.signals import user_logged_in, user_logged_out
+from django.contrib.auth.signals import user_logged_out
 from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
-
-
-@receiver(user_logged_in)
-def shorten_staff_sessions(sender, request, user, **kwargs):
-    """Staff can see subscriber lists, analytics and the inbox, so their sessions end sooner.
-
-    allauth sets the expiry again after this signal on a password sign-in, so
-    StaffSessionLimitMiddleware holds the session to the sign-in time recorded here.
-    """
-    from spanza_journal_watch.utils.middleware import STAFF_SIGNED_IN_AT_SESSION_KEY
-
-    if request is not None and user.is_staff:
-        request.session[STAFF_SIGNED_IN_AT_SESSION_KEY] = time.time()
-        request.session.set_expiry(getattr(settings, "STAFF_SESSION_COOKIE_AGE", 12 * 60 * 60))
 
 
 @receiver(user_logged_out)
@@ -40,7 +25,6 @@ def revoke_planka_sessions_on_logout(sender, request, user, **kwargs):
 
 def _revoke_planka_db_sessions(user):
     """Delete all Planka session rows for this user."""
-    from django.conf import settings
 
     db_url = (getattr(settings, "PLANKA_DB_URL", "") or "").strip()
     if not db_url:

@@ -365,9 +365,9 @@ LOGGING = {
 # are deleted once older than this (analytics.tasks.purge_expired_personal_records).
 PERSONAL_DATA_RETENTION_DAYS = env.int("PERSONAL_DATA_RETENTION_DAYS", default=730)
 
-# Staff sessions expire 12 hours after sign-in rather than the default two weeks
-# (users.signals.shorten_staff_sessions, utils.middleware.StaffSessionLimitMiddleware).
-STAFF_SESSION_COOKIE_AGE = 12 * 60 * 60
+# Staff sessions end after a week without a visit; each visit renews the week
+# (utils.middleware.StaffSessionLimitMiddleware).
+STAFF_SESSION_IDLE_AGE = 7 * 24 * 60 * 60
 
 # Celery
 # ------------------------------------------------------------------------------

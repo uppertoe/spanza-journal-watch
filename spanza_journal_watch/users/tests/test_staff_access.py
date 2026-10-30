@@ -18,22 +18,6 @@ def test_admin_login_refuses_signed_in_non_staff(client):
     assert client.get(reverse("admin:login")).status_code == 403
 
 
-def test_staff_session_expires_sooner_than_a_reader_session(client):
-    from django.contrib.auth.signals import user_logged_in
-    from django.test import RequestFactory
-
-    request = RequestFactory().get("/")
-    request.session = client.session
-    staff = UserFactory(is_staff=True)
-    user_logged_in.send(sender=staff.__class__, request=request, user=staff)
-    assert request.session.get_expiry_age() == settings.STAFF_SESSION_COOKIE_AGE
-
-    request.session = client.session
-    reader = UserFactory(is_staff=False)
-    user_logged_in.send(sender=reader.__class__, request=request, user=reader)
-    assert request.session.get_expiry_age() == settings.SESSION_COOKIE_AGE
-
-
 def _signed_in_staff(email="editor@example.org"):
     from allauth.account.models import EmailAddress
 
@@ -44,43 +28,45 @@ def _signed_in_staff(email="editor@example.org"):
     return staff
 
 
-def test_password_sign_in_keeps_the_staff_session_limit(client):
+def test_remembered_staff_sign_in_lasts_a_week(client):
     staff = _signed_in_staff()
     response = client.post(
         reverse("account_login"), {"login": staff.email, "password": "Correct-Horse-9", "remember": "on"}
     )
     assert response.status_code == 302
-    assert client.session.get_expiry_age() <= settings.STAFF_SESSION_COOKIE_AGE
-    assert response.cookies[settings.SESSION_COOKIE_NAME]["max-age"] <= settings.STAFF_SESSION_COOKIE_AGE
+    assert client.session.get_expiry_age() == settings.STAFF_SESSION_IDLE_AGE
+    assert response.cookies[settings.SESSION_COOKIE_NAME]["max-age"] == settings.STAFF_SESSION_IDLE_AGE
 
 
-def test_staff_session_is_signed_out_once_the_limit_has_passed(client):
-    import time
-
-    from spanza_journal_watch.utils.middleware import STAFF_SIGNED_IN_AT_SESSION_KEY
-
+def test_unremembered_staff_sign_in_ends_with_the_browser(client):
     staff = _signed_in_staff()
-    client.force_login(staff)
+    client.post(reverse("account_login"), {"login": staff.email, "password": "Correct-Horse-9"})
+    assert client.session.get_expire_at_browser_close()
+
+
+def test_a_visit_renews_the_staff_week(client):
+    client.force_login(_signed_in_staff())
     session = client.session
-    session[STAFF_SIGNED_IN_AT_SESSION_KEY] = time.time() - settings.STAFF_SESSION_COOKIE_AGE - 60
-    session.set_expiry(None)
+    session.set_expiry(60 * 60)  # an hour left
     session.save()
 
     client.get("/")
 
-    assert "_auth_user_id" not in client.session
+    assert client.session.get_expiry_age() == settings.STAFF_SESSION_IDLE_AGE
 
 
-def test_later_requests_do_not_extend_the_staff_session(client):
-    from spanza_journal_watch.utils.middleware import STAFF_SIGNED_IN_AT_SESSION_KEY
+def test_recent_visits_do_not_rewrite_the_session(client):
+    from spanza_journal_watch.utils.middleware import STAFF_SESSION_RENEW_INTERVAL
 
     client.force_login(_signed_in_staff())
+    session = client.session
+    session.set_expiry(settings.STAFF_SESSION_IDLE_AGE - STAFF_SESSION_RENEW_INTERVAL + 60)
+    session.save()
+    before = client.session.get_expiry_date()
+
     client.get("/")
-    signed_in_at = client.session[STAFF_SIGNED_IN_AT_SESSION_KEY]
-    first_expiry = client.session.get_expiry_date()
-    client.get("/")
-    assert client.session[STAFF_SIGNED_IN_AT_SESSION_KEY] == signed_in_at
-    assert abs((client.session.get_expiry_date() - first_expiry).total_seconds()) < 2
+
+    assert abs((client.session.get_expiry_date() - before).total_seconds()) < 2
 
 
 def test_reader_sessions_are_left_at_the_default_length(client):
