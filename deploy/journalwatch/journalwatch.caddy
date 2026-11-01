@@ -128,7 +128,9 @@ planka.{$DOMAIN} {
         import jw_strip_client_identity
         request_header -X-Gateway-Secret
 
-        forward_auth jw-django:5000 {
+        # journal-watch is the Django service's name on the proxy network that
+        # Caddy shares; the jw-django alias exists only on the internal networks.
+        forward_auth journal-watch:5000 {
             uri /planka/check
             copy_headers Remote-Email Remote-User Remote-Groups
             header_up X-Forwarded-For {client_ip}
