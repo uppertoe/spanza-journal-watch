@@ -1,0 +1,31 @@
+# Local stand-in for the planka.<domain> site block in
+# deploy/journalwatch/journalwatch.caddy. The browser reaches Planka only
+# through here. Every request is first checked with Django, which answers
+# 204 plus the Remote-* headers for a signed-in editorial account, or a
+# redirect to its own /planka/ page for anyone else. The check goes to the
+# django container, which shares the database (and so the session store)
+# with a dev server run on the host. The Journal Watch session cookie is
+# host-only on "localhost", which browsers send to every port, so a session
+# started on localhost:8000 or localhost:8033 is seen here on :3001. Set
+# DJANGO_SITE_URL in .env.local to whichever of those you browse Django on.
+{
+	auto_https off
+}
+
+:3001 {
+	route {
+		request_header -Remote-User
+		request_header -Remote-Email
+		request_header -Remote-Groups
+		request_header -X-Gateway-Secret
+
+		forward_auth django:8000 {
+			uri /planka/check
+			copy_headers Remote-Email Remote-User Remote-Groups
+		}
+
+		reverse_proxy planka:1337 {
+			header_up X-Gateway-Secret {$PLANKA_GATEWAY_SECRET}
+		}
+	}
+}

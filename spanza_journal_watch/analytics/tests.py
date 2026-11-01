@@ -3,6 +3,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import RequestFactory
@@ -244,17 +245,17 @@ def test_beacon_response_sets_csrf_cookie(client):
 
 
 def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_home(client):
-    client.cookies["sessionid"] = "stale-session-cookie"
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
 
     response = client.get("/")
 
     assert response.status_code == 200
-    assert response.cookies["sessionid"].value == ""
+    assert response.cookies[settings.SESSION_COOKIE_NAME].value == ""
 
 
 def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_pageview(client):
     review = _make_review()
-    client.cookies["sessionid"] = "stale-session-cookie"
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
 
     # Use a crawler UA so the pageview code path skips session writes — this
     # isolates the regression check (Django #11506) from legitimate session
@@ -265,7 +266,7 @@ def test_stale_session_cookie_does_not_trigger_new_session_cookie_on_pageview(cl
     )
 
     assert response.status_code == 200
-    assert response.cookies["sessionid"].value == ""
+    assert response.cookies[settings.SESSION_COOKIE_NAME].value == ""
 
 
 # ---- Referrer categorisation ----
@@ -1214,39 +1215,39 @@ def test_page_response_does_not_touch_session(client):
     """Anonymous page loads must not create a session (Set-Cookie breaks CDN caching)."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "sessionid" not in response.cookies
+    assert settings.SESSION_COOKIE_NAME not in response.cookies
 
 
 # ---- SafeSessionCookieMiddleware ----
 
 
 def test_manifest_response_has_no_session_cookie(client):
-    """manifest.json is a sub-resource; its response must never carry sessionid."""
-    client.cookies["sessionid"] = "stale-session-cookie"
+    """manifest.json is a sub-resource; its response must never carry the session cookie."""
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
     response = client.get("/manifest.json")
     assert response.status_code == 200
-    assert "sessionid" not in response.cookies
+    assert settings.SESSION_COOKIE_NAME not in response.cookies
 
 
 def test_sw_js_response_has_no_session_cookie(client):
-    """sw.js is a sub-resource; its response must never carry sessionid."""
-    client.cookies["sessionid"] = "stale-session-cookie"
+    """sw.js is a sub-resource; its response must never carry the session cookie."""
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
     response = client.get("/sw.js")
     assert response.status_code == 200
-    assert "sessionid" not in response.cookies
+    assert settings.SESSION_COOKIE_NAME not in response.cookies
 
 
 def test_robots_txt_response_has_no_session_cookie(client):
-    client.cookies["sessionid"] = "stale-session-cookie"
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
     response = client.get("/robots.txt")
     assert response.status_code == 200
-    assert "sessionid" not in response.cookies
+    assert settings.SESSION_COOKIE_NAME not in response.cookies
 
 
 def test_favicon_response_has_no_session_cookie(client):
-    client.cookies["sessionid"] = "stale-session-cookie"
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
     response = client.get("/favicon.ico")
-    assert "sessionid" not in response.cookies
+    assert settings.SESSION_COOKIE_NAME not in response.cookies
 
 
 def test_track_event_with_stale_session_does_not_delete_cookie(client):
@@ -1256,7 +1257,7 @@ def test_track_event_with_stale_session_does_not_delete_cookie(client):
     not include Set-Cookie — neither SET nor DELETE — because it would race
     with the authenticated session cookie from the login response.
     """
-    client.cookies["sessionid"] = "stale-session-cookie"
+    client.cookies[settings.SESSION_COOKIE_NAME] = "stale-session-cookie"
 
     response = client.post(
         reverse("reader_action"),
@@ -1270,7 +1271,7 @@ def test_track_event_with_stale_session_does_not_delete_cookie(client):
     )
 
     assert response.status_code == 200
-    assert "sessionid" not in response.cookies
+    assert settings.SESSION_COOKIE_NAME not in response.cookies
 
 
 def test_manifest_does_not_add_vary_cookie(client):

@@ -79,13 +79,29 @@ Named volumes: `jw_postgres_data`, `jw_postgres_backups`, `jw_planka_data`,
 
 ### Authentication for Planka
 
-Django is the OIDC provider (django-oauth-toolkit, mounted at `/o/`). Planka
-is registered as a client by `manage.py setup_planka_oidc`. There is no
-separate identity provider in the stack.
+Planka signs people in from the Journal Watch session. Caddy asks Django at
+`/planka/check` before it forwards any request to `planka.<domain>`. For a
+signed-in editorial account Django answers with `Remote-Email` and
+`Remote-Groups`, which Caddy copies onto the request together with the shared
+secret `PLANKA_GATEWAY_SECRET`; Planka accepts no identity without that
+secret. For anyone else Django answers with a redirect to its own `/planka/`
+page, which signs the visitor in and sends them back, or explains that the
+account has no editorial role. The code is
+`spanza_journal_watch/backend/planka_gateway.py`.
 
-**Planka is pinned by digest to `2.1.0@sha256:32c919d9…` because newer
-releases break the OIDC login flow. Do not bump it without re-testing SSO end
-to end.**
+The session cookie therefore has `SESSION_COOKIE_DOMAIN=.journalwatch.org.au`
+in production, so that the check on the Planka host can see it.
+
+Planka's role comes from the groups Django sends: chief editors are
+administrators (`planka-admins`) and every other staff member or invited
+contributor is a board user (`planka-users`). Planka re-applies the role at
+each sign-in, so it cannot be edited inside Planka.
+
+The image is our own build of Planka,
+`ghcr.io/uppertoe/kanban-gateway-signin`, which is upstream 2.2.1 plus the
+gateway sign-in patch (see `GATEWAY.md` in that repository). Upstream removed
+single sign-on in 2.2.0, so there is no OIDC any more; the OIDC provider
+in Django is retired and will be removed in a follow-up release.
 
 ---
 
@@ -268,11 +284,10 @@ chmod 600 .env apps/journal-watch/.env
 
 `generate_journal_watch_env.py` fills `DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`,
 `WEBHOOK_SECRET`, `CELERY_FLOWER_PASSWORD`, `SECRET_KEY`,
-`PLANKA_POSTGRES_PASSWORD`, `OIDC_CLIENT_SECRET`, `DEFAULT_ADMIN_PASSWORD`
+`PLANKA_POSTGRES_PASSWORD`, `PLANKA_GATEWAY_SECRET`, `DEFAULT_ADMIN_PASSWORD`
 and `PLANKA_WEBHOOK_SECRET` when they are blank, and leaves everything else
-alone. Two values need attention by hand:
+alone. One value needs attention by hand:
 
-- `OIDC_RSA_PRIVATE_KEY` — `openssl genrsa 4096 | base64 -w 0`
 - `WEBHOOK_SECRET` — Anymail's SES webhook uses HTTP basic auth, so this must
   be in `username:password` form. Use the same value in the SNS subscription
   URL (see below).
@@ -301,19 +316,14 @@ ssh journal-watch-vps ./deploy          # caddy-init, migrate, collectstatic, up
 ssh journal-watch-vps
 cd /opt/deploy
 docker compose exec -T journal-watch python manage.py create_chief_editor you@example.com --name "Your Name"
-docker compose exec -T journal-watch python manage.py setup_planka_oidc
 ```
 
 Then set up the Planka API key: log in at `https://<domain>/editorial/settings`
 as the chief editor and use **Run setup_planka_api_key**, or run
 `docker compose exec -T journal-watch python manage.py setup_planka_api_key`.
-Afterwards:
-
-1. Uncomment `OIDC_ENFORCED=true` in `apps/journal-watch/.env`.
-2. `docker compose up -d jw_planka`.
-3. Remove `DEFAULT_ADMIN_PASSWORD` from the env file — it is no longer used.
-
-From this point Planka login is SSO-only through Django.
+Afterwards remove `DEFAULT_ADMIN_PASSWORD` from the env file; it is no longer
+used. Planka sign-in needs no further step: the chief editor opens
+`https://planka.<domain>/` and is signed in as an administrator.
 
 ### 6. Subscribe SNS to the Django webhook
 
@@ -376,7 +386,7 @@ After a deploy or any structural change:
 - [ ] `docker compose ps` from `/opt/deploy` — every service `running` or `healthy`; no orphans
 - [ ] `https://journalwatch.org.au/healthz` returns 200
 - [ ] `https://journalwatch.org.au/` and `/editorial/` load
-- [ ] `https://planka.journalwatch.org.au/` redirects to Django login and SSO completes
+- [ ] `https://planka.journalwatch.org.au/` sends a signed-out browser to the Journal Watch sign-in and, once signed in, opens the boards
 - [ ] a hashed asset under `/static/` returns `Cache-Control: public, max-age=31536000, immutable`
 - [ ] an image under `/media/` returns 200 from the site domain
 - [ ] `docker compose logs --tail=100 journal-watch jw_celeryworker` show no tracebacks

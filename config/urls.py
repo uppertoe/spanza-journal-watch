@@ -12,6 +12,7 @@ from markdownx.views import ImageUploadView, MarkdownifyView
 from oauth2_provider import urls as oauth2_urls
 
 from spanza_journal_watch.analytics import views as analytics_views
+from spanza_journal_watch.backend import planka_gateway
 from spanza_journal_watch.backend import views as backend_views
 from spanza_journal_watch.backend.oidc_validator import EditorialAuthorizationView
 from spanza_journal_watch.events.models import LiveSessionSitemap
@@ -91,7 +92,12 @@ urlpatterns = [
         backend_views.chief_editor_invite_accept,
         name="chief_editor_invite_accept",
     ),
-    # OAuth2 / OIDC provider (Django acts as IdP for Planka)
+    # Planka sign-in gateway: Caddy asks /planka/check before every request to
+    # planka.<domain>; /planka/ signs people in and sends them on (planka_gateway.py).
+    path("planka/", planka_gateway.planka_entry, name="planka_entry"),
+    path("planka/check", planka_gateway.planka_gateway_check, name="planka_gateway_check"),
+    # OAuth2 / OIDC provider, retired: kept for one release so the previous
+    # Planka image can be redeployed. Removed in a follow-up.
     # Shadows DOT's authorize view so only contributors and staff can sign in to Planka
     path("o/authorize/", EditorialAuthorizationView.as_view()),
     path("o/", include((oauth2_patterns, "oauth2_provider"), namespace="oauth2_provider")),

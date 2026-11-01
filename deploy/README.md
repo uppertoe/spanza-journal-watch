@@ -5,7 +5,7 @@ This repository contains two kinds of non-application files:
 - `deploy/journalwatch/`
   A synced copy of `apps/journal-watch/` in the `journal-watch-vps` server
   repo (the runtime source of truth). Last synced from the server on
-  2026-09-05. When a change here is needed in production, apply it in the
+  2026-11-01. When a change here is needed in production, apply it in the
   server repo and copy it back so the two stay identical.
 - `deploy/bootstrap/`
   One-off or occasional helper tools run from a local machine when creating or

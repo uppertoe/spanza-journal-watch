@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Editorial boards{% endblock %}
+{% block main_container_class %}container-fluid px-0{% endblock main_container_class %}
+{% block content_column_class %}col-12 pb-4{% endblock content_column_class %}
+
+{% block content %}
+<div class="row justify-content-center py-4 py-md-5">
+    <div class="col-12">
+        <div class="card border-0">
+            <div class="card-body p-4 p-md-5 text-center">
+                <div class="mb-3">
+                    <img src="{% static 'images/errors/exclamation-octagon.svg' %}" alt="" width="72" height="72">
+                </div>
+                <h1 class="h3 mb-3">Editorial boards</h1>
+                {% if planka_unconfigured %}
+                    <p class="text-body-secondary mb-4">The editorial boards are not available on this site at the moment. You can contact the editors for assistance.</p>
+                {% else %}
+                    <p class="text-body-secondary mb-4">Your Journal Watch account is not set up for the editorial boards. If you have been invited to contribute, sign in with the email address the invitation was sent to. If you still cannot reach the boards, you can contact the editors for assistance.</p>
+                {% endif %}
+
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <a class="btn btn-primary" href="{% url 'home' %}">Go to home</a>
+                    {% if not planka_unconfigured %}
+                        <a class="btn btn-outline-secondary" href="{% url 'account_logout' %}?next={% url 'planka_entry' %}">Sign in as someone else</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

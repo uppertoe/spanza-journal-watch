@@ -124,14 +124,9 @@ def dashboard(request):
     planka_credential = _get_planka_integration_credential()
     planka_api_key_ok = bool(planka_credential and planka_credential.get_api_key())
     planka_connection_error = (planka_credential.last_error or "") if planka_credential else ""
-    try:
-        from oauth2_provider.models import Application as OAuthApplication
-
-        planka_oidc_ok = OAuthApplication.objects.filter(client_id__startswith="planka").exists()
-    except Exception:
-        planka_oidc_ok = False
-
-    planka_ok = planka_oidc_ok and planka_api_key_ok and not planka_connection_error
+    # Sign-in needs no registration step any more: Planka takes the identity
+    # from the gateway check (backend/planka_gateway.py).
+    planka_ok = planka_api_key_ok and not planka_connection_error
 
     last_fetch = FetchLog.objects.filter(status=FetchLog.STATUS_SUCCESS).order_by("-started_at").first()
     fetch_hours_ago = None

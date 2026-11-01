@@ -256,6 +256,14 @@ FIXTURE_DIRS = (str(APPS_DIR / "fixtures"),)
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#session-cookie-httponly
 SESSION_COOKIE_HTTPONLY = True
+# Renamed when the cookie gained a domain (see production.py): a browser that
+# still holds the old host-only "sessionid" would otherwise keep a stale
+# session alongside the new one, and signing out would not end it.
+SESSION_COOKIE_NAME = "jw_session"
+# Set in production to the parent domain so the Planka sign-in check at
+# /planka/check sees the session on planka.<domain>. None keeps the cookie
+# host-only, which is right for local development.
+SESSION_COOKIE_DOMAIN = env("DJANGO_SESSION_COOKIE_DOMAIN", default=None)
 # https://docs.djangoproject.com/en/dev/ref/settings/#csrf-cookie-httponly
 # False (the Django default) so htmx can read the token from the cookie at
 # request time — pages are CDN-cached, so a token baked into markup goes
@@ -467,6 +475,16 @@ OAUTH2_PROVIDER = {
 }
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
+
+# Planka sign-in gateway (backend/planka_gateway.py)
+# ------------------------------------------------------------------------------
+# Absolute URL of this site, used when the gateway check has to send a browser
+# on planka.<domain> back here to sign in.
+SITE_URL = env("DJANGO_SITE_URL", default="http://localhost:8000")
+# Group names sent to Planka; GATEWAY_ADMIN_GROUPS / GATEWAY_BOARD_USER_GROUPS
+# in Planka's environment must name the same groups.
+PLANKA_GATEWAY_ADMIN_GROUP = env("PLANKA_GATEWAY_ADMIN_GROUP", default="planka-admins")
+PLANKA_GATEWAY_USER_GROUP = env("PLANKA_GATEWAY_USER_GROUP", default="planka-users")
 
 # IndexNow (Bing, Yandex, ...) instant URL submission
 # ------------------------------------------------------------------------------
