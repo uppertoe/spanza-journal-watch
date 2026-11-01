@@ -187,19 +187,13 @@ for Amazon SES, the DKIM selectors, and the DMARC policy.
 
 ## Planka Integration
 
-### `setup_planka_oidc`
+### `setup_planka_oidc` (retired)
 
-Register Planka as an OAuth2/OIDC client application in django-oauth-toolkit. Idempotent: creates the application if missing, otherwise updates any drifted field.
-
-```bash
-python manage.py setup_planka_oidc
-```
-
-Reads `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and `PLANKA_EXTERNAL_URL` from the environment (the redirect URI is `<PLANKA_EXTERNAL_URL>/oidc-callback`). Without them it falls back to local-development defaults, so in production make sure the app env is loaded — it is when run through `docker compose exec`.
+Planka no longer signs in through OIDC; it takes the identity from Django's gateway check (`/planka/check`), which needs no registration step. The command is kept for one release so the previous Planka image can be redeployed, and is removed after that.
 
 ### `setup_planka_api_key`
 
-Generate a Planka API key and initialise the Planka instance by writing directly to Planka's Postgres. Works whether or not `OIDC_ENFORCED` is set and whether or not Planka is running. Idempotent: re-running rotates the stored key.
+Generate a Planka API key and initialise the Planka instance by writing directly to Planka's Postgres. Works whether or not Planka is running. Idempotent: re-running rotates the stored key.
 
 ```bash
 python manage.py setup_planka_api_key [--email admin@example.com]
@@ -302,7 +296,6 @@ Run after the first `./deploy` has migrated the database:
 
 ```bash
 python manage.py create_chief_editor admin@example.com --name "Chief Editor"
-python manage.py setup_planka_oidc
 python manage.py setup_planka_api_key
 python manage.py backfill_watched_journals --apply
 python manage.py backfill_pubmed_journal_cache

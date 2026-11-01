@@ -1,5 +1,31 @@
+# Origin lock: every hostname here is proxied by Cloudflare, so a peer outside
+# its edge ranges has bypassed the WAF and bot controls and is dropped before
+# any route runs. The Caddyfile orders abort ahead of handle and redir so this
+# covers every route. Private ranges stay allowed: no internet peer can complete
+# a handshake from one, and they keep on-box probes and local development
+# working. Ranges from https://www.cloudflare.com/ips/ (checked 2026-10-28);
+# keep them in step with trusted_proxies in the Caddyfile.
+(jw_cloudflare_only) {
+    @jw_not_cloudflare not remote_ip private_ranges 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+    abort @jw_not_cloudflare
+}
+
+# No forward_auth runs on these sites, so nothing would overwrite a
+# client-supplied identity header: it would reach the apps and fill the user
+# field of the access log. Drop all three on the way in.
+(jw_strip_client_identity) {
+    request_header -Remote-User
+    request_header -Remote-Email
+    request_header -Remote-Groups
+}
+
+# The scaffold renderer requires every reverse_proxy to strip the auth
+# gateway's session cookie. This host runs no gateway, so there is no such
+# cookie to strip, and each proxy below carries the renderer's allow marker.
+
 # Redirect www to apex
 www.{$DOMAIN} {
+    import jw_cloudflare_only
     redir https://{$DOMAIN}{uri} permanent
 }
 
@@ -10,6 +36,8 @@ www.{$DOMAIN} {
     # caddy_logs volume, size-capped rotation), compression and baseline
     # security headers are injected into every site by
     # scaffold/docker/render-caddy-routes.sh — don't redeclare them here.
+    import jw_cloudflare_only
+    import jw_strip_client_identity
 
     # Security headers (in addition to the scaffold baseline)
     header {
@@ -40,41 +68,96 @@ www.{$DOMAIN} {
     # `immutable` is the piece the S3 headers were missing: without it,
     # Safari/Firefox revalidate every image on reload, repainting the
     # placeholder frames while they wait (the homepage flicker).
+    #
+    # The proxy is read-only: only GET and HEAD reach S3, and the query string
+    # is dropped, so a request cannot ask S3 for an object version, an ACL or
+    # any other subresource. Media URLs carry no query string of their own.
     handle /media/* {
+        @jw_media_not_read not method GET HEAD
+        respond @jw_media_not_read 405
+        rewrite * {path}?
+
         header {
             Cache-Control "public, max-age=604800, immutable"
             -x-amz-server-side-encryption
             -x-amz-version-id
             defer
         }
+        # The whole Cookie header is removed here, not just a gateway cookie.
+        # scaffold-lint: allow-session-cookie
         reverse_proxy https://spanza-journal-watch-production-v2.s3.amazonaws.com {
             header_up Host spanza-journal-watch-production-v2.s3.amazonaws.com
             header_up -Cookie
         }
     }
 
-    # X-Forwarded-For is replaced by Caddy, overwriting anything the request carried,
-    # so Django can rate-limit sign-in attempts per reader rather than treating
-    # every request as coming from Caddy. With trusted_proxies set for the
-    # Cloudflare ranges in the scaffold, client_ip is the reader's address.
+    # X-Forwarded-For is set to the client address Caddy has already taken
+    # from CF-Connecting-IP, rather than passing on a chain whose first entry
+    # the visitor can write.
+    # scaffold-lint: allow-session-cookie
     reverse_proxy journal-watch:5000 {
         header_up X-Forwarded-For {client_ip}
     }
 }
 
-# Planka — project management
+# Planka — project management, signed in from the Journal Watch session.
+#
+# Planka (our build, github.com/uppertoe/kanban-gateway-signin) trusts the
+# Remote-Email and Remote-Groups headers only alongside X-Gateway-Secret,
+# which this block injects from PLANKA_GATEWAY_SECRET. Before any request is
+# forwarded, forward_auth asks Django at /planka/check with the visitor's
+# cookies: a 204 carries the two headers, which are copied onto the request;
+# any other answer (a redirect to Django's own /planka/ sign-in page) goes
+# back to the browser as it is. The check covers the whole site, API and
+# socket handshake included, because Planka re-checks the identity on every
+# request. Django sees the Journal Watch session here because its cookie is
+# set on the parent domain.
+#
+# Everything sits inside one route block so the gate runs before the cover
+# handle: in Caddy's default directive order a bare handle would run BEFORE
+# forward_auth. header_up REPLACES the header, so a client-sent
+# X-Gateway-Secret never survives, and jw_strip_client_identity drops any
+# client-sent Remote-* before the copy. Keep this comment free of curly
+# braces: the route renderer counts them.
 planka.{$DOMAIN} {
-    @custom_cover path_regexp cover ^/assets/(login-)?cover-[A-Za-z0-9-]+\.jpg$
+    import jw_cloudflare_only
 
-    # /srv/planka is apps/journal-watch/planka, mounted read-only in docker-compose.yml
-    handle @custom_cover {
-        root * /srv/planka
-        rewrite * /cover-journalwatch.webp
-        file_server
-    }
+    @custom_cover path_regexp cover ^/assets/(login-)?cover-[A-Za-z0-9_-]+\.jpg$
 
-    handle {
-        reverse_proxy jw_planka:1337
+    route {
+        import jw_strip_client_identity
+        request_header -X-Gateway-Secret
+
+        forward_auth jw-django:5000 {
+            uri /planka/check
+            copy_headers Remote-Email Remote-User Remote-Groups
+            header_up X-Forwarded-For {client_ip}
+        }
+
+        # /srv/planka is apps/journal-watch/planka, mounted read-only in
+        # docker-compose.yml. The cover shows only when a sign-in has been
+        # refused, since the gateway signs everyone else straight in. The
+        # file never changes without a new filename, so browsers and
+        # Cloudflare may keep it for a year.
+        handle @custom_cover {
+            root * /srv/planka
+            rewrite * /cover-journalwatch.webp
+            header Cache-Control "public, max-age=31536000, immutable"
+            file_server
+        }
+
+        # X-Forwarded-For is set to the client address Caddy has already
+        # taken from CF-Connecting-IP, rather than passing on a chain whose
+        # first entry the visitor can write. Planka's uploads routes now
+        # send a correct max-age themselves (fixed in 2.2.1), so the old
+        # header rewrite for Firefox is gone.
+        handle {
+            # scaffold-lint: allow-session-cookie
+            reverse_proxy jw_planka:1337 {
+                header_up X-Forwarded-For {client_ip}
+                header_up X-Gateway-Secret {$PLANKA_GATEWAY_SECRET}
+            }
+        }
     }
 }
 

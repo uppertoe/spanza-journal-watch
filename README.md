@@ -32,7 +32,7 @@ A web application for the [Society of Paediatric Anaesthesia in New Zealand and 
 ### Access control
 
 - Role-based: **chief editor**, **regional coordinator**, **reviewer**
-- Django acts as an OIDC provider — Planka uses SSO, no separate login required
+- Planka signs people in from their Journal Watch session, so there is no separate login
 - Invite-based onboarding for reviewers and coordinators
 
 ---
@@ -42,14 +42,14 @@ A web application for the [Society of Paediatric Anaesthesia in New Zealand and 
 Production runs pre-built Docker Hub images on a single VPS behind the
 hardened-Caddy scaffold. Nothing is built on the server.
 
-| Image                                 | Purpose                                   |
-| ------------------------------------- | ----------------------------------------- |
-| `{namespace}/journalwatch-app:{tag}`  | Django under gunicorn, Celery worker      |
-| `{namespace}/journalwatch-mjml:{tag}` | MJML TCP rendering server                 |
-| `ghcr.io/plankanban/planka:2.1.0`     | Planka kanban (digest-pinned; SSO tested) |
-| `postgres:17-alpine`                  | Django database                           |
-| `postgres:16-alpine`                  | Planka database                           |
-| `redis:7-alpine`                      | Celery broker, Django cache and sessions  |
+| Image                                    | Purpose                                       |
+| ---------------------------------------- | --------------------------------------------- |
+| `{namespace}/journalwatch-app:{tag}`     | Django under gunicorn, Celery worker          |
+| `{namespace}/journalwatch-mjml:{tag}`    | MJML TCP rendering server                     |
+| `ghcr.io/uppertoe/kanban-gateway-signin` | Planka kanban, our build with gateway sign-in |
+| `postgres:17-alpine`                     | Django database                               |
+| `postgres:16-alpine`                     | Planka database                               |
+| `redis:7-alpine`                         | Celery broker, Django cache and sessions      |
 
 Every push to `main` runs lint and the full test suite in GitHub Actions and,
 only if they pass, builds both images and pushes them tagged `latest` and

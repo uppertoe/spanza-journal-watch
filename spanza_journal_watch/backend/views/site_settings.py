@@ -2,7 +2,6 @@
 
 import datetime
 import logging
-import os
 
 from django.conf import settings
 from django.contrib import messages
@@ -45,7 +44,6 @@ from ..topics import (  # noqa: F401 — re-exported for existing importers
     REVIEW_PUBLICATION_TYPES,
     TRIAL_PUBLICATION_TYPES,
 )
-from . import shared
 from .planka_boards import _build_planka_webhook_url
 from .shared import _get_planka_integration_credential, _safe_planka_error
 
@@ -68,13 +66,8 @@ def _get_inbox_from_email():
 
 
 def _build_backend_settings_context(request, *, inbox_settings_form=None, frontend_banner_form=None):
-    from oauth2_provider.models import Application as OAuthApplication
-
     pubmed_credential = _get_pubmed_integration_credential()
     planka_credential = _get_planka_integration_credential()
-    planka_client_id = os.getenv("OIDC_CLIENT_ID", "planka-local")
-    planka_client_secret = os.getenv("OIDC_CLIENT_SECRET", "")
-    planka_oidc_app = OAuthApplication.objects.filter(client_id=planka_client_id).first()
     backend_preference = _get_backend_preference() or BackendPreference(singleton=1)
 
     if inbox_settings_form is None:
@@ -91,8 +84,6 @@ def _build_backend_settings_context(request, *, inbox_settings_form=None, fronte
         "pubmed_credential": pubmed_credential,
         "pubmed_api_key_form": PubmedApiKeyForm(),
         "planka_credential": planka_credential,
-        "planka_oidc_app": planka_oidc_app,
-        "planka_oidc_client_secret_configured": bool(planka_client_secret.strip()),
         "planka_callback_url": planka_callback_url,
         "planka_webhook_secret_set": bool(planka_webhook_secret),
         "chief_editor_invites": chief_editor_invites,
@@ -486,25 +477,6 @@ def _run_management_command(command_name, **kwargs):
 
 @login_required
 @permission_required("submissions.chief_editor", raise_exception=True)
-def planka_run_setup_oidc(request):
-    if request.method != "POST":
-        from django.http import HttpResponseNotAllowed
-
-        return HttpResponseNotAllowed(["POST"])
-    success, output = _run_management_command("setup_planka_oidc")
-    return render(
-        request,
-        "backend/_setup_command_result.html",
-        {
-            "success": success,
-            "output": output,
-            "command": "setup_planka_oidc",
-        },
-    )
-
-
-@login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
 def planka_run_setup_api_key(request):
     if request.method != "POST":
         from django.http import HttpResponseNotAllowed
@@ -520,59 +492,3 @@ def planka_run_setup_api_key(request):
             "command": "setup_planka_api_key",
         },
     )
-
-
-@login_required
-@permission_required("submissions.chief_editor", raise_exception=True)
-def planka_promote_chief_editor(request):
-    """Promote the requesting chief editor's Planka account to the admin role."""
-    if request.method != "POST":
-        from django.http import HttpResponseNotAllowed
-
-        return HttpResponseNotAllowed(["POST"])
-    try:
-        client = shared._build_planka_client()
-        planka_user = client.find_user_by_email(request.user.email)
-        if not planka_user:
-            return render(
-                request,
-                "backend/_setup_command_result.html",
-                {
-                    "success": False,
-                    "output": (
-                        f"No Planka account found for {request.user.email}.\n"
-                        "Log into Planka via SSO first, then return here to promote your account."
-                    ),
-                    "command": "planka_promote_chief_editor",
-                },
-            )
-        if planka_user.get("role") == "admin":
-            return render(
-                request,
-                "backend/_setup_command_result.html",
-                {
-                    "success": True,
-                    "output": f"Account {request.user.email} is already a Planka admin.",
-                    "command": "planka_promote_chief_editor",
-                },
-            )
-        client.set_user_role(str(planka_user["id"]), "admin")
-        return render(
-            request,
-            "backend/_setup_command_result.html",
-            {
-                "success": True,
-                "output": f"Promoted {request.user.email} to Planka admin.",
-                "command": "planka_promote_chief_editor",
-            },
-        )
-    except PlankaAPIError as exc:
-        return render(
-            request,
-            "backend/_setup_command_result.html",
-            {
-                "success": False,
-                "output": f"Planka API error: {_safe_planka_error(exc)}",
-                "command": "planka_promote_chief_editor",
-            },
-        )

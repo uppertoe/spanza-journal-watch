@@ -9,13 +9,34 @@
 #   * Planka and Flower are further web-facing services of the same app, so
 #     they join the same generated journal-watch_proxy network explicitly.
 #   * jw_internal is this app's private backend network (Django ↔ Postgres,
-#     Redis, MJML, Planka).
+#     Redis, MJML). Planka is not on it.
+#   * jw_planka_internal joins Planka, its database, and the Django web and
+#     Celery containers, which call the Planka API and write to Planka's
+#     database. Planka is third-party code and internet-facing, so it gets
+#     no route to Django's database or to Redis.
+#   * Both of those networks are internal: nothing on them can reach the
+#     internet. The web container reaches it through the proxy network and the
+#     Celery worker through jw_egress, which carries nothing else.
+#   * Only the Django-image services read the whole .env. Planka and both
+#     databases list the variables they use, so a compromised Planka holds
+#     none of Django's secrets. A bare name passes the value through from
+#     .env when it is set there and is left unset otherwise, exactly as
+#     env_file did for that one variable.
 #
 # Bring up with:  docker compose --profile workers --profile planka up -d
 
 networks:
   jw_internal:
     name: jw_internal
+    driver: bridge
+    internal: true
+  jw_planka_internal:
+    name: jw_planka_internal
+    driver: bridge
+    internal: true
+  # Outbound only, for the Celery worker's email, S3, PubMed and Sentry calls.
+  jw_egress:
+    name: jw_egress
     driver: bridge
 
 volumes:
@@ -37,6 +58,12 @@ x-journal-watch-base: &journal_watch_base
   mem_limit: 700m
   oom_score_adj: -300
   pids_limit: 128
+  # The image runs as the unprivileged django user and binds port 5000, so
+  # gunicorn, Celery, Flower and collectstatic need no capabilities.
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
   command: /start
   depends_on:
     jw_postgres:
@@ -50,7 +77,7 @@ x-journal-watch-base: &journal_watch_base
     # Docker-internal addresses — always override these here, not in .env
     POSTGRES_HOST: jw_postgres
     POSTGRES_PORT: "5432"
-    REDIS_URL: redis://jw_redis:6379/0
+    REDIS_URL: redis://:${JW_REDIS_PASSWORD:?set JW_REDIS_PASSWORD in apps/journal-watch/.env}@jw_redis:6379/0
     PLANKA_BASE_URL: http://jw_planka:1337
     PLANKA_DB_URL: postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
     PLANKA_CALLBACK_BASE_URL: "http://jw-django:5000"
@@ -76,6 +103,10 @@ x-journal-watch-base: &journal_watch_base
     jw_internal:
       aliases:
         - jw-django
+    # Planka's webhooks call http://jw-django:5000 (PLANKA_CALLBACK_BASE_URL).
+    jw_planka_internal:
+      aliases:
+        - jw-django
 
 services:
 
@@ -85,6 +116,16 @@ services:
   # ---------------------------------------------------------------------------
   journal-watch:
     <<: *journal_watch_base
+    # Keep the web workers resident. Measured here: this page renders in
+    # 0.13-0.23 s with the process in RAM, and took 1.39 s once it had been
+    # paged out over an idle spell - the first visitor of the morning was
+    # faulting ~200 MB back from dm-crypt swap on one vCPU. Peak is 316 MB
+    # against the 700m ceiling, so the slice costs no real headroom.
+    #
+    # Deliberately on this service and not the shared anchor: jw_celeryworker
+    # needs its swap. Its children were already being OOM-killed at the old
+    # 350m ceiling, and taking swap away as well would only make that worse.
+    cgroup_parent: vps-noswap.slice
 
   caddy:
     volumes:
@@ -92,13 +133,25 @@ services:
       # Planka cover artwork served by Caddy. The hardened Caddy no longer
       # mounts the deploy repo, so expose only this asset directory.
       - ./planka:/srv/planka:ro
+    # The secret that journalwatch.caddy injects as X-Gateway-Secret on every
+    # request to Planka. Same .env value as jw_planka's GATEWAY_AUTH_SECRET.
+    environment:
+      - PLANKA_GATEWAY_SECRET=${PLANKA_GATEWAY_SECRET:-}
 
   # ---------------------------------------------------------------------------
   # PostgreSQL (Django)
   # ---------------------------------------------------------------------------
   jw_postgres:
-    image: postgres:17-alpine
+    # Pinned to the digest that has been running here, so this is a pin and not
+    # an upgrade. Bump deliberately.
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     restart: unless-stopped
+    # Was unbounded on a 2 GB host already deep in swap, so a runaway here had
+    # nothing to stop it before the kernel started choosing victims. 512m
+    # against a measured 188 MB peak over six days, and above
+    # shared_buffers=192MB plus the work_mem a realistic number of the 30
+    # permitted connections would take at once.
+    mem_limit: 512m
     command:
     - postgres
     - -c
@@ -109,6 +162,13 @@ services:
     - pg_stat_statements.max=10000
     - -c
     - track_io_timing=on
+    # No log_min_duration_statement: psycopg writes values into the SQL text,
+    # so a slow-query log line carries email addresses and names into
+    # journald. pg_stat_statements above records slow queries with the values
+    # stripped. Terse errors likewise leave out the DETAIL line, which quotes
+    # the offending key value ("Key (email)=(...) already exists").
+    - -c
+    - log_error_verbosity=terse
     # Tuning for 1.9GB-RAM VPS — give PG enough cache/work_mem to avoid disk
     # spills, but cap so it doesn't crowd out Django/Celery.
     - -c
@@ -123,14 +183,35 @@ services:
     - max_connections=30
     oom_score_adj: -500
     pids_limit: 128
-    env_file: .env
+    # The entrypoint starts as root, fixes data-directory ownership, then
+    # drops to the postgres user; these are the capabilities that needs.
+    # Tested here on a fresh volume, a restart, pg_dump and a restore.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_INITDB_ARGS
+      - POSTGRES_HOST_AUTH_METHOD
+      # A bare name missing from .env would replace the image's own PGDATA
+      # with nothing, so the image default is spelled out as the fallback.
+      - PGDATA=${PGDATA:-/var/lib/postgresql/data}
+      - TZ
     volumes:
       - jw_postgres_data:/var/lib/postgresql/data
       - jw_postgres_backups:/backups
       - ./postgres:/docker-entrypoint-initdb.d:ro
-    # Exposed on loopback only so the VPS backup agent can connect from the host
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No host port: backup, restore and the restore drill all reach the
+    # database through docker exec.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-spanza_journal_watch}"]
       interval: 30s
@@ -143,11 +224,26 @@ services:
   # Redis (Celery broker + Django cache)
   # ---------------------------------------------------------------------------
   jw_redis:
-    image: redis:7-alpine
+    # Pinned to the digest already running.
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     restart: unless-stopped
     mem_limit: 128m
     oom_score_adj: 300
     pids_limit: 64
+    # The entrypoint drops from root to the redis user, which needs only
+    # SETUID and SETGID once /data is owned by redis.
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    # A password, so that no other container on jw_internal can read or alter
+    # the job queue and cache. redis-cli in the healthcheck reads REDISCLI_AUTH.
+    command: ["redis-server", "--requirepass", "${JW_REDIS_PASSWORD:?set JW_REDIS_PASSWORD in apps/journal-watch/.env}"]
+    environment:
+      REDISCLI_AUTH: ${JW_REDIS_PASSWORD:?set JW_REDIS_PASSWORD in apps/journal-watch/.env}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -166,6 +262,13 @@ services:
     mem_limit: 128m
     oom_score_adj: 400
     pids_limit: 64
+    # The image runs as root by default, but the renderer only reads its own
+    # files and binds port 28101, so the node user is enough.
+    user: node
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     command: ["--mjml.minify=true", "--mjml.validationLevel=strict"]
     healthcheck:
       test:
@@ -198,7 +301,15 @@ services:
     # --max-tasks-per-child to take effect.
     command: celery -A config.celery_app worker --beat -l INFO --concurrency=1 --max-tasks-per-child=100
     mem_reservation: 192m
-    mem_limit: 350m
+    # 512m, not 350m. celery --beat --concurrency=1 is three processes (main,
+    # forked child, beat) and the children the OOM killer took here were
+    # 122-173 MB of anon each, so 350m was never enough for all three at once -
+    # swap was quietly absorbing the overflow. Lowering vm.swappiness to 10 on
+    # 2026-09-23 stopped it doing that, and the cgroup started OOM-killing
+    # children instead: four kills in nine hours against none in the seven days
+    # the journal covers before it. The limit was the real fault; swap was
+    # hiding it.
+    mem_limit: 512m
     oom_score_adj: -100
     healthcheck:
       disable: true
@@ -207,6 +318,8 @@ services:
       - jw_staticfiles:/app/staticfiles
     networks:
       - jw_internal   # workers don't need caddy
+      - jw_planka_internal   # Celery tasks write to Planka's database
+      - jw_egress   # SES, S3, PubMed and Sentry
 
   jw_flower:
     <<: *journal_watch_base
@@ -238,27 +351,103 @@ services:
   # Planka (profile: planka)
   # ---------------------------------------------------------------------------
   jw_planka:
-    # PINNED BY DIGEST — newer Planka releases break the OIDC login flow. Do not
-    # bump without re-testing SSO against Django (see docs/07 in the app repo).
-    image: ghcr.io/plankanban/planka:2.1.0@sha256:32c919d9e65b0479d1bbf0e4fb8e00fb11403a5234242b9f5fc900e595c2e2ce
+    # Caddy-reachable, so a person waits on it: keep it resident rather than
+    # let the hourly backup or a deploy evict it and charge the next visitor
+    # the fault-in from dm-crypt swap. Asserted by the compose audit.
+    cgroup_parent: vps-noswap.slice
+    # Our own build of Planka (github.com/uppertoe/kanban-gateway-signin):
+    # upstream 2.2.1 plus a sign-in patch that takes the identity from the
+    # Remote-Email / Remote-Groups headers Caddy adds after asking Django at
+    # /planka/check (journalwatch.caddy). Upstream removed single sign-on in
+    # 2.2.0, so the OIDC settings are gone. The image's CI upgrades a real
+    # database and runs the sign-in checks before it publishes, so Renovate's
+    # digest bumps are safe to take.
+    image: ghcr.io/uppertoe/kanban-gateway-signin:latest@sha256:d9d307576e1b38c0a9cb4fb2b3d962d47f2e2fe14dce04e2a136fcebfebb0897
     restart: unless-stopped
     mem_limit: 256m
     oom_score_adj: 250
     pids_limit: 128
+    # The image already runs as the non-root node user and needs no
+    # capabilities at all.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       jw_planka_postgres:
         condition: service_healthy
-    env_file: .env
+    # No env_file: Planka reads only what is mapped or named here. The
+    # DEFAULT_ADMIN_* variables are left out: password sign-in is off, and the
+    # admin account they created already exists. The bare names are every
+    # variable Planka 2.2.1 reads (grepped from the image), so any that .env
+    # sets still reach it. Re-check the list if the image is ever bumped.
     environment:
-      DATABASE_URL: postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
-      # OIDC issuer is the public Django URL — read from .env
-      OIDC_ISSUER: ${OIDC_ISS_ENDPOINT}
-      DEFAULT_ADMIN_EMAIL: ${PLANKA_ADMIN_EMAIL}
-      S3_REGION: ${PLANKA_S3_REGION}
-      S3_ACCESS_KEY_ID: ${PLANKA_S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${PLANKA_S3_SECRET_ACCESS_KEY}
-      S3_BUCKET: ${PLANKA_S3_BUCKET}
-      S3_FORCE_PATH_STYLE: "false"
+      - BASE_URL
+      - SECRET_KEY
+      - TRUST_PROXY
+      - TOKEN_EXPIRES_IN
+      - MAX_UPLOAD_FILE_SIZE
+      - STORAGE_LIMIT
+      - ACTIVE_USERS_LIMIT
+      - DEFAULT_LANGUAGE
+      - GRAVATAR_BASE_URL
+      - INTERNAL_ACCESS_TOKEN
+      - KNEX_REJECT_UNAUTHORIZED_SSL_CERTIFICATE
+      - OUTGOING_PROXY
+      - SHOW_DETAILED_AUTH_ERRORS
+      - SWAGGER_EXPOSED
+      - TERMS_TYPE
+      - DEMO_MODE
+      - CUSTOMER_PANEL_URL
+      - LOG_LEVEL
+      - S3_REQUEST_CHECKSUM_CALCULATION
+      - S3_ENDPOINT
+      - SMTP_NAME
+      - SMTP_TLS_REJECT_UNAUTHORIZED
+      - NODE_ENV
+      - PORT
+      - TZ
+      - DATABASE_URL=postgresql://postgres:${PLANKA_POSTGRES_PASSWORD}@jw_planka_postgres/planka
+      # --- Gateway sign-in ---
+      # Planka trusts Remote-Email / Remote-Groups only alongside this secret,
+      # which Caddy injects (journalwatch.caddy) from the same .env value.
+      # Password sign-in is off while GATEWAY_AUTH is true. Planka refuses to
+      # start if the secret is missing or shorter than 32 characters.
+      - GATEWAY_AUTH=true
+      - GATEWAY_AUTH_SECRET=${PLANKA_GATEWAY_SECRET:?set PLANKA_GATEWAY_SECRET in apps/journal-watch/.env}
+      # Group -> Planka role, re-applied at every sign-in. Django sends the
+      # groups from its permissions (backend/planka_gateway.py in the app):
+      # chief editors are admins, other staff and invited contributors are
+      # board users. Nobody needs project owner: Django creates the projects
+      # with its API key.
+      - GATEWAY_ADMIN_GROUPS=planka-admins
+      - GATEWAY_BOARD_USER_GROUPS=planka-users
+      # Signing out of Planka also signs out of Journal Watch (allauth asks
+      # for confirmation), which then returns the browser to Planka's door.
+      - GATEWAY_LOGOUT_URL=https://${DOMAIN}/accounts/logout/?next=/planka/
+      - S3_REGION=${PLANKA_S3_REGION}
+      - S3_ACCESS_KEY_ID=${PLANKA_S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${PLANKA_S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${PLANKA_S3_BUCKET}
+      - S3_FORCE_PATH_STYLE=false
+      # Notification email. Planka emails whoever it would notify in-app, so
+      # this reaches reviewers about their own cards: they are auto-subscribed
+      # when added to one and when they comment. Board-wide mail only happens
+      # for someone who deliberately subscribes to a board, which is an opt-in
+      # toggle and never set by board membership. There is no separate per-user
+      # email switch in 2.1.0, so turning this on turns it on for everyone -
+      # scoped, though, by those same subscriptions.
+      #
+      # Credentials are SES SMTP, derived from this deployment's own IAM key
+      # (username = access key ID, password = an HMAC over the secret), so no
+      # AWS resource was created and no credential is shared between hosts.
+      # SMTP_SECURE is deliberately absent: 587 is STARTTLS, and Planka reads
+      # it as `=== 'true'`, so setting it would try implicit TLS and fail.
+      - SMTP_HOST=${PLANKA_SMTP_HOST}
+      - SMTP_PORT=${PLANKA_SMTP_PORT}
+      - SMTP_USER=${PLANKA_SMTP_USER}
+      - SMTP_PASSWORD=${PLANKA_SMTP_PASSWORD}
+      - SMTP_FROM=${PLANKA_SMTP_FROM}
     volumes:
       - ./planka/custom:/app/terms/custom:ro
     healthcheck:
@@ -275,28 +464,45 @@ services:
       start_period: 30s
     networks:
       - journal-watch_proxy   # generated in .generated/caddy/networks.yml
-      - jw_internal
+      - jw_planka_internal
 
   # ---------------------------------------------------------------------------
   # PostgreSQL (Planka)
   # ---------------------------------------------------------------------------
   jw_planka_postgres:
-    image: postgres:16-alpine
+    # Pinned to the digest already running. Planka's own image is pinned to
+    # 2.1.0 below and must stay there; this is its database, pinned for the
+    # same reason - no silent major-version change under a live data volume.
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     oom_score_adj: -400
     pids_limit: 128
+    # The entrypoint starts as root, fixes data-directory ownership, then
+    # drops to the postgres user; these are the capabilities that needs.
+    # Tested here on a fresh volume, a restart, pg_dump and a restore.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    # 256m against a measured 52 MB peak over six days. Was unbounded.
+    mem_limit: 256m
     environment:
       POSTGRES_DB: planka
       POSTGRES_PASSWORD: ${PLANKA_POSTGRES_PASSWORD}
     volumes:
       - jw_planka_postgres_data:/var/lib/postgresql/data
-    # Port 5433 avoids conflict with Django postgres on 5432
-    ports:
-      - "127.0.0.1:5433:5432"
+    # No host port: backups reach the database through docker exec, and
+    # Django reaches it over jw_planka_internal.
     healthcheck:
       test: ["CMD-SHELL", "PGPASSWORD=$${POSTGRES_PASSWORD} pg_isready -U postgres -d planka"]
       interval: 30s
       timeout: 5s
       retries: 5
     networks:
-      - jw_internal
+      - jw_planka_internal

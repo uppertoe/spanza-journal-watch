@@ -315,14 +315,8 @@ class TestChiefEditorOnlyGuards:
     def test_backend_settings(self):
         check_guards(reverse("backend:backend_settings"))
 
-    def test_planka_run_setup_oidc(self):
-        check_guards(reverse("backend:planka_run_setup_oidc"), method="post")
-
     def test_planka_run_setup_api_key(self):
         check_guards(reverse("backend:planka_run_setup_api_key"), method="post")
-
-    def test_planka_promote_chief_editor(self):
-        check_guards(reverse("backend:planka_promote_chief_editor"), method="post")
 
 
 # ---------------------------------------------------------------------------

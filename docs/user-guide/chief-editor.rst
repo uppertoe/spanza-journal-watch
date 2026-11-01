@@ -17,9 +17,11 @@ Open **Settings** once, before the first issue is created.
 
 1. **PubMed API key**: paste an NCBI key and click **Save key**. It is
    optional, but it raises the PubMed rate limit.
-2. **Planka integration**: click **Run setup_planka_oidc**, then **Run
-   setup_planka_api_key**. The connection card below turns green. Run the
-   API key step again if Planka is ever restored from backup.
+2. **Planka integration**: click **Run setup_planka_api_key**. The
+   connection card below turns green. Run the step again if Planka is ever
+   restored from backup. Signing in needs no setup: Planka takes your
+   identity from your Journal Watch session, and as chief editor you are a
+   Planka administrator.
 3. **Watched journals**: click **Manage journals**, search by name, choose
    the NLM catalogue entry, and click **Add watched journal**. Repeat for
    each journal. **Deactivate** hides a journal from intake without deleting

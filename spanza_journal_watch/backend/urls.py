@@ -335,13 +335,7 @@ urlpatterns = [
     # Legacy redirects
     path("analytics/content/", analytics_views.analytics_content, name="analytics_content"),
     path("analytics/search/", analytics_views.analytics_search, name="analytics_search"),
-    path("settings/run/planka-oidc", views.planka_run_setup_oidc, name="planka_run_setup_oidc"),
     path("settings/run/planka-api-key", views.planka_run_setup_api_key, name="planka_run_setup_api_key"),
-    path(
-        "settings/run/planka-promote-chief-editor",
-        views.planka_promote_chief_editor,
-        name="planka_promote_chief_editor",
-    ),
     path("contributors/author-lookup", views.contributor_author_lookup, name="contributor_author_lookup"),
     path("affiliations", views.affiliations_list, name="affiliations_list"),
     path("affiliations/<int:affiliation_id>/edit", views.affiliation_edit, name="affiliation_edit"),

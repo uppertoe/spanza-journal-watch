@@ -108,47 +108,19 @@
   <div class="card-header">Planka integration setup</div>
   <div class="card-body">
     <p class="text-muted small mb-4">
-      Run these once during initial deployment. Both commands are idempotent and safe to re-run.
+      The API key step is run once during initial deployment. It is idempotent and safe to re-run.
     </p>
 
-    {# Step 1 — OIDC #}
+    {# Step 1 — sign-in, which needs no action here #}
     <div class="d-flex align-items-start gap-3 mb-4">
       <div class="flex-shrink-0 mt-1">
-        {% if planka_oidc_app %}
-          <span class="badge text-bg-success">Done</span>
-        {% else %}
-          <span class="badge text-bg-secondary">Pending</span>
-        {% endif %}
+        <span class="badge text-bg-success">Set on the server</span>
       </div>
       <div class="flex-grow-1">
-        <div class="fw-semibold mb-1">1. Register OIDC application</div>
-        <p class="text-muted small mb-2">
-          Creates the OAuth2/OIDC application in Django so Planka can use it as a login provider.
-          {% if planka_oidc_app %}
-            Registered as <code>{{ planka_oidc_app.client_id }}</code>.
-          {% endif %}
+        <div class="fw-semibold mb-1">1. Sign-in</div>
+        <p class="text-muted small mb-0">
+          Planka signs people in from their Journal Watch session. Set <code>PLANKA_GATEWAY_SECRET</code> in the server environment. Caddy sends it with every request, and Planka accepts no identity without it.
         </p>
-        {% if not planka_oidc_client_secret_configured %}
-          <div class="alert alert-warning py-2 small mb-2">
-            <strong>OIDC client secret is missing.</strong>
-            Set <code>OIDC_CLIENT_SECRET</code> in the server env before running this step, otherwise Django will register Planka with a blank or fallback secret.
-          </div>
-        {% endif %}
-        <div class="d-inline-flex align-items-center gap-2">
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-primary"
-            hx-post="{% url "backend:planka_run_setup_oidc" %}"
-            hx-target="#oidc-setup-result"
-            hx-swap="innerHTML"
-            hx-include="[name=csrfmiddlewaretoken]"
-            hx-indicator="#oidc-setup-spinner"
-          >
-            Run setup_planka_oidc
-          </button>
-          <span id="oidc-setup-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
-        </div>
-        <div id="oidc-setup-result"></div>
       </div>
     </div>
 
@@ -166,8 +138,7 @@
       <div class="flex-grow-1">
         <div class="fw-semibold mb-1">2. Generate API key</div>
         <p class="text-muted small mb-2">
-          Writes an API key directly to Planka's database — works regardless of
-          <code>OIDC_ENFORCED</code> and requires no browser login.
+          Writes an API key directly to Planka's database and requires no browser login.
           Also marks the admin account's terms as accepted.
           The key appears in Planka's profile settings (prefix only, as normal).
           {% if planka_credential and planka_credential.get_api_key %}

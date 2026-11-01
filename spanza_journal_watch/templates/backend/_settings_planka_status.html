@@ -71,81 +71,30 @@
       {% if chief_editor_planka_user.role == "admin" %}
         <span class="badge text-bg-success">Admin</span>
       {% else %}
-        <span class="badge text-bg-warning">Board user</span>
+        <span class="badge text-bg-secondary">{{ chief_editor_planka_user.role }}</span>
       {% endif %}
     {% elif planka_connected %}
-      <span class="badge text-bg-secondary">Not found</span>
+      <span class="badge text-bg-secondary">Not yet opened</span>
     {% endif %}
   </div>
   <div class="card-body">
     {% if not planka_connected %}
       <p class="text-muted small mb-0">Planka is not connected. Set up the API key above first.</p>
-    {% elif chief_editor_planka_user %}
-      <p class="text-muted small mb-2">
-        Logged in as <strong>{{ chief_editor_planka_user.name }}</strong>
-        &lt;{{ chief_editor_planka_user.email }}&gt;
-        · Planka role: <strong>{{ chief_editor_planka_user.role }}</strong>
-      </p>
-      {% if chief_editor_planka_user.role != "admin" %}
-        <p class="text-muted small mb-3">
-          As chief editor you should have Planka admin access. Click below to promote your account.
-        </p>
-        <div class="d-inline-flex align-items-center gap-2">
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-warning"
-            hx-post="{% url "backend:planka_promote_chief_editor" %}"
-            hx-target="#chief-editor-promote-result"
-            hx-swap="innerHTML"
-            hx-include="[name=csrfmiddlewaretoken]"
-            hx-indicator="#chief-editor-promote-spinner"
-          >
-            Promote to Planka admin
-          </button>
-          <span id="chief-editor-promote-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
-        </div>
-      {% else %}
-        <p class="text-muted small mb-3">
-          Your account has full Planka admin access. If you ever lose admin access (e.g. after OIDC
-          re-provisioning), click below to restore it.
-        </p>
-        <div class="d-inline-flex align-items-center gap-2">
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-secondary"
-            hx-post="{% url "backend:planka_promote_chief_editor" %}"
-            hx-target="#chief-editor-promote-result"
-            hx-swap="innerHTML"
-            hx-include="[name=csrfmiddlewaretoken]"
-            hx-indicator="#chief-editor-promote-spinner"
-          >
-            Re-confirm Planka admin
-          </button>
-          <span id="chief-editor-promote-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
-        </div>
-      {% endif %}
-      <div id="chief-editor-promote-result"></div>
     {% else %}
-      <p class="text-muted small mb-3">
-        No Planka account found for <strong>{{ request.user.email }}</strong>.
-        Log into Planka via SSO at least once, then return here to promote your account to admin.
+      {% if chief_editor_planka_user %}
+        <p class="text-muted small mb-2">
+          Planka knows you as <strong>{{ chief_editor_planka_user.name }}</strong>
+          &lt;{{ chief_editor_planka_user.email }}&gt;
+          · Planka role: <strong>{{ chief_editor_planka_user.role }}</strong>
+        </p>
+      {% else %}
+        <p class="text-muted small mb-2">
+          Planka has no account for <strong>{{ request.user.email }}</strong> yet. Planka creates it the first time you open the boards.
+        </p>
+      {% endif %}
+      <p class="text-muted small mb-0">
+        Your Planka role follows your Journal Watch permissions. Chief editors are Planka administrators, and staff and invited contributors are board users. Planka sets the role each time you open it.
       </p>
-      <div class="d-inline-flex align-items-center gap-2">
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary"
-          hx-post="{% url "backend:planka_promote_chief_editor" %}"
-          hx-target="#chief-editor-promote-result"
-          hx-swap="innerHTML"
-          hx-include="[name=csrfmiddlewaretoken]"
-          hx-indicator="#chief-editor-promote-spinner"
-          disabled
-        >
-          Promote to Planka admin
-        </button>
-        <span id="chief-editor-promote-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status"></span>
-      </div>
-      <div id="chief-editor-promote-result"></div>
     {% endif %}
   </div>
 </div>

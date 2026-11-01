@@ -288,23 +288,28 @@ docker compose exec -T jw_postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES
   select id, issue_id, publication_ready, created from layout_homepage order by created desc;"'
 ```
 
-## 10. Planka setup and OIDC checks
+## 10. Planka setup and sign-in checks
 
 ```bash
 cd /opt/deploy
-docker compose exec -T journal-watch python manage.py setup_planka_oidc
 docker compose exec -T journal-watch python manage.py setup_planka_api_key
-docker compose exec -T journal-watch python manage.py shell -c "
-from oauth2_provider.models import Application
-print(list(Application.objects.values('name', 'client_id', 'redirect_uris')))"
-```
-
-After enabling `OIDC_ENFORCED=true` in the app env:
-
-```bash
-docker compose up -d jw_planka
 docker compose logs --tail=100 jw_planka
 ```
+
+Planka refuses to start when `GATEWAY_AUTH=true` and `PLANKA_GATEWAY_SECRET`
+is missing or shorter than 32 characters; the log says which. To check the
+sign-in path from the box, ask Django's gateway check as Caddy would:
+
+```bash
+docker compose exec -T journal-watch python -c "import urllib.request
+req = urllib.request.Request('http://127.0.0.1:5000/planka/check', headers={'Host': 'planka.journalwatch.org.au'})
+try:
+    urllib.request.urlopen(req)
+except urllib.error.HTTPError as e:
+    print(e.code, e.headers.get('Location'))"
+```
+
+A signed-out request prints `302 https://journalwatch.org.au/planka/`.
 
 ## 11. Fast checks after a deploy or restore
 
@@ -356,11 +361,22 @@ IAM brittle. Fix: dedicated bucket in `PLANKA_S3_BUCKET` with its own IAM
 user. The old error looked like
 `AccessDenied ... s3:PutObject ... /protected/background-images/...`.
 
-### Planka SSO broken after an image bump
+### Planka shows "Sign in again" or the login cover instead of the boards
 
-Cause: newer Planka releases change the OIDC flow. Fix: keep the digest pin
-`2.1.0@sha256:32c919d9…` in `apps/journal-watch/docker-compose.yml`; only
-bump with a full SSO re-test.
+Planka has refused the identity it was handed. Causes, in the order to check:
+`PLANKA_GATEWAY_SECRET` differs between the `caddy` and `jw_planka`
+environments (`docker compose exec -T jw_planka env | grep GATEWAY_AUTH_SECRET`
+against the caddy container); the account has been deactivated inside
+Planka; or Django sent no group, which means the Journal Watch account has
+neither `is_staff` nor the invited-contributor permission. The Planka log
+names the refused email.
+
+### Planka image bumps
+
+The image is our own build (`ghcr.io/uppertoe/kanban-gateway-signin`); its
+CI runs the gateway sign-in checks against an upgraded database before it
+publishes, so Renovate's digest bumps are safe to take. A move to a new
+upstream release is a rebase in that repository, not a change here.
 
 ### Wrong AWS profile name
 

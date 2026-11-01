@@ -78,6 +78,7 @@ FLOWER_USER="flower"
 FLOWER_PASSWORD="$(gen_token 24)"
 OIDC_CLIENT_SECRET="$(gen_hex 32)"
 PLANKA_SECRET_KEY="$(gen_hex 32)"
+PLANKA_GATEWAY_SECRET="$(gen_hex 32)"
 PLANKA_WEBHOOK_SECRET="$(gen_hex 32)"
 PLANKA_POSTGRES_PASSWORD="$(gen_token 24)"
 DJANGO_ADMIN_PATH="$(gen_token 12 | tr -dc 'a-zA-Z0-9' | head -c 12)"
@@ -213,20 +214,11 @@ PLANKA_POSTGRES_PASSWORD=${PLANKA_POSTGRES_PASSWORD}
 SECRET_KEY=${PLANKA_SECRET_KEY}
 USER_TERMS_OF_SERVICE_VERSION=1
 
-# OIDC: run 'manage.py setup_planka_oidc' once after first boot.
-# OIDC_ISSUER and DEFAULT_ADMIN_EMAIL are set automatically by compose from
-# the vars above — no need to duplicate them here.
-OIDC_CLIENT_ID=planka-production
-OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-OIDC_USE_DEFAULT_RESPONSE_MODE=true
-OIDC_SCOPES=openid email profile
-OIDC_EMAIL_ATTRIBUTE=email
-OIDC_NAME_ATTRIBUTE=name
-OIDC_IGNORE_USERNAME=true
-OIDC_IGNORE_ROLES=true
-# Enable AFTER running setup_planka_api_key from the backend settings UI.
-# Uncomment and restart Planka to enforce SSO-only login.
-# OIDC_ENFORCED=true
+# Sign-in: Planka takes the identity from Django's gateway check. Caddy adds
+# this secret to every request it forwards to Planka, and Planka accepts no
+# identity without it. The same value reaches the caddy and jw_planka
+# services through compose.
+PLANKA_GATEWAY_SECRET=${PLANKA_GATEWAY_SECRET}
 
 # Admin bootstrap — used only by 'manage.py setup_planka_api_key'
 DEFAULT_ADMIN_NAME=Journal Watch Admin
