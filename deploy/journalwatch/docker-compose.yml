@@ -362,7 +362,7 @@ services:
     # 2.2.0, so the OIDC settings are gone. The image's CI upgrades a real
     # database and runs the sign-in checks before it publishes, so Renovate's
     # digest bumps are safe to take.
-    image: ghcr.io/uppertoe/kanban-gateway-signin:latest@sha256:d9d307576e1b38c0a9cb4fb2b3d962d47f2e2fe14dce04e2a136fcebfebb0897
+    image: ghcr.io/uppertoe/kanban-gateway-signin:latest@sha256:2e1106cd65cbd54d71c856f7679b10c03a8c818865093ad2a8b9eb72190b68b6
     restart: unless-stopped
     mem_limit: 256m
     oom_score_adj: 250

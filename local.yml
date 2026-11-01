@@ -127,7 +127,7 @@ services:
   # browser talks to planka_gateway on :3001, never to Planka itself. Keep the
   # digest in step with deploy/journalwatch/docker-compose.yml.
   planka:
-    image: ghcr.io/uppertoe/kanban-gateway-signin:latest@sha256:d9d307576e1b38c0a9cb4fb2b3d962d47f2e2fe14dce04e2a136fcebfebb0897
+    image: ghcr.io/uppertoe/kanban-gateway-signin:latest@sha256:2e1106cd65cbd54d71c856f7679b10c03a8c818865093ad2a8b9eb72190b68b6
     container_name: spanza_journal_watch_local_planka
     profiles: ['planka']
     restart: on-failure
