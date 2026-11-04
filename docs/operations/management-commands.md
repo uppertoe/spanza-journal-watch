@@ -187,9 +187,7 @@ for Amazon SES, the DKIM selectors, and the DMARC policy.
 
 ## Planka Integration
 
-### `setup_planka_oidc` (retired)
-
-Planka no longer signs in through OIDC; it takes the identity from Django's gateway check (`/planka/check`), which needs no registration step. The command is kept for one release so the previous Planka image can be redeployed, and is removed after that.
+Planka takes each person's identity from Django's gateway check (`/planka/check`), which needs no registration step on the Django side. The former `setup_planka_oidc` command has been removed with the OIDC provider.
 
 ### `setup_planka_api_key`
 

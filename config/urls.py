@@ -9,12 +9,10 @@ from django.views import defaults as default_views
 from django.views.decorators.cache import cache_control, cache_page
 from django.views.generic.base import TemplateView
 from markdownx.views import ImageUploadView, MarkdownifyView
-from oauth2_provider import urls as oauth2_urls
 
 from spanza_journal_watch.analytics import views as analytics_views
 from spanza_journal_watch.backend import planka_gateway
 from spanza_journal_watch.backend import views as backend_views
-from spanza_journal_watch.backend.oidc_validator import EditorialAuthorizationView
 from spanza_journal_watch.events.models import LiveSessionSitemap
 from spanza_journal_watch.layout.feeds import LatestReviewsFeed
 from spanza_journal_watch.layout.models import (
@@ -27,12 +25,6 @@ from spanza_journal_watch.layout.models import (
 )
 from spanza_journal_watch.layout.views import HomepageView, indexnow_key
 from spanza_journal_watch.users.views import invite_aware_login_view, invite_aware_signup_view
-
-# Planka needs only sign-in, tokens and discovery. Application registration,
-# token management and the device flow are left out.
-oauth2_patterns = [
-    pattern for pattern in oauth2_urls.base_urlpatterns if not pattern.name.startswith("device")
-] + oauth2_urls.oidc_urlpatterns
 
 sitemaps = {
     "pages": StaticPagesSitemap,
@@ -96,11 +88,6 @@ urlpatterns = [
     # planka.<domain>; /planka/ signs people in and sends them on (planka_gateway.py).
     path("planka/", planka_gateway.planka_entry, name="planka_entry"),
     path("planka/check", planka_gateway.planka_gateway_check, name="planka_gateway_check"),
-    # OAuth2 / OIDC provider, retired: kept for one release so the previous
-    # Planka image can be redeployed. Removed in a follow-up.
-    # Shadows DOT's authorize view so only contributors and staff can sign in to Planka
-    path("o/authorize/", EditorialAuthorizationView.as_view()),
-    path("o/", include((oauth2_patterns, "oauth2_provider"), namespace="oauth2_provider")),
     # Third party urls
     path("tinymce/", include("tinymce.urls")),
     # The markdown editor is used only in the admin, so only staff may upload or preview.

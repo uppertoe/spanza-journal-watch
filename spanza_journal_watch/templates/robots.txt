@@ -3,7 +3,6 @@ Allow: /
 # Signed-in areas and account plumbing
 Disallow: /editorial/
 Disallow: /accounts/
-Disallow: /o/
 Disallow: /users/
 Disallow: /cpd/
 Disallow: /newsletter/

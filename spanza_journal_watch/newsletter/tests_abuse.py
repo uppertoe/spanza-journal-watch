@@ -34,9 +34,3 @@ def test_one_visitor_is_limited_across_addresses(client):
             response = _subscribe(client, f"person{n}@example.com")
             assert response.status_code == 200
     assert task.delay.call_count == VISITOR_HOURLY_LIMIT
-
-
-def test_refresh_tokens_expire():
-    from django.conf import settings
-
-    assert settings.OAUTH2_PROVIDER["REFRESH_TOKEN_EXPIRE_SECONDS"] == 30 * 24 * 60 * 60

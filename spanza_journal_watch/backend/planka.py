@@ -353,9 +353,8 @@ class PlankaClient:
     def create_user_via_db(self, email, name, role="boardUser"):
         """Create a Planka user directly in the database.
 
-        Required when OIDC_ENFORCED=true blocks POST /api/users.
-        The user will be linked to their OIDC identity on first SSO login
-        via Planka's get-or-create-one-with-oidc helper (matches by email).
+        Required when password sign-in is off and POST /api/users is refused.
+        The gateway matches the row by email at the person's first sign-in.
         """
         import re
         from datetime import datetime, timezone

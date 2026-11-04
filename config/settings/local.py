@@ -84,12 +84,6 @@ CELERY_TASK_EAGER_PROPAGATES = True
 # django-webpack-loader
 # ------------------------------------------------------------------------------
 WEBPACK_LOADER["DEFAULT"]["CACHE"] = not DEBUG  # noqa: F405
-# django-oauth-toolkit: allow http origins for local OIDC CORS (dev only)
-# ------------------------------------------------------------------------------
-OAUTH2_PROVIDER = {
-    **OAUTH2_PROVIDER,  # noqa: F405
-    "ALLOWED_SCHEMES": ["http", "https"],
-}
 
 # Your stuff...
 # ------------------------------------------------------------------------------

@@ -38,19 +38,23 @@ class TestMarkdownxUpload:
         assert client.post("/markdownx/markdownify/", {"content": "**x**"}).status_code == 302
 
 
-class TestOAuthRoutes:
+class TestRetiredOIDCProvider:
+    """Planka signs in through the gateway check, so the OIDC provider's routes are gone."""
+
     @pytest.mark.parametrize(
-        "path", ["/o/applications/", "/o/applications/register/", "/o/authorized_tokens/", "/o/device/"]
+        "path",
+        [
+            "/o/.well-known/openid-configuration",
+            "/o/authorize/",
+            "/o/token/",
+            "/o/userinfo/",
+            "/o/.well-known/jwks.json",
+        ],
     )
-    def test_management_and_device_routes_are_absent(self, client, path):
-        client.force_login(UserFactory(is_staff=False))
+    def test_provider_routes_are_absent(self, client, path):
+        client.force_login(UserFactory(is_staff=True))
         assert client.get(path).status_code == 404
 
-    def test_sign_in_routes_remain(self, client):
-        assert client.get("/o/.well-known/openid-configuration").status_code == 200
-        for name in ("token", "revoke-token", "user-info", "jwks-info"):
-            assert reverse(f"oauth2_provider:{name}")
-
-    def test_registration_is_not_routable(self):
+    def test_provider_namespace_is_not_routable(self):
         with pytest.raises(NoReverseMatch):
-            reverse("oauth2_provider:register")
+            reverse("oauth2_provider:authorize")

@@ -9,18 +9,17 @@ logger = logging.getLogger(__name__)
 
 @receiver(user_logged_out)
 def revoke_planka_sessions_on_logout(sender, request, user, **kwargs):
-    """Delete the user's Planka sessions and revoke Django OAuth2 tokens on logout.
+    """Delete the user's Planka sessions on logout.
 
-    Planka maintains its own session (httpOnlyToken cookie) after OIDC login.
-    Deleting the session rows invalidates that cookie on Planka's next request,
-    forcing re-authentication through Django's OIDC flow.
+    Planka keeps its own session (the httpOnlyToken cookie) once the gateway
+    has signed a person in. Deleting the session rows invalidates that cookie
+    on Planka's next request, so the person signs in again through the gateway
+    check (backend/planka_gateway.py).
     """
     if user is None:
         return
 
     _revoke_planka_db_sessions(user)
-    if user.pk is not None:  # A deleted account's tokens went with it
-        _revoke_oauth2_tokens(user)
 
 
 def _revoke_planka_db_sessions(user):
@@ -70,18 +69,3 @@ def _resolve_planka_user_id(user, db_url):
     except Exception:
         logger.exception("Failed to look up Planka user ID for user %s", user.pk)
         return None
-
-
-def _revoke_oauth2_tokens(user):
-    """Revoke all OAuth2 access/refresh tokens for this user."""
-    try:
-        from django.utils import timezone
-        from oauth2_provider.models import AccessToken, RefreshToken
-
-        now = timezone.now()
-        revoked = AccessToken.objects.filter(user=user, expires__gt=now).update(expires=now)
-        RefreshToken.objects.filter(user=user, revoked__isnull=True).update(revoked=now)
-        if revoked:
-            logger.info("Revoked %d OAuth2 token(s) for user %s", revoked, user.pk)
-    except Exception:
-        logger.exception("Failed to revoke OAuth2 tokens for user %s", user.pk)

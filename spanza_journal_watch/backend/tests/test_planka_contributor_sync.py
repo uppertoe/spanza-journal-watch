@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 
 from spanza_journal_watch.backend.models import IssueContributor, PlankaIssueBinding
-from spanza_journal_watch.backend.oidc_validator import _display_name
 from spanza_journal_watch.backend.views.planka_boards import _sync_contributor_to_planka
 from spanza_journal_watch.submissions.models import Issue
 
@@ -115,16 +114,3 @@ def test_planka_name_drops_honorific_so_initials_are_the_persons(contributor):
     _sync(client, contributor)
 
     assert client.renamed == [("user-1", "Jane Smith")]
-
-
-def test_oidc_name_claim_drops_honorific():
-    class User:
-        email = "jane@example.com"
-
-    user = User()
-    user.name = "Dr Jane Smith"
-    assert _display_name(user) == "Jane Smith"
-    user.name = "Jane Smith"
-    assert _display_name(user) == "Jane Smith"
-    user.name = ""
-    assert _display_name(user) == "jane@example.com"

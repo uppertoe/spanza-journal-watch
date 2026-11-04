@@ -68,9 +68,7 @@ crispy-bootstrap5==2026.3
 cron-descriptor==1.4.5
     # via django-celery-beat
 cryptography==46.0.7
-    # via
-    #   -r requirements/base.in
-    #   jwcrypto
+    # via -r requirements/base.in
 defusedxml==0.7.1
     # via fpdf2
 django==6.0.9
@@ -84,7 +82,6 @@ django==6.0.9
     #   django-markdownx
     #   django-mjml
     #   django-model-utils
-    #   django-oauth-toolkit
     #   django-redis
     #   django-storages
     #   django-timezone-field
@@ -107,8 +104,6 @@ django-markdownx==4.0.9
 django-mjml==1.5
     # via -r requirements/base.in
 django-model-utils==5.0.0
-    # via -r requirements/base.in
-django-oauth-toolkit==3.2.0
     # via -r requirements/base.in
 django-redis==6.0.0
     # via -r requirements/base.in
@@ -156,14 +151,10 @@ jmespath==1.1.0
     # via
     #   boto3
     #   botocore
-jwcrypto==1.5.7
-    # via django-oauth-toolkit
 kombu==5.6.2
     # via celery
 markdown==3.10.2
     # via django-markdownx
-oauthlib==3.3.1
-    # via django-oauth-toolkit
 openpyxl==3.1.5
     # via -r requirements/base.in
 packaging==26.0
@@ -205,8 +196,8 @@ redis==7.4.0
     #   django-redis
 requests==2.33.1
     # via
+    #   -r requirements/base.in
     #   django-anymail
-    #   django-oauth-toolkit
 s3transfer==0.16.0
     # via boto3
 sentry-sdk==2.57.0
@@ -228,7 +219,6 @@ truststore==0.10.4
 typing-extensions==4.15.0
     # via
     #   anthropic
-    #   jwcrypto
     #   pydantic
     #   pydantic-core
     #   typing-inspection

@@ -100,8 +100,8 @@ each sign-in, so it cannot be edited inside Planka.
 The image is our own build of Planka,
 `ghcr.io/uppertoe/kanban-gateway-signin`, which is upstream 2.2.1 plus the
 gateway sign-in patch (see `GATEWAY.md` in that repository). Upstream removed
-single sign-on in 2.2.0, so there is no OIDC any more; the OIDC provider
-in Django is retired and will be removed in a follow-up release.
+single sign-on in 2.2.0, so there is no OIDC any more, and the OIDC provider
+Django once ran for Planka has been removed as well.
 
 ---
 
