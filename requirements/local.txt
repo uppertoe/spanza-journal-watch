@@ -92,7 +92,6 @@ cron-descriptor==1.4.5
 cryptography==46.0.7
     # via
     #   -r requirements/base.in
-    #   jwcrypto
     #   moto
 decorator==5.2.1
     # via
@@ -117,7 +116,6 @@ django==6.0.9
     #   django-markdownx
     #   django-mjml
     #   django-model-utils
-    #   django-oauth-toolkit
     #   django-redis
     #   django-stubs
     #   django-stubs-ext
@@ -145,8 +143,6 @@ django-markdownx==4.0.9
 django-mjml==1.5
     # via -r requirements/base.in
 django-model-utils==5.0.0
-    # via -r requirements/base.in
-django-oauth-toolkit[oidc]==3.2.0
     # via -r requirements/base.in
 django-redis==6.0.0
     # via -r requirements/base.in
@@ -227,8 +223,6 @@ jmespath==1.1.0
     # via
     #   boto3
     #   botocore
-jwcrypto==1.5.7
-    # via django-oauth-toolkit
 kombu==5.6.2
     # via celery
 librt==0.9.0
@@ -251,8 +245,6 @@ mypy-extensions==1.1.0
     # via mypy
 nodeenv==1.10.0
     # via pre-commit
-oauthlib==3.3.1
-    # via django-oauth-toolkit
 openpyxl==3.1.5
     # via -r requirements/base.in
 packaging==26.0
@@ -364,7 +356,7 @@ redis==7.4.0
     #   django-redis
 requests==2.33.1
     # via
-    #   django-oauth-toolkit
+    #   -r requirements/base.in
     #   moto
     #   responses
     #   sphinx
@@ -431,7 +423,6 @@ typing-extensions==4.15.0
     #   anthropic
     #   django-stubs
     #   django-stubs-ext
-    #   jwcrypto
     #   mypy
     #   pydantic
     #   pydantic-core

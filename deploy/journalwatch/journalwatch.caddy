@@ -24,6 +24,7 @@
 # cookie to strip, and each proxy below carries the renderer's allow marker.
 
 # Redirect www to apex
+# scaffold-lint: public -- the www name only redirects to the apex
 www.{$DOMAIN} {
     import jw_cloudflare_only
     redir https://{$DOMAIN}{uri} permanent
@@ -31,6 +32,10 @@ www.{$DOMAIN} {
 
 # Journal Watch — main app
 # (Keep comments free of curly braces: the scaffold renderer counts braces.)
+# Journal Watch is a public journal club site. Readers sign in to Django
+# itself for the editorial and member pages, so the site carries no scaffold
+# guard and Caddy holds it open.
+# scaffold-lint: public -- a public site; Django signs in its own editors and members
 {$DOMAIN} {
     # Per-request JSON access logging (/var/log/caddy/access.log on the
     # caddy_logs volume, size-capped rotation), compression and baseline
@@ -119,6 +124,14 @@ www.{$DOMAIN} {
 # X-Gateway-Secret never survives, and jw_strip_client_identity drops any
 # client-sent Remote-* before the copy. Keep this comment free of curly
 # braces: the route renderer counts them.
+#
+# Access declaration for the scaffold's render lint: the forward_auth below
+# is the gate, and the renderer recognises it as one. The gate is Django's,
+# not the scaffold gateway's, so route-access.tsv lists no group or domain
+# rule for this site; who may enter is decided by may_use_planka() in the
+# app's backend/planka_gateway.py (staff and invited contributors). The
+# cover handle sits after forward_auth inside the same route block, so it
+# is reached only once the check has answered.
 planka.{$DOMAIN} {
     import jw_cloudflare_only
 

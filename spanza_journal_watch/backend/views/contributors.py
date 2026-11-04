@@ -649,7 +649,7 @@ def issue_invite_accept(request, token):
                 contributor.save(update_fields=["author", "modified"])
 
         # Populate the user's display name from the invite if not already set,
-        # so that OIDC name claims (used by Planka SSO) reflect their real name.
+        # so that the name the gateway sends to Planka is their real name.
         contributor_name = (contributor.name or "").strip()
         if contributor_name and not (getattr(request.user, "name", "") or "").strip():
             request.user.name = contributor_name

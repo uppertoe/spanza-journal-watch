@@ -98,7 +98,6 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
-    "oauth2_provider",
     "django_celery_beat",
     "webpack_loader",
     "view_breadcrumbs",
@@ -131,7 +130,6 @@ MIGRATION_MODULES = {"sites": "spanza_journal_watch.contrib.sites.migrations"}
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
-    "oauth2_provider.backends.OAuth2Backend",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#auth-user-model
 AUTH_USER_MODEL = "users.User"
@@ -450,29 +448,6 @@ SOCIALACCOUNT_FORMS = {"signup": "spanza_journal_watch.users.forms.UserSocialSig
 # ------------------------------------------------------------------------------
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 REVIEW_HEADLINE_MODEL = env("REVIEW_HEADLINE_MODEL", default="claude-opus-5")
-
-# django-oauth-toolkit — Django acts as the OIDC provider for Planka
-# ------------------------------------------------------------------------------
-import base64  # noqa: E402
-
-_oidc_key_b64 = env("OIDC_RSA_PRIVATE_KEY", default="")
-
-_oidc_iss_endpoint = env("OIDC_ISS_ENDPOINT", default="")
-
-OAUTH2_PROVIDER = {
-    "OIDC_ENABLED": True,
-    "OIDC_RSA_PRIVATE_KEY": base64.b64decode(_oidc_key_b64).decode() if _oidc_key_b64 else "",
-    "OIDC_ISS_ENDPOINT": _oidc_iss_endpoint or None,
-    "OAUTH2_VALIDATOR_CLASS": "spanza_journal_watch.backend.oidc_validator.OIDCValidator",
-    "SCOPES": {
-        "openid": "OpenID Connect scope",
-        "email": "Email address",
-        "profile": "Profile information",
-    },
-    "PKCE_REQUIRED": env.bool("OIDC_PKCE_REQUIRED", default=False),
-    # Planka keeps its own session once signed in, so renewal tokens need not last.
-    "REFRESH_TOKEN_EXPIRE_SECONDS": 30 * 24 * 60 * 60,
-}
 
 PLANKA_EXTERNAL_URL = env("PLANKA_EXTERNAL_URL", default="")
 

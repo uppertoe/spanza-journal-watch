@@ -48,6 +48,5 @@ PLANKA_ADMIN_EMAIL = ""
 PLANKA_DB_URL = ""
 ANTHROPIC_API_KEY = ""
 INDEXNOW_KEY = ""
-OAUTH2_PROVIDER = {**OAUTH2_PROVIDER, "OIDC_ISS_ENDPOINT": None}  # noqa: F405
 # Your stuff...
 # ------------------------------------------------------------------------------

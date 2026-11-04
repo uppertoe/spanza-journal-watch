@@ -2,7 +2,7 @@
 Bootstrap a Planka API key and initialise the instance via direct DB writes.
 
 This approach:
-  - Works regardless of whether OIDC_ENFORCED=true is set
+  - Works with password sign-in switched off (gateway sign-in needs no REST login)
   - Works regardless of whether Planka is running (pure DB write, no REST call)
   - Does not require the admin user to have accepted Terms of Service in a browser
   - Accepts terms on behalf of the admin user automatically
@@ -114,8 +114,8 @@ class Command(BaseCommand):
                     if cur.rowcount != 1:
                         raise CommandError("UPDATE affected unexpected number of rows.")
 
-                    # Set is_initialized = true so SSO users can log in.
-                    # Planka checks this flag before allowing any OIDC exchange.
+                    # Set is_initialized = true so gateway sign-ins are accepted.
+                    # Planka checks this flag before it signs anyone in.
                     # It is normally set when an admin first logs in via email/password,
                     # but we set it here directly to avoid that manual step.
                     cur.execute("SELECT id, is_initialized FROM internal_config LIMIT 1")
@@ -158,8 +158,7 @@ class Command(BaseCommand):
         action = "Created" if created else "Updated"
         self.stdout.write(self.style.SUCCESS(f"  ✓ {action} Django credential (key: {masked})."))
         self.stdout.write(
-            "\nDone. The X-Api-Key is active immediately and works regardless of OIDC_ENFORCED.\n"
-            "SSO logins will now work. You can enable OIDC_ENFORCED to disable email/password login.\n"
-            "Run setup_planka_oidc if not already done:\n"
-            "  python manage.py setup_planka_oidc\n"
+            "\nDone. The X-Api-Key is active immediately.\n"
+            "Planka signs people in through Django's gateway check (/planka/check); "
+            "nothing further needs registering on the Django side.\n"
         )

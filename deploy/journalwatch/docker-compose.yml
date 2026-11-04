@@ -146,6 +146,9 @@ services:
     # an upgrade. Bump deliberately.
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     restart: unless-stopped
+    # Databases belong in the data tier, which may swap and sits under the
+    # estate's shared ceiling (scaffold/docs/04-server-repo.md, Memory tiers).
+    cgroup_parent: vps-data.slice
     # Was unbounded on a 2 GB host already deep in swap, so a runaway here had
     # nothing to stop it before the kernel started choosing victims. 512m
     # against a measured 188 MB peak over six days, and above
@@ -227,6 +230,7 @@ services:
     # Pinned to the digest already running.
     image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     restart: unless-stopped
+    cgroup_parent: vps-data.slice
     mem_limit: 128m
     oom_score_adj: 300
     pids_limit: 64
@@ -259,6 +263,9 @@ services:
   jw_mjml:
     image: ${JW_DOCKERHUB_NAMESPACE}/journalwatch-mjml:${JW_APP_TAG:-latest}
     restart: unless-stopped
+    # Renders newsletter email for the Celery worker; nobody waits on it in a
+    # browser, so it sits in the batch tier beside the worker.
+    cgroup_parent: vps-batch.slice
     mem_limit: 128m
     oom_score_adj: 400
     pids_limit: 64
@@ -300,6 +307,9 @@ services:
     # matches the 1-vCPU box; prefork pool (not solo) is required for
     # --max-tasks-per-child to take effect.
     command: celery -A config.celery_app worker --beat -l INFO --concurrency=1 --max-tasks-per-child=100
+    # Background jobs nobody waits on in a browser. The batch tier may swap,
+    # which this worker needs (see the mem_limit note below).
+    cgroup_parent: vps-batch.slice
     mem_reservation: 192m
     # 512m, not 350m. celery --beat --concurrency=1 is three processes (main,
     # forked child, beat) and the children the OOM killer took here were
@@ -475,6 +485,7 @@ services:
     # same reason - no silent major-version change under a live data volume.
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
+    cgroup_parent: vps-data.slice
     oom_score_adj: -400
     pids_limit: 128
     # The entrypoint starts as root, fixes data-directory ownership, then

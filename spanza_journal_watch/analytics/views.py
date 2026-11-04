@@ -262,7 +262,7 @@ def track_email_click(request):
 
 # Staff/utility paths whose page loads should not be recorded — mirrors the
 # exclusions the old server-side PageVisitAnalyticsMiddleware applied.
-_PAGE_VISIT_EXCLUDED_PREFIXES = ("/editorial/", "/o/", "/__debug__/", "/tinymce/", "/markdownx/")
+_PAGE_VISIT_EXCLUDED_PREFIXES = ("/editorial/", "/__debug__/", "/tinymce/", "/markdownx/")
 
 
 def _is_excluded_page_path(path):

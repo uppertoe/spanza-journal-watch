@@ -142,7 +142,7 @@ def _sync_contributor_to_planka(contributor):
                 planka_user = client.create_user(contributor.email, desired_name)
             except PlankaAPIError as exc:
                 if "403" in str(exc):
-                    # OIDC_ENFORCED=true blocks the REST API — create via direct DB write
+                    # Password sign-in is off, so the REST API refuses user creation; write the row directly
                     planka_user = client.create_user_via_db(contributor.email, desired_name)
                 else:
                     raise
@@ -150,10 +150,10 @@ def _sync_contributor_to_planka(contributor):
             try:
                 client.update_user(str(planka_user["id"]), desired_name)
             except PlankaAPIError:
-                pass  # Best-effort: OIDC will sync the name on next Planka login
+                pass  # Best-effort: the gateway sends the name again at the next Planka sign-in
 
         # If a Django user already exists for this email, ensure user.name is
-        # set so the OIDC token carries the correct name when they log into Planka.
+        # set so the gateway sends the correct name when they sign in to Planka.
         User = get_user_model()
         django_user = User.objects.filter(email__iexact=contributor.email).first()
         if django_user and not (getattr(django_user, "name", "") or "").strip():
