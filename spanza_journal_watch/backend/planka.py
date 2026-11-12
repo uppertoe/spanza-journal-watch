@@ -337,18 +337,28 @@ class PlankaClient:
         username = re.sub(r"[^a-z0-9_.]", "_", raw_prefix).strip("_.") or "user"
         username = username[:48]
 
-        payload = self._request(
-            "POST",
-            "/users",
-            json={
-                "email": email,
-                "name": name,
-                "password": secrets.token_urlsafe(32),
-                "username": username,
-                "role": "boardUser",
-            },
-        )
-        return payload.get("item", {})
+        # The username comes from the email's local part, so two addresses such as
+        # jo.bloggs@a.org and jo.bloggs@b.org collide; add a suffix as the DB path does.
+        candidates = [username] + [f"{username[:44]}_{i}" for i in range(1, 20)]
+        for candidate in candidates:
+            try:
+                payload = self._request(
+                    "POST",
+                    "/users",
+                    json={
+                        "email": email,
+                        "name": name,
+                        "password": secrets.token_urlsafe(32),
+                        "username": candidate,
+                        "role": "boardUser",
+                    },
+                )
+            except PlankaAPIError as error:
+                if "409" in str(error) and "username" in str(error).lower():
+                    continue
+                raise
+            return payload.get("item", {})
+        raise PlankaAPIError(f"Planka API 409: no free username found for {username}")
 
     def create_user_via_db(self, email, name, role="boardUser"):
         """Create a Planka user directly in the database.

@@ -114,3 +114,39 @@ def test_planka_name_drops_honorific_so_initials_are_the_persons(contributor):
     _sync(client, contributor)
 
     assert client.renamed == [("user-1", "Jane Smith")]
+
+
+def test_create_user_adds_suffix_when_username_is_taken():
+    """Two addresses with the same local part must not block the second person."""
+    from spanza_journal_watch.backend.planka import PlankaAPIError, PlankaClient
+
+    client = PlankaClient.__new__(PlankaClient)
+    sent = []
+
+    def fake_request(method, path, json=None, **kwargs):
+        sent.append(json["username"])
+        if json["username"] in {"jo.bloggs", "jo.bloggs_1"}:
+            raise PlankaAPIError("Planka API 409: Username already in use")
+        return {"item": {"id": "user-2", "username": json["username"]}}
+
+    client._request = fake_request
+    user = client.create_user("jo.bloggs@health.example", "Jo Bloggs")
+
+    assert sent == ["jo.bloggs", "jo.bloggs_1", "jo.bloggs_2"]
+    assert user["username"] == "jo.bloggs_2"
+
+
+def test_create_user_does_not_retry_an_email_conflict():
+    from spanza_journal_watch.backend.planka import PlankaAPIError, PlankaClient
+
+    client = PlankaClient.__new__(PlankaClient)
+    calls = []
+
+    def fake_request(method, path, json=None, **kwargs):
+        calls.append(json["username"])
+        raise PlankaAPIError("Planka API 409: Email already in use")
+
+    client._request = fake_request
+    with pytest.raises(PlankaAPIError, match="Email already in use"):
+        client.create_user("jo.bloggs@health.example", "Jo Bloggs")
+    assert calls == ["jo.bloggs"]
