@@ -136,6 +136,28 @@ class TestSendNewsletterBatch:
         assert "&s=" in html or "&amp;s=" in html
 
     @patch("spanza_journal_watch.newsletter.tasks.mail.get_connection")
+    def test_opens_one_connection_for_the_whole_batch(self, mock_conn, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
+
+        second = Subscriber.objects.create(email="task-sub-2@example.com", subscribed=True)
+        connection = mock_conn.return_value
+        connection.send_messages.return_value = 1
+        send_newsletter_batch(newsletter.pk, [subscriber.pk, second.pk], test_email=False)
+        assert mock_conn.call_count == 1
+        assert connection.open.call_count == 1
+        assert connection.send_messages.call_count == 2
+        assert connection.close.call_count == 1
+
+    @patch("spanza_journal_watch.newsletter.tasks.mail.get_connection")
+    def test_closes_connection_after_send_failure(self, mock_conn, newsletter, subscriber):
+        from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
+
+        mock_conn.return_value.send_messages.side_effect = RuntimeError("SMTP down")
+        with pytest.raises(RuntimeError):
+            send_newsletter_batch(newsletter.pk, [subscriber.pk], test_email=False)
+        assert mock_conn.return_value.close.call_count == 1
+
+    @patch("spanza_journal_watch.newsletter.tasks.mail.get_connection")
     def test_reraises_send_failure(self, mock_conn, newsletter, subscriber):
         from spanza_journal_watch.newsletter.tasks import send_newsletter_batch
 

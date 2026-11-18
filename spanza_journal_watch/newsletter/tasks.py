@@ -110,6 +110,9 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
     connection = mail.get_connection()
     messages = newsletter.generate_emails(subscribers)
     successful = 0
+    # One connection for the whole batch: an unopened backend opens and closes a new
+    # SES client on every send_messages call, which costs about a second per email.
+    connection.open()
     try:
         for subscriber, message in zip(subscribers, messages, strict=True):
             sent = connection.send_messages([message]) or 0
@@ -125,6 +128,7 @@ def send_newsletter_batch(newsletter_pk, subscriber_pks, test_email):
         )
         raise
     finally:
+        connection.close()
         if successful and not test_email:
             newsletter_queryset.update(emails_sent=F("emails_sent") + successful)
 
