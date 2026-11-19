@@ -94,7 +94,7 @@ def analytics_issues(request):
         )
     }
 
-    issues = list(Issue.objects.filter(active=True).order_by("-date", "-id"))
+    issues = list(Issue.objects.filter(active=True).in_release_order())
     issue_ids = [i.id for i in issues]
     issue_reviews = defaultdict(list)
     for issue_id, review_id in Issue.reviews.through.objects.filter(issue_id__in=issue_ids).values_list(

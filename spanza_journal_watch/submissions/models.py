@@ -18,7 +18,8 @@ from django.contrib.postgres.search import (
 )
 from django.core.cache import cache
 from django.db import models
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import Exists, F, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -561,14 +562,36 @@ class Review(TimeStampedModel):
         return self.article.get_truncated_name()
 
 
+class IssueQuerySet(models.QuerySet):
+    def in_release_order(self):
+        """Newest first by the date readers received each issue.
+
+        That is the first send of its newsletter, or for an issue not yet emailed, the date it was
+        published. ``date`` is the month the issue covers and does not track release order.
+        """
+        newsletter_model = apps.get_model("newsletter", "Newsletter")
+        first_send = (
+            newsletter_model.objects.filter(issue=OuterRef("pk"), is_sent=True, send_date__isnull=False)
+            .order_by("send_date")
+            .values("send_date")[:1]
+        )
+        return self.annotate(
+            released_at=Coalesce(Subquery(first_send), F("published_at"), F("created")),
+        ).order_by(F("released_at").desc(nulls_last=True), "-pk")
+
+
 class Issue(TimeStampedModel):
     name = models.CharField(max_length=255, null=False, blank=False)
     date = models.DateField(null=True, blank=True)
+    # Set the first time the issue goes live; unpublishing and republishing keeps the first date.
+    published_at = models.DateTimeField(null=True, blank=True, editable=False)
     slug = models.SlugField(max_length=255, null=False, blank=True, unique=True)
     body = models.TextField()
     image = models.ImageField(upload_to="issues/", blank=True, null=True)
     reviews = models.ManyToManyField(Review, blank=True, related_name="issues")
     active = models.BooleanField(default=False)
+
+    objects = IssueQuerySet.as_manager()
 
     class Meta:
         indexes = [
@@ -722,6 +745,11 @@ class Issue(TimeStampedModel):
                     if desired_slug and desired_slug != self.slug:
                         retired_slug = self.slug
                         self.slug = desired_slug
+        if self.active and self.published_at is None:
+            self.published_at = timezone.now()
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None and "published_at" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "published_at"]
         super().save(*args, **kwargs)
 
         if retired_slug and retired_slug != self.slug:

@@ -48,7 +48,7 @@ def report_page(request):
             full_text_clicked_at__lt=default_to + timedelta(days=1),
         ).count()
 
-    sidebar_issues = list(Issue.objects.filter(active=True).order_by("-date", "-created")[:3])
+    sidebar_issues = list(Issue.objects.filter(active=True).in_release_order()[:3])
     Issue.attach_display_images(sidebar_issues)
 
     return render(

@@ -119,7 +119,7 @@ class IssueListView(AnonymousCacheMixin, SidebarMixin, HtmxMixin, ListBreadcrumb
     template_name = "submissions/issue_list.html"
     # The card fragment counts each issue's reviews; prefetch them so the page
     # runs one query for all issues instead of two per issue.
-    queryset = Issue.objects.exclude(active=False).order_by("-date").prefetch_related("reviews")
+    queryset = Issue.objects.exclude(active=False).in_release_order().prefetch_related("reviews")
 
     # HTMX
     htmx_templates = [
@@ -167,7 +167,7 @@ class LatestIssueView(RedirectView):
     query_string = False
 
     def get_redirect_url(self, *args, **kwargs):
-        issue = Issue.objects.exclude(active=False).order_by("-date").first()
+        issue = Issue.objects.exclude(active=False).in_release_order().first()
         if not issue:
             raise Http404
         return issue.get_absolute_url()

@@ -131,7 +131,7 @@ class SidebarMixin:
 
         context["sidebar_issues"] = cache.get_or_set(
             issues_cache_key,
-            lambda: list(Issue.objects.exclude(active=False).order_by("-date")[: self.number_of_sidebar_issues]),
+            lambda: list(Issue.objects.exclude(active=False).in_release_order()[: self.number_of_sidebar_issues]),
             timeout=60 * 30,
         )
         context["sidebar_tags"] = cache.get_or_set(
