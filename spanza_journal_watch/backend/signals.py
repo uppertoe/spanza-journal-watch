@@ -45,9 +45,14 @@ if not settings.DEBUG:  # Anymail only available in production
 
         @receiver(inbound)
         def handle_inbound_email(sender, event, esp_name, **kwargs):
+            from spanza_journal_watch.newsletter.inbound import handle_unsubscribe_email
+
             from .models import EmailThread, InboundEmail, SentEmail
 
             message = event.message
+            if handle_unsubscribe_email(message, event.esp_event):
+                logger.info("Unsubscribe email handled: %s", event.event_id)
+                return
             msg_id = (getattr(message, "message_id", None) or "").strip()
             in_reply_to = (message.get("In-Reply-To") or "").strip()
             received_at = message.date or timezone.now()

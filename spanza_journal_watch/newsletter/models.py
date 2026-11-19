@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from spanza_journal_watch.analytics.links import EmailLinkBuilder
 from spanza_journal_watch.backend.models import SubscriberCSV
+from spanza_journal_watch.newsletter.inbound import UNSUBSCRIBE_ADDRESS
 from spanza_journal_watch.submissions.models import Issue, Review
 from spanza_journal_watch.utils.celerytasks import celery_resize_greyscale_contrast_image
 from spanza_journal_watch.utils.functions import get_domain_url
@@ -151,7 +152,7 @@ class Subscriber(models.Model):
 
     def get_list_unsubscribe_headers(self):
         one_click_url = self.get_unsubscribe_link(absolute=True)
-        mailto = f"mailto:unsubscribe@journalwatch.org.au?subject={quote('unsubscribe')}"
+        mailto = f"mailto:{UNSUBSCRIBE_ADDRESS}?subject={quote('unsubscribe')}"
         return {
             "List-Unsubscribe": f"<{mailto}>, <{one_click_url}>",
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
