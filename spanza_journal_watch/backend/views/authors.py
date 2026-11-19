@@ -175,6 +175,8 @@ def author_merge(request, author_id):
 
             updated_fields = []
             if not target.email and source.email:
+                # Email is unique, so the source releases it before the target takes it.
+                Author.objects.filter(pk=source.pk).update(email=None)
                 target.email = source.email
                 updated_fields.append("email")
             if not target.user and source.user:
