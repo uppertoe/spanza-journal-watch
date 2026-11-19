@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.text import slugify
 
 from spanza_journal_watch.submissions.models import (
     Author,
@@ -190,6 +191,12 @@ def author_merge(request, author_id):
 
             source_name = f"{source.title} {source.name}"
             source.delete()
+
+            # A duplicate's numbered slug (jane-citizen-1) gives way to the plain one once it is free.
+            plain_slug = slugify(target.name)
+            if plain_slug and target.slug != plain_slug and not Author.objects.filter(slug=plain_slug).exists():
+                target.slug = plain_slug
+                target.save(update_fields=["slug", "modified"])
 
         messages.success(
             request,

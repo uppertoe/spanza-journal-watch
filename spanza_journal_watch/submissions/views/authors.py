@@ -1,6 +1,7 @@
 """Contributor and health service pages."""
 
 import json
+import re
 
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponsePermanentRedirect
@@ -64,9 +65,14 @@ class AuthorDetailView(
         try:
             self.object = self.get_object(queryset=authors)
         except Http404:
-            # Older addresses left out the honorific, e.g. /about/jane-citizen for Dr Jane Citizen.
+            # Older addresses left out the honorific, e.g. /about/jane-citizen for Dr Jane Citizen,
+            # or carried the numbered suffix of a duplicate since merged away, e.g. /about/jane-citizen-1.
             slug = kwargs.get("slug")
-            match = next((author for author in authors.exclude(slug=slug) if slugify(author.name) == slug), None)
+            candidates = {slug, re.sub(r"-\d+$", "", slug)}
+            match = next(
+                (author for author in authors.exclude(slug=slug) if slugify(author.name) in candidates),
+                None,
+            )
             if match is None:
                 raise
             return HttpResponsePermanentRedirect(match.get_absolute_url())

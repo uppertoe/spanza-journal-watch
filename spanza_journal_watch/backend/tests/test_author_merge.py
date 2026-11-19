@@ -58,3 +58,25 @@ def test_health_services_are_combined(manager_client):
     _merge(manager_client, source, target)
 
     assert list(target.health_services.all()) == [service]
+
+
+def test_survivor_takes_the_plain_slug_once_the_duplicate_is_gone(manager_client):
+    original = Author.objects.create(title="Dr", name="Andrew Hughes")
+    duplicate = Author.objects.create(title="Dr", name="Andrew Hughes")
+    assert (original.slug, duplicate.slug) == ("andrew-hughes", "andrew-hughes-1")
+
+    _merge(manager_client, original, duplicate)
+
+    duplicate.refresh_from_db()
+    assert duplicate.slug == "andrew-hughes"
+
+
+def test_survivor_keeps_its_slug_when_the_plain_one_belongs_to_someone_else(manager_client):
+    Author.objects.create(name="Frank Hsiao")
+    keeper = Author.objects.create(name="Frank Hsiao")
+    other = Author.objects.create(name="Someone Else")
+
+    _merge(manager_client, other, keeper)
+
+    keeper.refresh_from_db()
+    assert keeper.slug == "frank-hsiao-1"
