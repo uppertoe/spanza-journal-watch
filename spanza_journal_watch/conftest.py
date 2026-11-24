@@ -45,4 +45,6 @@ def client(client):
     client.defaults.setdefault("HTTP_USER_AGENT", _TEST_BROWSER_USER_AGENT)
     client.defaults.setdefault("HTTP_SEC_FETCH_MODE", "navigate")
     client.defaults.setdefault("HTTP_SEC_FETCH_SITE", "same-origin")
+    # Chrome sends Priority on every page load; sign-up refuses an old Chrome without it.
+    client.defaults.setdefault("HTTP_PRIORITY", "u=0, i")
     return client

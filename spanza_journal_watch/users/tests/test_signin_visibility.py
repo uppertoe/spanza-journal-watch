@@ -343,6 +343,54 @@ class TestSignInByCode:
         assert response.url == reverse("account_confirm_login_code")
         cache.clear()
 
+    def test_signup_page_carries_the_honeypot(self, client):
+        body = client.get(reverse("account_signup")).content.decode()
+        assert 'name="jw_hp_extra"' in body
+
+    def test_direct_signup_ignores_a_filled_honeypot(self, client):
+        # The bots of 2026-11-23 posted straight to /accounts/signup/, not /users/~start/.
+        from django.contrib.auth import get_user_model
+
+        mail.outbox.clear()
+        response = client.post(
+            reverse("account_signup"), {"email": "bot@formtests.example", "jw_hp_extra": "http://spam.example"}
+        )
+        assert response.status_code == 302
+        assert response.url == reverse("account_signup")
+        assert not get_user_model().objects.filter(email="bot@formtests.example").exists()
+        assert not mail.outbox
+
+    def test_direct_signup_is_capped_per_hour(self, client, settings):
+        from django.contrib.auth import get_user_model
+        from django.core.cache import cache
+
+        cache.clear()
+        settings.SIGNUP_HOURLY_LIMIT = 1
+        client.post(reverse("account_signup"), {"email": "first@example.org"})
+        assert get_user_model().objects.filter(email="first@example.org").exists()
+        mail.outbox.clear()
+        response = client.post(reverse("account_signup"), {"email": "second@example.org"}, follow=True)
+        assert not get_user_model().objects.filter(email="second@example.org").exists()
+        assert not mail.outbox
+        assert "We are not able to create new accounts at the moment." in response.content.decode()
+        cache.clear()
+
+    def test_start_and_direct_signup_share_one_cap(self, settings):
+        from django.contrib.auth import get_user_model
+        from django.core.cache import cache
+        from django.test import Client
+
+        cache.clear()
+        settings.SIGNUP_HOURLY_LIMIT = 2
+        # A fresh browser for each address, as the bots used.
+        Client().post(reverse("users:start"), {"email": "one@example.org"})
+        Client().post(reverse("account_signup"), {"email": "two@example.org"})
+        Client().post(reverse("users:start"), {"email": "three@example.org"})
+        emails = set(get_user_model().objects.values_list("email", flat=True))
+        assert {"one@example.org", "two@example.org"} <= emails
+        assert "three@example.org" not in emails
+        cache.clear()
+
 
 def _extract_code(body):
     """allauth prints the code on its own line in the plain-text email."""

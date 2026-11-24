@@ -132,7 +132,65 @@ invite_aware_login_view = InviteAwareLoginView.as_view()
 
 
 class InviteAwareSignupView(AllauthSignupView):
-    """Allauth SignupView that pre-fills and locks the email when coming from an invite."""
+    """Allauth SignupView that pre-fills and locks the email when coming from an invite.
+
+    Both sign-up routes end here: /users/~start/ hands a new address to this view,
+    and /accounts/signup/ is the view itself. The honeypot, the checks in
+    signup_guard and the hourly cap are therefore applied here, so posting
+    straight to /accounts/signup/ passes the same guards. Invited contributors
+    face only the honeypot.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        # Checked ahead of allauth's dispatch, which would otherwise send a browser
+        # with a sign-up still pending to its confirmation page first.
+        if request.method != "POST":
+            return super().dispatch(request, *args, **kwargs)
+
+        from allauth.account.adapter import get_adapter
+        from django.contrib import messages
+        from django.shortcuts import redirect
+
+        from spanza_journal_watch.users import signup_guard
+        from spanza_journal_watch.users.adapters import pending_invite_email
+
+        if request.POST.get(HONEYPOT_FIELD):
+            # Only a bot fills the hidden field. Return to the form without saying why.
+            signup_guard.log_refusal("honeypot")
+            return redirect("account_signup")
+        if pending_invite_email(request) is not None:
+            # An editor invited this address, so the remaining checks do not apply.
+            return super().dispatch(request, *args, **kwargs)
+
+        reason = signup_guard.scripted_signup_reason(request)
+        if reason == signup_guard.SCRIPTED_ACCEPT_LANGUAGE:
+            # No browser writes this header, so the form returns without saying why.
+            signup_guard.log_refusal(reason)
+            return redirect("account_signup")
+        if reason == signup_guard.STALE_CHROMIUM_WITHOUT_PRIORITY:
+            signup_guard.log_refusal(reason)
+            messages.error(
+                request,
+                "We have not been able to create your account from this browser. "
+                "If you are using an older version of Chrome, please update it and try again. "
+                "If you still cannot sign up, you can contact us for assistance.",
+            )
+            return redirect("account_signup")
+        if not signup_guard.ipv6_prefix_signup_allowed(get_adapter(request).get_client_ip(request)):
+            signup_guard.log_refusal("ipv6_prefix_daily_limit")
+            messages.error(
+                request,
+                "We are not able to create another account from this connection today. "
+                "Please try again tomorrow, or you can contact us for assistance.",
+            )
+            return redirect("account_signup")
+        if not _new_signup_allowed():
+            signup_guard.log_refusal("hourly_limit")
+            messages.error(
+                request, "We are not able to create new accounts at the moment. Please try again in an hour."
+            )
+            return redirect("account_login")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -206,8 +264,5 @@ def email_start(request):
 
     if not get_adapter(request).is_open_for_signup(request):
         messages.error(request, "There is no account for that address, and registration is closed.")
-        return redirect("account_login")
-    if not _new_signup_allowed():
-        messages.error(request, "We are not able to create new accounts at the moment. Please try again in an hour.")
         return redirect("account_login")
     return invite_aware_signup_view(request)
