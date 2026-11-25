@@ -166,9 +166,14 @@ planka.{$DOMAIN} {
         # first entry the visitor can write. Planka's uploads routes now
         # send a correct max-age themselves (fixed in 2.2.1), so the old
         # header rewrite for Firefox is gone.
+        #
+        # The Journal Watch session cookie (jw_session) is scoped to the parent
+        # domain so that forward_auth above can read it. Planka has no use for
+        # it, so it is removed here before the request is proxied. Planka's own
+        # accessToken and httpOnlyToken cookies are passed on unchanged.
         handle {
-            # scaffold-lint: allow-session-cookie
             reverse_proxy jw_planka:1337 {
+                header_up Cookie `^jw_session=[^;]*(;\s*)?|;\s*jw_session=[^;]*` ""
                 header_up X-Forwarded-For {client_ip}
                 header_up X-Gateway-Secret {$PLANKA_GATEWAY_SECRET}
             }
